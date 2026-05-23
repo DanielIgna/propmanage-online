@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="36" time="61.829" timestamp="2026-05-23T16:44:23.644335+00:00" hostname="agent-env-5fea00b5-37f3-49c5-9521-8e803208718f"><testcase classname="backend.tests.test_propmanage_api.TestAuth" name="test_root" time="0.206" /><testcase classname="backend.tests.test_propmanage_api.TestAuth" name="test_login_client" time="0.359" /><testcase classname="backend.tests.test_propmanage_api.TestAuth" name="test_login_specialist" time="0.381" /><testcase classname="backend.tests.test_propmanage_api.TestAuth" name="test_login_admin" time="0.393" /><testcase classname="backend.tests.test_propmanage_api.TestAuth" name="test_login_operator" time="0.373" /><testcase classname="backend.tests.test_propmanage_api.TestAuth" name="test_login_invalid" time="0.120" /><testcase classname="backend.tests.test_propmanage_api.TestAuth" name="test_login_wrong_password" time="0.327" /><testcase classname="backend.tests.test_propmanage_api.TestAuth" name="test_register_new_client" time="0.336" /><testcase classname="backend.tests.test_propmanage_api.TestAuth" name="test_register_duplicate" time="0.115" /><testcase classname="backend.tests.test_propmanage_api.TestAuth" name="test_me_requires_auth" time="0.100" /><testcase classname="backend.tests.test_propmanage_api.TestAuth" name="test_logout" time="0.475" /><testcase classname="backend.tests.test_propmanage_api.TestProperties" name="test_client_sees_own_property" time="0.413" /><testcase classname="backend.tests.test_propmanage_api.TestProperties" name="test_admin_sees_all_properties" time="0.407" /><testcase classname="backend.tests.test_propmanage_api.TestProperties" name="test_specialist_cannot_create_property" time="0.391" /><testcase classname="backend.tests.test_propmanage_api.TestRequests" name="test_client_sees_own_requests" time="0.375" /><testcase classname="backend.tests.test_propmanage_api.TestRequests" name="test_specialist_sees_open_and_assigned" time="0.369" /><testcase classname="backend.tests.test_propmanage_api.TestRequests" name="test_admin_sees_all_requests" time="0.420" /><testcase classname="backend.tests.test_propmanage_api.TestRequests" name="test_create_request_as_client" time="0.498" /><testcase classname="backend.tests.test_propmanage_api.TestRequests" name="test_specialist_cannot_create_request" time="0.386" /><testcase classname="backend.tests.test_propmanage_api.TestMarketplaceFlow" name="test_specialist_accept_deducts_wallet" time="1.013" /><testcase classname="backend.tests.test_propmanage_api.TestMarketplaceFlow" name="test_accept_already_assigned_fails" time="0.367" /><testcase classname="backend.tests.test_propmanage_api.TestMarketplaceFlow" name="test_client_places_escrow" time="0.465" /><testcase classname="backend.tests.test_propmanage_api.TestMarketplaceFlow" name="test_specialist_start" time="0.442" /><testcase classname="backend.tests.test_propmanage_api.TestMarketplaceFlow" name="test_specialist_complete" time="0.441" /><testcase classname="backend.tests.test_propmanage_api.TestMarketplaceFlow" name="test_client_confirm_releases_escrow_and_tokens" time="1.143" /><testcase classname="backend.tests.test_propmanage_api.TestAdmin" name="test_admin_stats" time="0.414" /><testcase classname="backend.tests.test_propmanage_api.TestAdmin" name="test_pending_specialists" time="0.386" /><testcase classname="backend.tests.test_propmanage_api.TestAdmin" name="test_client_cannot_access_admin_stats" time="0.384" /><testcase classname="backend.tests.test_propmanage_api.TestAdmin" name="test_specialist_cannot_access_admin" time="30.019"><failure message="requests.exceptions.ConnectTimeout: HTTPSConnectionPool(host='phased-document.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/auth/login (Caused by ConnectTimeoutError(&lt;HTTPSConnection(host='phased-document.preview.emergentagent.com', port=443) at 0xfa86ab5c5750&gt;, 'Connection to phased-document.preview.emergentagent.com timed out. (connect timeout=15)'))">/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:204: in _new_conn
+    sock = connection.create_connection(
+/root/.venv/lib/python3.11/site-packages/urllib3/util/connection.py:85: in create_connection
+    raise err
+/root/.venv/lib/python3.11/site-packages/urllib3/util/connection.py:73: in create_connection
+    sock.connect(sa)
+E   TimeoutError: timed out
+
+The above exception was the direct cause of the following exception:
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:788: in urlopen
+    response = self._make_request(
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:488: in _make_request
+    raise new_e
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:464: in _make_request
+    self._validate_conn(conn)
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:1106: in _validate_conn
+    conn.connect()
+/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:759: in connect
+    self.sock = sock = self._new_conn()
+                       ^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:213: in _new_conn
+    raise ConnectTimeoutError(
+E   urllib3.exceptions.ConnectTimeoutError: (&lt;HTTPSConnection(host='phased-document.preview.emergentagent.com', port=443) at 0xfa86ab5c5750&gt;, 'Connection to phased-document.preview.emergentagent.com timed out. (connect timeout=15)')
+
+The above exception was the direct cause of the following exception:
+/root/.venv/lib/python3.11/site-packages/requests/adapters.py:696: in send
+    resp = conn.urlopen(
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:842: in urlopen
+    retries = retries.increment(
+/root/.venv/lib/python3.11/site-packages/urllib3/util/retry.py:543: in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='phased-document.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/auth/login (Caused by ConnectTimeoutError(&lt;HTTPSConnection(host='phased-document.preview.emergentagent.com', port=443) at 0xfa86ab5c5750&gt;, 'Connection to phased-document.preview.emergentagent.com timed out. (connect timeout=15)'))
+
+During handling of the above exception, another exception occurred:
+backend/tests/test_propmanage_api.py:312: in test_specialist_cannot_access_admin
+    s = make_session(SPEC)
+        ^^^^^^^^^^^^^^^^^^
+backend/tests/test_propmanage_api.py:21: in make_session
+    r = s.post(f"{API}/auth/login", json=creds, timeout=15)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:712: in post
+    return self.request("POST", url, data=data, json=json, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:651: in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:784: in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/adapters.py:717: in send
+    raise ConnectTimeout(e, request=request)
+E   requests.exceptions.ConnectTimeout: HTTPSConnectionPool(host='phased-document.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/auth/login (Caused by ConnectTimeoutError(&lt;HTTPSConnection(host='phased-document.preview.emergentagent.com', port=443) at 0xfa86ab5c5750&gt;, 'Connection to phased-document.preview.emergentagent.com timed out. (connect timeout=15)'))</failure></testcase><testcase classname="backend.tests.test_propmanage_api.TestAdmin" name="test_admin_verify_specialist" time="16.173" /><testcase classname="backend.tests.test_propmanage_api.TestOperator" name="test_operator_queue" time="0.476" /><testcase classname="backend.tests.test_propmanage_api.TestOperator" name="test_client_cannot_access_operator" time="0.393" /><testcase classname="backend.tests.test_propmanage_api.TestWallet" name="test_wallet_topup" time="0.470" /><testcase classname="backend.tests.test_propmanage_api.TestWallet" name="test_topup_invalid" time="0.437" /><testcase classname="backend.tests.test_propmanage_api.TestWallet" name="test_transactions_list" time="0.378" /><testcase classname="backend.tests.test_propmanage_api.TestSeed" name="test_all_demo_accounts_login" time="1.660" /></testsuite></testsuites>

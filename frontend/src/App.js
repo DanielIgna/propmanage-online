@@ -1,16 +1,23 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Home, Wrench, Shield, Wallet, Box, Users, AlertTriangle, CheckCircle2,
   ArrowRight, ArrowUpRight, Zap, Droplet, Wind, Building2, Coins, TrendingUp,
-  Eye, Lock, Star, Sparkles, FileCheck, Gavel, ChevronRight, Play,
-  Activity, Layers, Cpu, Award, MessageSquare, Camera, Bell, Plus, Minus
+  Eye, Lock, Star, Sparkles, FileCheck, Gavel, ChevronRight, Play, Pause,
+  Activity, Layers, Cpu, Award, MessageSquare, Camera, Bell, Plus, Minus, Languages, LogIn, LayoutDashboard
 } from "lucide-react";
+import { AuthProvider, useAuth } from "./auth";
+import { I18nProvider, useI18n } from "./i18n";
+import { LoginPage, RegisterPage } from "./pages/Auth";
+import { ClientDashboard, SpecialistDashboard, AdminDashboard, OperatorDashboard } from "./pages/Dashboards";
 import "./App.css";
 
 // ============= NAV =============
 const Nav = () => {
   const [scrolled, setScrolled] = useState(false);
+  const { user } = useAuth();
+  const { lang, toggle, t } = useI18n();
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener("scroll", onScroll);
@@ -18,11 +25,11 @@ const Nav = () => {
   }, []);
 
   const links = [
-    { href: "#problem", label: "Problemă" },
-    { href: "#solution", label: "Soluție" },
-    { href: "#journey", label: "Experiență" },
-    { href: "#twin", label: "Digital Twin" },
-    { href: "#business", label: "Business" },
+    { href: "#problem", label: t("nav.problem") },
+    { href: "#solution", label: t("nav.solution") },
+    { href: "#journey", label: t("nav.journey") },
+    { href: "#twin", label: t("nav.twin") },
+    { href: "#business", label: t("nav.business") },
   ];
 
   return (
@@ -41,9 +48,20 @@ const Nav = () => {
             </a>
           ))}
         </div>
-        <a href="#cta" className="btn-accent px-5 py-2.5 rounded-full text-sm font-medium" data-testid="nav-cta">
-          Începe Demo
-        </a>
+        <div className="flex items-center gap-2">
+          <button onClick={toggle} className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-white/5 rounded-full text-xs uppercase tracking-wider text-stone-300" data-testid="lang-toggle">
+            <Languages className="w-3.5 h-3.5" />{lang.toUpperCase()}
+          </button>
+          {user && user !== false ? (
+            <Link to={`/${user.role}`} className="btn-accent px-5 py-2.5 rounded-full text-sm font-medium inline-flex items-center gap-1.5" data-testid="nav-dashboard">
+              <LayoutDashboard className="w-3.5 h-3.5" />{t("nav.dashboard")}
+            </Link>
+          ) : (
+            <Link to="/login" className="btn-accent px-5 py-2.5 rounded-full text-sm font-medium inline-flex items-center gap-1.5" data-testid="nav-login">
+              <LogIn className="w-3.5 h-3.5" />{t("nav.login")}
+            </Link>
+          )}
+        </div>
       </div>
     </nav>
   );
@@ -228,16 +246,31 @@ const UserJourney = () => {
   ];
 
   const [active, setActive] = useState(0);
+  const [autoplay, setAutoplay] = useState(true);
+  
+  useEffect(() => {
+    if (!autoplay) return;
+    const timer = setInterval(() => {
+      setActive(prev => (prev + 1) % steps.length);
+    }, 3500);
+    return () => clearInterval(timer);
+  }, [autoplay, steps.length]);
 
   return (
     <section id="journey" className="py-32 px-6 relative">
       <div className="max-w-7xl mx-auto">
         <SectionTag num="03" label="Experiență Utilizator" />
-        <h2 className="font-serif text-5xl md:text-7xl tracking-tight mb-6 max-w-4xl" data-testid="journey-title">
-          Călătoria de la <span className="italic">A la J</span>.
-        </h2>
+        <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
+          <h2 className="font-serif text-5xl md:text-7xl tracking-tight max-w-3xl" data-testid="journey-title">
+            Călătoria de la <span className="italic">A la J</span>.
+          </h2>
+          <button onClick={() => setAutoplay(!autoplay)} className="glass px-4 py-2.5 rounded-full flex items-center gap-2 text-sm hover:bg-white/10 transition-colors" data-testid="journey-autoplay">
+            {autoplay ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            {autoplay ? "Pauză auto-play" : "Pornește auto-play"}
+          </button>
+        </div>
         <p className="text-lg text-stone-400 max-w-2xl mb-16">
-          Click pe oricare pas pentru a vedea exact ce se întâmplă în aplicație. Un flux complet, transparent, fără surprize.
+          Click pe oricare pas sau lasă să ruleze automat. Un flux complet, transparent, fără surprize.
         </p>
 
         <div className="grid lg:grid-cols-[1fr_1.2fr] gap-12">
@@ -246,7 +279,7 @@ const UserJourney = () => {
             {steps.map((s, i) => (
               <button
                 key={s.id}
-                onClick={() => setActive(i)}
+                onClick={() => { setActive(i); setAutoplay(false); }}
                 className={`w-full text-left p-5 rounded-2xl transition-all border ${
                   active === i 
                     ? "bg-[#d4ff3a]/10 border-[#d4ff3a]/30" 
@@ -255,10 +288,17 @@ const UserJourney = () => {
                 data-testid={`journey-step-${s.id}`}
               >
                 <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-serif text-lg shrink-0 ${
+                  <div className={`relative w-10 h-10 rounded-full flex items-center justify-center font-serif text-lg shrink-0 ${
                     active === i ? "bg-[#d4ff3a] text-black" : "bg-white/10 text-stone-400"
                   }`}>
                     {s.id}
+                    {active === i && autoplay && (
+                      <svg className="absolute inset-0 -m-0.5" viewBox="0 0 44 44">
+                        <circle cx="22" cy="22" r="20" fill="none" stroke="#d4ff3a" strokeWidth="1.5" strokeDasharray="125.6" strokeDashoffset="125.6" opacity="0.6">
+                          <animate attributeName="stroke-dashoffset" from="125.6" to="0" dur="3.5s" repeatCount="1" />
+                        </circle>
+                      </svg>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium">{s.title}</div>
@@ -1231,24 +1271,46 @@ const Footer = () => (
   </footer>
 );
 
+// ============= LANDING PAGE =============
+const LandingPage = () => (
+  <div className="grain min-h-screen bg-[#0a0a0b] text-stone-100">
+    <Nav />
+    <Hero />
+    <Problem />
+    <Solution />
+    <UserJourney />
+    <SpecialistJourney />
+    <WalletEcosystem />
+    <DigitalTwin />
+    <AdminTrust />
+    <BusinessModel />
+    <ValueProp />
+    <GoldenPath />
+    <CTA />
+    <Footer />
+  </div>
+);
+
 // ============= MAIN APP =============
 function App() {
   return (
-    <div className="App grain min-h-screen bg-[#0a0a0b] text-stone-100">
-      <Nav />
-      <Hero />
-      <Problem />
-      <Solution />
-      <UserJourney />
-      <SpecialistJourney />
-      <WalletEcosystem />
-      <DigitalTwin />
-      <AdminTrust />
-      <BusinessModel />
-      <ValueProp />
-      <GoldenPath />
-      <CTA />
-      <Footer />
+    <div className="App">
+      <I18nProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/client" element={<ClientDashboard />} />
+              <Route path="/specialist" element={<SpecialistDashboard />} />
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/operator" element={<OperatorDashboard />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </I18nProvider>
     </div>
   );
 }
