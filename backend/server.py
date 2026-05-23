@@ -13,6 +13,11 @@ import uuid
 import asyncio
 import httpx
 import stripe
+import pyotp
+import qrcode
+import io
+import base64 as b64
+from emergentintegrations.llm.chat import LlmChat, UserMessage
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Literal, Dict
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, status, WebSocket, WebSocketDisconnect
@@ -23,6 +28,9 @@ from pydantic import BaseModel, EmailStr, Field
 
 # Stripe configuration
 stripe.api_key = os.environ.get("STRIPE_API_KEY", "sk_test_emergent")
+
+# LLM key for AI assistant
+EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 
 # ============= DB SETUP =============
 mongo_url = os.environ['MONGO_URL']
@@ -110,6 +118,10 @@ class RegisterIn(BaseModel):
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+    totp_code: Optional[str] = None  # Required if 2FA enabled
+
+class TotpVerifyIn(BaseModel):
+    code: str
 
 class PropertyIn(BaseModel):
     name: str
@@ -181,6 +193,15 @@ async def login(data: LoginIn, response: Response):
     user = await db.users.find_one({"email": email})
     if not user or not verify_password(data.password, user["password_hash"]):
         raise HTTPException(401, "Invalid credentials")
+    
+    # 2FA gate
+    if user.get("totp_enabled"):
+        if not data.totp_code:
+            raise HTTPException(202, {"error": "totp_required", "message": "2FA code required"})
+        totp = pyotp.TOTP(user["totp_secret"])
+        if not totp.verify(data.totp_code, valid_window=1):
+            raise HTTPException(401, "Invalid 2FA code")
+    
     uid = str(user["_id"])
     access = create_access_token(uid, email, user.get("role", "client"))
     refresh = create_refresh_token(uid)
@@ -296,15 +317,39 @@ async def create_request(data: RequestIn, user: dict = Depends(require_role("cli
     return doc
 
 @api.get("/requests")
-async def list_requests(user: dict = Depends(get_current_user)):
+async def list_requests(
+    user: dict = Depends(get_current_user),
+    q: Optional[str] = None,  # search query
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+):
     if user["role"] == "client":
-        q = {"client_id": user["id"]}
+        query = {"client_id": user["id"]}
     elif user["role"] == "specialist":
         # show open requests + assigned to this specialist
-        q = {"$or": [{"status": "open"}, {"specialist_id": user["id"]}]}
+        query = {"$or": [{"status": "open"}, {"specialist_id": user["id"]}]}
     else:  # admin/operator
-        q = {}
-    docs = await db.requests.find(q).sort("created_at", -1).to_list(200)
+        query = {}
+    
+    # Apply filters
+    if category:
+        query["category"] = category
+    if status:
+        query["status"] = status
+    if priority:
+        query["priority"] = priority
+    if q:
+        # text search on title/description
+        regex = {"$regex": q, "$options": "i"}
+        text_filter = {"$or": [{"title": regex}, {"description": regex}]}
+        # combine with existing query
+        if "$or" in query:
+            query = {"$and": [query, text_filter]}
+        else:
+            query = {**query, **text_filter}
+    
+    docs = await db.requests.find(query).sort("created_at", -1).to_list(200)
     return [serialize_doc(d) for d in docs]
 
 @api.get("/requests/{req_id}")
@@ -1001,6 +1046,240 @@ async def notify(user_id: str, title: str, message: str, type_: str = "info", li
         if link:
             html += f'<p><a href="{link}">Vezi detalii</a></p>'
         await send_email(user["email"], f"PropManage: {title}", html)
+
+
+# ============= 2FA (TOTP) =============
+
+@api.post("/auth/2fa/setup")
+async def setup_2fa(user: dict = Depends(get_current_user)):
+    """Generate TOTP secret + QR code for setup. Does NOT enable until verified."""
+    secret = pyotp.random_base32()
+    # Store as pending (not enabled until verified)
+    await db.users.update_one(
+        {"_id": ObjectId(user["id"])},
+        {"$set": {"totp_pending_secret": secret}}
+    )
+    issuer = "PropManage"
+    otp_uri = pyotp.TOTP(secret).provisioning_uri(name=user["email"], issuer_name=issuer)
+    # Generate QR code as base64 data URL
+    img = qrcode.make(otp_uri)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    qr_data_url = f"data:image/png;base64,{b64.b64encode(buf.getvalue()).decode()}"
+    return {"secret": secret, "otp_uri": otp_uri, "qr_code": qr_data_url}
+
+
+@api.post("/auth/2fa/verify")
+async def verify_2fa(data: TotpVerifyIn, user: dict = Depends(get_current_user)):
+    """Verify code and activate 2FA"""
+    full_user = await db.users.find_one({"_id": ObjectId(user["id"])})
+    secret = full_user.get("totp_pending_secret")
+    if not secret:
+        raise HTTPException(400, "No 2FA setup in progress")
+    totp = pyotp.TOTP(secret)
+    if not totp.verify(data.code, valid_window=1):
+        raise HTTPException(401, "Invalid code")
+    await db.users.update_one(
+        {"_id": ObjectId(user["id"])},
+        {"$set": {"totp_enabled": True, "totp_secret": secret}, "$unset": {"totp_pending_secret": ""}}
+    )
+    return {"ok": True, "enabled": True}
+
+
+@api.post("/auth/2fa/disable")
+async def disable_2fa(data: TotpVerifyIn, user: dict = Depends(get_current_user)):
+    """Disable 2FA - requires current code"""
+    full_user = await db.users.find_one({"_id": ObjectId(user["id"])})
+    if not full_user.get("totp_enabled"):
+        raise HTTPException(400, "2FA not enabled")
+    totp = pyotp.TOTP(full_user["totp_secret"])
+    if not totp.verify(data.code, valid_window=1):
+        raise HTTPException(401, "Invalid code")
+    await db.users.update_one(
+        {"_id": ObjectId(user["id"])},
+        {"$unset": {"totp_enabled": "", "totp_secret": ""}}
+    )
+    return {"ok": True, "enabled": False}
+
+
+@api.get("/auth/2fa/status")
+async def status_2fa(user: dict = Depends(get_current_user)):
+    full_user = await db.users.find_one({"_id": ObjectId(user["id"])})
+    return {"enabled": bool(full_user.get("totp_enabled"))}
+
+
+# ============= AI ASSISTANT (Claude Haiku 4.5) =============
+
+class AiChatIn(BaseModel):
+    message: str
+    session_id: Optional[str] = None  # client-managed for conversation continuity
+
+
+def _build_system_prompt(role: str) -> str:
+    base = """Ești PropManage Assistant, un AI util pentru utilizatorii platformei PropManage (Property Operating System).
+Răspunzi concis, prietenos, în română.
+
+Despre PropManage:
+- Marketplace pentru servicii de mentenanță proprietăți (HVAC, electric, sanitar, alte categorii)
+- 4 roluri: Client (proprietar), Specialist (tehnician), Operator (validator), Admin
+- Wallet: bani reali pentru plăți, Tokens pentru recompense (+100/job confirmat, +20/review, +500/referral)
+- Specialiști plătesc 40-50 RON per lead acceptat
+- Plățile sunt securizate în Escrow până la confirmarea lucrării (5% comision platformă)
+- Specialiști au tier-uri: ENTRY → VERIFIED (10+ joburi, rating 4.8+) → PREMIUM
+- Digital Twin = replică 3D a proprietății cu istoric mentenanță și scor sănătate
+"""
+    if role == "client":
+        return base + """
+Ești specializat să ajuți CLIENTUL:
+- Diagnoză probleme: dacă utilizatorul spune "AC nu mai răcește" → sugerează categoria HVAC, prioritate Urgent, buget estimat 200-500 RON
+- Format răspuns pentru diagnoză: "Categorie: X | Prioritate: Y | Buget estimat: Z RON | Sugestie titlu: ..."
+- Răspunde FAQ despre escrow, tokens, cum funcționează platforma
+"""
+    elif role == "specialist":
+        return base + """
+Ești specializat să ajuți SPECIALISTUL:
+- Sfaturi pentru a deveni VERIFIED rapid
+- Cum să răspunzi profesional la clienți
+- Cum funcționează lead-urile și plata fee-ului
+- Cum să-ți construiești reputația
+"""
+    return base + "Răspunde la întrebări generale despre platformă."
+
+
+@api.post("/ai/chat")
+async def ai_chat(data: AiChatIn, user: dict = Depends(get_current_user)):
+    """AI Assistant chat using Claude Haiku 4.5 via Emergent LLM key"""
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(503, "AI Assistant not configured")
+    
+    session_id = data.session_id or f"{user['id']}:default"
+    role = user.get("role", "client")
+    
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=session_id,
+            system_message=_build_system_prompt(role),
+        ).with_model("anthropic", "claude-haiku-4-5-20251001")
+        
+        # Send to LLM (multi-turn history maintained by library)
+        response_text = await chat.send_message(UserMessage(text=data.message))
+        
+        # Persist both messages only on success (no orphans)
+        now = datetime.now(timezone.utc).isoformat()
+        await db.ai_messages.insert_many([
+            {"session_id": session_id, "user_id": user["id"], "role": "user", "text": data.message, "created_at": now},
+            {"session_id": session_id, "user_id": user["id"], "role": "assistant", "text": response_text, "created_at": now},
+        ])
+        
+        return {"reply": response_text, "session_id": session_id}
+    except Exception as e:
+        logger.error(f"AI chat error: {e}")
+        # Friendly fallback message
+        err_str = str(e)
+        if "budget" in err_str.lower() or "exceeded" in err_str.lower():
+            raise HTTPException(503, "AI Assistant indisponibil - cota a fost depășită. Contactează administratorul pentru a alimenta cheia.")
+        raise HTTPException(500, f"AI error: {err_str}")
+
+
+@api.get("/ai/history")
+async def ai_history(session_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    sid = session_id or f"{user['id']}:default"
+    msgs = await db.ai_messages.find({"session_id": sid, "user_id": user["id"]}).sort("created_at", 1).to_list(100)
+    return [serialize_doc(m) for m in msgs]
+
+
+# ============= PUBLIC MARKETPLACE =============
+
+@api.get("/marketplace/specialists")
+async def public_marketplace(
+    category: Optional[str] = None,
+    verified_only: bool = False,
+    min_rating: Optional[float] = None,
+    sort: str = "rating",  # rating, reviews, recent
+):
+    """Public endpoint: browse all specialists with filters. No auth required."""
+    q = {"role": "specialist"}
+    if category:
+        q["specialty"] = category
+    if verified_only:
+        q["verified"] = True
+    if min_rating is not None:
+        q["rating"] = {"$gte": min_rating}
+    
+    sort_map = {
+        "rating": [("rating", -1), ("reviews_count", -1)],
+        "reviews": [("reviews_count", -1)],
+        "recent": [("created_at", -1)],
+    }
+    cursor = db.users.find(q).sort(sort_map.get(sort, sort_map["rating"]))
+    docs = await cursor.to_list(100)
+    
+    return [{
+        "id": str(d["_id"]),
+        "name": d.get("name"),
+        "picture": d.get("picture"),
+        "specialty": d.get("specialty"),
+        "rating": d.get("rating"),
+        "reviews_count": d.get("reviews_count", 0),
+        "tier": d.get("tier"),
+        "verified": d.get("verified", False),
+    } for d in docs]
+
+
+# ============= PROPERTY TIMELINE =============
+
+@api.get("/properties/{prop_id}/timeline")
+async def property_timeline(prop_id: str, user: dict = Depends(get_current_user)):
+    """Chronological list of all events for a property"""
+    prop = await db.properties.find_one({"_id": ObjectId(prop_id)})
+    if not prop: raise HTTPException(404, "Property not found")
+    
+    # Aggregate all events: requests + maintenance logs
+    requests_docs = await db.requests.find({"property_id": prop_id}).to_list(200)
+    
+    events = []
+    for r in requests_docs:
+        events.append({
+            "type": "request_created",
+            "title": r.get("title"),
+            "description": f"Solicitare {r.get('category', '')} ({r.get('priority', '')})",
+            "timestamp": r.get("created_at"),
+            "status": r.get("status"),
+            "request_id": str(r["_id"]),
+        })
+        if r.get("assigned_at"):
+            events.append({
+                "type": "specialist_assigned",
+                "title": f"Specialist alocat: {r.get('specialist_name','')}",
+                "description": r.get("title"),
+                "timestamp": r["assigned_at"],
+                "request_id": str(r["_id"]),
+            })
+        if r.get("completed_at"):
+            events.append({
+                "type": "work_completed",
+                "title": f"Finalizat: {r.get('title','')}",
+                "description": f"De {r.get('specialist_name','')}",
+                "timestamp": r["completed_at"],
+                "request_id": str(r["_id"]),
+            })
+        if r.get("confirmed_at"):
+            events.append({
+                "type": "confirmed",
+                "title": f"Confirmat & plătit: {r.get('escrow_amount','—')} RON",
+                "description": r.get("title"),
+                "timestamp": r["confirmed_at"],
+                "request_id": str(r["_id"]),
+            })
+    
+    # Sort newest first
+    events.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
+    return {
+        "property": serialize_doc(prop),
+        "events": events,
+        "total": len(events),
+    }
 
 
 # ============= ROOT =============

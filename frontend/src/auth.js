@@ -21,8 +21,10 @@ export const AuthProvider = ({ children }) => {
       .catch(() => setUser(false));
   }, []);
   
-  const login = async (email, password) => {
-    const { data } = await axios.post(`${API}/auth/login`, { email, password });
+  const login = async (email, password, totp_code) => {
+    const payload = { email, password };
+    if (totp_code) payload.totp_code = totp_code;
+    const { data } = await axios.post(`${API}/auth/login`, payload);
     setUser(data);
     return data;
   };

@@ -38,6 +38,8 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [totpCode, setTotpCode] = useState("");
+  const [needsTotp, setNeedsTotp] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   
@@ -47,10 +49,18 @@ export const LoginPage = () => {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
-      const u = await login(email, password);
+      const u = await login(email, password, totpCode || undefined);
       navigate(`/${u.role}`);
     } catch (err) {
-      setError(formatApiError(err));
+      const status = err?.response?.status;
+      const detail = err?.response?.data?.detail;
+      // Backend returns 202 with detail.error="totp_required" via HTTPException; axios sees it as error
+      if (status === 202 || (detail && detail.error === "totp_required") || formatApiError(err).includes("totp_required")) {
+        setNeedsTotp(true);
+        setError("");
+      } else {
+        setError(formatApiError(err));
+      }
     } finally {
       setLoading(false);
     }
@@ -102,6 +112,19 @@ export const LoginPage = () => {
                 data-testid="login-password"
               />
             </div>
+            {needsTotp && (
+              <div>
+                <label className="text-xs uppercase tracking-wider text-[#d4ff3a] mb-1.5 block">Cod 2FA (6 cifre)</label>
+                <input
+                  type="text" value={totpCode} onChange={e => setTotpCode(e.target.value)} required maxLength={6}
+                  className="w-full bg-white/5 border border-[#d4ff3a]/30 rounded-xl px-4 py-3 text-center text-2xl tracking-widest font-mono focus:outline-none focus:border-[#d4ff3a]/70"
+                  placeholder="123456"
+                  data-testid="login-totp"
+                  autoFocus
+                />
+                <div className="text-[10px] text-stone-500 mt-1">Introdu codul din aplicația ta authenticator</div>
+              </div>
+            )}
             {error && <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3" data-testid="login-error">{error}</div>}
             <button type="submit" disabled={loading} className="btn-accent w-full py-3 rounded-xl font-medium disabled:opacity-50 flex items-center justify-center gap-2" data-testid="login-submit">
               {loading ? t("common.loading") : t("login.submit")}

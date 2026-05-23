@@ -4,15 +4,17 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import axios from "axios";
 import {
-  Building2, Home, Wrench, Shield, Settings, LogOut, Languages,
+  Building2, Home, Wrench, ShieldCheck, Settings, LogOut, Languages,
   Wallet, Sparkles, Zap, Droplet, Wind, AlertTriangle, CheckCircle2,
   Clock, Star, TrendingUp, Users, Briefcase, Award, Plus,
-  ArrowRight, FileCheck, MessageSquare, Gavel, Activity, ArrowUpRight, Eye, CreditCard, Bell, Building, Camera
+  ArrowRight, FileCheck, MessageSquare, Gavel, Activity, ArrowUpRight, Eye, CreditCard, Bell, Building, Camera, Shield, Calendar, Search, Filter
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { useI18n } from "../i18n";
 import { ChatPanel } from "./ChatPanel";
 import { PhotoUploader, ReviewModal, PropertyManagerModal } from "./Components";
+import { TwoFASetupModal, PropertyTimelineModal } from "./Marketplace";
+import { AIAssistant } from "./AIAssistant";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -90,7 +92,7 @@ const DashLayout = ({ children, role, title }) => {
   const roleConfig = {
     client: { icon: Home, label: "Client", color: "lime" },
     specialist: { icon: Wrench, label: "Specialist", color: "amber" },
-    admin: { icon: Shield, label: "Admin", color: "cyan" },
+    admin: { icon: ShieldCheck, label: "Admin", color: "cyan" },
     operator: { icon: Settings, label: "Operator", color: "purple" },
   }[role];
   
@@ -138,10 +140,11 @@ const DashLayout = ({ children, role, title }) => {
           </div>
         </div>
       </header>
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        {title && <h1 className="font-serif text-4xl mb-8" data-testid="dash-title">{title}</h1>}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {title && <h1 className="font-serif text-3xl sm:text-4xl mb-6 sm:mb-8" data-testid="dash-title">{title}</h1>}
         {children}
       </main>
+      <AIAssistant />
     </div>
   );
 };
@@ -181,8 +184,28 @@ export const ClientDashboard = () => {
   const [showPropManager, setShowPropManager] = useState(false);
   const [reviewFor, setReviewFor] = useState(null);
   const [selectedPropId, setSelectedPropId] = useState(null);
+  const [show2FA, setShow2FA] = useState(false);
+  const [show2FAStatus, setShow2FAStatus] = useState(false);
+  const [timelineFor, setTimelineFor] = useState(null);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterCat, setFilterCat] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [twoFAEnabled, setTwoFAEnabled] = useState(false);
   
-  const loadRequests = () => axios.get(`${API}/requests`).then(r => setRequests(r.data)).catch(() => {});
+  // Load 2FA status
+  useEffect(() => {
+    if (user && user !== false) {
+      axios.get(`${API}/auth/2fa/status`).then(r => setTwoFAEnabled(r.data.enabled)).catch(() => {});
+    }
+  }, [user]);
+  
+  const loadRequests = () => {
+    const params = new URLSearchParams();
+    if (searchQ) params.set("q", searchQ);
+    if (filterCat) params.set("category", filterCat);
+    if (filterStatus) params.set("status", filterStatus);
+    return axios.get(`${API}/requests?${params}`).then(r => setRequests(r.data)).catch(() => {});
+  };
   
   useEffect(() => {
     if (user && user !== false) {
@@ -249,6 +272,14 @@ export const ClientDashboard = () => {
               <button onClick={() => setShowPropManager(true)} className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-white/5 hover:bg-white/10 flex items-center gap-1" data-testid="manage-props">
                 <Building className="w-3 h-3" />Gestionează ({properties.length})
               </button>
+              {prop && (
+                <button onClick={() => setTimelineFor(prop.id)} className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-white/5 hover:bg-white/10 flex items-center gap-1" data-testid="timeline-btn">
+                  <Calendar className="w-3 h-3" />Timeline
+                </button>
+              )}
+              <button onClick={() => setShow2FA(true)} className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-full flex items-center gap-1 ${twoFAEnabled ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "bg-white/5 hover:bg-white/10"}`} data-testid="2fa-btn">
+                <Shield className="w-3 h-3" />{twoFAEnabled ? "2FA ✓" : "2FA"}
+              </button>
               <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">LIVE 3D</span>
             </div>
           </div>
@@ -297,7 +328,28 @@ export const ClientDashboard = () => {
               <Plus className="w-3 h-3" />{t("client.newRequest")}
             </button>
           </div>
-          <div className="space-y-2 max-h-[480px] overflow-auto no-scrollbar">
+          {/* Search + Filter */}
+          <div className="space-y-2 mb-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-500" />
+              <input type="text" placeholder="Caută..." value={searchQ} onChange={e => setSearchQ(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-[#d4ff3a]/50" data-testid="req-search" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <select value={filterCat} onChange={e => setFilterCat(e.target.value)} className="bg-white/5 border border-white/10 rounded-xl px-2 py-1.5 text-xs" data-testid="req-filter-cat">
+                <option value="">Toate categoriile</option>
+                <option value="hvac">HVAC</option><option value="electric">Electric</option>
+                <option value="plumbing">Sanitar</option><option value="other">Altele</option>
+              </select>
+              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="bg-white/5 border border-white/10 rounded-xl px-2 py-1.5 text-xs" data-testid="req-filter-status">
+                <option value="">Toate statusurile</option>
+                <option value="open">Deschis</option><option value="assigned">Asignat</option>
+                <option value="in_progress">În lucru</option><option value="completed">Finalizat</option>
+                <option value="confirmed">Confirmat</option>
+              </select>
+            </div>
+          </div>
+          <div className="space-y-2 max-h-[400px] overflow-auto no-scrollbar">
             {requests.length === 0 && <div className="text-xs text-stone-500 text-center py-8">Nicio solicitare</div>}
             {requests.map(r => (
               <div key={r.id} className="bg-white/5 rounded-xl p-4" data-testid={`req-${r.id}`}>
@@ -345,6 +397,8 @@ export const ClientDashboard = () => {
       {showNewReq && <NewRequestModal onClose={() => setShowNewReq(false)} property={prop} onCreated={r => setRequests([r, ...requests])} />}
       {chatRequest && <ChatPanel requestId={chatRequest} onClose={() => setChatRequest(null)} />}
       {showPropManager && <PropertyManagerModal properties={properties} onClose={() => setShowPropManager(false)} onChange={setProperties} />}
+      {timelineFor && <PropertyTimelineModal propertyId={timelineFor} onClose={() => setTimelineFor(null)} />}
+      {show2FA && <TwoFASetupModal onClose={(updated) => { setShow2FA(false); if (updated) axios.get(`${API}/auth/2fa/status`).then(r => setTwoFAEnabled(r.data.enabled)); }} currentlyEnabled={twoFAEnabled} />}
       {reviewFor && (
         <ReviewModal 
           requestId={reviewFor.id} 
