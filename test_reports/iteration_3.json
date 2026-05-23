@@ -1,0 +1,63 @@
+{
+  "summary": "Phase 4 backend testing complete: 19/19 pytest tests passed (100%). Verified Property CRUD with ACL (POST/PUT/DELETE incl. 404 for non-owner, 400 when active request blocks delete, 200 when no requests), photo upload via POST /api/requests (base64 data URLs persisted in request.photos), public Specialist profile (no auth, returns rating/reviews_count/completed_jobs/specialties/reviews; 404 for invalid ObjectId and for non-specialist user), full review flow (+20 tokens to client, updates specialist rating + reviews_count, persists in db.reviews), notifications list (newest-first) and mark-read, notify() fires on new-request->'lead' for matching-specialty specialist, accept->'assignment' for client, complete->'completion' for client, confirm->'payment' for specialist, and SendGrid email_log fallback writes demo:true entries to db.email_log when SENDGRID_API_KEY is missing. Regression smoke (login, /auth/me, /properties, /requests, /specialists) all pass.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "DELETE /api/properties/{id}",
+        "issue": "Active-request check uses status in {assigned, in_progress, completed} but excludes 'open'. A property with only open (unassigned) requests can still be deleted, orphaning those request docs. Consider adding 'open' to the block-list OR cascading-delete orphan requests."
+      },
+      {
+        "endpoint": "POST /api/requests (photos)",
+        "issue": "No size/count validation on photos[] - large base64 payloads can balloon a single document past MongoDB's 16MB BSON limit. Add per-photo size cap (e.g., <2MB) and array length cap (e.g., <=10)."
+      },
+      {
+        "endpoint": "GET /api/specialists/{id}/profile",
+        "issue": "Endpoint exposes specialist email publicly. PII leak risk - consider removing email from public payload or only showing it after request assignment."
+      },
+      {
+        "endpoint": "POST /api/requests/{id}/review",
+        "issue": "No check that request status == 'confirmed' before allowing review. Currently reviews can be left even before work is done; also no uniqueness constraint (client can spam reviews and inflate +20 token rewards). Add: require status='confirmed' AND only one review per request_id+client_id."
+      },
+      {
+        "endpoint": "PUT /api/properties/{id}",
+        "issue": "PropertyUpdateIn.surface is float and type is free string - no enum validation for type. Add Literal['apartment','house','villa']."
+      },
+      {
+        "endpoint": "POST /api/notifications/{notif_id}/read",
+        "issue": "Returns {ok:true} even if notification doesn't exist or doesn't belong to user (update_one with no match silently succeeds). Add matched_count check -> 404 for cleaner contract."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_phase4.py",
+    "/app/test_reports/pytest/phase4_results.xml"
+  ],
+  "action_items": [
+    "Decide whether 'open' requests should block property deletion (currently they don't).",
+    "Add validation on POST /api/requests photos[] (max count + per-item size) to prevent BSON 16MB overflow.",
+    "Restrict POST /api/requests/{id}/review to status='confirmed' and enforce one-review-per-(request,client) to stop +20 token farming.",
+    "Consider hiding specialist email from public profile payload.",
+    "POST /api/notifications/{id}/read should return 404 when no document matches owner+id."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 1166 lines - well past the 700-line guideline. Split into routers: auth.py, properties.py, requests.py, payments.py, chat.py, admin.py, notifications.py.",
+    "notify() awaits send_email() inline inside hot paths like POST /api/requests which loops over up-to-50 specialists - each notify() does an extra DB read + email insert. For a category with many specialists, the request handler can stall. Consider firing notifications via asyncio.create_task / background queue.",
+    "POST /api/requests/{id}/escrow accepts amount as a query param (?amount=) rather than JSON body; inconsistent with the rest of the API.",
+    "review_specialist updates rating but doesn't guard against zero division; safe today because old_count starts at 24 from seed but a freshly-registered specialist has reviews_count=0 -> new_count=1 (ok). Still, the rating math assumes the seeded rating=4.9 with reviews_count=24 reflects 24 actual reviews (it doesn't, they're mock). First real review will heavily skew weighted-average math.",
+    "send_email() writes its own try/except but a hung SendGrid call (10s timeout) blocks the request thread. Move email send to background task.",
+    "CORS allow_origins=['*'] with allow_credentials=True still present from prior iterations - browsers reject this combo; fix to explicit origin list from CORS_ORIGINS env var.",
+    "@app.on_event still deprecated - migrate to lifespan handlers.",
+    "Specialist public profile leaks email (PII); also includes 'verified' and 'tier' which is fine but email is not.",
+    "Property.type and Request.category are free strings - no enum enforcement at the model layer; PUT property and POST request both accept arbitrary strings."
+  ],
+  "updated_files": ["/app/backend/tests/test_phase4.py"],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "N/A (not requested)"},
+  "test_credentials": "client@propmanage.io/Client123!, specialist@propmanage.io/Spec123! (hvac, verified), specialist2@propmanage.io/Spec123! (plumbing, verified), admin@propmanage.io/Admin123!, operator@propmanage.io/Op123! - all working.",
+  "seed_data_creation": "Tests create TEST_-prefixed properties/requests/reviews/notifications/email_log entries plus one TEST_phase4_otherclient@propmanage.io user. Accumulates across runs but harmless and easy to identify via the TEST_ prefix.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All Phase 4 tests in /app/backend/tests/test_phase4.py (19 tests, 100% pass). Phase 3 Stripe test (test_phase3.py) still fails due to invalid STRIPE_API_KEY - unchanged from iteration_2. Notification system, email_log fallback, specialist public profile, photo storage, property CRUD with ACL, and review flow are all verified. The seed user specialist@propmanage.io has reviews_count incremented by ~5 across phase4 reviews; rating drifts slightly each run since the seeded reviews_count=24 is mock data, not real review docs - first few real reviews skew the running average.",
+  "rca of the issue": "No new bugs. All Phase 4 features pass end-to-end including DB persistence checks (db.requests.photos, db.reviews, db.notifications, db.email_log)."
+}

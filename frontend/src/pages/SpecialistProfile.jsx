@@ -1,0 +1,120 @@
+// Public Specialist Profile Page
+import React, { useEffect, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import axios from "axios";
+import { motion } from "framer-motion";
+import { Star, CheckCircle2, Award, Briefcase, Calendar, ArrowLeft, Building2 } from "lucide-react";
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+export const SpecialistProfile = () => {
+  const { id } = useParams();
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    axios.get(`${API}/specialists/${id}/profile`)
+      .then(r => setData(r.data))
+      .catch(() => setError(true));
+  }, [id]);
+
+  if (error) return (
+    <div className="min-h-screen flex items-center justify-center text-stone-400">
+      Specialist negăsit. <Link to="/" className="text-[#d4ff3a] ml-2">Înapoi acasă</Link>
+    </div>
+  );
+  if (!data) return <div className="min-h-screen flex items-center justify-center text-stone-400">Se încarcă...</div>;
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0b] text-stone-100">
+      <header className="border-b border-white/5 sticky top-0 z-30 bg-[#0a0a0b]/80 backdrop-blur-xl">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2" data-testid="sp-back">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#d4ff3a] to-[#a8e028] flex items-center justify-center">
+              <Building2 className="w-3.5 h-3.5 text-black" strokeWidth={2.5} />
+            </div>
+            <span className="font-serif text-lg font-semibold">PropManage</span>
+          </Link>
+          <Link to="/login" className="text-xs text-stone-400 hover:text-white flex items-center gap-1">
+            <ArrowLeft className="w-3 h-3" /> Login
+          </Link>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-6 py-12">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-strong rounded-3xl p-10 mb-6">
+          <div className="flex items-start gap-6 mb-6">
+            <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-stone-600 to-stone-800 flex items-center justify-center text-3xl font-medium shrink-0">
+              {data.name?.[0]}
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="font-serif text-4xl" data-testid="sp-name">{data.name}</h1>
+                {data.verified && (
+                  <span className="inline-flex items-center gap-1 bg-[#d4ff3a]/15 text-[#d4ff3a] text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full border border-[#d4ff3a]/30">
+                    <CheckCircle2 className="w-3 h-3" />Verified
+                  </span>
+                )}
+              </div>
+              <div className="text-sm text-stone-400 mb-3 capitalize">{data.specialty || "Specialist"}</div>
+              <div className="flex items-center gap-6 text-sm">
+                <div className="flex items-center gap-1.5">
+                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                  <span className="font-medium">{data.rating || "—"}</span>
+                  <span className="text-stone-500">({data.reviews_count} reviews)</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-stone-400">
+                  <Briefcase className="w-4 h-4" />{data.completed_jobs} joburi
+                </div>
+                {data.tier && (
+                  <div className="flex items-center gap-1.5 text-amber-400">
+                    <Award className="w-4 h-4" />{data.tier}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          {data.specialties.length > 0 && (
+            <div className="pt-6 border-t border-white/5">
+              <div className="text-xs uppercase tracking-wider text-stone-400 mb-3">Specialități</div>
+              <div className="flex flex-wrap gap-2">
+                {data.specialties.map((s, i) => (
+                  <span key={i} className="bg-white/5 px-3 py-1.5 rounded-full text-xs capitalize">
+                    {s.category} <span className="text-stone-500">· {s.count}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </motion.div>
+
+        {/* Reviews */}
+        <div className="glass-strong rounded-3xl p-8">
+          <h2 className="font-serif text-2xl mb-6">Recenzii recente</h2>
+          {data.reviews.length === 0 ? (
+            <div className="text-center text-sm text-stone-500 py-12">Nicio recenzie încă</div>
+          ) : (
+            <div className="space-y-4">
+              {data.reviews.map((r, i) => (
+                <div key={i} className="bg-white/5 rounded-2xl p-5" data-testid={`review-${i}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex gap-0.5">
+                      {[1,2,3,4,5].map(n => (
+                        <Star key={n} className={`w-3.5 h-3.5 ${n <= r.rating ? "fill-amber-400 text-amber-400" : "text-stone-700"}`} />
+                      ))}
+                    </div>
+                    <div className="text-[10px] text-stone-500">
+                      {new Date(r.created_at).toLocaleDateString("ro-RO")}
+                    </div>
+                  </div>
+                  {r.comment && <p className="text-sm text-stone-300 leading-relaxed">"{r.comment}"</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+};

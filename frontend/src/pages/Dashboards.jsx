@@ -7,13 +7,79 @@ import {
   Building2, Home, Wrench, Shield, Settings, LogOut, Languages,
   Wallet, Sparkles, Zap, Droplet, Wind, AlertTriangle, CheckCircle2,
   Clock, Star, TrendingUp, Users, Briefcase, Award, Plus,
-  ArrowRight, FileCheck, MessageSquare, Gavel, Activity, ArrowUpRight, Eye, CreditCard
+  ArrowRight, FileCheck, MessageSquare, Gavel, Activity, ArrowUpRight, Eye, CreditCard, Bell, Building, Camera
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { useI18n } from "../i18n";
 import { ChatPanel } from "./ChatPanel";
+import { PhotoUploader, ReviewModal, PropertyManagerModal } from "./Components";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+// ============= NOTIFICATIONS BELL =============
+const NotificationsBell = () => {
+  const [notifs, setNotifs] = useState([]);
+  const [open, setOpen] = useState(false);
+  
+  const load = () => axios.get(`${API}/notifications`).then(r => setNotifs(r.data)).catch(() => {});
+  useEffect(() => {
+    load();
+    const interval = setInterval(load, 15000); // poll every 15s
+    return () => clearInterval(interval);
+  }, []);
+  
+  const unread = notifs.filter(n => !n.read).length;
+  
+  const markRead = async (id) => {
+    await axios.post(`${API}/notifications/${id}/read`).catch(() => {});
+    load();
+  };
+  
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(!open)} className="relative p-2 hover:bg-white/5 rounded-lg" data-testid="notif-bell">
+        <Bell className="w-4 h-4 text-stone-400" />
+        {unread > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#d4ff3a] text-black text-[9px] font-bold rounded-full flex items-center justify-center">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-2 w-80 glass-strong rounded-2xl border border-white/10 z-40 max-h-[400px] overflow-auto no-scrollbar" data-testid="notif-panel">
+            <div className="p-3 border-b border-white/5 sticky top-0 bg-[#0a0a0b]/80 backdrop-blur">
+              <div className="text-xs uppercase tracking-wider text-stone-400">Notificări</div>
+            </div>
+            {notifs.length === 0 ? (
+              <div className="p-6 text-center text-xs text-stone-500">Nicio notificare</div>
+            ) : (
+              <div className="divide-y divide-white/5">
+                {notifs.slice(0, 10).map(n => (
+                  <div key={n.id} onClick={() => markRead(n.id)} 
+                    className={`p-3 cursor-pointer hover:bg-white/5 ${!n.read ? "bg-[#d4ff3a]/5" : ""}`}
+                    data-testid={`notif-${n.id}`}>
+                    <div className="flex items-start gap-2">
+                      {!n.read && <div className="w-1.5 h-1.5 rounded-full bg-[#d4ff3a] mt-1.5 shrink-0" />}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium">{n.title}</div>
+                        <div className="text-[11px] text-stone-400 mt-0.5">{n.message}</div>
+                        <div className="text-[9px] text-stone-600 mt-1">
+                          {new Date(n.created_at).toLocaleString("ro-RO")}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 // ============= LAYOUT =============
 const DashLayout = ({ children, role, title }) => {
@@ -55,6 +121,7 @@ const DashLayout = ({ children, role, title }) => {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <NotificationsBell />
             <button onClick={toggle} className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-white/5 rounded-full text-xs uppercase tracking-wider" data-testid="dash-lang">
               <Languages className="w-3.5 h-3.5" />{lang.toUpperCase()}
             </button>
@@ -111,6 +178,9 @@ export const ClientDashboard = () => {
   const [requests, setRequests] = useState([]);
   const [showNewReq, setShowNewReq] = useState(false);
   const [chatRequest, setChatRequest] = useState(null);
+  const [showPropManager, setShowPropManager] = useState(false);
+  const [reviewFor, setReviewFor] = useState(null);
+  const [selectedPropId, setSelectedPropId] = useState(null);
   
   const loadRequests = () => axios.get(`${API}/requests`).then(r => setRequests(r.data)).catch(() => {});
   
@@ -141,7 +211,7 @@ export const ClientDashboard = () => {
     }
   }, [user]);
   
-  const prop = properties[0];
+  const prop = properties.find(p => p.id === selectedPropId) || properties[0];
   
   const payEscrow = async (reqId) => {
     try {
@@ -169,7 +239,18 @@ export const ClientDashboard = () => {
               <h2 className="font-serif text-2xl" data-testid="property-name">{prop?.name || "—"}</h2>
               <div className="text-sm text-stone-400">{prop?.address}</div>
             </div>
-            <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">LIVE 3D</span>
+            <div className="flex items-center gap-2">
+              {properties.length > 1 && (
+                <select value={prop?.id || ""} onChange={e => setSelectedPropId(e.target.value)}
+                  className="bg-white/5 border border-white/10 rounded-full px-3 py-1.5 text-xs" data-testid="prop-selector">
+                  {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              )}
+              <button onClick={() => setShowPropManager(true)} className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-white/5 hover:bg-white/10 flex items-center gap-1" data-testid="manage-props">
+                <Building className="w-3 h-3" />Gestionează ({properties.length})
+              </button>
+              <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">LIVE 3D</span>
+            </div>
           </div>
           <div className="aspect-[16/8] rounded-2xl bg-gradient-to-br from-slate-900 via-cyan-950 to-slate-900 border border-white/10 flex items-center justify-center mb-6 relative overflow-hidden">
             <svg viewBox="0 0 400 200" className="w-full h-full p-6">
@@ -242,10 +323,17 @@ export const ClientDashboard = () => {
                   )}
                 </div>
                 {r.status === "completed" && (
-                  <button onClick={() => confirmRequest(r.id, refreshUser, setRequests)} 
+                  <button onClick={() => confirmRequest(r.id, refreshUser, setRequests, setReviewFor, r)} 
                     className="mt-2 w-full bg-[#d4ff3a] text-black py-2 rounded-lg text-xs font-medium"
                     data-testid={`confirm-${r.id}`}>
                     Confirmă & Eliberează plata
+                  </button>
+                )}
+                {r.status === "confirmed" && r.specialist_id && (
+                  <button onClick={() => setReviewFor(r)} 
+                    className="mt-2 w-full bg-white/10 hover:bg-white/15 py-2 rounded-lg text-xs flex items-center justify-center gap-1"
+                    data-testid={`review-${r.id}`}>
+                    <Star className="w-3 h-3" />Evaluează specialist
                   </button>
                 )}
               </div>
@@ -256,6 +344,15 @@ export const ClientDashboard = () => {
       
       {showNewReq && <NewRequestModal onClose={() => setShowNewReq(false)} property={prop} onCreated={r => setRequests([r, ...requests])} />}
       {chatRequest && <ChatPanel requestId={chatRequest} onClose={() => setChatRequest(null)} />}
+      {showPropManager && <PropertyManagerModal properties={properties} onClose={() => setShowPropManager(false)} onChange={setProperties} />}
+      {reviewFor && (
+        <ReviewModal 
+          requestId={reviewFor.id} 
+          specialistName={reviewFor.specialist_name} 
+          onClose={() => setReviewFor(null)}
+          onSubmitted={async () => { await refreshUser(); loadRequests(); }}
+        />
+      )}
     </DashLayout>
   );
 };
@@ -266,24 +363,29 @@ const Layers = ({ className }) => (
   </svg>
 );
 
-async function confirmRequest(id, refresh, setRequests) {
+async function confirmRequest(id, refresh, setRequests, setReviewFor, req) {
   try {
     await axios.post(`${API}/requests/${id}/confirm`);
     const { data } = await axios.get(`${API}/requests`);
     setRequests(data);
     await refresh();
-    alert("Confirmat! Ai primit +100 tokeni.");
+    // Trigger review modal for the just-confirmed request
+    if (setReviewFor && req && req.specialist_id) {
+      const updated = data.find(x => x.id === id) || req;
+      setReviewFor(updated);
+    }
   } catch (e) { alert(formatApiError(e)); }
 }
 
 const NewRequestModal = ({ onClose, property, onCreated }) => {
   const [form, setForm] = useState({ title: "", description: "", category: "hvac", priority: "normal", budget_estimate: 200 });
+  const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const { data } = await axios.post(`${API}/requests`, { ...form, property_id: property.id });
+      const { data } = await axios.post(`${API}/requests`, { ...form, property_id: property.id, photos });
       onCreated(data); onClose();
     } catch (e) { alert(formatApiError(e)); }
     finally { setLoading(false); }
@@ -291,7 +393,7 @@ const NewRequestModal = ({ onClose, property, onCreated }) => {
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-6" onClick={onClose}>
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} 
-        className="glass-strong rounded-3xl p-8 max-w-md w-full" onClick={e => e.stopPropagation()}>
+        className="glass-strong rounded-3xl p-8 max-w-md w-full max-h-[90vh] overflow-auto no-scrollbar" onClick={e => e.stopPropagation()}>
         <h2 className="font-serif text-2xl mb-6">Solicitare nouă</h2>
         <form onSubmit={submit} className="space-y-3">
           <input required placeholder="Titlu (ex: Reparație centrală)" value={form.title} onChange={e => setForm({...form, title: e.target.value})}
@@ -307,6 +409,12 @@ const NewRequestModal = ({ onClose, property, onCreated }) => {
           </div>
           <input type="number" placeholder="Buget estimat (RON)" value={form.budget_estimate} onChange={e => setForm({...form, budget_estimate: parseFloat(e.target.value)})}
             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" data-testid="newreq-budget" />
+          <div>
+            <label className="text-xs uppercase tracking-wider text-stone-400 mb-2 flex items-center gap-1">
+              <Camera className="w-3 h-3" />Dovezi foto (opțional)
+            </label>
+            <PhotoUploader photos={photos} onChange={setPhotos} max={5} />
+          </div>
           <div className="flex gap-2 pt-2">
             <button type="button" onClick={onClose} className="flex-1 py-3 bg-white/5 rounded-xl text-sm">Anulează</button>
             <button type="submit" disabled={loading} className="flex-1 btn-accent py-3 rounded-xl text-sm font-medium" data-testid="newreq-submit">

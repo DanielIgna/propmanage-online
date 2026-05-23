@@ -12,6 +12,7 @@ import { I18nProvider, useI18n } from "./i18n";
 import { LoginPage, RegisterPage } from "./pages/Auth";
 import { ClientDashboard, SpecialistDashboard, AdminDashboard, OperatorDashboard } from "./pages/Dashboards";
 import { AuthCallback } from "./pages/AuthCallback";
+import { SpecialistProfile } from "./pages/SpecialistProfile";
 import "./App.css";
 
 // ============= NAV =============
@@ -1312,6 +1313,7 @@ function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/specialists/:id" element={<SpecialistProfile />} />
               <Route path="/client" element={<ClientDashboard />} />
               <Route path="/specialist" element={<SpecialistDashboard />} />
               <Route path="/admin" element={<AdminDashboard />} />

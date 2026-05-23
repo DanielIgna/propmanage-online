@@ -118,6 +118,13 @@ class PropertyIn(BaseModel):
     surface: float
     rooms: int
 
+class PropertyUpdateIn(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    type: Optional[str] = None
+    surface: Optional[float] = None
+    rooms: Optional[int] = None
+
 class RequestIn(BaseModel):
     property_id: str
     category: str  # electric, plumbing, hvac, etc.
@@ -125,6 +132,7 @@ class RequestIn(BaseModel):
     description: str
     priority: Literal["normal", "urgent"] = "normal"
     budget_estimate: Optional[float] = None
+    photos: Optional[List[str]] = None  # base64 data URLs
 
 class OfferIn(BaseModel):
     request_id: str
@@ -226,6 +234,31 @@ async def get_property(prop_id: str, user: dict = Depends(get_current_user)):
     if not doc: raise HTTPException(404, "Property not found")
     return serialize_doc(doc)
 
+@api.put("/properties/{prop_id}")
+async def update_property(prop_id: str, data: PropertyUpdateIn, user: dict = Depends(require_role("client"))):
+    """Update property (owner only)"""
+    prop = await db.properties.find_one({"_id": ObjectId(prop_id), "owner_id": user["id"]})
+    if not prop: raise HTTPException(404, "Property not found")
+    update = {k: v for k, v in data.model_dump().items() if v is not None}
+    if update:
+        await db.properties.update_one({"_id": ObjectId(prop_id)}, {"$set": update})
+    return serialize_doc(await db.properties.find_one({"_id": ObjectId(prop_id)}))
+
+@api.delete("/properties/{prop_id}")
+async def delete_property(prop_id: str, user: dict = Depends(require_role("client"))):
+    """Delete property (owner only, no active requests)"""
+    prop = await db.properties.find_one({"_id": ObjectId(prop_id), "owner_id": user["id"]})
+    if not prop: raise HTTPException(404, "Property not found")
+    # Check for active requests
+    active = await db.requests.count_documents({
+        "property_id": prop_id,
+        "status": {"$in": ["assigned", "in_progress", "completed"]}
+    })
+    if active > 0:
+        raise HTTPException(400, f"Cannot delete: {active} active request(s)")
+    await db.properties.delete_one({"_id": ObjectId(prop_id)})
+    return {"ok": True}
+
 # ============= REQUESTS =============
 @api.post("/requests")
 async def create_request(data: RequestIn, user: dict = Depends(require_role("client"))):
@@ -245,6 +278,21 @@ async def create_request(data: RequestIn, user: dict = Depends(require_role("cli
     res = await db.requests.insert_one(doc)
     doc["id"] = str(res.inserted_id)
     doc.pop("_id", None)
+    
+    # Notify all eligible specialists about the new lead
+    spec_query = {"role": "specialist"}
+    if data.category:
+        # Notify specialists with matching specialty OR no specialty set
+        spec_query = {"role": "specialist", "$or": [{"specialty": data.category}, {"specialty": None}]}
+    specs = await db.users.find(spec_query).to_list(50)
+    for s in specs:
+        await notify(
+            str(s["_id"]),
+            f"Lead nou: {data.title}",
+            f"Solicitare {data.priority} în categoria {data.category}. Buget estimat: {data.budget_estimate or '—'} RON",
+            type_="lead",
+            link=f"/specialist"
+        )
     return doc
 
 @api.get("/requests")
@@ -309,6 +357,14 @@ async def accept_request(req_id: str, user: dict = Depends(require_role("special
         "request_id": req_id,
         "created_at": datetime.now(timezone.utc).isoformat()
     })
+    # Notify client that specialist accepted
+    await notify(
+        req["client_id"],
+        f"Specialist alocat: {user['name']}",
+        f"{user['name']} a acceptat solicitarea ta '{req.get('title','')}'.",
+        type_="assignment",
+        link="/client"
+    )
     return {"ok": True, "balance_after": (specialist.get("wallet_balance") or 0) - LEAD_FEE}
 
 @api.post("/requests/{req_id}/start")
@@ -323,6 +379,7 @@ async def complete_work(req_id: str, user: dict = Depends(require_role("speciali
     req = await db.requests.find_one({"_id": ObjectId(req_id), "specialist_id": user["id"]})
     if not req: raise HTTPException(404, "Request not found")
     await db.requests.update_one({"_id": ObjectId(req_id)}, {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}})
+    await notify(req["client_id"], "Lucrare finalizată", f"{user['name']} a marcat lucrarea '{req.get('title','')}' ca finalizată. Verifică și confirmă pentru a elibera plata.", type_="completion", link="/client")
     return {"ok": True}
 
 @api.post("/requests/{req_id}/escrow")
@@ -376,6 +433,15 @@ async def confirm_complete(req_id: str, user: dict = Depends(require_role("clien
         {"_id": ObjectId(req_id)},
         {"$set": {"status": "confirmed", "escrow_status": "released", "confirmed_at": datetime.now(timezone.utc).isoformat()}}
     )
+    # Notify specialist about payment
+    if req.get("specialist_id"):
+        await notify(
+            req["specialist_id"],
+            "Plată eliberată",
+            f"Plata de {specialist_amount:.2f} RON a fost eliberată în contul tău pentru lucrarea '{req.get('title','')}'.",
+            type_="payment",
+            link="/specialist"
+        )
     return {"ok": True, "tokens_earned": 100}
 
 @api.post("/requests/{req_id}/review")
@@ -809,6 +875,132 @@ async def chat_ws(websocket: WebSocket, request_id: str):
     except Exception as e:
         logger.error(f"WS error: {e}")
         manager.disconnect(request_id, websocket)
+
+
+# ============= SPECIALIST PUBLIC PROFILE =============
+
+@api.get("/specialists/{spec_id}/profile")
+async def specialist_profile(spec_id: str):
+    """Public profile for a specialist - no auth required"""
+    try:
+        spec = await db.users.find_one({"_id": ObjectId(spec_id), "role": "specialist"})
+    except Exception:
+        raise HTTPException(404, "Specialist not found")
+    if not spec:
+        raise HTTPException(404, "Specialist not found")
+    
+    # Get reviews
+    reviews = await db.reviews.find({"specialist_id": spec_id}).sort("created_at", -1).limit(20).to_list(20)
+    
+    # Get completed jobs count
+    completed = await db.requests.count_documents({"specialist_id": spec_id, "status": "confirmed"})
+    
+    # Get specialties from past requests
+    specialties_cursor = db.requests.aggregate([
+        {"$match": {"specialist_id": spec_id, "status": "confirmed"}},
+        {"$group": {"_id": "$category", "count": {"$sum": 1}}}
+    ])
+    specialties = await specialties_cursor.to_list(10)
+    
+    return {
+        "id": str(spec["_id"]),
+        "name": spec.get("name"),
+        "email": spec.get("email"),
+        "picture": spec.get("picture"),
+        "specialty": spec.get("specialty"),
+        "rating": spec.get("rating"),
+        "reviews_count": spec.get("reviews_count", 0),
+        "tier": spec.get("tier"),
+        "verified": spec.get("verified", False),
+        "completed_jobs": completed,
+        "member_since": spec.get("created_at"),
+        "specialties": [{"category": s["_id"], "count": s["count"]} for s in specialties if s["_id"]],
+        "reviews": [
+            {
+                "rating": r.get("rating"),
+                "comment": r.get("comment"),
+                "created_at": r.get("created_at"),
+            } for r in reviews
+        ],
+    }
+
+
+# ============= EMAIL NOTIFICATIONS =============
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
+SENDGRID_SENDER = os.environ.get("SENDGRID_SENDER", "noreply@propmanage.io")
+
+async def send_email(to_email: str, subject: str, html_body: str):
+    """Send email via SendGrid with graceful fallback to console logging."""
+    if not SENDGRID_API_KEY or not SENDGRID_API_KEY.startswith("SG."):
+        # Demo mode: log to console + persist to db.email_log for in-app review
+        logger.info(f"[EMAIL DEMO] To: {to_email} | Subject: {subject}")
+        await db.email_log.insert_one({
+            "to": to_email,
+            "subject": subject,
+            "body": html_body,
+            "demo": True,
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+        })
+        return {"status": "demo", "to": to_email}
+    
+    # Real SendGrid call
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post(
+                "https://api.sendgrid.com/v3/mail/send",
+                headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+                json={
+                    "personalizations": [{"to": [{"email": to_email}]}],
+                    "from": {"email": SENDGRID_SENDER, "name": "PropManage"},
+                    "subject": subject,
+                    "content": [{"type": "text/html", "value": html_body}],
+                }
+            )
+            await db.email_log.insert_one({
+                "to": to_email, "subject": subject,
+                "status_code": r.status_code,
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+            })
+            return {"status": "sent" if r.status_code < 300 else "failed", "code": r.status_code}
+    except Exception as e:
+        logger.error(f"SendGrid error: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@api.get("/notifications")
+async def list_notifications(user: dict = Depends(get_current_user)):
+    """Get in-app notifications for current user"""
+    docs = await db.notifications.find({"user_id": user["id"]}).sort("created_at", -1).limit(50).to_list(50)
+    return [serialize_doc(d) for d in docs]
+
+
+@api.post("/notifications/{notif_id}/read")
+async def mark_read(notif_id: str, user: dict = Depends(get_current_user)):
+    await db.notifications.update_one(
+        {"_id": ObjectId(notif_id), "user_id": user["id"]},
+        {"$set": {"read": True}}
+    )
+    return {"ok": True}
+
+
+async def notify(user_id: str, title: str, message: str, type_: str = "info", link: str = None):
+    """Create in-app notification + send email if user has email"""
+    await db.notifications.insert_one({
+        "user_id": user_id,
+        "title": title,
+        "message": message,
+        "type": type_,
+        "link": link,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    # Best-effort email
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    if user and user.get("email"):
+        html = f"<h2>{title}</h2><p>{message}</p>"
+        if link:
+            html += f'<p><a href="{link}">Vezi detalii</a></p>'
+        await send_email(user["email"], f"PropManage: {title}", html)
 
 
 # ============= ROOT =============
