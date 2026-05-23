@@ -1,61 +1,78 @@
-# PropManage - Interactive Product Demo App
+# PropManage - Property Operating System
 
 ## Original Problem Statement
-User a livrat în mai multe runde: documente de servicii (DIGITALIZAREA CASEI), PDF Audit & Mapare, și 45+ screenshots de UI ale aplicației PropManage/Residency. Cerința finală: construirea unei aplicații-demo interactive de prezentare completă A-Z (problem, solution, UX, business model, system logic) cu 10 secțiuni structurate.
+Construire aplicație completă end-to-end (backend + auth + marketplace funcțional), Auto-play pentru User Journey, Pagini dedicate per rol (Client / Specialist / Admin / Operator), Toggle bilingv RO/EN.
 
 ## Architecture
-- **Frontend only**: React 19 + Tailwind + Framer Motion + lucide-react
-- **No backend needed**: aplicația este o prezentare/demo SaaS, pur frontend
-- **Single page** scroll-based cu 10 secțiuni interactive
+- **Frontend**: React 19 + Tailwind + Framer Motion + react-router-dom + i18n context
+- **Backend**: FastAPI + MongoDB (motor async) + JWT (httpOnly cookies) + bcrypt
+- **4 user roles**: client, specialist, admin, operator
+- **Marketplace mechanics**: lead fees, escrow, tokens, property health scoring
 
-## Design System
-- Background: dark `#0a0a0b` (premium SaaS)
-- Accent: lime `#d4ff3a` (distinctiv, NU purple generic)
-- Typography: Fraunces (serif italics) + Geist (body)
-- Effects: glass-morphism, grain texture, dotted backgrounds, pulse animations
-- Premium asymmetric layouts cu generous spacing
+## What's Implemented (2026-01)
 
-## Sections Implemented (10/10)
-1. ✅ **Hero** - "Proprietatea ta, perfecționată digital" + stats (12,842 users)
-2. ✅ **Problem** - 4 puncte de durere (cutie neagră)
-3. ✅ **Solution** - 4 piloni (Digital Twin, Marketplace, Escrow, Istoric)
-4. ✅ **User Journey A→J** - Interactive cu phone mockup live
-5. ✅ **Specialist Journey** - 3 tier-uri Entry/Verified/Premium + flow 6 pași
-6. ✅ **Wallet & Ecosistem** - Wallet/Tokens/Credits + Logică Escrow
-7. ✅ **Digital Twin** - Vizualizare 3D building + 4 sisteme + AI Insight
-8. ✅ **Admin & Trust** - 4 items + PropAdmin live metrics
-9. ✅ **Business Model** - 4 revenue streams + Unit economics
-10. ✅ **Value Proposition** - 3 actori (Client/Specialist/Platformă)
-11. ✅ **Golden Path** - 7 pași de la click la closure + KPIs
-12. ✅ **CTA + Footer**
+### Backend - 100% functional (36/36 tests passed)
+- ✅ JWT auth with httpOnly cookies (access 24h + refresh 7 days)
+- ✅ bcrypt password hashing + role-based access control
+- ✅ 5 pre-seeded demo accounts (idempotent on startup)
+- ✅ Full marketplace flow: create request → accept (45 RON fee) → start → complete → confirm
+- ✅ Escrow logic: client funds held, 95% released to specialist on confirmation
+- ✅ Token economy: +100 per confirmed job, +20 per review
+- ✅ Property health scoring: +5 health per confirmed intervention
+- ✅ Specialist tier system: auto-upgrade to VERIFIED at 10+ reviews & 4.8+ rating
+- ✅ Admin verification queue for specialists
 
-## Key Interactive Features
-- Click pe orice pas din User Journey arată ecran-mockup diferit în phone
-- Hover pe sistem Digital Twin scoate în evidență punctul pe building 3D
-- Animații Framer Motion la scroll (entrance staggered)
-- Stats cu countup la viewport entry
-- Nav sticky cu glass effect la scroll
+### Frontend - All routes working
+- ✅ `/` - Landing page (10 sections, auto-play User Journey)
+- ✅ `/login` - Login with demo account quick-buttons
+- ✅ `/register` - Sign up with role selection (client/specialist)
+- ✅ `/client` - Client dashboard (property, requests, Digital Twin 3D)
+- ✅ `/specialist` - Specialist dashboard (leads + my jobs)
+- ✅ `/admin` - Admin control panel (stats, verification queue)
+- ✅ `/operator` - Operator dashboard (validation queue)
+- ✅ **Bilingual RO/EN toggle** (persistent in localStorage)
+- ✅ **Auto-play User Journey** (3.5s per step, pause/resume button)
 
-## Files
-- /app/frontend/src/App.js (toate componentele)
-- /app/frontend/src/index.css (fonts + design tokens + grain texture)
-- /app/frontend/src/App.css (minimal)
+### Files
+- /app/backend/server.py - Complete backend (auth, marketplace, admin, operator)
+- /app/backend/.env - JWT_SECRET, MONGO_URL, ADMIN credentials
+- /app/frontend/src/App.js - Landing + router
+- /app/frontend/src/auth.js - AuthContext (login, register, logout, refreshUser)
+- /app/frontend/src/i18n.js - Translation context (RO/EN)
+- /app/frontend/src/pages/Auth.jsx - Login + Register pages
+- /app/frontend/src/pages/Dashboards.jsx - All 4 role dashboards
+- /app/memory/test_credentials.md - Demo account credentials
 
-## What's Built (Date: 2026-01)
-- Aplicație de prezentare completă cu toate 10 secțiunile cerute
-- Toate datele/numbers verificate cu ecranele furnizate de user
-- Bilingvă-ready (acum doar RO, structură pregătită pentru EN)
-- Test IDs adăugate pe toate elementele interactive
+## Demo Accounts (Pre-seeded)
+- Client: client@propmanage.io / Client123! (5000 RON wallet, 250 tokens, 1 property "Skyline Loft A4", 3 sample requests)
+- Specialist (HVAC): specialist@propmanage.io / Spec123! (VERIFIED, 800 RON balance, rating 4.9)
+- Specialist (Plumbing): specialist2@propmanage.io / Spec123! (VERIFIED)
+- Admin: admin@propmanage.io / Admin123!
+- Operator: operator@propmanage.io / Op123!
+
+## API Endpoints
+- POST /api/auth/{register,login,logout} | GET /api/auth/me
+- GET/POST /api/properties | GET /api/properties/{id}
+- GET/POST /api/requests | GET /api/requests/{id}
+- POST /api/requests/{id}/{accept,start,complete,confirm,escrow,review}
+- GET /api/specialists?category=
+- GET /api/transactions | POST /api/wallet/topup
+- GET /api/admin/{stats,specialists/pending,disputes} | POST /api/admin/specialists/{id}/verify
+- GET /api/operator/queue | POST /api/operator/logs/{id}/validate
 
 ## Backlog / Next Phase (P1)
-- Toggle limbă RO/EN funcțional
-- Pagini detaliate pentru fiecare rol (Client, Specialist, Admin)
-- Demo interactiv complet flow A-J cu auto-play
-- Animații Lottie pentru hero
-- Video product walkthrough
+- Stripe escrow integration (real payments)
+- Google OAuth via Emergent Auth (currently JWT only - user requested both)
+- Real-time chat between client + specialist (WebSocket)
+- Photo uploads for request evidence
+- Full bilingual coverage on landing page (currently only nav)
+- Mobile-responsive testing & fixes
+- Property health degradation over time (cron job)
 
 ## P2 / Future
-- Aplicația reală end-to-end (Backend FastAPI + MongoDB + auth)
-- Marketplace funcțional
-- Escrow integrare Stripe
-- Dashboard real-time pentru admin
+- IoT integration for live telemetry (HVAC, electric, plumbing)
+- 3D model upload + LiDAR scanning workflow
+- Sage Certified Audit external integration
+- Dispute mediation system (admin)
+- Maintenance log AR validation
+- Mobile native apps (React Native)
