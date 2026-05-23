@@ -574,6 +574,38 @@ async def create_checkout_session(request_id: str, request: Request, user: dict 
     if not origin:
         raise HTTPException(400, "Missing origin header")
     
+    # Demo mode: if Stripe key is the placeholder, simulate a successful payment
+    if stripe.api_key in ("sk_test_emergent", "", None) or not stripe.api_key.startswith("sk_"):
+        fake_session_id = f"cs_demo_{uuid.uuid4().hex[:16]}"
+        await db.payments.insert_one({
+            "session_id": fake_session_id,
+            "request_id": request_id,
+            "client_id": user["id"],
+            "amount": amount,
+            "status": "demo_pending",
+            "demo": True,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        # In demo mode, we immediately mark as paid and redirect to success
+        await db.payments.update_one(
+            {"session_id": fake_session_id},
+            {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        await db.requests.update_one(
+            {"_id": ObjectId(request_id)},
+            {"$set": {"escrow_amount": amount, "escrow_status": "held", "paid_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        await db.transactions.insert_one({
+            "user_id": user["id"],
+            "type": "escrow_deposit",
+            "amount": -amount,
+            "request_id": request_id,
+            "session_id": fake_session_id,
+            "demo": True,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        return {"checkout_url": f"{origin}/client?payment=success&request={request_id}&demo=1", "session_id": fake_session_id, "demo_mode": True}
+    
     try:
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
@@ -620,6 +652,16 @@ async def payment_status(session_id: str, user: dict = Depends(get_current_user)
     payment = await db.payments.find_one({"session_id": session_id})
     if not payment:
         raise HTTPException(404, "Payment session not found")
+    
+    # Demo mode short-circuit
+    if payment.get("demo"):
+        return {
+            "status": "paid",
+            "amount": payment["amount"],
+            "request_id": payment["request_id"],
+            "stripe_status": "complete",
+            "demo_mode": True,
+        }
     
     try:
         session = stripe.checkout.Session.retrieve(session_id)
