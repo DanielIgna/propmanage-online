@@ -7,7 +7,7 @@ import {
   Building2, Home, Wrench, ShieldCheck, Settings, LogOut, Languages,
   Wallet, Sparkles, Zap, Droplet, Wind, AlertTriangle, CheckCircle2,
   Clock, Star, TrendingUp, Users, Briefcase, Award, Plus,
-  ArrowRight, FileCheck, MessageSquare, Gavel, Activity, ArrowUpRight, Eye, CreditCard, Bell, Building, Camera, Shield, Calendar, Search, Filter
+  ArrowRight, FileCheck, MessageSquare, Gavel, Activity, ArrowUpRight, Eye, CreditCard, Bell, Building, Camera, Shield, Calendar, Search, Filter, Scale
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { useI18n } from "../i18n";
@@ -15,6 +15,8 @@ import { ChatPanel } from "./ChatPanel";
 import { PhotoUploader, ReviewModal, PropertyManagerModal } from "./Components";
 import { TwoFASetupModal, PropertyTimelineModal } from "./Marketplace";
 import { AIAssistant } from "./AIAssistant";
+import { SpecialistDetailModal, DisputeResolveModal, OpenDisputeModal, SpecialistDocumentsModal } from "./AdminModals";
+import { TwinEditorModal, TWIN_STATUS_LABELS } from "./OperatorTwin";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -187,6 +189,7 @@ export const ClientDashboard = () => {
   const [show2FA, setShow2FA] = useState(false);
   const [show2FAStatus, setShow2FAStatus] = useState(false);
   const [timelineFor, setTimelineFor] = useState(null);
+  const [disputeFor, setDisputeFor] = useState(null);
   const [searchQ, setSearchQ] = useState("");
   const [filterCat, setFilterCat] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -388,6 +391,18 @@ export const ClientDashboard = () => {
                     <Star className="w-3 h-3" />Evaluează specialist
                   </button>
                 )}
+                {r.specialist_id && ["assigned","in_progress","completed"].includes(r.status) && !r.disputed && (
+                  <button onClick={() => setDisputeFor(r)}
+                    className="mt-2 w-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 py-2 rounded-lg text-xs flex items-center justify-center gap-1"
+                    data-testid={`dispute-${r.id}`}>
+                    <AlertTriangle className="w-3 h-3" />Deschide dispută
+                  </button>
+                )}
+                {r.disputed && (
+                  <div className="mt-2 w-full bg-amber-500/15 border border-amber-500/40 text-amber-300 py-2 rounded-lg text-xs text-center" data-testid={`disputed-badge-${r.id}`}>
+                    ⚠ Dispută în analiză
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -398,6 +413,7 @@ export const ClientDashboard = () => {
       {chatRequest && <ChatPanel requestId={chatRequest} onClose={() => setChatRequest(null)} />}
       {showPropManager && <PropertyManagerModal properties={properties} onClose={() => setShowPropManager(false)} onChange={setProperties} />}
       {timelineFor && <PropertyTimelineModal propertyId={timelineFor} onClose={() => setTimelineFor(null)} />}
+      {disputeFor && <OpenDisputeModal requestId={disputeFor.id} requestTitle={disputeFor.title} onClose={() => setDisputeFor(null)} onOpened={() => loadRequests()} />}
       {show2FA && <TwoFASetupModal onClose={(updated) => { setShow2FA(false); if (updated) axios.get(`${API}/auth/2fa/status`).then(r => setTwoFAEnabled(r.data.enabled)); }} currentlyEnabled={twoFAEnabled} />}
       {reviewFor && (
         <ReviewModal 
@@ -486,6 +502,8 @@ export const SpecialistDashboard = () => {
   const { user, refreshUser } = useAuth();
   const [requests, setRequests] = useState([]);
   const [chatRequest, setChatRequest] = useState(null);
+  const [showDocs, setShowDocs] = useState(false);
+  const [disputeFor, setDisputeFor] = useState(null);
   
   const load = () => axios.get(`${API}/requests`).then(r => setRequests(r.data)).catch(() => {});
   useEffect(() => { if (user) load(); }, [user]);
@@ -504,6 +522,27 @@ export const SpecialistDashboard = () => {
   
   return (
     <DashLayout role="specialist" title={`Bună, ${user?.name?.split(" ")[0]}`}>
+      {!user?.verified && (
+        <div className="mb-6 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3" data-testid="verify-banner">
+          <div className="flex items-center gap-3">
+            <FileCheck className="w-5 h-5 text-amber-400" />
+            <div>
+              <div className="text-sm font-medium">Cont neverificat</div>
+              <div className="text-xs text-stone-400">Încarcă documentele pentru a primi badge "VERIFIED" și acces complet la marketplace.</div>
+            </div>
+          </div>
+          <button onClick={() => setShowDocs(true)} className="btn-accent px-4 py-2 rounded-full text-xs font-medium" data-testid="upload-docs-cta">
+            Încarcă documente
+          </button>
+        </div>
+      )}
+      {user?.verified && (
+        <div className="mb-6 flex justify-end">
+          <button onClick={() => setShowDocs(true)} className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full text-xs flex items-center gap-2" data-testid="manage-docs-btn">
+            <FileCheck className="w-3.5 h-3.5" />Documentele mele
+          </button>
+        </div>
+      )}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Stat icon={Wallet} label="Sold lead-uri" value={`${user?.wallet_balance?.toFixed(0) || 0}`} sub="RON" color="emerald" tid="spec-stat-wallet" />
         <Stat icon={Star} label="Rating" value={user?.rating || "—"} sub={`${user?.reviews_count || 0} reviews`} color="amber" tid="spec-stat-rating" />
@@ -566,13 +605,21 @@ export const SpecialistDashboard = () => {
                       <MessageSquare className="w-3 h-3" />
                     </button>
                   )}
+                  {(r.status === "assigned" || r.status === "in_progress" || r.status === "completed") && !r.disputed && (
+                    <button onClick={() => setDisputeFor(r)} className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 py-2 px-3 rounded-lg text-xs flex items-center gap-1" data-testid={`spec-dispute-${r.id}`} title="Deschide dispută">
+                      <AlertTriangle className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
+                {r.disputed && <div className="mt-2 w-full bg-amber-500/15 border border-amber-500/40 text-amber-300 py-1.5 rounded-lg text-[11px] text-center">⚠ Dispută în analiză</div>}
               </div>
             ))}
           </div>
         </div>
       </div>
       {chatRequest && <ChatPanel requestId={chatRequest} onClose={() => setChatRequest(null)} />}
+      {showDocs && <SpecialistDocumentsModal onClose={() => setShowDocs(false)} />}
+      {disputeFor && <OpenDisputeModal requestId={disputeFor.id} requestTitle={disputeFor.title} onClose={() => setDisputeFor(null)} onOpened={() => load()} />}
     </DashLayout>
   );
 };
@@ -581,76 +628,272 @@ export const SpecialistDashboard = () => {
 export const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
   const [pending, setPending] = useState([]);
-  
-  useEffect(() => {
+  const [disputes, setDisputes] = useState([]);
+  const [tab, setTab] = useState("overview");
+  const [detailSpecId, setDetailSpecId] = useState(null);
+  const [resolveDispute, setResolveDispute] = useState(null);
+
+  const loadAll = () => {
     axios.get(`${API}/admin/stats`).then(r => setStats(r.data)).catch(() => {});
     axios.get(`${API}/admin/specialists/pending`).then(r => setPending(r.data)).catch(() => {});
-  }, []);
-  
-  const verify = async (id) => {
-    try {
-      await axios.post(`${API}/admin/specialists/${id}/verify`);
-      setPending(pending.filter(p => p.id !== id));
-    } catch (e) { alert(formatApiError(e)); }
+    axios.get(`${API}/admin/disputes`).then(r => setDisputes(r.data)).catch(() => {});
   };
-  
+  useEffect(() => { loadAll(); }, []);
+
+  const openDisputes = disputes.filter(d => d.status === "open");
+
+  const TabBtn = ({ id, label, count, icon: Ic }) => (
+    <button onClick={() => setTab(id)} className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm transition ${tab === id ? "bg-[#d4ff3a] text-black font-medium" : "bg-white/5 hover:bg-white/10 text-stone-300"}`} data-testid={`admin-tab-${id}`}>
+      <Ic className="w-3.5 h-3.5" />{label}
+      {count > 0 && <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tab === id ? "bg-black/20 text-black" : "bg-[#d4ff3a]/20 text-[#d4ff3a]"}`}>{count}</span>}
+    </button>
+  );
+
   return (
     <DashLayout role="admin" title="Panou de Control">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         <Stat icon={Users} label="Utilizatori" value={stats?.users || 0} sub="Total" tid="admin-users" />
         <Stat icon={Briefcase} label="Joburi active" value={stats?.active_jobs || 0} sub="Live" color="amber" tid="admin-jobs" />
         <Stat icon={Award} label="Verificați" value={stats?.verified || 0} sub={`/ ${stats?.specialists || 0}`} color="emerald" tid="admin-verified" />
-        <Stat icon={Gavel} label="În așteptare" value={stats?.pending_verification || 0} sub="Acțiune" color="cyan" tid="admin-pending" />
+        <Stat icon={Gavel} label="În așteptare" value={stats?.pending_verification || 0} sub="Specialiști" color="cyan" tid="admin-pending" />
+        <Stat icon={AlertTriangle} label="Dispute" value={openDisputes.length} sub="Deschise" color="red" tid="admin-disputes-stat" />
       </div>
-      
-      <div className="glass-strong rounded-3xl p-6">
-        <h3 className="font-serif text-xl mb-4">Coadă verificare specialiști</h3>
-        {pending.length === 0 && <div className="text-xs text-stone-500 text-center py-8" data-testid="admin-empty">Niciun specialist în așteptare</div>}
-        <div className="space-y-2">
-          {pending.map(p => (
-            <div key={p.id} className="flex items-center justify-between bg-white/5 rounded-xl p-4" data-testid={`pending-${p.id}`}>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-stone-600 to-stone-800 flex items-center justify-center font-medium">{p.name?.[0]}</div>
+
+      <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar">
+        <TabBtn id="overview" label="Sumar" count={0} icon={Activity} />
+        <TabBtn id="specialists" label="Specialiști" count={pending.length} icon={ShieldCheck} />
+        <TabBtn id="disputes" label="Dispute" count={openDisputes.length} icon={Scale} />
+      </div>
+
+      {tab === "overview" && (
+        <div className="grid lg:grid-cols-2 gap-6">
+          <div className="glass-strong rounded-3xl p-6">
+            <h3 className="font-serif text-xl mb-4">Activitate platformă</h3>
+            <div className="space-y-3">
+              <Row label="Joburi finalizate" value={stats?.completed_jobs || 0} />
+              <Row label="Specialiști total" value={stats?.specialists || 0} />
+              <Row label="Specialiști verificați" value={stats?.verified || 0} />
+              <Row label="Dispute deschise" value={openDisputes.length} />
+              <Row label="Dispute rezolvate" value={disputes.length - openDisputes.length} />
+            </div>
+          </div>
+          <div className="glass-strong rounded-3xl p-6">
+            <h3 className="font-serif text-xl mb-4">Acțiuni rapide</h3>
+            <div className="space-y-2">
+              <button onClick={() => setTab("specialists")} className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 rounded-xl p-4 text-left transition" data-testid="quick-verify">
                 <div>
-                  <div className="font-medium text-sm">{p.name}</div>
-                  <div className="text-[10px] text-stone-500">{p.email} · {p.specialty || "Specialist"}</div>
+                  <div className="text-sm font-medium">Verifică specialiști</div>
+                  <div className="text-[11px] text-stone-400">{pending.length} în așteptare</div>
                 </div>
-              </div>
-              <button onClick={() => verify(p.id)} className="btn-accent px-4 py-2 rounded-full text-xs font-medium" data-testid={`verify-${p.id}`}>
-                Verifică
+                <ArrowRight className="w-4 h-4 text-stone-400" />
+              </button>
+              <button onClick={() => setTab("disputes")} className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 rounded-xl p-4 text-left transition" data-testid="quick-disputes">
+                <div>
+                  <div className="text-sm font-medium">Mediere dispute</div>
+                  <div className="text-[11px] text-stone-400">{openDisputes.length} de analizat</div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-stone-400" />
               </button>
             </div>
-          ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {tab === "specialists" && (
+        <div className="glass-strong rounded-3xl p-6">
+          <h3 className="font-serif text-xl mb-4">Coadă verificare specialiști</h3>
+          {pending.length === 0 && <div className="text-xs text-stone-500 text-center py-8" data-testid="admin-empty">Niciun specialist în așteptare</div>}
+          <div className="space-y-2">
+            {pending.map(p => (
+              <div key={p.id} className="flex items-center justify-between bg-white/5 rounded-xl p-4" data-testid={`pending-${p.id}`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-stone-600 to-stone-800 flex items-center justify-center font-medium">{p.name?.[0]}</div>
+                  <div>
+                    <div className="font-medium text-sm">{p.name}</div>
+                    <div className="text-[10px] text-stone-500">
+                      {p.email} · {p.specialty || "Specialist"} · {(p.documents || []).length} docs
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => setDetailSpecId(p.id)} className="px-4 py-2 bg-white/10 hover:bg-white/15 rounded-full text-xs font-medium flex items-center gap-1" data-testid={`review-spec-${p.id}`}>
+                  <Eye className="w-3 h-3" />Analizează
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === "disputes" && (
+        <div className="space-y-4">
+          <div className="glass-strong rounded-3xl p-6">
+            <h3 className="font-serif text-xl mb-4 flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-amber-400" />Dispute deschise ({openDisputes.length})</h3>
+            {openDisputes.length === 0 && <div className="text-xs text-stone-500 text-center py-8" data-testid="no-open-disputes">Nicio dispută deschisă</div>}
+            <div className="space-y-2">
+              {openDisputes.map(d => (
+                <div key={d.id} className="bg-white/5 rounded-xl p-4" data-testid={`dispute-${d.id}`}>
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm">{d.request_title || "Lucrare necunoscută"}</div>
+                      <div className="text-[10px] text-stone-500 mt-0.5">
+                        Deschis de {d.opened_by_role} · Client: {d.client_name || "—"} · Specialist: {d.specialist_name || "—"}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] text-stone-500">Escrow</div>
+                      <div className="font-serif text-base text-amber-300">{(d.escrow_amount || 0).toFixed(0)} RON</div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-stone-300 italic mb-3 line-clamp-2">"{d.reason}"</div>
+                  <button onClick={() => setResolveDispute(d)} className="w-full btn-accent py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-2" data-testid={`resolve-${d.id}`}>
+                    <Scale className="w-3 h-3" />Mediere & Rezolvare
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {disputes.length - openDisputes.length > 0 && (
+            <div className="glass-strong rounded-3xl p-6">
+              <h3 className="font-serif text-xl mb-4">Istoric rezolvate ({disputes.length - openDisputes.length})</h3>
+              <div className="space-y-2">
+                {disputes.filter(d => d.status === "resolved").slice(0, 10).map(d => (
+                  <div key={d.id} className="bg-white/5 rounded-xl p-3 text-xs flex items-center justify-between" data-testid={`resolved-${d.id}`}>
+                    <div className="min-w-0">
+                      <div className="font-medium text-sm truncate">{d.request_title}</div>
+                      <div className="text-[10px] text-stone-500">{d.resolution} · Client: {(d.client_amount || 0).toFixed(0)} RON, Specialist: {(d.specialist_amount || 0).toFixed(0)} RON</div>
+                    </div>
+                    <span className="text-[10px] uppercase tracking-wider px-2 py-1 bg-emerald-500/15 text-emerald-400 rounded-full">Rezolvată</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {detailSpecId && (
+        <SpecialistDetailModal specialistId={detailSpecId} onClose={() => setDetailSpecId(null)} onChange={loadAll} />
+      )}
+      {resolveDispute && (
+        <DisputeResolveModal dispute={resolveDispute} onClose={() => setResolveDispute(null)} onResolved={loadAll} />
+      )}
     </DashLayout>
   );
 };
 
+const Row = ({ label, value }) => (
+  <div className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+    <span className="text-sm text-stone-400">{label}</span>
+    <span className="font-serif text-lg">{value}</span>
+  </div>
+);
+
 // ============= OPERATOR DASHBOARD =============
 export const OperatorDashboard = () => {
   const [queue, setQueue] = useState([]);
-  
-  useEffect(() => {
+  const [twins, setTwins] = useState([]);
+  const [tab, setTab] = useState("twins");
+  const [editingTwin, setEditingTwin] = useState(null);
+
+  const load = () => {
     axios.get(`${API}/operator/queue`).then(r => setQueue(r.data)).catch(() => {});
-  }, []);
-  
+    axios.get(`${API}/operator/twins`).then(r => setTwins(r.data)).catch(() => {});
+  };
+  useEffect(() => { load(); }, []);
+
+  const pendingTwins = twins.filter(t => t.status === "pending_validation");
+  const approvedTwins = twins.filter(t => t.status === "approved");
+  const revisionTwins = twins.filter(t => t.status === "needs_revision");
+
+  const TabBtn = ({ id, label, count, icon: Ic }) => (
+    <button onClick={() => setTab(id)} className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm transition ${tab === id ? "bg-[#d4ff3a] text-black font-medium" : "bg-white/5 hover:bg-white/10 text-stone-300"}`} data-testid={`op-tab-${id}`}>
+      <Ic className="w-3.5 h-3.5" />{label}
+      {count > 0 && <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tab === id ? "bg-black/20 text-black" : "bg-[#d4ff3a]/20 text-[#d4ff3a]"}`}>{count}</span>}
+    </button>
+  );
+
   return (
-    <DashLayout role="operator" title="Validare Mentenanță">
+    <DashLayout role="operator" title="Validare Digital Twin & Mentenanță">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Stat icon={Clock} label="În așteptare" value={queue.length} sub="Logs" color="amber" tid="op-queue" />
-        <Stat icon={CheckCircle2} label="Aprobate azi" value={0} sub="Today" color="emerald" tid="op-approved" />
-        <Stat icon={AlertTriangle} label="Respinse" value={0} sub="Today" color="red" tid="op-rejected" />
-        <Stat icon={Activity} label="Total" value={queue.length} sub="All time" tid="op-total" />
+        <Stat icon={Building} label="Twins activi" value={approvedTwins.length} sub="Aprobate" color="emerald" tid="op-approved" />
+        <Stat icon={Clock} label="În validare" value={pendingTwins.length} sub="Acțiune" color="amber" tid="op-pending-twins" />
+        <Stat icon={AlertTriangle} label="Revizie cerută" value={revisionTwins.length} sub="Așteptare client" color="red" tid="op-revision" />
+        <Stat icon={FileCheck} label="Logs mentenanță" value={queue.length} sub="În coadă" tid="op-logs" />
       </div>
-      
-      <div className="glass-strong rounded-3xl p-8 text-center">
-        <Wrench className="w-12 h-12 text-stone-600 mx-auto mb-4" />
-        <h3 className="font-serif text-2xl mb-2">Coadă de validare goală</h3>
-        <p className="text-sm text-stone-400 max-w-md mx-auto">
-          Toate log-urile de mentenanță au fost validate. Noile log-uri vor apărea aici când specialiștii completează lucrări.
-        </p>
+
+      <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar">
+        <TabBtn id="twins" label="Digital Twins" count={pendingTwins.length} icon={Building} />
+        <TabBtn id="logs" label="Logs mentenanță" count={queue.length} icon={FileCheck} />
       </div>
+
+      {tab === "twins" && (
+        <div className="space-y-4">
+          <div className="glass-strong rounded-3xl p-6">
+            <h3 className="font-serif text-xl mb-4 flex items-center gap-2"><Clock className="w-4 h-4 text-amber-400" />Twins în validare ({pendingTwins.length})</h3>
+            {pendingTwins.length === 0 && <div className="text-xs text-stone-500 text-center py-8" data-testid="no-pending-twins">Niciun twin în așteptare</div>}
+            <div className="grid sm:grid-cols-2 gap-3">
+              {pendingTwins.map(t => <TwinCard key={t.id} t={t} onOpen={() => setEditingTwin(t.property_id)} />)}
+            </div>
+          </div>
+
+          {(approvedTwins.length > 0 || revisionTwins.length > 0) && (
+            <div className="glass-strong rounded-3xl p-6">
+              <h3 className="font-serif text-xl mb-4">Istoric ({approvedTwins.length + revisionTwins.length})</h3>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {[...approvedTwins, ...revisionTwins].slice(0, 10).map(t => <TwinCard key={t.id} t={t} onOpen={() => setEditingTwin(t.property_id)} />)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "logs" && (
+        <div className="glass-strong rounded-3xl p-8 text-center">
+          <Wrench className="w-12 h-12 text-stone-600 mx-auto mb-4" />
+          <h3 className="font-serif text-2xl mb-2">Coadă logs mentenanță</h3>
+          <p className="text-sm text-stone-400 max-w-md mx-auto">
+            {queue.length === 0
+              ? "Toate log-urile de mentenanță au fost validate. Noile log-uri vor apărea aici când specialiștii completează lucrări."
+              : `${queue.length} log-uri în așteptare.`}
+          </p>
+        </div>
+      )}
+
+      {editingTwin && <TwinEditorModal propertyId={editingTwin} onClose={() => setEditingTwin(null)} onSaved={load} />}
     </DashLayout>
   );
 };
+
+const TwinCard = ({ t, onOpen }) => {
+  const statusInfo = TWIN_STATUS_LABELS[t.status] || TWIN_STATUS_LABELS.draft;
+  return (
+    <button onClick={onOpen} className="text-left bg-white/5 hover:bg-white/10 rounded-2xl p-4 transition border border-white/5" data-testid={`twin-card-${t.id || t.property_id}`}>
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="min-w-0">
+          <div className="font-medium text-sm truncate">{t.property_name || "Proprietate"}</div>
+          <div className="text-[10px] text-stone-500 truncate">{t.property_address || "—"}</div>
+        </div>
+        <span className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-full whitespace-nowrap ${statusInfo.color}`}>{statusInfo.label}</span>
+      </div>
+      <div className="text-[10px] text-stone-500 mb-3">
+        Proprietar: {t.owner_name || "—"}
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-xs">
+        <Pill label="Camere" value={(t.rooms || []).length} />
+        <Pill label="Asset-uri" value={(t.assets || []).length} />
+        <Pill label="Suprafață" value={t.property_surface ? `${t.property_surface}m²` : "—"} />
+      </div>
+      <div className="mt-3 text-[11px] text-[#d4ff3a] flex items-center gap-1">
+        Deschide editor <ArrowRight className="w-3 h-3" />
+      </div>
+    </button>
+  );
+};
+
+const Pill = ({ label, value }) => (
+  <div className="bg-black/30 rounded-lg p-2 text-center">
+    <div className="text-[9px] uppercase tracking-wider text-stone-500">{label}</div>
+    <div className="font-serif text-sm">{value}</div>
+  </div>
+);

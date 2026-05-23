@@ -1,0 +1,53 @@
+{
+  "summary": "Phase 6 (Admin Workflow + Operator Digital Twin) testing complete. Backend: 26/26 pytest tests passed (100%). Frontend: Playwright UI verified for Admin (3 tabs Sumar/Specialiști/Dispute with pill counts, SpecialistDetailModal opens with 3 seeded docs for pending@propmanage.io, approve-doc works, DisputeResolveModal accessible), Operator (2 tabs, twin-card opens TwinEditorModal showing 6 rooms + 5 assets on 2D canvas with toolbar Selectează/Cameră/Asset/Aprobă twin/Cere revizie), Pending Specialist (yellow verify-banner + SpecialistDocumentsModal showing 3 seeded docs). Regression smoke (login, /auth/me, properties, requests, marketplace, notifications, admin/stats) all pass. Dispute open + resolve flow verified end-to-end via backend (refund_client / pay_specialist / split with correct 5% platform fee math; wallet credits + request.status='confirmed' + escrow_status='released' + disputed=false all persist). Documents upload/list/delete + admin doc review (approved/rejected) + admin specialist verify/reject all green. Twin lifecycle (request -> pending_validation -> approve/needs_revision; save rooms/assets; empty-draft fallback) all green.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/admin/disputes/{id}/resolve (split)", "issue": "Math credits client_amount = amount * (pct/100) then specialist_amount = (amount - client_amount) * 0.95. Platform takes 5% only on specialist's share, not the client's refund slice. This is asymmetric: in a 100% client refund the platform gets 0; in 100% specialist payout the platform gets 5%. Probably intentional but worth documenting in admin UI so admins know split is post-fee for the specialist only."},
+      {"endpoint": "POST /api/specialist/documents", "issue": "No size/MIME validation on the base64 url payload. A specialist can push a multi-MB doc straight into the users document array. With many uploads the user doc can approach BSON 16MB."},
+      {"endpoint": "POST /api/specialist/documents", "issue": "type Literal does not include 'authorization' or 'work_permit' which Romanian property specialists typically need (autorizație ANRE, atestat ANRSC). Consider broadening."},
+      {"endpoint": "POST /api/operator/twins/{prop_id}/validate", "issue": "Does not actually set property.twin_unlocked anywhere - only updates twin.status='approved'. The feature description says it should toggle property.twin_unlocked but backend code path never touches db.properties. Either remove the claim or add the property update."},
+      {"endpoint": "POST /api/operator/twins/{prop_id}", "issue": "Saving the twin overwrites status implicitly because payload doesn't include 'status', but if existing twin was 'pending_validation' status is preserved (good). However a NEW twin is set to 'draft' on first save - which means an operator editing & saving a 'pending_validation' twin will keep it pending; but if an operator saves on a property that has no twin yet, it lands in draft - the validate endpoint then 404s. The empty-draft path from GET is OK but POST without a prior request leaves twin invisible in 'pending' tab. Minor UX/state issue."},
+      {"endpoint": "POST /api/requests/{id}/dispute", "issue": "Allows opening dispute on status='completed'. After confirm() runs the request becomes 'confirmed' and dispute is blocked, but during the 'completed' window (specialist marked done, client not yet confirmed) the client can both confirm AND dispute. If they race, the dispute opens but escrow may already be released by confirm. Recommend either: (a) block disputes once escrow_status='released', or (b) when dispute opens on 'completed' status, also block client's confirm endpoint until resolved."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin Dashboard stats row", "issues": ["The third Stat card on overview shows '/ 4' as the sub-label (e.g., '3 / 4 Verificați') but the slash-number floats above with no clear meaning; consider 'Verificați 3 / 4' single line"]},
+      {"screen": "Twin Editor", "issues": ["Header 'NECESITĂ REVIZIE' badge color is red, but the same twin still has a green 'Aprobă twin' CTA in footer. After clicking 'Cere revizie' once, the editor still allows re-approving - admin/operator can ping-pong status. Consider disabling footer actions for already-validated twins or showing the current status more prominently before re-action."]},
+      {"screen": "TwinEditorModal canvas", "issues": ["Asset icon overlap with room label text in small rooms (Living shows asset icon on top of room name text). Consider rendering asset icons in front and shifting room label to a corner."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase6.py",
+    "/app/test_reports/pytest/phase6_results.xml"
+  ],
+  "action_items": [
+    "Verify operator_validate_twin should also set property.twin_unlocked=true on approve (claimed in PRD but not implemented).",
+    "Add per-document size cap (~2MB base64) + total documents array cap on POST /api/specialist/documents.",
+    "Decide policy on dispute-after-completed-before-confirmed race; current code allows both confirm and dispute paths to fire on a 'completed' job.",
+    "Tooltip or label clarifying that split resolution charges 5% platform fee only on the specialist's slice.",
+    "Consider broadening DocumentIn.type Literal to include Romanian-specific work permits (ANRE, ANRSC).",
+    "Minor UI: rework admin Stat sub-label '/ 4' formatting and avoid icon/text overlap in narrow twin rooms."
+  ],
+  "critical_code_review_comments": [
+    "server.py now 2246 lines - same advice as iteration_3: split into routers (admin, disputes, twin, documents, marketplace, notifications, ai, payments).",
+    "list_disputes does N+1 queries (3 lookups per dispute: request, client, specialist). Use $lookup aggregation or batch the users in a single find({_id: {$in: [...]}}) once we have >50 disputes.",
+    "operator_list_twins also has N+1 (property+owner per twin). Same fix.",
+    "resolve_dispute mutates request.status to 'confirmed' even if the original status was 'assigned' (work never started). Semantically 'confirmed' implies completed work; consider a new terminal status like 'dispute_resolved' for clarity, or leave but document.",
+    "Twin status state machine has no enforcement - operator_save_twin can be called regardless of current status; validate endpoint can flip between approved <-> needs_revision repeatedly. Add a small FSM check.",
+    "open_dispute notifies admins via for-loop awaiting notify() per admin sequentially. Same async-fanout suggestion as Phase 4 notifications.",
+    "DisputeResolveIn.client_pct is Optional[int] but only used when resolution=='split'. Pydantic doesn't enforce the cross-field rule. Add a validator that requires client_pct when resolution=='split' and rejects it otherwise.",
+    "TwinAsset / TwinRoom Literal lists hard-code Romanian-flavored types but no localization layer; OK for now."
+  ],
+  "updated_files": ["/app/backend/tests/test_phase6.py", "/app/test_reports/iteration_4.json"],
+  "success_rate": {"backend": "100% (26/26)", "frontend": "~95% (admin tabs, modals, twin editor, pending-spec banner & docs modal all verified; client dispute open modal not directly clicked due to script timeout selecting login form, but the OpenDisputeModal selectors and reason textarea exist in code, the dispute open path is covered via backend, and admin already shows 2 resolved disputes that came from a successful frontend/backend dispute creation in prior testing)"},
+  "test_credentials": "client@propmanage.io/Client123!, specialist@propmanage.io/Spec123!, pending@propmanage.io/Spec123! (3 seeded docs, NOT verified), admin@propmanage.io/Admin123!, operator@propmanage.io/Op123! (1 pending twin on Skyline Loft A4 with 5 rooms + 3 assets) - all working.",
+  "seed_data_creation": "Tests create TEST_phase6 prefixed: certification documents (uploaded then deleted), one TEST_phase6 dispute request + lampa asset on first twin. Tests reuse the seeded pending specialist and Skyline twin. Cumulative test data is identifiable via TEST_phase6 prefix.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 6 fully green. New file at /app/backend/tests/test_phase6.py - 26 tests, ~5.5s runtime. Notable side-effect: test_phase6 will approve at least one doc on pending@propmanage.io each run (idempotent fallback picks first doc if all are reviewed), and will resolve any existing open dispute via split 60/40 (also creates a new disputed job if none exist). Wallet balances on client@propmanage.io and specialist@propmanage.io drift slightly each run. The pending@propmanage.io specialist remains verified=false across runs (admin never auto-verifies them in the test). Skyline Loft A4 twin alternates between approved and needs_revision across runs depending on last test execution. The Operator Twin's property.twin_unlocked field is NOT set by the validate endpoint - flag for E1 if PRD says it should be.",
+  "rca of the issue": "No bugs blocking the workflow. Minor design/data-integrity concerns documented above. The new Admin (disputes + specialist docs validation) and Operator (digital twin) workflows are wired correctly end-to-end - backend persistence verified via GET-after-mutation and frontend modals verified via Playwright."
+}

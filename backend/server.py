@@ -137,6 +137,33 @@ class PropertyUpdateIn(BaseModel):
     surface: Optional[float] = None
     rooms: Optional[int] = None
 
+# ============= REGIONS / ZONES =============
+class RegionIn(BaseModel):
+    country: str
+    city: str
+    zone: str  # neighborhood
+
+class SpecialistZonesIn(BaseModel):
+    zones: List[str]  # list of zone IDs the specialist covers
+    categories: List[str]  # service categories
+
+class AvailabilityIn(BaseModel):
+    status: Literal["available", "busy", "offline"]
+    available_hours: Optional[Dict] = None  # {monday: [{start: "09:00", end: "17:00"}], ...}
+
+class ServiceAvailabilityIn(BaseModel):
+    region_id: str
+    service: str  # plumbing, electric, hvac, interior_design, etc.
+    state: Literal["active", "inactive", "limited", "premium_only"]
+    min_specialists: int = 1
+
+class InteriorDesignIn(BaseModel):
+    property_id: str
+    rooms_to_design: List[str]  # ["living", "bedroom", ...]
+    style: str
+    budget_total: float
+    tokens_to_apply: int  # how many tokens to redeem
+
 class RequestIn(BaseModel):
     property_id: str
     category: str  # electric, plumbing, hvac, etc.
@@ -156,6 +183,59 @@ class ReviewIn(BaseModel):
     job_id: str
     rating: int = Field(ge=1, le=5)
     comment: Optional[str] = None
+
+class DocumentIn(BaseModel):
+    type: Literal["id_card", "insurance", "certification", "company_cui", "other"]
+    name: str
+    url: str  # base64 data URL or http URL
+
+class DocumentReviewIn(BaseModel):
+    status: Literal["approved", "rejected"]
+    reason: Optional[str] = None
+
+class SpecialistRejectIn(BaseModel):
+    reason: str = Field(min_length=3)
+
+class DisputeOpenIn(BaseModel):
+    reason: str = Field(min_length=10)
+    evidence_urls: Optional[List[str]] = None  # photos
+
+class DisputeResolveIn(BaseModel):
+    resolution: Literal["refund_client", "pay_specialist", "split"]
+    client_pct: Optional[int] = None  # 0-100 if split
+    notes: Optional[str] = None
+
+# ============= DIGITAL TWIN MODELS =============
+class TwinRoom(BaseModel):
+    id: str
+    name: str
+    type: Literal["living", "bedroom", "kitchen", "bathroom", "hallway", "balcony", "office", "storage", "other"]
+    area: float = 0  # m²
+    x: float = 0
+    y: float = 0
+    w: float = 100
+    h: float = 100
+
+class TwinAsset(BaseModel):
+    id: str
+    type: Literal["hvac", "boiler", "electric_panel", "water_meter", "gas_meter", "appliance", "lighting", "plumbing", "other"]
+    name: str
+    room_id: Optional[str] = None
+    x: float = 0
+    y: float = 0
+    condition: Literal["good", "fair", "needs_service", "critical"] = "good"
+    last_service_date: Optional[str] = None
+    notes: Optional[str] = None
+
+class TwinUpsertIn(BaseModel):
+    rooms: List[TwinRoom] = []
+    assets: List[TwinAsset] = []
+    model_url: Optional[str] = None
+    notes: Optional[str] = None
+
+class TwinValidateIn(BaseModel):
+    action: Literal["approve", "request_revision"]
+    notes: Optional[str] = None
 
 # ============= AUTH ENDPOINTS =============
 @api.post("/auth/register")
@@ -581,7 +661,225 @@ async def verify_specialist(spec_id: str, user: dict = Depends(require_role("adm
 @api.get("/admin/disputes")
 async def list_disputes(user: dict = Depends(require_role("admin"))):
     docs = await db.disputes.find({}).sort("created_at", -1).to_list(50)
-    return [serialize_doc(d) for d in docs]
+    # Enrich with request + client + specialist names
+    out = []
+    for d in docs:
+        d = serialize_doc(d)
+        req = await db.requests.find_one({"_id": ObjectId(d["request_id"])}) if d.get("request_id") else None
+        if req:
+            d["request_title"] = req.get("title")
+            d["request_status"] = req.get("status")
+            d["escrow_amount"] = req.get("escrow_amount", 0)
+            client_u = await db.users.find_one({"_id": ObjectId(req["client_id"])}) if req.get("client_id") else None
+            spec_u = await db.users.find_one({"_id": ObjectId(req["specialist_id"])}) if req.get("specialist_id") else None
+            d["client_name"] = client_u.get("name") if client_u else None
+            d["specialist_name"] = spec_u.get("name") if spec_u else None
+        out.append(d)
+    return out
+
+@api.get("/admin/specialists/{spec_id}")
+async def admin_specialist_detail(spec_id: str, user: dict = Depends(require_role("admin"))):
+    doc = await db.users.find_one({"_id": ObjectId(spec_id), "role": "specialist"})
+    if not doc:
+        raise HTTPException(404, "Specialist not found")
+    return serialize_doc(doc)
+
+@api.post("/admin/specialists/{spec_id}/reject")
+async def reject_specialist(spec_id: str, data: SpecialistRejectIn, user: dict = Depends(require_role("admin"))):
+    spec = await db.users.find_one({"_id": ObjectId(spec_id), "role": "specialist"})
+    if not spec:
+        raise HTTPException(404, "Specialist not found")
+    await db.users.update_one(
+        {"_id": ObjectId(spec_id)},
+        {"$set": {
+            "verified": False,
+            "tier": "REJECTED",
+            "rejection_reason": data.reason,
+            "rejected_at": datetime.now(timezone.utc).isoformat(),
+            "rejected_by": user["id"],
+        }}
+    )
+    await notify(spec_id, "Verificare respinsă", f"Cererea de verificare a fost respinsă. Motiv: {data.reason}", type_="verification", link="/specialist")
+    return {"ok": True}
+
+@api.post("/admin/specialists/{spec_id}/documents/{doc_id}/review")
+async def review_specialist_document(spec_id: str, doc_id: str, data: DocumentReviewIn, user: dict = Depends(require_role("admin"))):
+    spec = await db.users.find_one({"_id": ObjectId(spec_id), "role": "specialist"})
+    if not spec:
+        raise HTTPException(404, "Specialist not found")
+    docs = spec.get("documents") or []
+    found = False
+    for d in docs:
+        if d.get("id") == doc_id:
+            d["status"] = data.status
+            d["reason"] = data.reason
+            d["validated_at"] = datetime.now(timezone.utc).isoformat()
+            d["validated_by"] = user["id"]
+            found = True
+            break
+    if not found:
+        raise HTTPException(404, "Document not found")
+    await db.users.update_one({"_id": ObjectId(spec_id)}, {"$set": {"documents": docs}})
+    title = "Document aprobat" if data.status == "approved" else "Document respins"
+    msg = f"Documentul '{next((d['name'] for d in docs if d.get('id')==doc_id), '')}' a fost {('aprobat' if data.status=='approved' else 'respins')}."
+    if data.reason:
+        msg += f" Motiv: {data.reason}"
+    await notify(spec_id, title, msg, type_="verification", link="/specialist")
+    return {"ok": True}
+
+# ============= SPECIALIST DOCUMENTS (self-upload) =============
+@api.get("/specialist/documents")
+async def list_my_documents(user: dict = Depends(require_role("specialist"))):
+    spec = await db.users.find_one({"_id": ObjectId(user["id"])})
+    return spec.get("documents") or []
+
+@api.post("/specialist/documents")
+async def upload_document(data: DocumentIn, user: dict = Depends(require_role("specialist"))):
+    doc = {
+        "id": str(uuid.uuid4()),
+        "type": data.type,
+        "name": data.name,
+        "url": data.url,
+        "status": "pending",
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.users.update_one(
+        {"_id": ObjectId(user["id"])},
+        {"$push": {"documents": doc}}
+    )
+    return doc
+
+@api.delete("/specialist/documents/{doc_id}")
+async def delete_document(doc_id: str, user: dict = Depends(require_role("specialist"))):
+    await db.users.update_one(
+        {"_id": ObjectId(user["id"])},
+        {"$pull": {"documents": {"id": doc_id}}}
+    )
+    return {"ok": True}
+
+# ============= DISPUTES =============
+@api.post("/requests/{req_id}/dispute")
+async def open_dispute(req_id: str, data: DisputeOpenIn, user: dict = Depends(get_current_user)):
+    """Client or assigned specialist opens a dispute on a job"""
+    req = await db.requests.find_one({"_id": ObjectId(req_id)})
+    if not req:
+        raise HTTPException(404, "Request not found")
+    # Authorization: must be the request's client or the assigned specialist
+    role = None
+    if req.get("client_id") == user["id"]:
+        role = "client"
+    elif req.get("specialist_id") == user["id"]:
+        role = "specialist"
+    else:
+        raise HTTPException(403, "Not allowed")
+    # Only allow disputes on jobs that have funds in escrow or work started
+    if req.get("status") not in ["assigned", "in_progress", "completed"]:
+        raise HTTPException(400, "Disputes can only be opened on active jobs")
+    # Prevent duplicates
+    existing = await db.disputes.find_one({"request_id": req_id, "status": "open"})
+    if existing:
+        raise HTTPException(400, "An open dispute already exists for this job")
+    dispute = {
+        "request_id": req_id,
+        "opened_by": user["id"],
+        "opened_by_role": role,
+        "opened_by_name": user.get("name"),
+        "reason": data.reason,
+        "evidence_urls": data.evidence_urls or [],
+        "status": "open",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    result = await db.disputes.insert_one(dispute)
+    # Mark request as disputed
+    await db.requests.update_one(
+        {"_id": ObjectId(req_id)},
+        {"$set": {"disputed": True, "escrow_status": "frozen"}}
+    )
+    # Notify the other party + admin (best-effort: pick first admin)
+    other_user_id = req.get("specialist_id") if role == "client" else req.get("client_id")
+    if other_user_id:
+        await notify(other_user_id, "Dispută deschisă", f"O dispută a fost deschisă pe lucrarea '{req.get('title','')}'. Echipa admin va analiza cazul.", type_="dispute", link="/" + ("specialist" if role == "client" else "client"))
+    admins = await db.users.find({"role": "admin"}).to_list(10)
+    for a in admins:
+        await notify(str(a["_id"]), "Nouă dispută", f"Dispută deschisă pe '{req.get('title','')}' de către {role}.", type_="dispute", link="/admin")
+    return {"ok": True, "id": str(result.inserted_id)}
+
+@api.get("/requests/{req_id}/dispute")
+async def get_dispute_for_request(req_id: str, user: dict = Depends(get_current_user)):
+    req = await db.requests.find_one({"_id": ObjectId(req_id)})
+    if not req:
+        raise HTTPException(404, "Request not found")
+    if user["id"] not in [req.get("client_id"), req.get("specialist_id")] and user.get("role") != "admin":
+        raise HTTPException(403, "Not allowed")
+    doc = await db.disputes.find_one({"request_id": req_id})
+    return serialize_doc(doc) if doc else None
+
+@api.post("/admin/disputes/{dispute_id}/resolve")
+async def resolve_dispute(dispute_id: str, data: DisputeResolveIn, user: dict = Depends(require_role("admin"))):
+    dispute = await db.disputes.find_one({"_id": ObjectId(dispute_id)})
+    if not dispute:
+        raise HTTPException(404, "Dispute not found")
+    if dispute.get("status") != "open":
+        raise HTTPException(400, "Dispute already resolved")
+    req = await db.requests.find_one({"_id": ObjectId(dispute["request_id"])})
+    if not req:
+        raise HTTPException(404, "Request not found")
+    amount = req.get("escrow_amount") or 0
+    client_id = req.get("client_id")
+    specialist_id = req.get("specialist_id")
+    
+    if data.resolution == "refund_client":
+        client_amount = amount
+        specialist_amount = 0
+    elif data.resolution == "pay_specialist":
+        client_amount = 0
+        specialist_amount = amount * 0.95  # 5% platform fee
+    elif data.resolution == "split":
+        pct = data.client_pct if data.client_pct is not None else 50
+        if pct < 0 or pct > 100:
+            raise HTTPException(400, "client_pct must be 0..100")
+        client_amount = amount * (pct / 100)
+        specialist_amount = (amount - client_amount) * 0.95
+    else:
+        raise HTTPException(400, "Invalid resolution")
+    
+    now_iso = datetime.now(timezone.utc).isoformat()
+    if client_amount > 0 and client_id:
+        await db.users.update_one({"_id": ObjectId(client_id)}, {"$inc": {"wallet_balance": client_amount}})
+        await db.transactions.insert_one({
+            "user_id": client_id, "type": "dispute_refund", "amount": client_amount,
+            "request_id": dispute["request_id"], "created_at": now_iso,
+        })
+    if specialist_amount > 0 and specialist_id:
+        await db.users.update_one({"_id": ObjectId(specialist_id)}, {"$inc": {"wallet_balance": specialist_amount}})
+        await db.transactions.insert_one({
+            "user_id": specialist_id, "type": "dispute_payment", "amount": specialist_amount,
+            "request_id": dispute["request_id"], "created_at": now_iso,
+        })
+    
+    await db.disputes.update_one(
+        {"_id": ObjectId(dispute_id)},
+        {"$set": {
+            "status": "resolved",
+            "resolution": data.resolution,
+            "client_pct": data.client_pct,
+            "client_amount": client_amount,
+            "specialist_amount": specialist_amount,
+            "notes": data.notes,
+            "resolved_at": now_iso,
+            "resolved_by": user["id"],
+        }}
+    )
+    await db.requests.update_one(
+        {"_id": ObjectId(dispute["request_id"])},
+        {"$set": {"status": "confirmed", "escrow_status": "released", "disputed": False, "confirmed_at": now_iso}}
+    )
+    # Notify both parties
+    if client_id:
+        await notify(client_id, "Dispută rezolvată", f"Dispută rezolvată. Rambursare: {client_amount:.2f} RON.", type_="dispute", link="/client")
+    if specialist_id:
+        await notify(specialist_id, "Dispută rezolvată", f"Dispută rezolvată. Plată: {specialist_amount:.2f} RON.", type_="dispute", link="/specialist")
+    return {"ok": True, "client_amount": client_amount, "specialist_amount": specialist_amount}
 
 # ============= OPERATOR (Maintenance validation) =============
 @api.get("/operator/queue")
@@ -599,6 +897,133 @@ async def validate_log(log_id: str, action: str, user: dict = Depends(require_ro
         {"$set": {"status": action, "validated_by": user["id"], "validated_at": datetime.now(timezone.utc).isoformat()}}
     )
     return {"ok": True}
+
+# ============= OPERATOR: DIGITAL TWIN =============
+@api.post("/properties/{prop_id}/twin/request")
+async def request_twin_validation(prop_id: str, user: dict = Depends(get_current_user)):
+    """Client requests a Digital Twin model build/review by Operator"""
+    prop = await db.properties.find_one({"_id": ObjectId(prop_id)})
+    if not prop:
+        raise HTTPException(404, "Property not found")
+    if prop.get("owner_id") != user["id"] and user.get("role") != "admin":
+        raise HTTPException(403, "Not allowed")
+    twin = await db.twins.find_one({"property_id": prop_id})
+    now_iso = datetime.now(timezone.utc).isoformat()
+    if twin:
+        await db.twins.update_one(
+            {"_id": twin["_id"]},
+            {"$set": {"status": "pending_validation", "requested_at": now_iso}}
+        )
+    else:
+        await db.twins.insert_one({
+            "property_id": prop_id,
+            "status": "pending_validation",
+            "rooms": [],
+            "assets": [],
+            "requested_at": now_iso,
+            "created_at": now_iso,
+        })
+    # Notify all operators
+    ops = await db.users.find({"role": "operator"}).to_list(10)
+    for op in ops:
+        await notify(str(op["_id"]), "Twin nou de validat", f"Proprietatea '{prop.get('name','')}' așteaptă validarea Digital Twin.", type_="twin", link="/operator")
+    return {"ok": True}
+
+@api.get("/operator/twins")
+async def operator_list_twins(user: dict = Depends(require_role("operator", "admin"))):
+    """List all twins (pending + approved)"""
+    docs = await db.twins.find({}).sort("requested_at", -1).to_list(100)
+    out = []
+    for d in docs:
+        d = serialize_doc(d)
+        # Enrich with property + owner
+        prop = await db.properties.find_one({"_id": ObjectId(d["property_id"])}) if d.get("property_id") else None
+        if prop:
+            d["property_name"] = prop.get("name")
+            d["property_address"] = prop.get("address")
+            d["property_type"] = prop.get("type")
+            d["property_surface"] = prop.get("surface")
+            d["property_rooms"] = prop.get("rooms")
+            owner = await db.users.find_one({"_id": ObjectId(prop["owner_id"])}) if prop.get("owner_id") else None
+            d["owner_name"] = owner.get("name") if owner else None
+            d["owner_email"] = owner.get("email") if owner else None
+        out.append(d)
+    return out
+
+@api.get("/operator/twins/{prop_id}")
+async def operator_get_twin(prop_id: str, user: dict = Depends(require_role("operator", "admin"))):
+    twin = await db.twins.find_one({"property_id": prop_id})
+    if not twin:
+        # Return empty draft so operator can start editing
+        prop = await db.properties.find_one({"_id": ObjectId(prop_id)})
+        if not prop:
+            raise HTTPException(404, "Property not found")
+        return {
+            "property_id": prop_id,
+            "status": "draft",
+            "rooms": [],
+            "assets": [],
+            "property_name": prop.get("name"),
+        }
+    twin = serialize_doc(twin)
+    prop = await db.properties.find_one({"_id": ObjectId(prop_id)})
+    if prop:
+        twin["property_name"] = prop.get("name")
+        twin["property_address"] = prop.get("address")
+        twin["property_surface"] = prop.get("surface")
+    return twin
+
+@api.post("/operator/twins/{prop_id}")
+async def operator_save_twin(prop_id: str, data: TwinUpsertIn, user: dict = Depends(require_role("operator", "admin"))):
+    now_iso = datetime.now(timezone.utc).isoformat()
+    payload = {
+        "rooms": [r.model_dump() for r in data.rooms],
+        "assets": [a.model_dump() for a in data.assets],
+        "model_url": data.model_url,
+        "notes": data.notes,
+        "updated_at": now_iso,
+        "updated_by": user["id"],
+    }
+    existing = await db.twins.find_one({"property_id": prop_id})
+    if existing:
+        await db.twins.update_one({"_id": existing["_id"]}, {"$set": payload})
+    else:
+        payload["property_id"] = prop_id
+        payload["status"] = "draft"
+        payload["created_at"] = now_iso
+        await db.twins.insert_one(payload)
+    return {"ok": True}
+
+@api.post("/operator/twins/{prop_id}/validate")
+async def operator_validate_twin(prop_id: str, data: TwinValidateIn, user: dict = Depends(require_role("operator", "admin"))):
+    twin = await db.twins.find_one({"property_id": prop_id})
+    if not twin:
+        raise HTTPException(404, "Twin not found")
+    new_status = "approved" if data.action == "approve" else "needs_revision"
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.twins.update_one(
+        {"_id": twin["_id"]},
+        {"$set": {
+            "status": new_status,
+            "validation_notes": data.notes,
+            "validated_at": now_iso,
+            "validated_by": user["id"],
+        }}
+    )
+    # Update property twin_unlocked flag
+    if data.action == "approve":
+        await db.properties.update_one(
+            {"_id": ObjectId(prop_id)},
+            {"$set": {"twin_unlocked": True, "structure_health": 95}}
+        )
+    # Notify property owner
+    prop = await db.properties.find_one({"_id": ObjectId(prop_id)})
+    if prop and prop.get("owner_id"):
+        if data.action == "approve":
+            await notify(prop["owner_id"], "Digital Twin aprobat", f"Twin-ul proprietății '{prop.get('name','')}' a fost validat și activat.", type_="twin", link="/client")
+        else:
+            await notify(prop["owner_id"], "Twin necesită revizie", f"Twin-ul proprietății '{prop.get('name','')}' necesită ajustări. {data.notes or ''}", type_="twin", link="/client")
+    return {"ok": True, "status": new_status}
 
 # ============= GOOGLE OAUTH (Emergent-managed) =============
 # REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
@@ -1282,6 +1707,310 @@ async def property_timeline(prop_id: str, user: dict = Depends(get_current_user)
     }
 
 
+# ============= REGIONS / ZONES =============
+
+@api.get("/regions")
+async def list_regions():
+    """List all regions (country/city/zone hierarchy)"""
+    docs = await db.regions.find({}).sort("country", 1).to_list(500)
+    return [serialize_doc(d) for d in docs]
+
+
+@api.post("/regions")
+async def create_region(data: RegionIn, user: dict = Depends(require_role("admin"))):
+    existing = await db.regions.find_one({"country": data.country, "city": data.city, "zone": data.zone})
+    if existing:
+        return serialize_doc(existing)
+    doc = {**data.model_dump(), "created_at": datetime.now(timezone.utc).isoformat()}
+    res = await db.regions.insert_one(doc)
+    doc["id"] = str(res.inserted_id)
+    doc.pop("_id", None)
+    return doc
+
+
+@api.put("/specialists/me/zones")
+async def update_specialist_zones(data: SpecialistZonesIn, user: dict = Depends(require_role("specialist"))):
+    """Specialist defines coverage zones and service categories"""
+    await db.users.update_one(
+        {"_id": ObjectId(user["id"])},
+        {"$set": {"coverage_zones": data.zones, "service_categories": data.categories}}
+    )
+    return {"ok": True, "zones": data.zones, "categories": data.categories}
+
+
+@api.put("/specialists/me/availability")
+async def update_availability(data: AvailabilityIn, user: dict = Depends(require_role("specialist"))):
+    """Toggle availability status + define hours"""
+    update = {"availability_status": data.status}
+    if data.available_hours:
+        update["available_hours"] = data.available_hours
+    await db.users.update_one({"_id": ObjectId(user["id"])}, {"$set": update})
+    return {"ok": True, "status": data.status}
+
+
+# ============= SMART MATCHING (Zone-based with fallback) =============
+
+async def find_matching_specialists(category: str, user_zone: str, max_results: int = 5):
+    """Smart match: primary (in-zone) + fallback (nearby zones with fee)"""
+    # Primary: specialists in user's zone with the category
+    primary = await db.users.find({
+        "role": "specialist",
+        "coverage_zones": user_zone,
+        "service_categories": category,
+        "availability_status": {"$ne": "offline"},
+    }).sort([("rating", -1), ("reviews_count", -1)]).limit(max_results).to_list(max_results)
+    
+    # Fallback: other specialists (out of zone) sorted by rating, marked as fallback
+    if len(primary) < max_results:
+        fallback_q = {
+            "role": "specialist",
+            "service_categories": category,
+            "availability_status": {"$ne": "offline"},
+            "coverage_zones": {"$ne": user_zone},
+        }
+        already_ids = [s["_id"] for s in primary]
+        if already_ids:
+            fallback_q["_id"] = {"$nin": already_ids}
+        fallback = await db.users.find(fallback_q).sort([("rating", -1)]).limit(max_results - len(primary)).to_list(max_results)
+        for s in fallback:
+            s["_fallback"] = True
+        primary.extend(fallback)
+    
+    # Annotate matches with reason
+    results = []
+    for s in primary:
+        match_reason = []
+        if s.get("_fallback"):
+            match_reason.append("Zonă apropiată · fee aplicabil")
+        else:
+            match_reason.append("Specialist în zona ta")
+        if s.get("availability_status") == "available":
+            match_reason.append("Disponibil acum")
+        if (s.get("rating") or 0) >= 4.8:
+            match_reason.append(f"Top rated ({s.get('rating')}★)")
+        if s.get("verified"):
+            match_reason.append("Verificat")
+        
+        results.append({
+            "id": str(s["_id"]),
+            "name": s.get("name"),
+            "rating": s.get("rating"),
+            "reviews_count": s.get("reviews_count", 0),
+            "specialty": s.get("specialty"),
+            "tier": s.get("tier"),
+            "verified": s.get("verified", False),
+            "availability_status": s.get("availability_status", "available"),
+            "is_in_zone": not s.get("_fallback", False),
+            "match_reasons": match_reason,
+            "lead_fee": 0 if not s.get("_fallback") else 45,
+        })
+    return results
+
+
+@api.get("/match")
+async def smart_match(category: str, zone: Optional[str] = None, user: dict = Depends(get_current_user)):
+    """Get smart-matched specialists for a category in user's (or given) zone"""
+    user_zone = zone or user.get("zone") or "default"
+    matches = await find_matching_specialists(category, user_zone)
+    return {
+        "zone": user_zone,
+        "category": category,
+        "matches": matches,
+        "total": len(matches),
+        "in_zone_count": sum(1 for m in matches if m["is_in_zone"]),
+    }
+
+
+# ============= SERVICE AVAILABILITY (Admin-controlled per region) =============
+
+@api.get("/services/availability")
+async def get_service_availability(zone: Optional[str] = None, user: Optional[dict] = None):
+    """Returns which services are available in user's zone"""
+    # Public endpoint - no auth required for browsing
+    q = {}
+    if zone:
+        q["zone"] = zone
+    docs = await db.service_availability.find(q).to_list(200)
+    
+    # Default services if none configured
+    default_services = ["plumbing", "electric", "hvac", "maintenance", "interior_design"]
+    result = {}
+    for s in default_services:
+        result[s] = {"state": "active", "min_specialists": 1}
+    for d in docs:
+        if d.get("service"):
+            result[d["service"]] = {
+                "state": d.get("state", "active"),
+                "min_specialists": d.get("min_specialists", 1),
+                "region_id": d.get("region_id"),
+            }
+    return result
+
+
+@api.post("/admin/services/availability")
+async def set_service_availability(data: ServiceAvailabilityIn, user: dict = Depends(require_role("admin"))):
+    """Admin: enable/disable/limit services per region"""
+    await db.service_availability.update_one(
+        {"region_id": data.region_id, "service": data.service},
+        {"$set": {**data.model_dump(), "updated_by": user["id"], "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True
+    )
+    return {"ok": True, **data.model_dump()}
+
+
+@api.get("/admin/services")
+async def admin_list_services(user: dict = Depends(require_role("admin"))):
+    """Admin: list all service availability configurations"""
+    docs = await db.service_availability.find({}).to_list(500)
+    return [serialize_doc(d) for d in docs]
+
+
+# ============= PREMIUM SERVICE: INTERIOR DESIGN =============
+
+INTERIOR_DESIGN_MIN_TOKENS = 3000
+TOKEN_VALUE_EUR = 0.20  # 1 token = 0.20 EUR (so 1000 tokens = 200 EUR)
+TOKEN_MAX_DISCOUNT_PCT = 0.70  # 70% max coverage
+TOKEN_MIN_DISCOUNT_PCT = 0.50  # 50% min if applied
+
+
+@api.get("/services/interior-design/eligibility")
+async def check_interior_design_eligibility(user: dict = Depends(get_current_user)):
+    """Check if user can access Interior Design (Digital Twin + Wallet activated + token threshold)"""
+    if user["role"] != "client":
+        return {"eligible": False, "reason": "Only clients can request design"}
+    
+    # Check user has at least one property with twin/wallet unlocked
+    has_twin = await db.properties.find_one({"owner_id": user["id"], "twin_unlocked": True})
+    has_wallet = await db.properties.find_one({"owner_id": user["id"], "wallet_unlocked": True})
+    tokens = user.get("tokens", 0)
+    
+    reasons = []
+    if not has_twin:
+        reasons.append("Digital Twin nu este activat pe nicio proprietate")
+    if not has_wallet:
+        reasons.append("Wallet nu este activat")
+    if tokens < INTERIOR_DESIGN_MIN_TOKENS:
+        reasons.append(f"Sub minimul de {INTERIOR_DESIGN_MIN_TOKENS} tokens (ai {tokens})")
+    
+    return {
+        "eligible": len(reasons) == 0,
+        "reasons": reasons,
+        "current_tokens": tokens,
+        "min_tokens_required": INTERIOR_DESIGN_MIN_TOKENS,
+        "has_twin": bool(has_twin),
+        "has_wallet": bool(has_wallet),
+    }
+
+
+@api.post("/services/interior-design/calculate")
+async def calculate_interior_design_cost(budget_total: float, tokens_to_apply: int, user: dict = Depends(get_current_user)):
+    """Calculate token discount preview"""
+    if budget_total <= 0:
+        raise HTTPException(400, "Invalid budget")
+    
+    tokens_available = user.get("tokens", 0)
+    tokens_used = min(tokens_to_apply, tokens_available)
+    
+    # Convert tokens to EUR value
+    token_value_eur = tokens_used * TOKEN_VALUE_EUR
+    
+    # Apply 50-70% discount rule
+    min_discount = budget_total * TOKEN_MIN_DISCOUNT_PCT
+    max_discount = budget_total * TOKEN_MAX_DISCOUNT_PCT
+    
+    actual_discount = min(token_value_eur, max_discount)
+    if actual_discount < min_discount and tokens_used > 0:
+        actual_discount = min(min_discount, token_value_eur)
+    
+    final_payable = budget_total - actual_discount
+    
+    return {
+        "budget_total": budget_total,
+        "tokens_available": tokens_available,
+        "tokens_to_apply": tokens_used,
+        "token_value_eur": round(token_value_eur, 2),
+        "discount_applied": round(actual_discount, 2),
+        "discount_pct": round((actual_discount / budget_total) * 100, 1),
+        "final_payable": round(final_payable, 2),
+        "min_discount_pct": int(TOKEN_MIN_DISCOUNT_PCT * 100),
+        "max_discount_pct": int(TOKEN_MAX_DISCOUNT_PCT * 100),
+    }
+
+
+@api.post("/services/interior-design/request")
+async def request_interior_design(data: InteriorDesignIn, user: dict = Depends(require_role("client"))):
+    """Create Interior Design premium request"""
+    # Verify eligibility
+    elig = await check_interior_design_eligibility(user)
+    if not elig["eligible"]:
+        raise HTTPException(403, f"Not eligible: {', '.join(elig['reasons'])}")
+    
+    # Verify property
+    prop = await db.properties.find_one({"_id": ObjectId(data.property_id), "owner_id": user["id"]})
+    if not prop or not prop.get("twin_unlocked"):
+        raise HTTPException(400, "Property must have Digital Twin activated")
+    
+    # Calculate cost
+    calc = await calculate_interior_design_cost(data.budget_total, data.tokens_to_apply, user)
+    
+    # Deduct tokens
+    if calc["tokens_to_apply"] > 0:
+        await db.users.update_one(
+            {"_id": ObjectId(user["id"])},
+            {"$inc": {"tokens": -calc["tokens_to_apply"]}}
+        )
+        await db.transactions.insert_one({
+            "user_id": user["id"],
+            "type": "tokens_redeem_interior_design",
+            "tokens": -calc["tokens_to_apply"],
+            "discount_eur": calc["discount_applied"],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    
+    # Create premium request
+    doc = {
+        "client_id": user["id"],
+        "client_name": user["name"],
+        "property_id": data.property_id,
+        "property_name": prop["name"],
+        "service_type": "interior_design",
+        "category": "interior_design",
+        "title": f"Design Interior - {prop['name']}",
+        "description": f"Stil: {data.style} · Camere: {', '.join(data.rooms_to_design)}",
+        "rooms_to_design": data.rooms_to_design,
+        "style": data.style,
+        "budget_total": data.budget_total,
+        "tokens_used": calc["tokens_to_apply"],
+        "discount_applied": calc["discount_applied"],
+        "final_payable": calc["final_payable"],
+        "status": "open",
+        "priority": "normal",
+        "is_premium": True,
+        "required_tier": "VERIFIED",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    res = await db.requests.insert_one(doc)
+    doc["id"] = str(res.inserted_id)
+    doc.pop("_id", None)
+    
+    # Notify verified specialists with interior_design category
+    specs = await db.users.find({
+        "role": "specialist",
+        "verified": True,
+        "$or": [{"service_categories": "interior_design"}, {"specialty": "interior_design"}]
+    }).to_list(20)
+    for s in specs:
+        await notify(
+            str(s["_id"]),
+            "🎨 Premium Request: Design Interior",
+            f"Cerere premium: {prop['name']} · Buget {data.budget_total}€. Doar Verified Specialists pot accepta.",
+            type_="premium_lead",
+            link="/specialist"
+        )
+    
+    return doc
+
+
 # ============= ROOT =============
 @api.get("/")
 async def root():
@@ -1309,6 +2038,7 @@ async def seed():
         {"email": "client@propmanage.io", "password": "Client123!", "name": "Andrei Popescu", "role": "client", "phone": "+40 712 345 678"},
         {"email": "specialist@propmanage.io", "password": "Spec123!", "name": "Mihai Ionescu", "role": "specialist", "specialty": "hvac", "phone": "+40 723 456 789"},
         {"email": "specialist2@propmanage.io", "password": "Spec123!", "name": "Elena Dumitru", "role": "specialist", "specialty": "plumbing", "phone": "+40 734 567 890"},
+        {"email": "pending@propmanage.io", "password": "Spec123!", "name": "Vasile Constantinescu", "role": "specialist", "specialty": "electric", "phone": "+40 745 678 901", "_pending": True},
         {"email": "admin@propmanage.io", "password": "Admin123!", "name": "Administrator", "role": "admin", "phone": ""},
         {"email": "operator@propmanage.io", "password": "Op123!", "name": "Lucian Stan", "role": "operator", "phone": ""},
     ]
@@ -1319,11 +2049,34 @@ async def seed():
         if existing:
             user_ids[u["email"]] = str(existing["_id"])
             # Update password if changed
+            update_fields = {}
             if not verify_password(u["password"], existing["password_hash"]):
-                await db.users.update_one(
-                    {"_id": existing["_id"]},
-                    {"$set": {"password_hash": hash_password(u["password"])}}
-                )
+                update_fields["password_hash"] = hash_password(u["password"])
+            # Always sync new zone/availability/categories fields
+            if u["role"] == "specialist":
+                update_fields["coverage_zones"] = ["Bucuresti-Sector1", "Bucuresti-Sector2"]
+                update_fields["service_categories"] = [u.get("specialty"), "interior_design"] if u.get("specialty") else ["interior_design"]
+                update_fields["availability_status"] = existing.get("availability_status") or "available"
+                # Preserve pending status across restarts
+                if u.get("_pending") and existing.get("verified"):
+                    update_fields["verified"] = False
+                    update_fields["tier"] = None
+                    update_fields["rating"] = None
+                    update_fields["reviews_count"] = 0
+                    if not (existing.get("documents") or []):
+                        now_iso = datetime.now(timezone.utc).isoformat()
+                        update_fields["documents"] = [
+                            {"id": str(uuid.uuid4()), "type": "id_card", "name": "CI Vasile Constantinescu.pdf", "url": "data:application/pdf;base64,JVBERi0xLjQK", "status": "pending", "uploaded_at": now_iso},
+                            {"id": str(uuid.uuid4()), "type": "certification", "name": "Atestat ANRE electrician.jpg", "url": "https://via.placeholder.com/600x400.jpg?text=Atestat+ANRE", "status": "pending", "uploaded_at": now_iso},
+                            {"id": str(uuid.uuid4()), "type": "insurance", "name": "Asigurare RCA.pdf", "url": "data:application/pdf;base64,JVBERi0xLjQK", "status": "pending", "uploaded_at": now_iso},
+                        ]
+            elif u["role"] == "client":
+                update_fields["zone"] = existing.get("zone") or "Bucuresti-Sector1"
+                # Bump tokens to 3500 if currently below 3000 (for demo eligibility)
+                if (existing.get("tokens") or 0) < 3000:
+                    update_fields["tokens"] = 3500
+            if update_fields:
+                await db.users.update_one({"_id": existing["_id"]}, {"$set": update_fields})
             continue
         doc = {
             "email": u["email"],
@@ -1332,12 +2085,20 @@ async def seed():
             "role": u["role"],
             "phone": u.get("phone", ""),
             "wallet_balance": 800.0 if u["role"] == "specialist" else (5000.0 if u["role"] == "client" else 0.0),
-            "tokens": 250 if u["role"] == "client" else 0,
-            "rating": 4.9 if u["role"] == "specialist" else None,
-            "reviews_count": 24 if u["role"] == "specialist" else 0,
-            "verified": u["role"] == "specialist",
-            "tier": "VERIFIED" if u["role"] == "specialist" else None,
+            "tokens": 3500 if u["role"] == "client" else 0,  # client gets enough tokens for interior design demo
+            "rating": 4.9 if u["role"] == "specialist" and not u.get("_pending") else None,
+            "reviews_count": 24 if u["role"] == "specialist" and not u.get("_pending") else 0,
+            "verified": u["role"] == "specialist" and not u.get("_pending"),
+            "tier": "VERIFIED" if u["role"] == "specialist" and not u.get("_pending") else None,
             "specialty": u.get("specialty"),
+            "zone": "Bucuresti-Sector1" if u["role"] == "client" else None,
+            "coverage_zones": ["Bucuresti-Sector1", "Bucuresti-Sector2"] if u["role"] == "specialist" else [],
+            "service_categories": [u.get("specialty"), "interior_design"] if u["role"] == "specialist" and u.get("specialty") else [],
+            "availability_status": "available" if u["role"] == "specialist" else None,
+            "documents": [
+                {"id": str(uuid.uuid4()), "type": "id_card", "name": "CI Vasile Constantinescu.pdf", "url": "data:application/pdf;base64,placeholder", "status": "pending", "uploaded_at": datetime.now(timezone.utc).isoformat()},
+                {"id": str(uuid.uuid4()), "type": "certification", "name": "Atestat ANRE electrician.pdf", "url": "data:application/pdf;base64,placeholder", "status": "pending", "uploaded_at": datetime.now(timezone.utc).isoformat()},
+            ] if u.get("_pending") else [],
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         res = await db.users.insert_one(doc)
@@ -1402,6 +2163,46 @@ async def seed():
             ]
             for r in sample_requests:
                 await db.requests.insert_one(r)
+    
+    # Seed a sample Digital Twin pending validation
+    if client_id:
+        prop_for_twin = await db.properties.find_one({"owner_id": client_id})
+        if prop_for_twin:
+            prop_id_str = str(prop_for_twin["_id"])
+            existing_twin = await db.twins.find_one({"property_id": prop_id_str})
+            if not existing_twin:
+                now_iso = datetime.now(timezone.utc).isoformat()
+                await db.twins.insert_one({
+                    "property_id": prop_id_str,
+                    "status": "pending_validation",
+                    "rooms": [
+                        {"id": str(uuid.uuid4()), "name": "Living", "type": "living", "area": 32, "x": 50, "y": 50, "w": 220, "h": 180},
+                        {"id": str(uuid.uuid4()), "name": "Dormitor", "type": "bedroom", "area": 16, "x": 280, "y": 50, "w": 160, "h": 130},
+                        {"id": str(uuid.uuid4()), "name": "Bucătărie", "type": "kitchen", "area": 12, "x": 50, "y": 240, "w": 140, "h": 120},
+                        {"id": str(uuid.uuid4()), "name": "Baie", "type": "bathroom", "area": 6, "x": 200, "y": 240, "w": 90, "h": 120},
+                        {"id": str(uuid.uuid4()), "name": "Hol", "type": "hallway", "area": 8, "x": 300, "y": 200, "w": 140, "h": 160},
+                    ],
+                    "assets": [
+                        {"id": str(uuid.uuid4()), "type": "boiler", "name": "Centrală termică", "x": 220, "y": 280, "condition": "good"},
+                        {"id": str(uuid.uuid4()), "name": "Panou electric", "type": "electric_panel", "x": 330, "y": 220, "condition": "good"},
+                        {"id": str(uuid.uuid4()), "name": "HVAC living", "type": "hvac", "x": 150, "y": 120, "condition": "fair"},
+                    ],
+                    "requested_at": now_iso,
+                    "created_at": now_iso,
+                })
+    
+    # Seed regions
+    sample_regions = [
+        {"country": "România", "city": "București", "zone": "Bucuresti-Sector1"},
+        {"country": "România", "city": "București", "zone": "Bucuresti-Sector2"},
+        {"country": "România", "city": "București", "zone": "Bucuresti-Sector3"},
+        {"country": "România", "city": "Cluj-Napoca", "zone": "Centru"},
+        {"country": "România", "city": "Timișoara", "zone": "Iosefin"},
+    ]
+    for r in sample_regions:
+        existing = await db.regions.find_one(r)
+        if not existing:
+            await db.regions.insert_one({**r, "created_at": datetime.now(timezone.utc).isoformat()})
     
     # Write test credentials
     creds_path = Path("/app/memory/test_credentials.md")
