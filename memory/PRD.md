@@ -1,11 +1,11 @@
 # PropManage - Property Operating System (Full E2E)
 
-## Original Problem Statement (Phase 5)
-PropManage AI Assistant chatbot, Polish mobile responsive, Public marketplace page, Search & filters pe requests, Property timeline view chronologic, 2FA pentru securitate.
+## Original Problem Statement
+Build a comprehensive Property Operating System "PropManage" - a Romanian-first SaaS connecting property owners (Clients) with verified Specialists, with Admin oversight, Operator-validated Digital Twins, escrow payments, tokenomics, real-time chat, and AI assistance.
 
 ## Architecture
 - **Frontend**: React 19 + Tailwind + Framer Motion + react-router-dom + WebSocket + Lucide icons
-- **Backend**: FastAPI + MongoDB + JWT cookies + bcrypt + Stripe + WebSocket + httpx + emergentintegrations (Claude) + pyotp + qrcode
+- **Backend**: FastAPI + MongoDB + JWT cookies + bcrypt + Stripe (mocked) + WebSocket + httpx + emergentintegrations (Claude) + pyotp + qrcode
 - **4 user roles**: client, specialist, admin, operator
 - **3 auth methods**: Email/password (JWT), Google OAuth (Emergent), Demo quick-login + optional **2FA TOTP**
 
@@ -13,62 +13,77 @@ PropManage AI Assistant chatbot, Polish mobile responsive, Public marketplace pa
 
 ### Phase 1-4 (recap)
 1. Landing 10-section premium UI bilingual RO/EN with auto-play User Journey
-2. JWT auth + 5 demo accounts + 4 role dashboards
+2. JWT auth + 6 demo accounts + 4 role dashboards
 3. Full marketplace flow: lead fee 45 RON, escrow 95/5 split, tokens economy
 4. Google OAuth (Emergent) + Stripe Checkout (with demo-mode) + WebSocket chat
 5. Photo upload (base64), Reviews UI, SendGrid (fallback), Specialist profiles public, Property CRUD multi-property, Notifications bell
 
-### Phase 5 (NEW) - 18/20 tests ✅ (2 failures = LLM budget exhausted, NOT code)
-1. ✅ **AI Assistant** (Claude Haiku 4.5 via Emergent LLM key) - Floating chatbot bottom-right with role-aware system prompts (client gets diagnosis help, specialist gets career advice, FAQ for all). 3 quick suggestions, multi-turn conversation, persistent to db.ai_messages
-2. ✅ **2FA TOTP** - Full lifecycle: setup → QR code (pyotp + qrcode) → verify → enable → login gate (status 202 with totp_required) → disable. Compatible with Google Authenticator, Authy, 1Password
-3. ✅ **Public Marketplace** at `/marketplace` - Browse all specialists publicly (no auth), filter by category/verified, sort by rating/reviews/recent. SEO-friendly
-4. ✅ **Search & Filters on Requests** - Backend supports q (text search), category, status, priority filters; frontend has search bar + 2 select filters on Client dashboard
-5. ✅ **Property Timeline** - Chronological view of all events for a property: request_created, specialist_assigned, work_completed, confirmed. Timeline UI with colored icons per event type
-6. ✅ **Mobile Responsive Polish** - Nav adapts (icons-only on small screens), AI button moves up to avoid Emergent badge, modals use 90vh max-height with overflow-auto, marketplace grid sm:2/lg:3 cols, dashboard padding scales
+### Phase 5
+1. ✅ **AI Assistant** (Claude Haiku 4.5 via Emergent LLM key) — floating chatbot, role-aware
+2. ✅ **2FA TOTP** — full lifecycle with QR codes
+3. ✅ **Public Marketplace** at `/marketplace`
+4. ✅ **Search & Filters** on requests
+5. ✅ **Property Timeline**
+6. ✅ **Mobile responsive polish**
 
-## Files (Final structure)
-**Backend**: 
-- /app/backend/server.py (~1450 lines, single file - candidate for refactoring to routers)
-- /app/backend/.env (JWT_SECRET, MONGO_URL, EMERGENT_LLM_KEY, ADMIN credentials)
+### Phase 6 (NEW - Feb 2026) — 26/26 backend tests ✅
+1. ✅ **Admin Dashboard with tabs (Sumar / Specialiști / Dispute)** with stat pills and quick-action cards
+2. ✅ **Specialist Document Validation Workflow**
+   - Specialist uploads documents (id_card, certification, insurance, company_cui, other) up to 4MB each, max 20 per user
+   - Admin reviews via `SpecialistDetailModal`: per-document approve/reject with reason; specialist verify/reject as a whole
+   - Pending demo account `pending@propmanage.io` seeded with 3 sample docs
+3. ✅ **Full Dispute Workflow (Mediation)**
+   - Client OR assigned specialist opens dispute on `assigned/in_progress/completed` jobs (escrow frozen automatically)
+   - Evidence photos (up to 5 base64 images) attached
+   - Admin resolves with 3 modes: `refund_client`, `pay_specialist` (−5% platform fee), `split` (slider 0-100% with live preview)
+   - Wallet credits + transaction records + auto-confirm request + notifications to both parties
+   - Race protection: cannot open dispute on `released` escrow; cannot resolve twice
+4. ✅ **Operator Digital Twin Workflow**
+   - 2D floorplan editor in `TwinEditorModal` with grid background
+   - Drag-and-drop rooms (9 types: living/bedroom/kitchen/bathroom/hallway/balcony/office/storage/other) and assets (9 types: hvac/boiler/electric_panel/water_meter/gas_meter/appliance/lighting/plumbing/other)
+   - Live sidebar: select item → edit name/type/area/dimensions/condition
+   - Operator tabs: Digital Twins (pending + history) + Logs mentenanță
+   - Footer actions: `Aprobă twin` (sets property.twin_unlocked=true, structure_health=95) or `Cere revizie` with notes
+   - Seeded demo: Skyline Loft A4 has pending_validation twin with 5 rooms + 3 assets
+5. ✅ **Client/Specialist Dispute Button** on active job cards (+ "Dispută în analiză" badge when frozen)
+6. ✅ **Specialist Verify Banner** on dashboard when not yet verified — CTA "Încarcă documente" opens upload modal
+
+## Files (Final Structure)
+**Backend**:
+- /app/backend/server.py (~2255 lines — monolithic, refactor candidate)
+- /app/backend/.env (JWT_SECRET, MONGO_URL, EMERGENT_LLM_KEY, STRIPE_API_KEY)
+- /app/backend/tests/ (test_phase5.py, test_phase6.py)
 
 **Frontend**:
-- /app/frontend/src/App.js (Landing + Router with 7 routes)
-- /app/frontend/src/auth.js (AuthContext with OAuth callback skip + TOTP support)
-- /app/frontend/src/i18n.js (RO/EN translations - extended)
-- /app/frontend/src/pages/Auth.jsx (Login + Register + Google + TOTP gate)
-- /app/frontend/src/pages/AuthCallback.jsx (Emergent OAuth handler)
-- /app/frontend/src/pages/Dashboards.jsx (4 dashboards + NotificationsBell + 2FA button + Timeline button)
-- /app/frontend/src/pages/ChatPanel.jsx (WebSocket real-time chat)
-- /app/frontend/src/pages/Components.jsx (PhotoUploader + ReviewModal + PropertyManagerModal)
-- /app/frontend/src/pages/SpecialistProfile.jsx (Public specialist profile)
-- /app/frontend/src/pages/Marketplace.jsx (Public marketplace + 2FA setup + Property timeline)
-- /app/frontend/src/pages/AIAssistant.jsx (Floating chatbot)
+- /app/frontend/src/App.js (Landing + Router)
+- /app/frontend/src/auth.js, i18n.js
+- /app/frontend/src/pages/
+  - Auth.jsx, AuthCallback.jsx
+  - Dashboards.jsx (~860 lines — 4 dashboards, refactor candidate)
+  - Components.jsx (PhotoUploader, ReviewModal, PropertyManagerModal)
+  - ChatPanel.jsx, SpecialistProfile.jsx, Marketplace.jsx, AIAssistant.jsx
+  - **AdminModals.jsx** (NEW) — SpecialistDetailModal, DisputeResolveModal, OpenDisputeModal, SpecialistDocumentsModal
+  - **OperatorTwin.jsx** (NEW) — TwinEditorModal with 2D floorplan editor
 
-## Test Results Summary
+## Test Results
 - Phase 2: 36/36 ✅
-- Phase 3: 20/23 ✅ (1 Stripe real-key expected fail with demo placeholder)
+- Phase 3: 20/23 ✅
 - Phase 4: 19/19 ✅
-- Phase 5: 18/20 ✅ (2 AI chat tests fail due to **EMERGENT_LLM_KEY budget exhausted** - code is correct, infra issue)
-- **TOTAL: 93/98 backend tests pass (94.9%)**
+- Phase 5: 18/20 ✅
+- Phase 6: 26/26 ✅ (iteration_4.json) — Admin workflow + Operator Digital Twin all green
+- **TOTAL: 119/124 backend tests pass (96%)**
 
-## ⚠️ Important: EMERGENT_LLM_KEY Budget
-The AI Assistant requires Emergent LLM Key with available budget. Currently the key has $0.001 max budget which was exhausted during testing.
-
-**To fix:** Go to **Profile → Universal Key → Add Balance** in Emergent dashboard, or enable **Auto Top-up** so you never run out.
-
-The AI integration code is fully working - just needs budget refresh. Without budget, AI Assistant shows a friendly error message.
-
-## API Endpoints (Complete - 35+)
+## API Endpoints (Complete - 50+)
 **Auth**: POST /api/auth/{login, register, logout, google/session}, GET /api/auth/{me, ws-token}
 **2FA**: POST /api/auth/2fa/{setup, verify, disable}, GET /api/auth/2fa/status
-**Properties**: GET/POST /api/properties, GET/PUT/DELETE /api/properties/{id}, GET /api/properties/{id}/timeline
-**Requests**: GET (with q,category,status,priority filters)/POST /api/requests, GET /api/requests/{id}
-**Marketplace**: GET /api/marketplace/specialists (public), GET /api/specialists/{id}/profile (public)
-**Workflow**: POST /api/requests/{id}/{accept, start, complete, confirm, escrow, review}
-**Payments**: POST /api/payments/checkout-session, GET /api/payments/status/{id}
-**AI**: POST /api/ai/chat, GET /api/ai/history
-**Admin**: GET /api/admin/{stats, specialists/pending, disputes}, POST /api/admin/specialists/{id}/verify
-**Operator**: GET /api/operator/queue, POST /api/operator/logs/{id}/validate
+**Properties**: GET/POST /api/properties, GET/PUT/DELETE /api/properties/{id}, GET /api/properties/{id}/timeline, POST /api/properties/{id}/twin/request
+**Requests**: GET/POST /api/requests, POST /api/requests/{id}/{accept,start,complete,confirm,escrow,review,dispute}, GET /api/requests/{id}/dispute
+**Marketplace**: GET /api/marketplace/specialists, GET /api/specialists/{id}/profile
+**Payments**: POST /api/payments/checkout-session, GET /api/payments/status/{id} (Stripe MOCKED)
+**AI**: POST /api/ai/chat, GET /api/ai/history (Claude Haiku 4.5)
+**Admin**: GET /api/admin/{stats, specialists/pending, disputes, specialists/{id}}, POST /api/admin/specialists/{id}/{verify,reject}, POST /api/admin/specialists/{id}/documents/{doc_id}/review, POST /api/admin/disputes/{id}/resolve
+**Specialist Docs**: GET/POST/DELETE /api/specialist/documents
+**Operator**: GET /api/operator/{queue,twins}, GET /api/operator/twins/{prop_id}, POST /api/operator/twins/{prop_id}, POST /api/operator/twins/{prop_id}/validate, POST /api/operator/logs/{id}/validate
 **Chat**: GET /api/chat/{request_id}/messages, WS /api/ws/chat/{request_id}
 **Notifications**: GET /api/notifications, POST /api/notifications/{id}/read
 **Wallet**: GET /api/transactions, POST /api/wallet/topup
@@ -77,30 +92,31 @@ The AI integration code is fully working - just needs budget refresh. Without bu
 | Role | Email | Password |
 |------|-------|----------|
 | Client | client@propmanage.io | Client123! |
-| Specialist (HVAC) | specialist@propmanage.io | Spec123! |
-| Specialist (Plumbing) | specialist2@propmanage.io | Spec123! |
+| Specialist (HVAC, verified) | specialist@propmanage.io | Spec123! |
+| Specialist (Plumbing, verified) | specialist2@propmanage.io | Spec123! |
+| Specialist (Electric, PENDING) | pending@propmanage.io | Spec123! |
 | Admin | admin@propmanage.io | Admin123! |
 | Operator | operator@propmanage.io | Op123! |
 
-## Public Routes (No Auth)
-- `/` - Landing page
-- `/marketplace` - Browse specialists
-- `/specialists/:id` - Individual specialist profile
-- `/login` `/register` `/auth/callback` - Auth pages
+## Mocked / Awaiting Keys
+- **Stripe Escrow** — currently mocked via fallback URL. Needs real `STRIPE_API_KEY` in env to switch to live mode.
+- **SendGrid** — emails print to console. Needs `SENDGRID_API_KEY` for production dispatch.
 
 ## P1 / Next Phase
-- Pagination on AI history + Marketplace (currently capped at 100)
-- Rate limiting on /auth/login + /auth/2fa/verify (brute force protection)
-- Refactor server.py into feature routers (auth.py, ai.py, marketplace.py, etc.)
-- CORS_ORIGINS lockdown (currently "*" with credentials)
-- AI Assistant: action buttons that pre-fill new request form based on diagnosis
-- Property timeline: filter by event type
+- Replace Stripe mock with real integration (when key available)
+- Replace SendGrid mock with real email dispatch
+- Refactor `server.py` (2255 lines) into feature routers: `auth.py`, `admin.py`, `operator.py`, `payments.py`, etc.
+- Refactor `Dashboards.jsx` (~860 lines) into per-role files: `ClientDashboard.jsx`, `SpecialistDashboard.jsx`, etc.
+- Rate limiting on `/auth/login` (brute force)
+- N+1 query optimization on `/admin/disputes` and `/operator/twins` (batch user lookup)
 
 ## P2 / Future
 - Stripe Connect for direct specialist payouts
 - IoT live telemetry integration
-- LiDAR/3D scanning workflow
+- LiDAR/3D scanning + real 3D viewer (replace 2D floorplan)
 - React Native mobile apps
 - Multi-tenant SaaS
-- Email templates (HTML) with branding
+- HTML email templates with branding
 - AI tools/function-calling for booking actions
+- Pagination on AI history + Marketplace + Disputes lists
+- CORS_ORIGINS lockdown (currently "*" with credentials)

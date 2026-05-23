@@ -735,6 +735,12 @@ async def list_my_documents(user: dict = Depends(require_role("specialist"))):
 
 @api.post("/specialist/documents")
 async def upload_document(data: DocumentIn, user: dict = Depends(require_role("specialist"))):
+    # Cap document payload size to prevent BSON overflow (each doc ≤ 4MB; array stays well under 16MB)
+    if len(data.url) > 5_500_000:  # ~4MB base64 encoded
+        raise HTTPException(413, "Document depășește 4MB. Folosește un fișier mai mic.")
+    spec = await db.users.find_one({"_id": ObjectId(user["id"])})
+    if len(spec.get("documents") or []) >= 20:
+        raise HTTPException(400, "Maximum 20 documente. Șterge documente vechi pentru a încărca altele noi.")
     doc = {
         "id": str(uuid.uuid4()),
         "type": data.type,
@@ -775,6 +781,9 @@ async def open_dispute(req_id: str, data: DisputeOpenIn, user: dict = Depends(ge
     # Only allow disputes on jobs that have funds in escrow or work started
     if req.get("status") not in ["assigned", "in_progress", "completed"]:
         raise HTTPException(400, "Disputes can only be opened on active jobs")
+    # Block dispute after escrow is released (prevents race with client.confirm())
+    if req.get("escrow_status") == "released":
+        raise HTTPException(400, "Plata a fost deja eliberată din escrow - dispută indisponibilă")
     # Prevent duplicates
     existing = await db.disputes.find_one({"request_id": req_id, "status": "open"})
     if existing:
