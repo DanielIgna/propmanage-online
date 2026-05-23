@@ -1,4 +1,4 @@
-"""PropManage Backend - FastAPI + MongoDB + JWT Auth + Marketplace"""
+"""PropManage Backend - FastAPI + MongoDB + JWT Auth + Marketplace + Stripe + Google OAuth + WebSocket"""
 from dotenv import load_dotenv
 from pathlib import Path
 ROOT_DIR = Path(__file__).parent
@@ -8,14 +8,21 @@ import os
 import jwt
 import bcrypt
 import logging
+import json
+import uuid
+import asyncio
+import httpx
+import stripe
 from datetime import datetime, timezone, timedelta
-from typing import Optional, List, Literal
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, status
+from typing import Optional, List, Literal, Dict
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 from pydantic import BaseModel, EmailStr, Field
-import uuid
+
+# Stripe configuration
+stripe.api_key = os.environ.get("STRIPE_API_KEY", "sk_test_emergent")
 
 # ============= DB SETUP =============
 mongo_url = os.environ['MONGO_URL']
@@ -181,6 +188,12 @@ async def logout(response: Response):
 @api.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
     return user
+
+@api.get("/auth/ws-token")
+async def ws_token(user: dict = Depends(get_current_user)):
+    """Issue a short-lived JWT for WebSocket connections (cookies don't work cross-origin in WS)"""
+    token = create_access_token(user["id"], user["email"], user["role"])
+    return {"token": token}
 
 # ============= PROPERTIES (Client) =============
 @api.post("/properties")
@@ -475,6 +488,286 @@ async def validate_log(log_id: str, action: str, user: dict = Depends(require_ro
         {"$set": {"status": action, "validated_by": user["id"], "validated_at": datetime.now(timezone.utc).isoformat()}}
     )
     return {"ok": True}
+
+# ============= GOOGLE OAUTH (Emergent-managed) =============
+# REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+
+@api.post("/auth/google/session")
+async def google_session_exchange(request: Request, response: Response):
+    """Exchange Emergent session_id for our JWT cookie + user record"""
+    session_id = request.headers.get("X-Session-ID")
+    if not session_id:
+        raise HTTPException(400, "Missing X-Session-ID header")
+    
+    # Call Emergent Auth backend
+    async with httpx.AsyncClient(timeout=10) as http_client:
+        try:
+            r = await http_client.get(
+                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
+                headers={"X-Session-ID": session_id}
+            )
+            r.raise_for_status()
+            data = r.json()
+        except Exception as e:
+            raise HTTPException(401, f"Invalid Emergent session: {e}")
+    
+    email = data.get("email", "").lower()
+    name = data.get("name", "")
+    picture = data.get("picture", "")
+    
+    # Find or create user
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        # Update picture/name if changed
+        await db.users.update_one(
+            {"_id": existing["_id"]},
+            {"$set": {"picture": picture, "name": name, "google_auth": True}}
+        )
+        user = await db.users.find_one({"_id": existing["_id"]})
+        uid = str(user["_id"])
+    else:
+        # Create new user as client by default
+        new_user = {
+            "email": email,
+            "name": name,
+            "picture": picture,
+            "role": "client",
+            "google_auth": True,
+            "password_hash": "",  # No password for OAuth users
+            "wallet_balance": 0.0,
+            "tokens": 0,
+            "rating": None,
+            "reviews_count": 0,
+            "verified": False,
+            "tier": None,
+            "phone": "",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        result = await db.users.insert_one(new_user)
+        uid = str(result.inserted_id)
+        user = new_user
+        user["_id"] = result.inserted_id
+    
+    # Issue our JWT tokens (same cookies as email/password flow)
+    access = create_access_token(uid, email, user.get("role", "client"))
+    refresh = create_refresh_token(uid)
+    set_auth_cookies(response, access, refresh)
+    return serialize_doc(user)
+
+
+# ============= STRIPE ESCROW =============
+
+@api.post("/payments/checkout-session")
+async def create_checkout_session(request_id: str, request: Request, user: dict = Depends(require_role("client"))):
+    """Create Stripe Checkout session for escrow funding"""
+    req = await db.requests.find_one({"_id": ObjectId(request_id), "client_id": user["id"]})
+    if not req:
+        raise HTTPException(404, "Request not found")
+    if req.get("status") not in ["open", "assigned"]:
+        raise HTTPException(400, "Request not eligible for payment")
+    
+    amount = req.get("budget_estimate") or 100.0
+    amount_cents = int(amount * 100)
+    
+    # Derive origin from request for dynamic redirect URLs
+    origin = request.headers.get("origin") or request.headers.get("referer", "").rstrip("/")
+    if not origin:
+        raise HTTPException(400, "Missing origin header")
+    
+    try:
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[{
+                "price_data": {
+                    "currency": "ron",
+                    "product_data": {
+                        "name": f"Escrow: {req.get('title', 'Service')}",
+                        "description": f"Property service deposit - {req.get('property_name', '')}",
+                    },
+                    "unit_amount": amount_cents,
+                },
+                "quantity": 1,
+            }],
+            mode="payment",
+            success_url=f"{origin}/client?payment=success&request={request_id}",
+            cancel_url=f"{origin}/client?payment=cancelled",
+            metadata={
+                "request_id": request_id,
+                "client_id": user["id"],
+                "specialist_id": req.get("specialist_id") or "",
+                "amount_ron": str(amount),
+            },
+        )
+        
+        # Track the payment session
+        await db.payments.insert_one({
+            "session_id": session.id,
+            "request_id": request_id,
+            "client_id": user["id"],
+            "amount": amount,
+            "status": "pending",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        
+        return {"checkout_url": session.url, "session_id": session.id}
+    except stripe.error.StripeError as e:
+        raise HTTPException(500, f"Stripe error: {str(e)}")
+
+
+@api.get("/payments/status/{session_id}")
+async def payment_status(session_id: str, user: dict = Depends(get_current_user)):
+    """Check Stripe Checkout session status and finalize escrow if paid"""
+    payment = await db.payments.find_one({"session_id": session_id})
+    if not payment:
+        raise HTTPException(404, "Payment session not found")
+    
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+    except stripe.error.StripeError as e:
+        raise HTTPException(500, f"Stripe error: {e}")
+    
+    status_val = session.payment_status  # "paid", "unpaid", "no_payment_required"
+    
+    # Update payment record (idempotent)
+    if status_val == "paid" and payment.get("status") != "completed":
+        await db.payments.update_one(
+            {"session_id": session_id},
+            {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        # Place funds in escrow on the request
+        await db.requests.update_one(
+            {"_id": ObjectId(payment["request_id"])},
+            {"$set": {"escrow_amount": payment["amount"], "escrow_status": "held", "paid_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        # Log transaction
+        await db.transactions.insert_one({
+            "user_id": payment["client_id"],
+            "type": "escrow_deposit",
+            "amount": -payment["amount"],
+            "request_id": payment["request_id"],
+            "session_id": session_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    
+    return {
+        "status": status_val,
+        "amount": payment["amount"],
+        "request_id": payment["request_id"],
+        "stripe_status": session.status,
+    }
+
+
+# ============= WEBSOCKET CHAT =============
+
+class ConnectionManager:
+    def __init__(self):
+        # request_id -> list of (user_id, websocket)
+        self.active: Dict[str, List[tuple]] = {}
+    
+    async def connect(self, request_id: str, user_id: str, ws: WebSocket):
+        await ws.accept()
+        self.active.setdefault(request_id, []).append((user_id, ws))
+    
+    def disconnect(self, request_id: str, ws: WebSocket):
+        if request_id in self.active:
+            self.active[request_id] = [(u, w) for u, w in self.active[request_id] if w != ws]
+            if not self.active[request_id]:
+                del self.active[request_id]
+    
+    async def broadcast(self, request_id: str, message: dict):
+        if request_id not in self.active:
+            return
+        dead = []
+        for uid, ws in self.active[request_id]:
+            try:
+                await ws.send_json(message)
+            except Exception:
+                dead.append(ws)
+        for w in dead:
+            self.disconnect(request_id, w)
+
+manager = ConnectionManager()
+
+
+@api.get("/chat/{request_id}/messages")
+async def get_messages(request_id: str, user: dict = Depends(get_current_user)):
+    """Get chat history for a request (client or assigned specialist only)"""
+    req = await db.requests.find_one({"_id": ObjectId(request_id)})
+    if not req:
+        raise HTTPException(404, "Request not found")
+    if user["role"] == "client" and req.get("client_id") != user["id"]:
+        raise HTTPException(403, "Not your request")
+    if user["role"] == "specialist" and req.get("specialist_id") != user["id"]:
+        raise HTTPException(403, "Not assigned to you")
+    
+    msgs = await db.chat_messages.find({"request_id": request_id}).sort("timestamp", 1).to_list(200)
+    return [serialize_doc(m) for m in msgs]
+
+
+@app.websocket("/api/ws/chat/{request_id}")
+async def chat_ws(websocket: WebSocket, request_id: str):
+    """WebSocket endpoint for real-time chat. Auth via token query param."""
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=4001)
+        return
+    
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        uid = payload["sub"]
+        user = await db.users.find_one({"_id": ObjectId(uid)})
+        if not user:
+            await websocket.close(code=4001); return
+        user_id = str(user["_id"])
+        user_name = user.get("name", "User")
+        user_role = user.get("role", "client")
+    except Exception:
+        await websocket.close(code=4001)
+        return
+    
+    # Verify access to request
+    req = await db.requests.find_one({"_id": ObjectId(request_id)})
+    if not req:
+        await websocket.close(code=4004); return
+    if user_role == "client" and req.get("client_id") != user_id:
+        await websocket.close(code=4003); return
+    if user_role == "specialist" and req.get("specialist_id") != user_id:
+        await websocket.close(code=4003); return
+    
+    await manager.connect(request_id, user_id, websocket)
+    try:
+        # Send system message: user joined
+        join_msg = {
+            "type": "system",
+            "text": f"{user_name} a intrat în conversație",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        await manager.broadcast(request_id, join_msg)
+        
+        while True:
+            data = await websocket.receive_json()
+            text = (data.get("text") or "").strip()
+            if not text:
+                continue
+            msg = {
+                "type": "message",
+                "request_id": request_id,
+                "user_id": user_id,
+                "user_name": user_name,
+                "user_role": user_role,
+                "text": text[:2000],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            # Persist
+            await db.chat_messages.insert_one(dict(msg))
+            # Broadcast (without _id)
+            await manager.broadcast(request_id, msg)
+    except WebSocketDisconnect:
+        manager.disconnect(request_id, websocket)
+    except Exception as e:
+        logger.error(f"WS error: {e}")
+        manager.disconnect(request_id, websocket)
+
 
 # ============= ROOT =============
 @api.get("/")

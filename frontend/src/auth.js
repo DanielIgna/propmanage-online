@@ -11,6 +11,11 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null); // null = checking, false = not auth, object = auth
   
   useEffect(() => {
+    // CRITICAL: If returning from Emergent OAuth callback, skip the /me check.
+    // AuthCallback will exchange the session_id and establish the session first.
+    if (window.location.hash?.includes("session_id=")) {
+      return;
+    }
     axios.get(`${API}/auth/me`)
       .then(r => setUser(r.data))
       .catch(() => setUser(false));

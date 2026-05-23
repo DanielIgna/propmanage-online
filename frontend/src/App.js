@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from "./auth";
 import { I18nProvider, useI18n } from "./i18n";
 import { LoginPage, RegisterPage } from "./pages/Auth";
 import { ClientDashboard, SpecialistDashboard, AdminDashboard, OperatorDashboard } from "./pages/Dashboards";
+import { AuthCallback } from "./pages/AuthCallback";
 import "./App.css";
 
 // ============= NAV =============
@@ -68,7 +69,9 @@ const Nav = () => {
 };
 
 // ============= HERO =============
-const Hero = () => (
+const Hero = () => {
+  const { t } = useI18n();
+  return (
   <section id="top" className="relative min-h-screen flex items-center pt-32 pb-20 px-6 overflow-hidden">
     <div className="absolute inset-0 dotted-bg opacity-30" />
     <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-[#d4ff3a] blur-[150px] opacity-10" />
@@ -77,26 +80,26 @@ const Hero = () => (
       <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
         <div className="inline-flex items-center gap-2 px-4 py-2 glass rounded-full mb-8" data-testid="hero-badge">
           <div className="w-2 h-2 rounded-full bg-[#d4ff3a] pulse-dot" />
-          <span className="text-xs tracking-wide text-stone-300">PROPERTY OPERATING SYSTEM • V4.2</span>
+          <span className="text-xs tracking-wide text-stone-300">{t("hero.badge")}</span>
         </div>
         
         <h1 className="font-serif text-6xl md:text-8xl lg:text-9xl leading-[0.95] tracking-tight mb-8 max-w-5xl" data-testid="hero-title">
-          Proprietatea ta,<br/>
-          <span className="italic gradient-text">perfecționată</span> digital.
+          {t("hero.title1")}<br/>
+          <span className="italic gradient-text">{t("hero.title2")}</span> {t("hero.title3")}
         </h1>
         
         <p className="text-lg md:text-xl text-stone-400 max-w-2xl mb-10 leading-relaxed">
-          PropManage creează un <span className="text-white">Digital Twin</span> high-fidelity al locuinței tale, monitorizând starea structurală și performanța financiară în timp real. Liniștea structurată pentru proprietarul modern.
+          {t("hero.subtitle")}
         </p>
         
         <div className="flex flex-col sm:flex-row gap-4">
           <a href="#problem" className="btn-accent px-8 py-4 rounded-full font-medium inline-flex items-center gap-2 group" data-testid="hero-start-btn">
-            Explorează Demo
+            {t("hero.cta1")}
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </a>
           <a href="#journey" className="glass px-8 py-4 rounded-full font-medium inline-flex items-center gap-2 hover:bg-white/10 transition-colors" data-testid="hero-journey-btn">
             <Play className="w-4 h-4" />
-            Vezi Flux Complet
+            {t("hero.cta2")}
           </a>
         </div>
       </motion.div>
@@ -107,10 +110,10 @@ const Hero = () => (
         className="mt-24 grid grid-cols-2 md:grid-cols-4 gap-8 pt-12 border-t border-white/5"
       >
         {[
-          { v: "12,842", l: "Utilizatori activi" },
-          { v: "856", l: "Joburi în execuție" },
-          { v: "142", l: "Specialiști verificați" },
-          { v: "94%", l: "Sănătate portofoliu" },
+          { v: "12,842", l: t("hero.stat1") },
+          { v: "856", l: t("hero.stat2") },
+          { v: "142", l: t("hero.stat3") },
+          { v: "94%", l: t("hero.stat4") },
         ].map((s, i) => (
           <div key={i} data-testid={`hero-stat-${i}`}>
             <div className="font-serif text-4xl md:text-5xl font-medium">{s.v}</div>
@@ -120,7 +123,8 @@ const Hero = () => (
       </motion.div>
     </div>
   </section>
-);
+  );
+};
 
 // ============= SECTION HEADER =============
 const SectionTag = ({ num, label }) => (
@@ -133,22 +137,23 @@ const SectionTag = ({ num, label }) => (
 
 // ============= PROBLEM =============
 const Problem = () => {
+  const { t } = useI18n();
   const problems = [
-    { icon: Eye, title: "Nu știi ce e în pereți", desc: "Trasee de instalații, vârste de echipamente, intervenții — totul rămâne ascuns până când ceva se strică." },
-    { icon: Activity, title: "Zero tracking mentenanță", desc: "Când a fost ultima revizie? Cine a făcut-o? Ce s-a schimbat? Nimeni nu mai știe." },
-    { icon: Shield, title: "Lipsă de încredere", desc: "Specialiști aleși la întâmplare, fără verificare, fără garanții. Risc constant." },
-    { icon: TrendingUp, title: "Costuri opace", desc: "Prețuri umflate, lucrări nedocumentate, fără devize transparente sau istoric financiar." },
+    { icon: Eye, title: t("problem.p1.t"), desc: t("problem.p1.d") },
+    { icon: Activity, title: t("problem.p2.t"), desc: t("problem.p2.d") },
+    { icon: Shield, title: t("problem.p3.t"), desc: t("problem.p3.d") },
+    { icon: TrendingUp, title: t("problem.p4.t"), desc: t("problem.p4.d") },
   ];
 
   return (
     <section id="problem" className="py-32 px-6 relative">
       <div className="max-w-7xl mx-auto">
-        <SectionTag num="01" label="Problemă" />
+        <SectionTag num="01" label={t("sec.problem")} />
         <h2 className="font-serif text-5xl md:text-7xl tracking-tight mb-6 max-w-4xl" data-testid="problem-title">
-          Proprietatea ta e o <span className="italic">cutie neagră</span>.
+          {t("problem.title1")} <span className="italic">{t("problem.title2")}</span>
         </h2>
         <p className="text-lg text-stone-400 max-w-2xl mb-16">
-          85% dintre proprietari nu au nicio documentație despre instalațiile, echipamentele sau intervențiile din propria casă. Asta înseamnă risc, costuri și pierdere de valoare.
+          {t("problem.intro")}
         </p>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -177,31 +182,32 @@ const Problem = () => {
 
 // ============= SOLUTION =============
 const Solution = () => {
+  const { t } = useI18n();
   const pillars = [
-    { icon: Box, title: "Digital Twin", desc: "Replică digitală 3D a proprietății cu toate sistemele și echipamentele mapate." },
-    { icon: Users, title: "Marketplace Verificat", desc: "Specialiști triple-verified cu rating real și garanție de servicii." },
-    { icon: Lock, title: "Escrow Securizat", desc: "Plățile sunt protejate până când lucrarea este confirmată ca finalizată." },
-    { icon: FileCheck, title: "Istoric Digital", desc: "Fiecare intervenție, fiecare reparație, fiecare cost — salvat permanent." },
+    { icon: Box, title: t("sol.p1.t"), desc: t("sol.p1.d") },
+    { icon: Users, title: t("sol.p2.t"), desc: t("sol.p2.d") },
+    { icon: Lock, title: t("sol.p3.t"), desc: t("sol.p3.d") },
+    { icon: FileCheck, title: t("sol.p4.t"), desc: t("sol.p4.d") },
   ];
 
   return (
     <section id="solution" className="py-32 px-6 relative">
       <div className="absolute inset-0 dotted-bg opacity-20" />
       <div className="max-w-7xl mx-auto relative">
-        <SectionTag num="02" label="Soluție" />
+        <SectionTag num="02" label={t("sec.solution")} />
         <div className="grid lg:grid-cols-2 gap-16 items-start mb-20">
           <div>
             <h2 className="font-serif text-5xl md:text-7xl tracking-tight" data-testid="solution-title">
-              Un sistem de operare pentru <span className="italic">casa ta</span>.
+              {t("sol.title1")} <span className="italic">{t("sol.title2")}</span>
             </h2>
           </div>
           <div className="lg:pt-12">
             <p className="text-lg text-stone-400 leading-relaxed">
-              PropManage transformă proprietatea fizică într-un activ digital. Diagnostic, analiză, control — toate într-o singură platformă, cu transparență totală și plăți securizate.
+              {t("sol.intro")}
             </p>
             <div className="mt-8 flex items-center gap-3 text-sm text-stone-300">
               <CheckCircle2 className="w-5 h-5 text-[#d4ff3a]" />
-              <span>Nu este un cost. Este o <span className="text-white font-medium">investiție</span>.</span>
+              <span className="text-white font-medium">{t("sol.tagline")}</span>
             </div>
           </div>
         </div>
@@ -1218,7 +1224,9 @@ const GoldenPath = () => {
 };
 
 // ============= CTA + FOOTER =============
-const CTA = () => (
+const CTA = () => {
+  const { t } = useI18n();
+  return (
   <section id="cta" className="py-32 px-6 relative">
     <div className="max-w-7xl mx-auto">
       <div className="relative glass-strong rounded-[3rem] p-12 md:p-20 overflow-hidden">
@@ -1228,29 +1236,30 @@ const CTA = () => (
         <div className="relative max-w-3xl">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full mb-8">
             <div className="w-2 h-2 rounded-full bg-[#d4ff3a] pulse-dot" />
-            <span className="text-xs tracking-wide text-stone-300">READY TO BUILD</span>
+            <span className="text-xs tracking-wide text-stone-300">{t("cta.badge")}</span>
           </div>
           <h2 className="font-serif text-5xl md:text-7xl tracking-tight mb-6" data-testid="cta-title">
-            Gata să digitalizezi <span className="italic">tot ecosistemul</span>?
+            {t("cta.title1")} <span className="italic">{t("cta.title2")}</span>
           </h2>
           <p className="text-lg text-stone-400 mb-10 max-w-xl">
-            Alătură-te celor 12,842 de utilizatori care au transformat proprietățile lor în active digitale gestionabile, valoroase și liniștitoare.
+            {t("cta.intro")}
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
-            <button className="btn-accent px-8 py-4 rounded-full font-medium inline-flex items-center gap-2 group" data-testid="cta-primary">
-              Creează cont gratuit
+            <Link to="/register" className="btn-accent px-8 py-4 rounded-full font-medium inline-flex items-center gap-2 group" data-testid="cta-primary">
+              {t("cta.btn1")}
               <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-            </button>
-            <button className="glass px-8 py-4 rounded-full font-medium inline-flex items-center gap-2 hover:bg-white/10 transition-colors" data-testid="cta-secondary">
-              Talk to specialist
-            </button>
+            </Link>
+            <Link to="/login" className="glass px-8 py-4 rounded-full font-medium inline-flex items-center gap-2 hover:bg-white/10 transition-colors" data-testid="cta-secondary">
+              {t("cta.btn2")}
+            </Link>
           </div>
-          <div className="text-xs text-stone-500 mt-6">No credit card required · Cancel anytime · 14-day trial</div>
+          <div className="text-xs text-stone-500 mt-6">{t("cta.footer")}</div>
         </div>
       </div>
     </div>
   </section>
-);
+  );
+};
 
 const Footer = () => (
   <footer className="border-t border-white/5 py-12 px-6">
@@ -1302,6 +1311,7 @@ function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/client" element={<ClientDashboard />} />
               <Route path="/specialist" element={<SpecialistDashboard />} />
               <Route path="/admin" element={<AdminDashboard />} />

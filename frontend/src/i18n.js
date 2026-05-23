@@ -43,6 +43,40 @@ const translations = {
     // Categories
     "cat.electric": "Electric", "cat.plumbing": "Sanitar", "cat.hvac": "HVAC",
     "cat.other": "Altele",
+    // Landing - Hero
+    "hero.badge": "PROPERTY OPERATING SYSTEM • V4.2",
+    "hero.title1": "Proprietatea ta,", "hero.title2": "perfecționată", "hero.title3": "digital.",
+    "hero.subtitle": "PropManage creează un Digital Twin high-fidelity al locuinței tale, monitorizând starea structurală și performanța financiară în timp real. Liniștea structurată pentru proprietarul modern.",
+    "hero.cta1": "Explorează Demo", "hero.cta2": "Vezi Flux Complet",
+    "hero.stat1": "Utilizatori activi", "hero.stat2": "Joburi în execuție",
+    "hero.stat3": "Specialiști verificați", "hero.stat4": "Sănătate portofoliu",
+    // Sections
+    "sec.problem": "Problemă", "sec.solution": "Soluție",
+    "sec.experience": "Experiență Utilizator", "sec.specialist": "Experiență Specialist",
+    "sec.wallet": "Wallet & Ecosistem", "sec.twin": "Digital Twin · Core Differentiator",
+    "sec.admin": "Admin & Trust", "sec.business": "Business Model",
+    "sec.value": "Value Proposition", "sec.golden": "Golden Path",
+    // Problem
+    "problem.title1": "Proprietatea ta e o", "problem.title2": "cutie neagră.",
+    "problem.intro": "85% dintre proprietari nu au nicio documentație despre instalațiile, echipamentele sau intervențiile din propria casă. Asta înseamnă risc, costuri și pierdere de valoare.",
+    "problem.p1.t": "Nu știi ce e în pereți", "problem.p1.d": "Trasee de instalații, vârste de echipamente, intervenții — totul rămâne ascuns până când ceva se strică.",
+    "problem.p2.t": "Zero tracking mentenanță", "problem.p2.d": "Când a fost ultima revizie? Cine a făcut-o? Ce s-a schimbat? Nimeni nu mai știe.",
+    "problem.p3.t": "Lipsă de încredere", "problem.p3.d": "Specialiști aleși la întâmplare, fără verificare, fără garanții. Risc constant.",
+    "problem.p4.t": "Costuri opace", "problem.p4.d": "Prețuri umflate, lucrări nedocumentate, fără devize transparente sau istoric financiar.",
+    // Solution
+    "sol.title1": "Un sistem de operare pentru", "sol.title2": "casa ta.",
+    "sol.intro": "PropManage transformă proprietatea fizică într-un activ digital. Diagnostic, analiză, control — toate într-o singură platformă, cu transparență totală și plăți securizate.",
+    "sol.tagline": "Nu este un cost. Este o investiție.",
+    "sol.p1.t": "Digital Twin", "sol.p1.d": "Replică digitală 3D a proprietății cu toate sistemele și echipamentele mapate.",
+    "sol.p2.t": "Marketplace Verificat", "sol.p2.d": "Specialiști triple-verified cu rating real și garanție de servicii.",
+    "sol.p3.t": "Escrow Securizat", "sol.p3.d": "Plățile sunt protejate până când lucrarea este confirmată ca finalizată.",
+    "sol.p4.t": "Istoric Digital", "sol.p4.d": "Fiecare intervenție, fiecare reparație, fiecare cost — salvat permanent.",
+    // CTA
+    "cta.badge": "READY TO BUILD",
+    "cta.title1": "Gata să digitalizezi", "cta.title2": "tot ecosistemul?",
+    "cta.intro": "Alătură-te celor 12,842 de utilizatori care au transformat proprietățile lor în active digitale gestionabile, valoroase și liniștitoare.",
+    "cta.btn1": "Creează cont gratuit", "cta.btn2": "Talk to specialist",
+    "cta.footer": "No credit card required · Cancel anytime · 14-day trial",
   },
   en: {
     // Nav
@@ -85,6 +119,40 @@ const translations = {
     // Categories
     "cat.electric": "Electric", "cat.plumbing": "Plumbing", "cat.hvac": "HVAC",
     "cat.other": "Other",
+    // Hero
+    "hero.badge": "PROPERTY OPERATING SYSTEM • V4.2",
+    "hero.title1": "Your property,", "hero.title2": "perfected", "hero.title3": "digitally.",
+    "hero.subtitle": "PropManage builds a high-fidelity Digital Twin of your home, monitoring structural condition and financial performance in real time. Structured peace of mind for the modern owner.",
+    "hero.cta1": "Explore Demo", "hero.cta2": "See Full Flow",
+    "hero.stat1": "Active users", "hero.stat2": "Active jobs",
+    "hero.stat3": "Verified specialists", "hero.stat4": "Portfolio health",
+    // Sections
+    "sec.problem": "Problem", "sec.solution": "Solution",
+    "sec.experience": "User Experience", "sec.specialist": "Specialist Experience",
+    "sec.wallet": "Wallet & Ecosystem", "sec.twin": "Digital Twin · Core Differentiator",
+    "sec.admin": "Admin & Trust", "sec.business": "Business Model",
+    "sec.value": "Value Proposition", "sec.golden": "Golden Path",
+    // Problem
+    "problem.title1": "Your property is a", "problem.title2": "black box.",
+    "problem.intro": "85% of homeowners have no documentation about installations, equipment or interventions in their own home. That means risk, costs and value loss.",
+    "problem.p1.t": "You don't know what's in your walls", "problem.p1.d": "Plumbing paths, equipment age, interventions — all hidden until something breaks.",
+    "problem.p2.t": "Zero maintenance tracking", "problem.p2.d": "When was the last service? Who did it? What changed? Nobody knows anymore.",
+    "problem.p3.t": "Lack of trust", "problem.p3.d": "Specialists picked at random, no verification, no warranty. Constant risk.",
+    "problem.p4.t": "Opaque costs", "problem.p4.d": "Inflated prices, undocumented work, no transparent quotes or financial history.",
+    // Solution
+    "sol.title1": "An operating system for", "sol.title2": "your home.",
+    "sol.intro": "PropManage turns your physical property into a digital asset. Diagnostic, analytics, control — all in one platform, with total transparency and secured payments.",
+    "sol.tagline": "Not a cost. An investment.",
+    "sol.p1.t": "Digital Twin", "sol.p1.d": "3D digital replica of the property with all systems and equipment mapped.",
+    "sol.p2.t": "Verified Marketplace", "sol.p2.d": "Triple-verified specialists with real ratings and service guarantee.",
+    "sol.p3.t": "Secure Escrow", "sol.p3.d": "Payments are protected until the work is confirmed as completed.",
+    "sol.p4.t": "Digital History", "sol.p4.d": "Every intervention, every repair, every cost — saved permanently.",
+    // CTA
+    "cta.badge": "READY TO BUILD",
+    "cta.title1": "Ready to digitize", "cta.title2": "your entire ecosystem?",
+    "cta.intro": "Join the 12,842 users who turned their properties into manageable, valuable, peace-of-mind digital assets.",
+    "cta.btn1": "Create free account", "cta.btn2": "Talk to specialist",
+    "cta.footer": "No credit card required · Cancel anytime · 14-day trial",
   }
 };
 

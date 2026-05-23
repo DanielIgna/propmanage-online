@@ -1,0 +1,66 @@
+{
+  "summary": "Phase 3 backend testing: 20/23 passed, 1 failed (Stripe Checkout creation - invalid API key), 2 skipped (logical: payment_status depends on failed checkout test; specialist-not-assigned ACL test when SPEC2 happens to be assigned). All Google OAuth (missing-header 400 / invalid-session 401), ws-token (auth-gated, returns JWT), WebSocket chat (token auth, message send/receive, MongoDB persistence in db.chat_messages, ACL closures 4001/4003), chat history HTTP endpoint (200/403/404/401), and regression smoke (login, properties, requests, /auth/me) all pass. The Stripe failure is a configuration bug: STRIPE_API_KEY is not set in /app/backend/.env so it falls back to the placeholder 'sk_test_emergent' which Stripe rejects with 'Invalid API Key provided: sk_test_****gent'.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/payments/checkout-session",
+        "issue": "Stripe rejects API key 'sk_test_emergent' (placeholder default). Server returns 500 'Stripe error: Invalid API Key provided: sk_test_****gent'. STRIPE_API_KEY is missing from /app/backend/.env; code at server.py:25 defaults to the invalid placeholder.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "POST /api/payments/checkout-session",
+        "issue": "Origin header optional but enforced manually; the Kubernetes ingress may inject a Referer making 'missing origin' 400 hard to trigger - works but worth documenting."
+      },
+      {
+        "endpoint": "GET /api/payments/status/{session_id}",
+        "issue": "When Stripe key is invalid or session was never created on Stripe, retrieve() raises 500. Consider catching InvalidRequestError -> 404 for cleaner error semantics."
+      },
+      {
+        "endpoint": "WebSocket /api/ws/chat/{request_id}",
+        "issue": "Accepts JWT via query-string ?token=... which can leak into proxy/access logs. Consider Sec-WebSocket-Protocol subprotocol auth or ephemeral one-time tokens (current ws-token uses full 7d access token TTL)."
+      },
+      {
+        "endpoint": "GET /api/auth/ws-token",
+        "issue": "Returns the full access token (same 7-day TTL) instead of a short-lived (e.g., 60s) WS-only token; docstring says 'short-lived' but implementation reuses create_access_token. Mismatch between intent and impl."
+      },
+      {
+        "endpoint": "POST /api/auth/google/session",
+        "issue": "On Emergent reject the 401 includes the raw exception string in 'detail' (leaks remote URL/status); should return a generic 'Invalid session' message."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_phase3.py",
+    "/app/test_reports/pytest/phase3_results.xml",
+    "/app/backend/tests/test_propmanage_api.py"
+  ],
+  "action_items": [
+    "Set a valid STRIPE_API_KEY in /app/backend/.env (test mode key). The placeholder 'sk_test_emergent' is not accepted by Stripe. Alternatively migrate to the platform-provided emergentintegrations.payments.stripe.checkout.StripeCheckout wrapper (already installed as emergentintegrations 0.1.0 - exposes create_checkout_session, get_checkout_status, handle_webhook) which is the recommended Emergent pattern for Stripe.",
+    "Once a valid Stripe key is in place, re-run pytest /app/backend/tests/test_phase3.py - the test_create_checkout_session and test_payment_status_unpaid tests will verify the full flow.",
+    "Consider issuing a short-lived (60-300s) JWT from /api/auth/ws-token instead of the full 7d access token (docstring already promises this).",
+    "Sanitize the error string in google_session_exchange (don't expose raw upstream exception)."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 932 lines - well past the 700-line guideline. Split into routers: auth.py, properties.py, requests.py, payments.py, chat.py, admin.py.",
+    "ConnectionManager.broadcast iterates while modifying dead list - safe but consider asyncio.gather for parallel sends.",
+    "chat WebSocket sends back the persisted message dict that still contains MongoDB ObjectId after insert_one (motor mutates the dict to add _id). server.py:762 does insert_one(dict(msg)) which is a shallow copy, so msg itself is NOT mutated - correct. However, if msg ever stored ObjectId fields they'd fail JSON serialization. Currently safe.",
+    "stripe.error.StripeError caught but on 500 returns the raw stripe error message including the masked key - acceptable for test mode, masked in prod.",
+    "JWT in WS query parameter is logged by uvicorn access log if enabled. Consider header-based auth via Sec-WebSocket-Protocol.",
+    "CORS allow_origins=['*'] with allow_credentials=True still present from iteration_1 - browsers reject this combo; fix to explicit origin list from CORS_ORIGINS env var.",
+    "@app.on_event('startup'/'shutdown') still deprecated - migrate to lifespan.",
+    "No rate limit on POST /api/auth/google/session - vulnerable to session-id brute force enumeration (though session ids are long random)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase3.py (new)"
+  ],
+  "success_rate": {"backend": "87% (20/23 - 1 failed due to invalid Stripe key, 2 logical skips)", "frontend": "N/A (not tested per request)"},
+  "test_credentials": "client@propmanage.io/Client123!, specialist@propmanage.io/Spec123!, specialist2@propmanage.io/Spec123! - all verified",
+  "seed_data_creation": "WebSocket persistence test inserts 1 TEST_-prefixed message ('TEST_hello_from_phase3_ws') into db.chat_messages per run; harmless, accumulates over runs but does not interfere.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All Phase 3 tests are in /app/backend/tests/test_phase3.py (23 tests). The only failure is Stripe Checkout creation due to invalid STRIPE_API_KEY. Once main agent either (a) sets a real test Stripe key in backend/.env, or (b) migrates to emergentintegrations.payments.stripe.checkout.StripeCheckout, re-run pytest and both currently-failing/skipped Stripe tests should pass. WebSocket auth/persistence is fully verified including 4001 (invalid token), 4003 (ACL), and broadcast+persistence. Google OAuth is verified up to the point where Emergent backend rejects fake session IDs (401). Regression of all iteration_1 endpoints still passes.",
+  "rca of the issue": "Stripe Checkout 500: STRIPE_API_KEY env var not set; code default 'sk_test_emergent' is a placeholder, not a real Stripe key. Reproduction: curl -X POST $BASE/api/payments/checkout-session?request_id=<id> -H 'Origin: http://localhost:3000' --cookie 'access_token=<client_token>' returns 500 with detail 'Stripe error: Invalid API Key provided: sk_test_****gent'. Mitigation: set STRIPE_API_KEY=<real_test_key> in /app/backend/.env and restart backend, OR switch to emergentintegrations.payments.stripe.checkout.StripeCheckout which is the Emergent-recommended wrapper (already installed, version 0.1.0, exposes create_checkout_session/get_checkout_status/handle_webhook)."
+}

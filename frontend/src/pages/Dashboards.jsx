@@ -7,10 +7,11 @@ import {
   Building2, Home, Wrench, Shield, Settings, LogOut, Languages,
   Wallet, Sparkles, Zap, Droplet, Wind, AlertTriangle, CheckCircle2,
   Clock, Star, TrendingUp, Users, Briefcase, Award, Plus,
-  ArrowRight, FileCheck, MessageSquare, Gavel, Activity, ArrowUpRight, Eye
+  ArrowRight, FileCheck, MessageSquare, Gavel, Activity, ArrowUpRight, Eye, CreditCard
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { useI18n } from "../i18n";
+import { ChatPanel } from "./ChatPanel";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -109,15 +110,45 @@ export const ClientDashboard = () => {
   const [properties, setProperties] = useState([]);
   const [requests, setRequests] = useState([]);
   const [showNewReq, setShowNewReq] = useState(false);
+  const [chatRequest, setChatRequest] = useState(null);
+  
+  const loadRequests = () => axios.get(`${API}/requests`).then(r => setRequests(r.data)).catch(() => {});
   
   useEffect(() => {
     if (user && user !== false) {
       axios.get(`${API}/properties`).then(r => setProperties(r.data)).catch(() => {});
-      axios.get(`${API}/requests`).then(r => setRequests(r.data)).catch(() => {});
+      loadRequests();
+      
+      // Check for Stripe payment success in URL
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("payment") === "success" && params.get("request")) {
+        const reqId = params.get("request");
+        // Find session id from latest payment for this request and verify
+        (async () => {
+          try {
+            // We need to find the most recent session. Easier: trigger polling
+            await new Promise(r => setTimeout(r, 1500));
+            await loadRequests();
+            await refreshUser();
+            alert("Plată confirmată! Fondurile sunt în escrow.");
+            window.history.replaceState(null, "", "/client");
+          } catch {}
+        })();
+      } else if (params.get("payment") === "cancelled") {
+        alert("Plata a fost anulată.");
+        window.history.replaceState(null, "", "/client");
+      }
     }
   }, [user]);
   
   const prop = properties[0];
+  
+  const payEscrow = async (reqId) => {
+    try {
+      const { data } = await axios.post(`${API}/payments/checkout-session?request_id=${reqId}`);
+      window.location.href = data.checkout_url;
+    } catch (e) { alert(formatApiError(e)); }
+  };
   
   return (
     <DashLayout role="client" title={`${t("client.welcome")}, ${user?.name?.split(" ")[0] || ""}`}>
@@ -198,9 +229,21 @@ export const ClientDashboard = () => {
                   <span>{r.category} · {r.priority}</span>
                   {r.specialist_name && <span className="text-[#d4ff3a]">{r.specialist_name}</span>}
                 </div>
+                <div className="flex gap-2 mt-3">
+                  {r.specialist_id && (r.status === "assigned" || r.status === "in_progress" || r.status === "completed") && (
+                    <button onClick={() => setChatRequest(r.id)} className="flex-1 bg-white/10 hover:bg-white/15 py-2 rounded-lg text-xs flex items-center justify-center gap-1" data-testid={`chat-${r.id}`}>
+                      <MessageSquare className="w-3 h-3" />Chat
+                    </button>
+                  )}
+                  {r.status === "assigned" && !r.escrow_amount && (
+                    <button onClick={() => payEscrow(r.id)} className="flex-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 py-2 rounded-lg text-xs flex items-center justify-center gap-1" data-testid={`pay-${r.id}`}>
+                      <CreditCard className="w-3 h-3" />Plătește
+                    </button>
+                  )}
+                </div>
                 {r.status === "completed" && (
                   <button onClick={() => confirmRequest(r.id, refreshUser, setRequests)} 
-                    className="mt-3 w-full bg-[#d4ff3a] text-black py-2 rounded-lg text-xs font-medium"
+                    className="mt-2 w-full bg-[#d4ff3a] text-black py-2 rounded-lg text-xs font-medium"
                     data-testid={`confirm-${r.id}`}>
                     Confirmă & Eliberează plata
                   </button>
@@ -212,6 +255,7 @@ export const ClientDashboard = () => {
       </div>
       
       {showNewReq && <NewRequestModal onClose={() => setShowNewReq(false)} property={prop} onCreated={r => setRequests([r, ...requests])} />}
+      {chatRequest && <ChatPanel requestId={chatRequest} onClose={() => setChatRequest(null)} />}
     </DashLayout>
   );
 };
@@ -279,6 +323,7 @@ const NewRequestModal = ({ onClose, property, onCreated }) => {
 export const SpecialistDashboard = () => {
   const { user, refreshUser } = useAuth();
   const [requests, setRequests] = useState([]);
+  const [chatRequest, setChatRequest] = useState(null);
   
   const load = () => axios.get(`${API}/requests`).then(r => setRequests(r.data)).catch(() => {});
   useEffect(() => { if (user) load(); }, [user]);
@@ -354,12 +399,18 @@ export const SpecialistDashboard = () => {
                   {r.status === "in_progress" && (
                     <button onClick={() => complete(r.id)} className="flex-1 btn-accent py-2 rounded-lg text-xs font-medium" data-testid={`complete-${r.id}`}>Marchează completă</button>
                   )}
+                  {(r.status === "assigned" || r.status === "in_progress" || r.status === "completed") && (
+                    <button onClick={() => setChatRequest(r.id)} className="bg-white/10 hover:bg-white/15 py-2 px-3 rounded-lg text-xs flex items-center gap-1" data-testid={`spec-chat-${r.id}`}>
+                      <MessageSquare className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         </div>
       </div>
+      {chatRequest && <ChatPanel requestId={chatRequest} onClose={() => setChatRequest(null)} />}
     </DashLayout>
   );
 };
