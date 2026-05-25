@@ -1,0 +1,36 @@
+{
+  "summary": "Phase 15 — LastActionBanner on request cards. Backend: 10/10 new tests pass; Phase 14 regression 20/20 pass. Frontend: banner verified on ClientDashboard JobsZone (8 banners) and SpecialistDashboard 'Lucrările mele' (7 banners) — role dot colors, Romanian action labels, schedule extras (start→end · Nh), time-ago strings, and click-to-open RequestTimelineModal all behave correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase15.py",
+    "/app/test_reports/pytest/phase15_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "/app/backend/server.py remains 3291 lines — please plan a module split (routers/, services/) as recommended in iteration_12.",
+    "Phase 15 enrichment runs an aggregation pipeline on every GET /api/requests with no index hint. With 30 requests perf is fine; recommend ensuring an index on activity_events.request_id + created_at (compound, desc) before traffic grows.",
+    "LastActionBanner schedule-extra parser checks payload.schedule.start_date but uses raw .slice(0,10) for display — fine for ISO strings, but if backend ever returns a date in another shape this silently breaks. Consider tolerant parsing.",
+    "Banner click is wired to setTimelineRequestId — works, but the underlying card already has a separate 'client-timeline-{id}' button next to it on ClientDashboard, creating two near-identical affordances. Minor UX duplication, not a bug."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase15.py"
+  ],
+  "success_rate": {
+    "backend": "100% (10/10 Phase15 + 20/20 Phase14 regression)",
+    "frontend": "100% on Phase 15 critical flows (banner render + click + schedule/role-dot/time-ago)"
+  },
+  "test_credentials": "client@propmanage.io / Client123! ; specialist@propmanage.io / Spec123! (active_view defaults to specialist) — both pre-seeded.",
+  "seed_data_creation": "None for Phase 15. Existing seed + Phase 14 TEST_* requests already provided ample events.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Phase 15 banner is rendered via <LastActionBanner event={r.last_event} .../> from ActivityTimeline.jsx. data-testid='last-action-banner' is present on every banner. Role dot color class encodes actor role (bg-cyan/amber/purple/fuchsia/stone). Schedule payload renders as italic ' (YYYY-MM-DD → YYYY-MM-DD · Nh)' suffix. Backend last_event is computed via aggregation on activity_events grouped by request_id (first by created_at DESC). Tabs to navigate: client-tab-jobs (ClientDashboard), spec-tab-jobs (SpecialistDashboard).",
+  "rca of the issue": "No issues — feature works end-to-end. Backend aggregation pipeline groups latest event per request and attaches as last_event; React banner correctly renders the 4 required pieces (role-dot, actor_name, action label, time-ago) plus optional schedule/escrow extras."
+}

@@ -19,7 +19,7 @@ import { InteriorDesignCard, InteriorDesignModal, DesignPhasesPanel } from "./In
 import { API, DashLayout, Stat, StatusBadge } from "./DashShared";
 import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
-import { RequestTimelineModal } from "./ActivityTimeline";
+import { RequestTimelineModal, LastActionBanner } from "./ActivityTimeline";
 
 export const ClientDashboard = () => {
   const { user, refreshUser } = useAuth();
@@ -474,6 +474,7 @@ const JobsZone = ({ requests, searchQ, setSearchQ, filterCat, setFilterCat, filt
               <span>{r.category} · {r.priority}</span>
               {r.specialist_name && <span className="text-[#d4ff3a]">{r.specialist_name}</span>}
             </div>
+            <LastActionBanner event={r.last_event} onClick={() => setTimelineRequestId(r.id)} />
             <div className="flex gap-2 mt-3">
               <button onClick={() => setTimelineRequestId(r.id)} className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 py-2 px-3 rounded-lg text-xs flex items-center gap-1" data-testid={`client-timeline-${r.id}`} title="Vezi timeline complet">
                 <Clock className="w-3 h-3" />Timeline

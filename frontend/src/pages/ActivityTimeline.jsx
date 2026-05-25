@@ -321,3 +321,76 @@ const Field = ({ label, children }) => (
     {children}
   </div>
 );
+
+// ============= LAST ACTION BANNER (shown on request cards) =============
+const ACTION_LABELS = {
+  "request.created":                 "a creat solicitarea",
+  "request.accepted":                "a acceptat",
+  "escrow.paid":                     "a plătit escrow",
+  "work.started":                    "a pornit lucrarea",
+  "work.completed":                  "a marcat finalizată",
+  "work.confirmed":                  "a confirmat & eliberat plata",
+  "twin.requested":                  "a cerut activare twin",
+  "twin.validated":                  "a validat twin-ul",
+  "dispute.opened":                  "a deschis o dispută",
+  "dispute.resolved":                "a rezolvat disputa",
+  "operator.flagged_nonconformity":  "a raportat neconformitate",
+  "admin.resolved_nonconformity":    "a rezolvat sesizarea",
+};
+
+const ROLE_DOT_COLOR = {
+  client:     "bg-cyan-400",
+  specialist: "bg-amber-400",
+  admin:      "bg-purple-400",
+  operator:   "bg-fuchsia-400",
+  system:     "bg-stone-400",
+};
+
+function timeAgo(iso) {
+  if (!iso) return "";
+  const then = new Date(iso).getTime();
+  const diff = Math.max(0, Date.now() - then);
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "acum câteva secunde";
+  if (m < 60) return `acum ${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `acum ${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `acum ${d}z`;
+  return new Date(iso).toLocaleDateString("ro-RO", { day: "2-digit", month: "short" });
+}
+
+export const LastActionBanner = ({ event, onClick }) => {
+  if (!event) return null;
+  const label = ACTION_LABELS[event.event_type] || event.event_type.replace(/[._]/g, " ");
+  const dot = ROLE_DOT_COLOR[event.actor_role] || ROLE_DOT_COLOR.system;
+
+  // Surface schedule info when relevant
+  let extra = null;
+  const sched = event.payload?.schedule;
+  if (sched && sched.start_date) {
+    const s = sched.start_date.slice(0, 10);
+    const e = sched.end_date ? `→ ${sched.end_date.slice(0, 10)}` : "";
+    const hrs = sched.estimated_hours != null ? ` · ${sched.estimated_hours}h` : "";
+    extra = ` (${s}${e ? " " + e : ""}${hrs})`;
+  } else if (event.payload?.amount != null && event.event_type.startsWith("escrow")) {
+    extra = ` · ${event.payload.amount} RON`;
+  }
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full mt-3 mb-1 bg-white/[0.04] hover:bg-white/[0.07] border border-white/5 rounded-lg px-3 py-2 text-left transition-colors group"
+      data-testid="last-action-banner"
+    >
+      <div className="flex items-center gap-2 text-[11px] flex-wrap">
+        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
+        <span className="text-stone-300 font-medium truncate">{event.actor_name}</span>
+        <span className="text-stone-400">{label}</span>
+        {extra && <span className="text-stone-500 italic">{extra}</span>}
+        <span className="text-stone-600 ml-auto shrink-0">{timeAgo(event.created_at)}</span>
+      </div>
+    </button>
+  );
+};
+

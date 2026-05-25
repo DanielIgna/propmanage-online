@@ -786,7 +786,36 @@ async def list_requests(
             query = {**query, **text_filter}
     
     docs = await db.requests.find(query).sort("created_at", -1).to_list(200)
-    return [serialize_doc(d) for d in docs]
+    out = [serialize_doc(d) for d in docs]
+
+    # Batch-enrich with last activity event per request (banner data)
+    req_ids = [r["id"] for r in out]
+    last_events = {}
+    if req_ids:
+        # Mongo aggregation to get the latest event per request
+        pipeline = [
+            {"$match": {"request_id": {"$in": req_ids}}},
+            {"$sort": {"created_at": -1}},
+            {"$group": {
+                "_id": "$request_id",
+                "event_type": {"$first": "$event_type"},
+                "actor_name": {"$first": "$actor_name"},
+                "actor_role": {"$first": "$actor_role"},
+                "payload": {"$first": "$payload"},
+                "created_at": {"$first": "$created_at"},
+            }}
+        ]
+        async for e in db.activity_events.aggregate(pipeline):
+            last_events[e["_id"]] = {
+                "event_type": e["event_type"],
+                "actor_name": e["actor_name"],
+                "actor_role": e["actor_role"],
+                "payload": e.get("payload") or {},
+                "created_at": e["created_at"],
+            }
+    for r in out:
+        r["last_event"] = last_events.get(r["id"])
+    return out
 
 @api.get("/requests/{req_id}")
 async def get_request(req_id: str, user: dict = Depends(get_current_user)):
