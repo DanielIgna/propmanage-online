@@ -184,6 +184,8 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Phase 15: 30/30 ✅ (LastActionBanner pe request cards)
 - Phase 16: 43/43 ✅ (Daily digest emails @ 19:00 Europe/Bucharest)
 - **TOTAL: 363/369 backend tests pass (98.4%)**
+- Phase 17 (Hotfix): Mobile bottom-nav visibility fix — Emergent preview badge relocated from bottom-right to top-right via CSS override on screens ≤1023px, freeing tabs 3-4 (Notificări/Setări) to be visible AND clickable (26 Feb 2026)
+
 
 ## API Endpoints (60+)
 **Auth**: POST /api/auth/{login, register, logout, google/session}, GET /api/auth/{me, ws-token}

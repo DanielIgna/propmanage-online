@@ -120,3 +120,22 @@ html { scroll-behavior: smooth; }
 .phone-glow {
     background: radial-gradient(ellipse at center, rgba(212, 255, 58, 0.15) 0%, transparent 70%);
 }
+
+
+/* ============================================================
+   FIX: Emergent preview badge (#emergent-badge) covers the
+   bottom navigation tabs 3-4 on mobile. We relocate the badge
+   from bottom-right to top-right (just below the sticky header)
+   so all 4 bottom-nav tabs remain visible AND clickable.
+   On larger screens the badge stays in its default position.
+   ============================================================ */
+@media (max-width: 1023px) {
+  #emergent-badge {
+    bottom: auto !important;
+    top: 76px !important;
+    right: 12px !important;
+    transform: scale(0.85) !important;
+    transform-origin: top right !important;
+    opacity: 0.85 !important;
+  }
+}
