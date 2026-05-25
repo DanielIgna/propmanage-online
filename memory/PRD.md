@@ -92,6 +92,13 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
   - Validări: max 30 items/specialist, 4MB cap pe imagine base64, ownership-scoped PUT/DELETE
   - Seed idempotent: 3 proiecte pre-populate (HVAC Pipera, baie industrială, bucătărie modernă)
 
+### Phase 15 — LastActionBanner pe request cards (30/30 tests ✅)
+- **Status Banner** pe fiecare card cerere (Client + Specialist) — afișează ultima acțiune cu: dot colorat per rol, actor_name, label român, extras inline (programare/sumă), time-ago ("acum 11m")
+- **Backend**: `GET /api/requests` enrich cu `last_event` (aggregation Mongo batched per request_id) — performanță O(1) query extra per listă
+- Click pe banner → deschide RequestTimelineModal
+- 12 event types mappate în ACTION_LABELS (română): "a creat solicitarea", "a acceptat", "a confirmat & eliberat plata" etc.
+- Detectare automată payload: schedule_proposal → afișează (data start → end · ore); escrow.paid → afișează suma RON
+
 ### Phase 14 — Activity Timeline + Cross-Role Visibility (43/43 tests ✅)
 - **Unified Activity Timeline** vizibil pe fiecare cerere — RBAC: client/specialist al cererii + admin + operator care a validat twin-ul
 - **12 event types** instrumentate cu `log_event()`: request.created, request.accepted, work.started, work.completed, work.confirmed, escrow.paid, twin.requested, twin.validated, dispute.opened, dispute.resolved, operator.flagged_nonconformity, admin.resolved_nonconformity
@@ -159,7 +166,8 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Phase 12: 14/14 ✅ (Referral + Web Push + Contact backend)
 - Phase 13: 23/23 ✅ (Onboarding cycle + Twin pipeline)
 - Phase 14: 43/43 ✅ (Activity Timeline + Cross-role visibility + Nonconformity)
-- **TOTAL: 290/296 backend tests pass (98%)**
+- Phase 15: 30/30 ✅ (LastActionBanner pe request cards)
+- **TOTAL: 320/326 backend tests pass (98%)**
 
 ## API Endpoints (60+)
 **Auth**: POST /api/auth/{login, register, logout, google/session}, GET /api/auth/{me, ws-token}
