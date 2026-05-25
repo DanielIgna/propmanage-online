@@ -3,11 +3,13 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import {
   Users, Briefcase, Award, Gavel, AlertTriangle, Activity, TrendingUp,
-  ShieldCheck, Scale, ArrowRight, Eye,
+  ShieldCheck, Scale, ArrowRight, Eye, Settings as SettingsIcon,
 } from "lucide-react";
 import { SpecialistDetailModal, DisputeResolveModal } from "./AdminModals";
 import { AdminAnalytics } from "./AdminAnalytics";
 import { API, DashLayout, Stat } from "./DashShared";
+import { BottomNav } from "./BottomNav";
+import { SettingsPanel } from "./SettingsPanel";
 
 export const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
@@ -26,64 +28,64 @@ export const AdminDashboard = () => {
 
   const openDisputes = disputes.filter(d => d.status === "open");
 
-  const TabBtn = ({ id, label, count, icon: Ic }) => (
-    <button onClick={() => setTab(id)} className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm transition ${tab === id ? "bg-[#d4ff3a] text-black font-medium" : "bg-white/5 hover:bg-white/10 text-stone-300"}`} data-testid={`admin-tab-${id}`}>
-      <Ic className="w-3.5 h-3.5" />{label}
-      {count > 0 && <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tab === id ? "bg-black/20 text-black" : "bg-[#d4ff3a]/20 text-[#d4ff3a]"}`}>{count}</span>}
-    </button>
-  );
+  const tabs = [
+    { id: "overview", label: "Sumar", icon: Activity, badge: 0 },
+    { id: "specialists", label: "Specialiști", icon: ShieldCheck, badge: pending.length },
+    { id: "disputes", label: "Dispute", icon: Scale, badge: openDisputes.length },
+    { id: "settings", label: "Setări", icon: SettingsIcon, badge: 0 },
+  ];
+
+  const title = {
+    overview: "Panou de Control",
+    specialists: "Coadă verificare",
+    disputes: "Dispute & Mediere",
+    settings: "Setări",
+  }[tab];
 
   return (
-    <DashLayout role="admin" title="Panou de Control">
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        <Stat icon={Users} label="Utilizatori" value={stats?.users || 0} sub="Total" tid="admin-users" />
-        <Stat icon={Briefcase} label="Joburi active" value={stats?.active_jobs || 0} sub="Live" color="amber" tid="admin-jobs" />
-        <Stat icon={Award} label="Verificați" value={stats?.verified || 0} sub={`/ ${stats?.specialists || 0}`} color="emerald" tid="admin-verified" />
-        <Stat icon={Gavel} label="În așteptare" value={stats?.pending_verification || 0} sub="Specialiști" color="cyan" tid="admin-pending" />
-        <Stat icon={AlertTriangle} label="Dispute" value={openDisputes.length} sub="Deschise" color="red" tid="admin-disputes-stat" />
-      </div>
-
-      <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar">
-        <TabBtn id="overview" label="Sumar" count={0} icon={Activity} />
-        <TabBtn id="analytics" label="Analytics" count={0} icon={TrendingUp} />
-        <TabBtn id="specialists" label="Specialiști" count={pending.length} icon={ShieldCheck} />
-        <TabBtn id="disputes" label="Dispute" count={openDisputes.length} icon={Scale} />
-      </div>
-
-      {tab === "analytics" && <AdminAnalytics />}
-
+    <DashLayout role="admin" title={title} bottomNav={<BottomNav tabs={tabs} active={tab} onChange={setTab} dataPrefix="admin-tab" />}>
       {tab === "overview" && (
-        <div className="grid lg:grid-cols-2 gap-6">
-          <div className="glass-strong rounded-3xl p-6">
-            <h3 className="font-serif text-xl mb-4">Activitate platformă</h3>
-            <div className="space-y-3">
-              <Row label="Joburi finalizate" value={stats?.completed_jobs || 0} />
-              <Row label="Specialiști total" value={stats?.specialists || 0} />
-              <Row label="Specialiști verificați" value={stats?.verified || 0} />
-              <Row label="Dispute deschise" value={openDisputes.length} />
-              <Row label="Dispute rezolvate" value={disputes.length - openDisputes.length} />
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+            <Stat icon={Users} label="Utilizatori" value={stats?.users || 0} sub="Total" tid="admin-users" />
+            <Stat icon={Briefcase} label="Joburi active" value={stats?.active_jobs || 0} sub="Live" color="amber" tid="admin-jobs" />
+            <Stat icon={Award} label="Verificați" value={stats?.verified || 0} sub={`/ ${stats?.specialists || 0}`} color="emerald" tid="admin-verified" />
+            <Stat icon={Gavel} label="În așteptare" value={stats?.pending_verification || 0} sub="Specialiști" color="cyan" tid="admin-pending" />
+            <Stat icon={AlertTriangle} label="Dispute" value={openDisputes.length} sub="Deschise" color="red" tid="admin-disputes-stat" />
+          </div>
+          <AdminAnalytics />
+          <div className="grid lg:grid-cols-2 gap-6 mt-6">
+            <div className="glass-strong rounded-3xl p-6">
+              <h3 className="font-serif text-xl mb-4">Activitate platformă</h3>
+              <div className="space-y-3">
+                <Row label="Joburi finalizate" value={stats?.completed_jobs || 0} />
+                <Row label="Specialiști total" value={stats?.specialists || 0} />
+                <Row label="Specialiști verificați" value={stats?.verified || 0} />
+                <Row label="Dispute deschise" value={openDisputes.length} />
+                <Row label="Dispute rezolvate" value={disputes.length - openDisputes.length} />
+              </div>
+            </div>
+            <div className="glass-strong rounded-3xl p-6">
+              <h3 className="font-serif text-xl mb-4">Acțiuni rapide</h3>
+              <div className="space-y-2">
+                <button onClick={() => setTab("specialists")} className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 rounded-xl p-4 text-left transition" data-testid="quick-verify">
+                  <div>
+                    <div className="text-sm font-medium">Verifică specialiști</div>
+                    <div className="text-[11px] text-stone-400">{pending.length} în așteptare</div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-stone-400" />
+                </button>
+                <button onClick={() => setTab("disputes")} className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 rounded-xl p-4 text-left transition" data-testid="quick-disputes">
+                  <div>
+                    <div className="text-sm font-medium">Mediere dispute</div>
+                    <div className="text-[11px] text-stone-400">{openDisputes.length} de analizat</div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-stone-400" />
+                </button>
+              </div>
             </div>
           </div>
-          <div className="glass-strong rounded-3xl p-6">
-            <h3 className="font-serif text-xl mb-4">Acțiuni rapide</h3>
-            <div className="space-y-2">
-              <button onClick={() => setTab("specialists")} className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 rounded-xl p-4 text-left transition" data-testid="quick-verify">
-                <div>
-                  <div className="text-sm font-medium">Verifică specialiști</div>
-                  <div className="text-[11px] text-stone-400">{pending.length} în așteptare</div>
-                </div>
-                <ArrowRight className="w-4 h-4 text-stone-400" />
-              </button>
-              <button onClick={() => setTab("disputes")} className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 rounded-xl p-4 text-left transition" data-testid="quick-disputes">
-                <div>
-                  <div className="text-sm font-medium">Mediere dispute</div>
-                  <div className="text-[11px] text-stone-400">{openDisputes.length} de analizat</div>
-                </div>
-                <ArrowRight className="w-4 h-4 text-stone-400" />
-              </button>
-            </div>
-          </div>
-        </div>
+        </>
       )}
 
       {tab === "specialists" && (
@@ -158,6 +160,8 @@ export const AdminDashboard = () => {
           )}
         </div>
       )}
+
+      {tab === "settings" && <SettingsPanel />}
 
       {detailSpecId && (
         <SpecialistDetailModal specialistId={detailSpecId} onClose={() => setDetailSpecId(null)} onChange={loadAll} />

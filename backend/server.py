@@ -16,6 +16,7 @@ import stripe
 import pyotp
 import qrcode
 import io
+import secrets
 import base64 as b64
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
@@ -75,6 +76,17 @@ def serialize_doc(doc):
     if "_id" in doc:
         doc["id"] = str(doc.pop("_id"))
     doc.pop("password_hash", None)
+    # Dual-role: ensure active_view + dual_role_enabled are always present
+    if doc.get("role") in ("client", "specialist", "admin", "operator"):
+        # Verified specialists can switch to client view
+        is_verified_spec = doc.get("role") == "specialist" and doc.get("verified") is True
+        doc["dual_role_enabled"] = is_verified_spec
+        # Default active_view = role; only specialist may have it = "client"
+        av = doc.get("active_view")
+        if doc.get("role") == "specialist" and is_verified_spec and av == "client":
+            doc["active_view"] = "client"
+        else:
+            doc["active_view"] = doc.get("role")
     return doc
 
 async def get_current_user(request: Request) -> dict:
@@ -98,10 +110,24 @@ async def get_current_user(request: Request) -> dict:
 
 def require_role(*allowed):
     async def dep(user: dict = Depends(get_current_user)):
-        if user.get("role") not in allowed:
-            raise HTTPException(403, "Insufficient permissions")
-        return user
+        # Native role match
+        if user.get("role") in allowed:
+            return user
+        # Dual-role: verified specialist with active_view=client can access client-only endpoints
+        if (
+            user.get("role") == "specialist"
+            and user.get("dual_role_enabled") is True
+            and user.get("active_view") in allowed
+        ):
+            return user
+        raise HTTPException(403, "Insufficient permissions")
     return dep
+
+def effective_role(user: dict) -> str:
+    """Returns active_view for dual-role specialists, otherwise the user's primary role."""
+    if user.get("role") == "specialist" and user.get("dual_role_enabled") is True:
+        return user.get("active_view") or "specialist"
+    return user.get("role", "client")
 
 def set_auth_cookies(response: Response, access: str, refresh: str):
     response.set_cookie("access_token", access, httponly=True, secure=False, samesite="lax", max_age=86400, path="/")
@@ -379,6 +405,110 @@ async def ws_token(user: dict = Depends(get_current_user)):
     token = create_access_token(user["id"], user["email"], user["role"])
     return {"token": token}
 
+# ============= DUAL-ROLE SWITCHER =============
+class SwitchViewIn(BaseModel):
+    view: Literal["client", "specialist"]
+
+@api.post("/auth/switch-view")
+async def switch_view(data: SwitchViewIn, user: dict = Depends(get_current_user)):
+    """Verified specialists can toggle between specialist and client view (dual-role)."""
+    if user.get("role") != "specialist":
+        raise HTTPException(403, "Doar specialiștii pot comuta între profile.")
+    if not user.get("verified"):
+        raise HTTPException(403, "Doar specialiștii verificați pot accesa modul Client.")
+    await db.users.update_one(
+        {"_id": ObjectId(user["id"])},
+        {"$set": {"active_view": data.view}}
+    )
+    refreshed = await db.users.find_one({"_id": ObjectId(user["id"])})
+    return serialize_doc(refreshed)
+
+# ============= PROFILE UPDATE =============
+class ProfileUpdateIn(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=2, max_length=80)
+    phone: Optional[str] = Field(default=None, max_length=30)
+    zone: Optional[str] = Field(default=None, max_length=80)
+    avatar: Optional[str] = Field(default=None, max_length=2_000_000)  # base64 data URL up to ~1.5MB
+
+@api.patch("/auth/profile")
+async def update_profile(data: ProfileUpdateIn, user: dict = Depends(get_current_user)):
+    update = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not update:
+        raise HTTPException(400, "Niciun câmp de actualizat.")
+    await db.users.update_one({"_id": ObjectId(user["id"])}, {"$set": update})
+    refreshed = await db.users.find_one({"_id": ObjectId(user["id"])})
+    return serialize_doc(refreshed)
+
+# ============= CHANGE PASSWORD =============
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=6)
+
+@api.post("/auth/change-password")
+async def change_password(data: ChangePasswordIn, user: dict = Depends(get_current_user)):
+    db_user = await db.users.find_one({"_id": ObjectId(user["id"])})
+    if not db_user or not verify_password(data.current_password, db_user.get("password_hash", "")):
+        raise HTTPException(401, "Parola curentă este incorectă.")
+    if data.current_password == data.new_password:
+        raise HTTPException(400, "Parola nouă trebuie să fie diferită de cea curentă.")
+    await db.users.update_one(
+        {"_id": ObjectId(user["id"])},
+        {"$set": {"password_hash": hash_password(data.new_password)}}
+    )
+    return {"ok": True}
+
+# ============= GDPR — ACCOUNT EXPORT & DELETE =============
+@api.post("/auth/account-export")
+async def account_export(user: dict = Depends(get_current_user)):
+    """Returns all user-owned data as JSON (GDPR Art. 20 — data portability)."""
+    uid = user["id"]
+    db_user = serialize_doc(await db.users.find_one({"_id": ObjectId(uid)}))
+    properties = [serialize_doc(d) for d in await db.properties.find({"owner_id": uid}).to_list(500)]
+    requests_as_client = [serialize_doc(d) for d in await db.requests.find({"client_id": uid}).to_list(500)]
+    requests_as_specialist = [serialize_doc(d) for d in await db.requests.find({"specialist_id": uid}).to_list(500)]
+    notifications = [serialize_doc(d) for d in await db.notifications.find({"user_id": uid}).to_list(500)]
+    transactions = [serialize_doc(d) for d in await db.transactions.find({"user_id": uid}).to_list(500)]
+    return {
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "user": db_user,
+        "properties": properties,
+        "requests_as_client": requests_as_client,
+        "requests_as_specialist": requests_as_specialist,
+        "notifications": notifications,
+        "transactions": transactions,
+    }
+
+class AccountDeleteIn(BaseModel):
+    password: str
+    confirmation: str  # must literally equal "STERGE"
+
+@api.post("/auth/account-delete")
+async def account_delete(data: AccountDeleteIn, response: Response, user: dict = Depends(get_current_user)):
+    """Soft-deletes the user account (GDPR Art. 17). Anonymizes user document."""
+    if data.confirmation != "STERGE":
+        raise HTTPException(400, "Confirmarea trebuie să fie exact 'STERGE'.")
+    db_user = await db.users.find_one({"_id": ObjectId(user["id"])})
+    if not db_user or not verify_password(data.password, db_user.get("password_hash", "")):
+        raise HTTPException(401, "Parolă incorectă.")
+    # Anonymize (soft delete) to preserve referential integrity in disputes/requests
+    anonymized = f"deleted_{user['id'][:8]}@propmanage.deleted"
+    await db.users.update_one(
+        {"_id": ObjectId(user["id"])},
+        {"$set": {
+            "email": anonymized,
+            "name": "Utilizator șters",
+            "phone": None,
+            "avatar": None,
+            "password_hash": hash_password(secrets.token_urlsafe(32)),
+            "deleted_at": datetime.now(timezone.utc).isoformat(),
+            "deleted": True,
+        }}
+    )
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/")
+    return {"ok": True, "message": "Cont șters. Datele asociate au fost anonimizate conform GDPR."}
+
+
 # ============= PROPERTIES (Client) =============
 @api.post("/properties")
 async def create_property(data: PropertyIn, user: dict = Depends(require_role("client"))):
@@ -400,7 +530,9 @@ async def create_property(data: PropertyIn, user: dict = Depends(require_role("c
 
 @api.get("/properties")
 async def list_properties(user: dict = Depends(get_current_user)):
-    q = {"owner_id": user["id"]} if user["role"] == "client" else {}
+    eff = effective_role(user)
+    # Clients (and dual-role specialists in client view) see their own properties
+    q = {"owner_id": user["id"]} if eff in ("client", "specialist") else {}
     docs = await db.properties.find(q).to_list(100)
     return [serialize_doc(d) for d in docs]
 
@@ -482,8 +614,12 @@ async def list_requests(
     if user["role"] == "client":
         query = {"client_id": user["id"]}
     elif user["role"] == "specialist":
-        # show open requests + assigned to this specialist
-        query = {"$or": [{"status": "open"}, {"specialist_id": user["id"]}]}
+        # Dual-role: in client view, specialist sees their own requests as a client would
+        if user.get("active_view") == "client" and user.get("dual_role_enabled"):
+            query = {"client_id": user["id"]}
+        else:
+            # show open requests + assigned to this specialist
+            query = {"$or": [{"status": "open"}, {"specialist_id": user["id"]}]}
     else:  # admin/operator
         query = {}
     

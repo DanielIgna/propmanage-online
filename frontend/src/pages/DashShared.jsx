@@ -75,7 +75,7 @@ export const NotificationsBell = () => {
 };
 
 // ============= LAYOUT =============
-export const DashLayout = ({ children, role, title }) => {
+export const DashLayout = ({ children, role, title, bottomNav }) => {
   const { user, logout } = useAuth();
   const { lang, toggle, t } = useI18n();
   const navigate = useNavigate();
@@ -94,14 +94,19 @@ export const DashLayout = ({ children, role, title }) => {
 
   if (!user) return <div className="min-h-screen flex items-center justify-center text-stone-400">{t("common.loading")}</div>;
   if (user === false) return <Navigate to="/login" replace />;
-  if (user.role !== role) return <Navigate to={`/${user.role}`} replace />;
+
+  // Dual-role: route guard accepts the user when their active_view matches the dashboard role
+  const effectiveRole = user.active_view || user.role;
+  if (effectiveRole !== role) return <Navigate to={`/${effectiveRole}`} replace />;
+
+  const inClientView = user.role === "specialist" && user.active_view === "client";
 
   return (
     <div className="min-h-screen bg-[#0a0a0b] text-stone-100">
       <header className="border-b border-white/5 sticky top-0 z-40 bg-[#0a0a0b]/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link to="/" className="flex items-center gap-2" data-testid="dash-logo">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4 sm:gap-8 min-w-0">
+            <Link to="/" className="flex items-center gap-2 shrink-0" data-testid="dash-logo">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#d4ff3a] to-[#a8e028] flex items-center justify-center">
                 <Building2 className="w-3.5 h-3.5 text-black" strokeWidth={2.5} />
               </div>
@@ -111,29 +116,35 @@ export const DashLayout = ({ children, role, title }) => {
               <roleConfig.icon className="w-3.5 h-3.5 text-[#d4ff3a]" />
               <span className="text-xs uppercase tracking-wider text-stone-300">{roleConfig.label}</span>
             </div>
+            {inClientView && (
+              <span className="hidden sm:inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30" data-testid="dual-role-badge">
+                Profil activ: Client
+              </span>
+            )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <NotificationsBell />
-            <button onClick={toggle} className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-white/5 rounded-full text-xs uppercase tracking-wider" data-testid="dash-lang">
+            <button onClick={toggle} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 hover:bg-white/5 rounded-full text-xs uppercase tracking-wider" data-testid="dash-lang">
               <Languages className="w-3.5 h-3.5" />{lang.toUpperCase()}
             </button>
-            <div className="hidden sm:block text-right">
-              <div className="text-sm font-medium">{user.name}</div>
-              <div className="text-[10px] text-stone-500">{user.email}</div>
+            <div className="hidden md:block text-right">
+              <div className="text-sm font-medium truncate max-w-[160px]">{user.name}</div>
+              <div className="text-[10px] text-stone-500 truncate max-w-[160px]">{user.email}</div>
             </div>
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-stone-600 to-stone-800 flex items-center justify-center font-medium text-sm">
-              {user.name?.[0] || "U"}
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-stone-600 to-stone-800 flex items-center justify-center font-medium text-sm overflow-hidden">
+              {user.avatar ? <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" /> : (user.name?.[0] || "U")}
             </div>
-            <button onClick={handleLogout} className="p-2 hover:bg-white/5 rounded-lg" data-testid="dash-logout">
+            <button onClick={handleLogout} className="hidden sm:block p-2 hover:bg-white/5 rounded-lg" data-testid="dash-logout">
               <LogOut className="w-4 h-4 text-stone-400" />
             </button>
           </div>
         </div>
       </header>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-24">
         {title && <h1 className="font-serif text-3xl sm:text-4xl mb-6 sm:mb-8" data-testid="dash-title">{title}</h1>}
         {children}
       </main>
+      {bottomNav}
       <AIAssistant />
     </div>
   );
