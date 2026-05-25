@@ -67,6 +67,20 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - **Modals**: `AdminModals.jsx` (547 lines - SpecialistDetailModal, DisputeResolveModal, OpenDisputeModal, SpecialistDocumentsModal)
 - **Specialized features**: `OperatorTwin.jsx` (427 lines - 2D floorplan editor), `AdminAnalytics.jsx` (201 lines - recharts dashboard)
 
+### Phase 9 — Interior Design Premium Service (11/11 tests ✅)
+- **Eligibility-gated**: doar clienții cu proprietate `twin_unlocked=true` + twin `status=approved` au acces
+- **Pricing model server-enforced**: 2200 RON / cameră (1 zi lucrătoare = 8h), valabil pe orice tip de cameră
+- **Token discount slider**: 1 token = 1 RON, max 50% din preț (cap server-side ca nu se poate eluda)
+- **Workflow**:
+  1. Client deschide modal → vede camerele din twin → selectează → alege stil (8 opțiuni) → slider tokeni → plasează cerere
+  2. Cererea apare pentru specialiști cu `service_categories` conținând `interior_design`
+  3. Specialist acceptă lead (45 RON) → flow normal accept/start/complete
+  4. După concept livrat, specialist propune faze ulterioare (phase-quote) cu nume, descriere, preț, zile
+  5. Client acceptă oferta → deducere din wallet (escrow logic), apoi complete → 95% către specialist, 5% platformă
+- **Endpoints noi**: `/design/eligibility`, `/design/concept-request`, `/design/phase-quote`, `/design/phase-accept`, `/design/phase-complete`
+- **Frontend**: `InteriorDesign.jsx` cu `InteriorDesignCard` (gated CTA pe dashboard client), `InteriorDesignModal` (ordering), `DesignPhasesPanel` (vizualizare faze), `ProposePhaseModal` (specialist)
+- **Cleanup**: vechile endpoints `/services/interior-design/*` și `Premium.jsx` dead code → șterse
+
 ## Test Results (Cumulative)
 - Phase 2: 36/36 ✅
 - Phase 3: 20/23 ✅
@@ -75,7 +89,8 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Phase 6: 26/26 ✅
 - Phase 7: 22/22 ✅
 - Phase 8: 18/18 ✅
-- **TOTAL: 159/164 backend tests pass (97%)**
+- Phase 9: 11/11 ✅
+- **TOTAL: 170/175 backend tests pass (97%)**
 
 ## API Endpoints (60+)
 **Auth**: POST /api/auth/{login, register, logout, google/session}, GET /api/auth/{me, ws-token}
