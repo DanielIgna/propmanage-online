@@ -164,13 +164,6 @@ class ServiceAvailabilityIn(BaseModel):
     state: Literal["active", "inactive", "limited", "premium_only"]
     min_specialists: int = 1
 
-class InteriorDesignIn(BaseModel):
-    property_id: str
-    rooms_to_design: List[str]  # ["living", "bedroom", ...]
-    style: str
-    budget_total: float
-    tokens_to_apply: int  # how many tokens to redeem
-
 class RequestIn(BaseModel):
     property_id: str
     category: str  # electric, plumbing, hvac, etc.
@@ -243,6 +236,27 @@ class TwinUpsertIn(BaseModel):
 class TwinValidateIn(BaseModel):
     action: Literal["approve", "request_revision"]
     notes: Optional[str] = None
+
+# ============= INTERIOR DESIGN =============
+DESIGN_CONCEPT_PRICE_PER_ROOM = 2200.0  # RON / room (fixed, 1 working day = 8h)
+DESIGN_MAX_TOKEN_DISCOUNT_PCT = 50  # tokens can cover at most 50% of price
+
+class DesignConceptIn(BaseModel):
+    property_id: str
+    room_ids: List[str] = Field(min_length=1)  # rooms from the twin
+    tokens_to_use: int = Field(ge=0, default=0)
+    style_preference: Optional[str] = None  # e.g., "modern", "scandinavian", "minimalist"
+    notes: Optional[str] = None
+
+class DesignPhaseQuoteIn(BaseModel):
+    request_id: str
+    phase_name: str = Field(min_length=3)
+    description: str
+    price: float = Field(gt=0)
+    estimated_days: int = Field(ge=1)
+
+class DesignPhaseAcceptIn(BaseModel):
+    quote_id: str
 
 # ============= AUTH ENDPOINTS =============
 @api.post("/auth/register")
@@ -1205,7 +1219,222 @@ async def operator_validate_twin(prop_id: str, data: TwinValidateIn, user: dict 
             await notify(prop["owner_id"], "Twin necesită revizie", f"Twin-ul proprietății '{prop.get('name','')}' necesită ajustări. {data.notes or ''}", type_="twin", link="/client")
     return {"ok": True, "status": new_status}
 
-# ============= GOOGLE OAUTH (Emergent-managed) =============
+# ============= INTERIOR DESIGN (eligible only for clients with Digital Twin unlocked) =============
+
+@api.get("/design/eligibility")
+async def design_eligibility(user: dict = Depends(require_role("client"))):
+    """Returns user's properties with twin_unlocked + rooms list per property."""
+    props = await db.properties.find({"owner_id": user["id"], "twin_unlocked": True}).to_list(20)
+    if not props:
+        return {"eligible": False, "reason": "no_twin_unlocked", "properties": []}
+    out = []
+    for p in props:
+        prop_id_str = str(p["_id"])
+        twin = await db.twins.find_one({"property_id": prop_id_str, "status": "approved"})
+        rooms = (twin or {}).get("rooms") or []
+        out.append({
+            "id": prop_id_str,
+            "name": p.get("name"),
+            "address": p.get("address"),
+            "surface": p.get("surface"),
+            "rooms": [{"id": r.get("id"), "name": r.get("name"), "type": r.get("type"), "area": r.get("area")} for r in rooms],
+        })
+    return {
+        "eligible": True,
+        "properties": out,
+        "concept_price_per_room": DESIGN_CONCEPT_PRICE_PER_ROOM,
+        "max_token_discount_pct": DESIGN_MAX_TOKEN_DISCOUNT_PCT,
+        "available_tokens": user.get("tokens", 0),
+    }
+
+@api.post("/design/concept-request")
+async def create_design_concept_request(data: DesignConceptIn, user: dict = Depends(require_role("client"))):
+    """Create a design concept request after validating twin + room ids + tokens."""
+    prop = await db.properties.find_one({"_id": ObjectId(data.property_id), "owner_id": user["id"]})
+    if not prop:
+        raise HTTPException(404, "Property not found")
+    if not prop.get("twin_unlocked"):
+        raise HTTPException(403, "Digital Twin nu este activat pentru această proprietate. Solicită activarea twin-ului mai întâi.")
+
+    twin = await db.twins.find_one({"property_id": data.property_id, "status": "approved"})
+    if not twin:
+        raise HTTPException(403, "Digital Twin pentru proprietate nu este aprobat")
+
+    twin_room_ids = {r.get("id") for r in (twin.get("rooms") or [])}
+    invalid_rooms = [r for r in data.room_ids if r not in twin_room_ids]
+    if invalid_rooms:
+        raise HTTPException(400, f"Camere invalide: {', '.join(invalid_rooms)}")
+
+    rooms_count = len(data.room_ids)
+    full_price = DESIGN_CONCEPT_PRICE_PER_ROOM * rooms_count
+    max_token_discount = full_price * (DESIGN_MAX_TOKEN_DISCOUNT_PCT / 100)
+    tokens_to_use = max(0, min(data.tokens_to_use, int(max_token_discount), user.get("tokens", 0)))
+    final_price = full_price - tokens_to_use
+
+    # Snapshot room details for the request
+    rooms_snapshot = []
+    for rid in data.room_ids:
+        r = next((x for x in twin.get("rooms", []) if x.get("id") == rid), None)
+        if r:
+            rooms_snapshot.append({"id": r.get("id"), "name": r.get("name"), "type": r.get("type"), "area": r.get("area")})
+
+    desc_lines = [f"📐 Faza CONCEPT pentru {rooms_count} {'cameră' if rooms_count == 1 else 'camere'}:"]
+    for r in rooms_snapshot:
+        desc_lines.append(f"  • {r['name']} ({r['type']}, {r.get('area', 0)} m²)")
+    desc_lines.append(f"\nPreț standard: {DESIGN_CONCEPT_PRICE_PER_ROOM:.0f} RON/cameră × {rooms_count} = {full_price:.0f} RON")
+    if tokens_to_use > 0:
+        desc_lines.append(f"Tokeni utilizați: -{tokens_to_use} RON")
+    desc_lines.append(f"Preț final concept: {final_price:.0f} RON")
+    if data.style_preference:
+        desc_lines.append(f"\nStil preferat: {data.style_preference}")
+    if data.notes:
+        desc_lines.append(f"\nNote suplimentare: {data.notes}")
+    desc_lines.append("\nDupă livrarea conceptului, specialistul va trimite oferte pentru faze ulterioare (proiect tehnic, execuție, achiziții) direct prin chat.")
+
+    title = f"Design Interior - Concept ({rooms_count} {'cameră' if rooms_count == 1 else 'camere'})"
+    now_iso = datetime.now(timezone.utc).isoformat()
+    req_doc = {
+        "client_id": user["id"],
+        "client_name": user.get("name"),
+        "property_id": data.property_id,
+        "property_name": prop.get("name"),
+        "category": "interior_design",
+        "title": title,
+        "description": "\n".join(desc_lines),
+        "priority": "normal",
+        "photos": [],
+        "status": "open",
+        "specialist_id": None,
+        "specialist_name": None,
+        "escrow_amount": 0,
+        "escrow_status": "none",
+        "budget_estimate": final_price,
+        "design_concept": {
+            "rooms": rooms_snapshot,
+            "rooms_count": rooms_count,
+            "full_price": full_price,
+            "tokens_used": tokens_to_use,
+            "final_price": final_price,
+            "style_preference": data.style_preference,
+        },
+        "phases": [],
+        "created_at": now_iso,
+    }
+    res = await db.requests.insert_one(req_doc)
+    req_id = str(res.inserted_id)
+
+    # Deduct tokens immediately + record transaction
+    if tokens_to_use > 0:
+        await db.users.update_one({"_id": ObjectId(user["id"])}, {"$inc": {"tokens": -tokens_to_use}})
+        await db.transactions.insert_one({
+            "user_id": user["id"], "type": "design_token_discount",
+            "amount": 0, "tokens": -tokens_to_use,
+            "request_id": req_id, "created_at": now_iso,
+        })
+
+    # Notify available interior_design specialists (idle/coverage match)
+    matched_specs = await db.users.find({
+        "role": "specialist",
+        "verified": True,
+        "service_categories": "interior_design",
+    }).limit(20).to_list(20)
+    for s in matched_specs:
+        await notify(str(s["_id"]), "Lead Design Interior", f"Nouă cerere de concept design — {rooms_count} {'cameră' if rooms_count == 1 else 'camere'}, {final_price:.0f} RON", type_="lead", link="/specialist")
+
+    req_doc["id"] = req_id
+    req_doc.pop("_id", None)
+    return req_doc
+
+
+@api.post("/design/phase-quote")
+async def create_phase_quote(data: DesignPhaseQuoteIn, user: dict = Depends(require_role("specialist"))):
+    """Specialist proposes a follow-up phase quote on a design request."""
+    req = await db.requests.find_one({"_id": ObjectId(data.request_id), "specialist_id": user["id"]})
+    if not req:
+        raise HTTPException(404, "Cererea nu există sau nu îți este asignată")
+    if req.get("category") != "interior_design":
+        raise HTTPException(400, "Quote-urile pe faze sunt disponibile doar pentru lucrări de Design Interior")
+    if req.get("status") not in ["in_progress", "completed", "confirmed"]:
+        raise HTTPException(400, "Faza concept trebuie să fie cel puțin în desfășurare pentru a propune faze ulterioare")
+
+    quote = {
+        "id": str(uuid.uuid4()),
+        "phase_name": data.phase_name,
+        "description": data.description,
+        "price": data.price,
+        "estimated_days": data.estimated_days,
+        "status": "pending",  # pending | accepted | rejected | paid
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "specialist_id": user["id"],
+    }
+    await db.requests.update_one(
+        {"_id": ObjectId(data.request_id)},
+        {"$push": {"phases": quote}}
+    )
+    await notify(req["client_id"], "Ofertă fază nouă", f"{user.get('name','Specialistul')} a propus o fază nouă: {data.phase_name} — {data.price:.0f} RON", type_="design_phase", link="/client")
+    return quote
+
+
+@api.post("/design/phase-accept")
+async def accept_phase_quote(data: DesignPhaseAcceptIn, request_id: str, user: dict = Depends(require_role("client"))):
+    """Client accepts a phase quote — funds escrow from wallet (or via Stripe in future)."""
+    req = await db.requests.find_one({"_id": ObjectId(request_id), "client_id": user["id"]})
+    if not req:
+        raise HTTPException(404, "Cerere inexistentă")
+    phases = req.get("phases", [])
+    quote = next((p for p in phases if p.get("id") == data.quote_id), None)
+    if not quote:
+        raise HTTPException(404, "Ofertă inexistentă")
+    if quote.get("status") != "pending":
+        raise HTTPException(400, "Această ofertă nu mai este disponibilă")
+
+    if (user.get("wallet_balance") or 0) < quote["price"]:
+        raise HTTPException(400, f"Sold insuficient. Necesar: {quote['price']:.0f} RON, Disponibil: {user.get('wallet_balance', 0):.0f} RON")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    # Deduct from wallet, mark phase paid (held in escrow logically)
+    await db.users.update_one({"_id": ObjectId(user["id"])}, {"$inc": {"wallet_balance": -quote["price"]}})
+    await db.requests.update_one(
+        {"_id": ObjectId(request_id), "phases.id": data.quote_id},
+        {"$set": {"phases.$.status": "paid", "phases.$.paid_at": now_iso}}
+    )
+    await db.transactions.insert_one({
+        "user_id": user["id"], "type": "design_phase_payment", "amount": -quote["price"],
+        "request_id": request_id, "phase_id": data.quote_id, "created_at": now_iso,
+    })
+    await notify(quote["specialist_id"], "Plată fază confirmată", f"Clientul a achitat faza '{quote['phase_name']}' — {quote['price']:.0f} RON sunt în escrow", type_="design_phase", link="/specialist")
+    return {"ok": True, "phase_id": data.quote_id}
+
+
+@api.post("/design/phase-complete")
+async def complete_phase(data: DesignPhaseAcceptIn, request_id: str, user: dict = Depends(require_role("client"))):
+    """Client confirms phase completion — releases escrow to specialist wallet (95/5 split)."""
+    req = await db.requests.find_one({"_id": ObjectId(request_id), "client_id": user["id"]})
+    if not req:
+        raise HTTPException(404, "Cerere inexistentă")
+    phases = req.get("phases", [])
+    quote = next((p for p in phases if p.get("id") == data.quote_id), None)
+    if not quote:
+        raise HTTPException(404, "Ofertă inexistentă")
+    if quote.get("status") != "paid":
+        raise HTTPException(400, "Această fază nu este în escrow")
+
+    specialist_share = quote["price"] * 0.95
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.users.update_one({"_id": ObjectId(quote["specialist_id"])}, {"$inc": {"wallet_balance": specialist_share}})
+    await db.requests.update_one(
+        {"_id": ObjectId(request_id), "phases.id": data.quote_id},
+        {"$set": {"phases.$.status": "completed", "phases.$.completed_at": now_iso}}
+    )
+    await db.transactions.insert_one({
+        "user_id": quote["specialist_id"], "type": "design_phase_payout", "amount": specialist_share,
+        "request_id": request_id, "phase_id": data.quote_id, "created_at": now_iso,
+    })
+    await notify(quote["specialist_id"], "Fază finalizată", f"Faza '{quote['phase_name']}' confirmată — {specialist_share:.0f} RON adăugați în portofel", type_="design_phase", link="/specialist")
+    return {"ok": True, "released_amount": specialist_share}
+
+
+
 # REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
 
 @api.post("/auth/google/session")
@@ -2100,152 +2329,6 @@ async def admin_list_services(user: dict = Depends(require_role("admin"))):
     """Admin: list all service availability configurations"""
     docs = await db.service_availability.find({}).to_list(500)
     return [serialize_doc(d) for d in docs]
-
-
-# ============= PREMIUM SERVICE: INTERIOR DESIGN =============
-
-INTERIOR_DESIGN_MIN_TOKENS = 3000
-TOKEN_VALUE_EUR = 0.20  # 1 token = 0.20 EUR (so 1000 tokens = 200 EUR)
-TOKEN_MAX_DISCOUNT_PCT = 0.70  # 70% max coverage
-TOKEN_MIN_DISCOUNT_PCT = 0.50  # 50% min if applied
-
-
-@api.get("/services/interior-design/eligibility")
-async def check_interior_design_eligibility(user: dict = Depends(get_current_user)):
-    """Check if user can access Interior Design (Digital Twin + Wallet activated + token threshold)"""
-    if user["role"] != "client":
-        return {"eligible": False, "reason": "Only clients can request design"}
-    
-    # Check user has at least one property with twin/wallet unlocked
-    has_twin = await db.properties.find_one({"owner_id": user["id"], "twin_unlocked": True})
-    has_wallet = await db.properties.find_one({"owner_id": user["id"], "wallet_unlocked": True})
-    tokens = user.get("tokens", 0)
-    
-    reasons = []
-    if not has_twin:
-        reasons.append("Digital Twin nu este activat pe nicio proprietate")
-    if not has_wallet:
-        reasons.append("Wallet nu este activat")
-    if tokens < INTERIOR_DESIGN_MIN_TOKENS:
-        reasons.append(f"Sub minimul de {INTERIOR_DESIGN_MIN_TOKENS} tokens (ai {tokens})")
-    
-    return {
-        "eligible": len(reasons) == 0,
-        "reasons": reasons,
-        "current_tokens": tokens,
-        "min_tokens_required": INTERIOR_DESIGN_MIN_TOKENS,
-        "has_twin": bool(has_twin),
-        "has_wallet": bool(has_wallet),
-    }
-
-
-@api.post("/services/interior-design/calculate")
-async def calculate_interior_design_cost(budget_total: float, tokens_to_apply: int, user: dict = Depends(get_current_user)):
-    """Calculate token discount preview"""
-    if budget_total <= 0:
-        raise HTTPException(400, "Invalid budget")
-    
-    tokens_available = user.get("tokens", 0)
-    tokens_used = min(tokens_to_apply, tokens_available)
-    
-    # Convert tokens to EUR value
-    token_value_eur = tokens_used * TOKEN_VALUE_EUR
-    
-    # Apply 50-70% discount rule
-    min_discount = budget_total * TOKEN_MIN_DISCOUNT_PCT
-    max_discount = budget_total * TOKEN_MAX_DISCOUNT_PCT
-    
-    actual_discount = min(token_value_eur, max_discount)
-    if actual_discount < min_discount and tokens_used > 0:
-        actual_discount = min(min_discount, token_value_eur)
-    
-    final_payable = budget_total - actual_discount
-    
-    return {
-        "budget_total": budget_total,
-        "tokens_available": tokens_available,
-        "tokens_to_apply": tokens_used,
-        "token_value_eur": round(token_value_eur, 2),
-        "discount_applied": round(actual_discount, 2),
-        "discount_pct": round((actual_discount / budget_total) * 100, 1),
-        "final_payable": round(final_payable, 2),
-        "min_discount_pct": int(TOKEN_MIN_DISCOUNT_PCT * 100),
-        "max_discount_pct": int(TOKEN_MAX_DISCOUNT_PCT * 100),
-    }
-
-
-@api.post("/services/interior-design/request")
-async def request_interior_design(data: InteriorDesignIn, user: dict = Depends(require_role("client"))):
-    """Create Interior Design premium request"""
-    # Verify eligibility
-    elig = await check_interior_design_eligibility(user)
-    if not elig["eligible"]:
-        raise HTTPException(403, f"Not eligible: {', '.join(elig['reasons'])}")
-    
-    # Verify property
-    prop = await db.properties.find_one({"_id": ObjectId(data.property_id), "owner_id": user["id"]})
-    if not prop or not prop.get("twin_unlocked"):
-        raise HTTPException(400, "Property must have Digital Twin activated")
-    
-    # Calculate cost
-    calc = await calculate_interior_design_cost(data.budget_total, data.tokens_to_apply, user)
-    
-    # Deduct tokens
-    if calc["tokens_to_apply"] > 0:
-        await db.users.update_one(
-            {"_id": ObjectId(user["id"])},
-            {"$inc": {"tokens": -calc["tokens_to_apply"]}}
-        )
-        await db.transactions.insert_one({
-            "user_id": user["id"],
-            "type": "tokens_redeem_interior_design",
-            "tokens": -calc["tokens_to_apply"],
-            "discount_eur": calc["discount_applied"],
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        })
-    
-    # Create premium request
-    doc = {
-        "client_id": user["id"],
-        "client_name": user["name"],
-        "property_id": data.property_id,
-        "property_name": prop["name"],
-        "service_type": "interior_design",
-        "category": "interior_design",
-        "title": f"Design Interior - {prop['name']}",
-        "description": f"Stil: {data.style} · Camere: {', '.join(data.rooms_to_design)}",
-        "rooms_to_design": data.rooms_to_design,
-        "style": data.style,
-        "budget_total": data.budget_total,
-        "tokens_used": calc["tokens_to_apply"],
-        "discount_applied": calc["discount_applied"],
-        "final_payable": calc["final_payable"],
-        "status": "open",
-        "priority": "normal",
-        "is_premium": True,
-        "required_tier": "VERIFIED",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    res = await db.requests.insert_one(doc)
-    doc["id"] = str(res.inserted_id)
-    doc.pop("_id", None)
-    
-    # Notify verified specialists with interior_design category
-    specs = await db.users.find({
-        "role": "specialist",
-        "verified": True,
-        "$or": [{"service_categories": "interior_design"}, {"specialty": "interior_design"}]
-    }).to_list(20)
-    for s in specs:
-        await notify(
-            str(s["_id"]),
-            "🎨 Premium Request: Design Interior",
-            f"Cerere premium: {prop['name']} · Buget {data.budget_total}€. Doar Verified Specialists pot accepta.",
-            type_="premium_lead",
-            link="/specialist"
-        )
-    
-    return doc
 
 
 # ============= ROOT =============

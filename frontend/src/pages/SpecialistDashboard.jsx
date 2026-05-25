@@ -2,11 +2,12 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import {
-  Wallet, Star, Briefcase, Award, Sparkles, FileCheck, MessageSquare, AlertTriangle,
+  Wallet, Star, Briefcase, Award, Sparkles, FileCheck, MessageSquare, AlertTriangle, Palette, Plus,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { ChatPanel } from "./ChatPanel";
 import { OpenDisputeModal, SpecialistDocumentsModal } from "./AdminModals";
+import { ProposePhaseModal } from "./InteriorDesign";
 import { API, DashLayout, Stat, StatusBadge } from "./DashShared";
 
 export const SpecialistDashboard = () => {
@@ -15,6 +16,7 @@ export const SpecialistDashboard = () => {
   const [chatRequest, setChatRequest] = useState(null);
   const [showDocs, setShowDocs] = useState(false);
   const [disputeFor, setDisputeFor] = useState(null);
+  const [proposePhaseFor, setProposePhaseFor] = useState(null);
 
   const load = () => axios.get(`${API}/requests`).then(r => setRequests(r.data)).catch(() => {});
   useEffect(() => { if (user) load(); }, [user]);
@@ -119,6 +121,13 @@ export const SpecialistDashboard = () => {
                   )}
                 </div>
                 {r.disputed && <div className="mt-2 w-full bg-amber-500/15 border border-amber-500/40 text-amber-300 py-1.5 rounded-lg text-[11px] text-center">⚠ Dispută în analiză</div>}
+                {r.category === "interior_design" && ["in_progress","completed","confirmed"].includes(r.status) && (
+                  <button onClick={() => setProposePhaseFor(r.id)}
+                    className="mt-2 w-full bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 py-1.5 rounded-lg text-[11px] flex items-center justify-center gap-1"
+                    data-testid={`propose-phase-${r.id}`}>
+                    <Plus className="w-3 h-3" />Propune fază nouă
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -127,6 +136,7 @@ export const SpecialistDashboard = () => {
       {chatRequest && <ChatPanel requestId={chatRequest} onClose={() => setChatRequest(null)} />}
       {showDocs && <SpecialistDocumentsModal onClose={() => setShowDocs(false)} />}
       {disputeFor && <OpenDisputeModal requestId={disputeFor.id} requestTitle={disputeFor.title} onClose={() => setDisputeFor(null)} onOpened={() => load()} />}
+      {proposePhaseFor && <ProposePhaseModal requestId={proposePhaseFor} onClose={() => setProposePhaseFor(null)} onProposed={() => load()} />}
     </DashLayout>
   );
 };

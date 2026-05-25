@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import axios from "axios";
 import {
   Wallet, Sparkles, Activity, Briefcase, Plus, FileCheck, MessageSquare,
-  AlertTriangle, Star, CreditCard, Building, Camera, Shield, Calendar, Search,
+  AlertTriangle, Star, CreditCard, Building, Camera, Shield, Calendar, Search, Palette, X,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { useI18n } from "../i18n";
@@ -12,6 +12,7 @@ import { ChatPanel } from "./ChatPanel";
 import { PhotoUploader, ReviewModal, PropertyManagerModal } from "./Components";
 import { TwoFASetupModal, PropertyTimelineModal } from "./Marketplace";
 import { OpenDisputeModal } from "./AdminModals";
+import { InteriorDesignCard, InteriorDesignModal, DesignPhasesPanel } from "./InteriorDesign";
 import { API, DashLayout, Stat, StatusBadge } from "./DashShared";
 
 export const ClientDashboard = () => {
@@ -31,6 +32,8 @@ export const ClientDashboard = () => {
   const [filterCat, setFilterCat] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
+  const [showDesign, setShowDesign] = useState(false);
+  const [designPhasesFor, setDesignPhasesFor] = useState(null);
 
   useEffect(() => {
     if (user && user !== false) {
@@ -182,6 +185,11 @@ export const ClientDashboard = () => {
               </div>
             ))}
           </div>
+
+          {/* Interior Design CTA - gated by twin_unlocked */}
+          <div className="mt-6">
+            <InteriorDesignCard user={user} onOpen={() => setShowDesign(true)} />
+          </div>
         </div>
 
         <div className="glass-strong rounded-3xl p-6">
@@ -262,6 +270,13 @@ export const ClientDashboard = () => {
                     ⚠ Dispută în analiză
                   </div>
                 )}
+                {r.category === "interior_design" && (
+                  <button onClick={() => setDesignPhasesFor(r)}
+                    className="mt-2 w-full bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 py-2 rounded-lg text-xs flex items-center justify-center gap-1"
+                    data-testid={`phases-${r.id}`}>
+                    <Palette className="w-3 h-3" />Faze design ({(r.phases || []).length})
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -273,6 +288,8 @@ export const ClientDashboard = () => {
       {showPropManager && <PropertyManagerModal properties={properties} onClose={() => setShowPropManager(false)} onChange={setProperties} />}
       {timelineFor && <PropertyTimelineModal propertyId={timelineFor} onClose={() => setTimelineFor(null)} />}
       {disputeFor && <OpenDisputeModal requestId={disputeFor.id} requestTitle={disputeFor.title} onClose={() => setDisputeFor(null)} onOpened={() => loadRequests()} />}
+      {showDesign && <InteriorDesignModal onClose={() => setShowDesign(false)} onCreated={() => loadRequests()} />}
+      {designPhasesFor && <DesignPhasesViewer request={designPhasesFor} onClose={() => setDesignPhasesFor(null)} onUpdate={() => { loadRequests(); refreshUser(); }} />}
       {show2FA && <TwoFASetupModal onClose={(updated) => { setShow2FA(false); if (updated) axios.get(`${API}/auth/2fa/status`).then(r => setTwoFAEnabled(r.data.enabled)); }} currentlyEnabled={twoFAEnabled} />}
       {reviewFor && (
         <ReviewModal
@@ -331,6 +348,41 @@ const NewRequestModal = ({ onClose, property, onCreated }) => {
             </button>
           </div>
         </form>
+      </motion.div>
+    </div>
+  );
+};
+
+
+// ============= DESIGN PHASES VIEWER (lightweight modal showing phases for a design request) =============
+const DesignPhasesViewer = ({ request, onClose, onUpdate }) => {
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+        className="glass-strong rounded-3xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}
+        data-testid="design-phases-viewer">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h2 className="font-serif text-2xl flex items-center gap-2"><Palette className="w-5 h-5 text-purple-400" />Faze proiect design</h2>
+            <p className="text-xs text-stone-400 mt-1">{request.title}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg"><X className="w-4 h-4 text-stone-400" /></button>
+        </div>
+        {request.design_concept && (
+          <div className="bg-white/5 rounded-2xl p-4 mb-4">
+            <div className="text-xs uppercase tracking-wider text-stone-400 mb-2">Faza concept</div>
+            <div className="grid grid-cols-3 gap-3 text-xs">
+              <div><span className="text-stone-500">Camere:</span> {request.design_concept.rooms_count}</div>
+              <div><span className="text-stone-500">Preț:</span> {request.design_concept.full_price} RON</div>
+              <div><span className="text-stone-500">Tokeni:</span> -{request.design_concept.tokens_used}</div>
+            </div>
+            <div className="mt-2 text-xs text-stone-300">
+              Final: <span className="font-serif text-base text-purple-300">{request.design_concept.final_price} RON</span>
+              {request.design_concept.style_preference && <span className="ml-3 text-stone-400">· Stil: {request.design_concept.style_preference}</span>}
+            </div>
+          </div>
+        )}
+        <DesignPhasesPanel request={request} onUpdate={onUpdate} />
       </motion.div>
     </div>
   );
