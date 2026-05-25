@@ -5,7 +5,7 @@ import axios from "axios";
 import {
   Wallet, Star, Briefcase, Award, Sparkles, FileCheck, MessageSquare, AlertTriangle,
   Palette, Plus, Image as ImageIcon, Target, ClipboardCheck, Bell,
-  Settings as SettingsIcon, Search, RefreshCw,
+  Settings as SettingsIcon, Search, RefreshCw, Clock,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { ChatPanel } from "./ChatPanel";
@@ -15,6 +15,7 @@ import { PortfolioManagerModal } from "./Portfolio";
 import { API, DashLayout, Stat, StatusBadge } from "./DashShared";
 import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
+import { RequestTimelineModal, ScheduleProposalModal } from "./ActivityTimeline";
 
 export const SpecialistDashboard = () => {
   const { user, refreshUser } = useAuth();
@@ -27,6 +28,8 @@ export const SpecialistDashboard = () => {
   const [showPortfolio, setShowPortfolio] = useState(false);
   const [tab, setTab] = useState("opportunities");
   const [searchQ, setSearchQ] = useState("");
+  const [acceptingReq, setAcceptingReq] = useState(null);  // {id, title} for ScheduleProposalModal
+  const [timelineRequestId, setTimelineRequestId] = useState(null);
 
   const load = () => axios.get(`${API}/requests`).then(r => setRequests(r.data)).catch(() => {});
   const loadNotifs = () => axios.get(`${API}/notifications`).then(r => setNotifs(r.data)).catch(() => {});
@@ -39,10 +42,7 @@ export const SpecialistDashboard = () => {
     }
   }, [user]);
 
-  const accept = async (id) => {
-    try { await axios.post(`${API}/requests/${id}/accept`); await refreshUser(); load(); }
-    catch (e) { alert(formatApiError(e)); }
-  };
+  const openAccept = (r) => setAcceptingReq({ id: r.id, title: r.title });
   const start = async (id) => { try { await axios.post(`${API}/requests/${id}/start`); load(); } catch (e) { alert(formatApiError(e)); } };
   const complete = async (id) => { try { await axios.post(`${API}/requests/${id}/complete`); load(); } catch (e) { alert(formatApiError(e)); } };
 
@@ -112,7 +112,7 @@ export const SpecialistDashboard = () => {
                 <p className="text-xs text-stone-400 mb-3 line-clamp-2">{r.description}</p>
                 <div className="flex justify-between items-center gap-2">
                   <div className="text-xs text-stone-400">Estimat: <span className="text-white">{r.budget_estimate} RON</span></div>
-                  <button onClick={() => accept(r.id)} className="btn-accent px-4 py-2 rounded-full text-xs font-medium shrink-0" data-testid={`accept-${r.id}`}>
+                  <button onClick={() => openAccept(r)} className="btn-accent px-4 py-2 rounded-full text-xs font-medium shrink-0" data-testid={`accept-${r.id}`}>
                     Acceptă (45 RON)
                   </button>
                 </div>
@@ -152,6 +152,9 @@ export const SpecialistDashboard = () => {
                 </div>
                 <div className="text-[10px] text-stone-500 mb-3">{r.client_name} · {r.escrow_amount ? `${r.escrow_amount} RON escrow` : "—"}</div>
                 <div className="flex gap-2 flex-wrap">
+                  <button onClick={() => setTimelineRequestId(r.id)} className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 py-2 px-3 rounded-lg text-xs flex items-center gap-1" data-testid={`spec-timeline-${r.id}`} title="Vezi timeline complet">
+                    <Clock className="w-3 h-3" />
+                  </button>
                   {r.status === "assigned" && (
                     <button onClick={() => start(r.id)} className="flex-1 bg-white/10 hover:bg-white/15 py-2 rounded-lg text-xs min-w-[100px]" data-testid={`start-${r.id}`}>Pornește</button>
                   )}
@@ -218,6 +221,8 @@ export const SpecialistDashboard = () => {
       {disputeFor && <OpenDisputeModal requestId={disputeFor.id} requestTitle={disputeFor.title} onClose={() => setDisputeFor(null)} onOpened={() => load()} />}
       {proposePhaseFor && <ProposePhaseModal requestId={proposePhaseFor} onClose={() => setProposePhaseFor(null)} onProposed={() => load()} />}
       {showPortfolio && <PortfolioManagerModal onClose={() => setShowPortfolio(false)} />}
+      {acceptingReq && <ScheduleProposalModal requestId={acceptingReq.id} requestTitle={acceptingReq.title} onClose={() => setAcceptingReq(null)} onAccepted={async () => { await refreshUser(); load(); }} />}
+      {timelineRequestId && <RequestTimelineModal requestId={timelineRequestId} onClose={() => setTimelineRequestId(null)} />}
     </DashLayout>
   );
 };

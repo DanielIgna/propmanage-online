@@ -730,7 +730,8 @@ async def create_request(data: RequestIn, user: dict = Depends(require_role("cli
     res = await db.requests.insert_one(doc)
     doc["id"] = str(res.inserted_id)
     doc.pop("_id", None)
-    
+    await log_event(doc["id"], "request.created", actor=user, property_id=data.property_id,
+                    payload={"title": data.title, "category": data.category, "priority": data.priority, "budget_estimate": data.budget_estimate})
     # Notify all eligible specialists about the new lead
     spec_query = {"role": "specialist"}
     if data.category:
@@ -801,34 +802,48 @@ async def list_specialists(category: Optional[str] = None):
     docs = await db.users.find(q).to_list(100)
     return [serialize_doc(d) for d in docs]
 
+class AcceptRequestIn(BaseModel):
+    proposed_start_date: Optional[str] = None
+    proposed_end_date: Optional[str] = None
+    estimated_hours: Optional[float] = Field(default=None, ge=0, le=200)
+    note: Optional[str] = Field(default=None, max_length=500)
+
 @api.post("/requests/{req_id}/accept")
-async def accept_request(req_id: str, user: dict = Depends(require_role("specialist"))):
-    """Specialist accepts a lead - pays 45 RON fee"""
+async def accept_request(req_id: str, data: Optional[AcceptRequestIn] = None, user: dict = Depends(require_role("specialist"))):
+    """Specialist accepts a lead - pays 45 RON fee and proposes terms (start/end dates, hours)."""
     req = await db.requests.find_one({"_id": ObjectId(req_id)})
     if not req: raise HTTPException(404, "Request not found")
     if req.get("status") != "open":
         raise HTTPException(400, "Request not available")
-    
+
     LEAD_FEE = 45.0
     specialist = await db.users.find_one({"_id": ObjectId(user["id"])})
     if (specialist.get("wallet_balance") or 0) < LEAD_FEE:
         raise HTTPException(400, f"Insufficient balance. Need {LEAD_FEE} RON")
-    
+
     # Deduct lead fee
     await db.users.update_one(
         {"_id": ObjectId(user["id"])},
         {"$inc": {"wallet_balance": -LEAD_FEE}}
     )
-    # Update request
-    await db.requests.update_one(
-        {"_id": ObjectId(req_id)},
-        {"$set": {
-            "status": "assigned",
-            "specialist_id": user["id"],
-            "specialist_name": user["name"],
-            "assigned_at": datetime.now(timezone.utc).isoformat()
-        }}
-    )
+    update = {
+        "status": "assigned",
+        "specialist_id": user["id"],
+        "specialist_name": user["name"],
+        "assigned_at": datetime.now(timezone.utc).isoformat(),
+    }
+    # Schedule proposal
+    proposed = {}
+    if data:
+        if data.proposed_start_date: proposed["start_date"] = data.proposed_start_date
+        if data.proposed_end_date: proposed["end_date"] = data.proposed_end_date
+        if data.estimated_hours is not None: proposed["estimated_hours"] = data.estimated_hours
+        if data.note: proposed["note"] = data.note
+    if proposed:
+        proposed["proposed_at"] = datetime.now(timezone.utc).isoformat()
+        proposed["proposed_by"] = user["id"]
+        update["schedule_proposal"] = proposed
+    await db.requests.update_one({"_id": ObjectId(req_id)}, {"$set": update})
     # Log transaction
     await db.transactions.insert_one({
         "user_id": user["id"],
@@ -837,14 +852,19 @@ async def accept_request(req_id: str, user: dict = Depends(require_role("special
         "request_id": req_id,
         "created_at": datetime.now(timezone.utc).isoformat()
     })
-    # Notify client that specialist accepted
+    # Notify client
+    schedule_msg = ""
+    if proposed.get("start_date"):
+        schedule_msg = f" Programare propusă: {proposed.get('start_date','')[:10]}"
+        if proposed.get("end_date"): schedule_msg += f" → {proposed.get('end_date','')[:10]}"
     await notify(
         req["client_id"],
         f"Specialist alocat: {user['name']}",
-        f"{user['name']} a acceptat solicitarea ta '{req.get('title','')}'.",
+        f"{user['name']} a acceptat solicitarea ta '{req.get('title','')}'.{schedule_msg}",
         type_="assignment",
         link="/client"
     )
+    await log_event(req_id, "request.accepted", actor=user, payload={"lead_fee": LEAD_FEE, "schedule": proposed or None})
     return {"ok": True, "balance_after": (specialist.get("wallet_balance") or 0) - LEAD_FEE}
 
 @api.post("/requests/{req_id}/start")
@@ -852,6 +872,7 @@ async def start_work(req_id: str, user: dict = Depends(require_role("specialist"
     req = await db.requests.find_one({"_id": ObjectId(req_id), "specialist_id": user["id"]})
     if not req: raise HTTPException(404, "Request not found")
     await db.requests.update_one({"_id": ObjectId(req_id)}, {"$set": {"status": "in_progress", "started_at": datetime.now(timezone.utc).isoformat()}})
+    await log_event(req_id, "work.started", actor=user)
     return {"ok": True}
 
 @api.post("/requests/{req_id}/complete")
@@ -860,6 +881,7 @@ async def complete_work(req_id: str, user: dict = Depends(require_role("speciali
     if not req: raise HTTPException(404, "Request not found")
     await db.requests.update_one({"_id": ObjectId(req_id)}, {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}})
     await notify(req["client_id"], "Lucrare finalizată", f"{user['name']} a marcat lucrarea '{req.get('title','')}' ca finalizată. Verifică și confirmă pentru a elibera plata.", type_="completion", link="/client")
+    await log_event(req_id, "work.completed", actor=user)
     return {"ok": True}
 
 @api.post("/requests/{req_id}/escrow")
@@ -956,6 +978,7 @@ async def confirm_complete(req_id: str, user: dict = Depends(require_role("clien
         {"_id": ObjectId(req_id)},
         {"$set": {"status": "confirmed", "escrow_status": "released", "confirmed_at": datetime.now(timezone.utc).isoformat()}}
     )
+    await log_event(req_id, "work.confirmed", actor=user, payload={"tokens_awarded": 100, "amount_released": specialist_amount})
     # Notify specialist about payment
     if req.get("specialist_id"):
         await notify(
@@ -1002,6 +1025,143 @@ async def review_specialist(req_id: str, data: ReviewIn, user: dict = Depends(re
     # Award client +20 tokens for review
     await db.users.update_one({"_id": ObjectId(user["id"])}, {"$inc": {"tokens": 20}})
     return {"ok": True, "new_rating": new_rating}
+
+# ============= ACTIVITY EVENTS API =============
+async def _can_view_request_events(user: dict, req: dict) -> bool:
+    """RBAC: returns True if the user is allowed to see all events for this request."""
+    if user.get("role") in ("admin",): return True
+    if req.get("client_id") == user["id"]: return True
+    if req.get("specialist_id") == user["id"]: return True
+    # Operator: only if they validated the twin of this property
+    if user.get("role") == "operator" and req.get("property_id"):
+        twin = await db.twins.find_one({"property_id": req["property_id"]})
+        if twin and twin.get("validated_by") == user["id"]:
+            return True
+    return False
+
+@api.get("/requests/{req_id}/timeline")
+async def request_timeline(req_id: str, user: dict = Depends(get_current_user)):
+    """Returns the full activity timeline for a request, accessible to:
+    - The client + specialist of the request
+    - Any admin
+    - The operator who validated the property's twin
+    """
+    req = await db.requests.find_one({"_id": ObjectId(req_id)})
+    if not req: raise HTTPException(404, "Request not found")
+    if not await _can_view_request_events(user, req):
+        raise HTTPException(403, "Nu ai permisiunea să vezi timeline-ul acestei cereri.")
+    events = await db.activity_events.find({"request_id": req_id}).sort("created_at", 1).to_list(500)
+    return {
+        "request": serialize_doc(req),
+        "events": [serialize_doc(e) for e in events],
+    }
+
+@api.get("/admin/activity-stream")
+async def admin_activity_stream(
+    user: dict = Depends(require_role("admin")),
+    limit: int = 100,
+    event_type: Optional[str] = None,
+    actor_role: Optional[str] = None,
+    since: Optional[str] = None,  # ISO timestamp
+):
+    """Platform-wide activity feed (admin only)."""
+    q = {}
+    if event_type: q["event_type"] = event_type
+    if actor_role: q["actor_role"] = actor_role
+    if since: q["created_at"] = {"$gte": since}
+    events = await db.activity_events.find(q).sort("created_at", -1).limit(min(max(limit, 1), 500)).to_list(500)
+    return [serialize_doc(e) for e in events]
+
+# ============= OPERATOR NON-CONFORMITY FLAG =============
+class NonConformityIn(BaseModel):
+    target_type: Literal["request", "property", "twin"]
+    target_id: str
+    reason: str = Field(min_length=5, max_length=2000)
+    severity: Literal["low", "medium", "high"] = "medium"
+
+@api.post("/operator/flag-nonconformity")
+async def operator_flag_nonconformity(data: NonConformityIn, user: dict = Depends(require_role("operator"))):
+    """Operator flags a request/property/twin as non-conformant. Notifies all admins + logs event."""
+    # Validate target exists
+    related_request_id = None
+    related_property_id = None
+    if data.target_type == "request":
+        r = await db.requests.find_one({"_id": ObjectId(data.target_id)})
+        if not r: raise HTTPException(404, "Cerere inexistentă.")
+        related_request_id = data.target_id
+        related_property_id = r.get("property_id")
+    elif data.target_type == "property":
+        p = await db.properties.find_one({"_id": ObjectId(data.target_id)})
+        if not p: raise HTTPException(404, "Proprietate inexistentă.")
+        related_property_id = data.target_id
+    elif data.target_type == "twin":
+        t = await db.twins.find_one({"_id": ObjectId(data.target_id)})
+        if not t: raise HTTPException(404, "Twin inexistent.")
+        related_property_id = t.get("property_id")
+
+    doc = {
+        "operator_id": user["id"],
+        "operator_name": user["name"],
+        "target_type": data.target_type,
+        "target_id": data.target_id,
+        "related_request_id": related_request_id,
+        "related_property_id": related_property_id,
+        "reason": data.reason,
+        "severity": data.severity,
+        "status": "open",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    res = await db.nonconformities.insert_one(doc)
+    flag_id = str(res.inserted_id)
+    # Log event
+    await log_event(related_request_id, "operator.flagged_nonconformity", actor=user,
+                    property_id=related_property_id,
+                    payload={"target_type": data.target_type, "target_id": data.target_id, "severity": data.severity, "reason": data.reason[:200]})
+    # Notify all admins
+    async for admin in db.users.find({"role": "admin"}):
+        await notify(
+            str(admin["_id"]),
+            f"⚠ Sesizare operator ({data.severity})",
+            f"{user['name']} a raportat o neconformitate pe {data.target_type}. Motiv: {data.reason[:140]}",
+            type_="nonconformity",
+            link="/admin"
+        )
+    return {"ok": True, "id": flag_id}
+
+@api.get("/admin/nonconformities")
+async def list_nonconformities(user: dict = Depends(require_role("admin")), status: Optional[str] = None):
+    q = {} if not status else {"status": status}
+    docs = await db.nonconformities.find(q).sort("created_at", -1).to_list(200)
+    return [serialize_doc(d) for d in docs]
+
+class NonConformityResolveIn(BaseModel):
+    resolution: str = Field(min_length=3, max_length=1000)
+
+@api.post("/admin/nonconformities/{flag_id}/resolve")
+async def resolve_nonconformity(flag_id: str, data: NonConformityResolveIn, user: dict = Depends(require_role("admin"))):
+    flag = await db.nonconformities.find_one({"_id": ObjectId(flag_id)})
+    if not flag: raise HTTPException(404, "Sesizare inexistentă.")
+    await db.nonconformities.update_one(
+        {"_id": ObjectId(flag_id)},
+        {"$set": {
+            "status": "resolved",
+            "resolution": data.resolution,
+            "resolved_by": user["id"],
+            "resolved_at": datetime.now(timezone.utc).isoformat(),
+        }}
+    )
+    await log_event(flag.get("related_request_id"), "admin.resolved_nonconformity", actor=user,
+                    property_id=flag.get("related_property_id"),
+                    payload={"flag_id": flag_id, "resolution": data.resolution[:200]})
+    # Notify operator
+    await notify(
+        flag["operator_id"],
+        "Sesizarea ta a fost rezolvată",
+        f"Admin {user['name']}: {data.resolution[:200]}",
+        type_="nonconformity_resolved",
+        link="/operator"
+    )
+    return {"ok": True}
 
 # ============= TRANSACTIONS / WALLET =============
 @api.get("/transactions")
@@ -1340,6 +1500,7 @@ async def open_dispute(req_id: str, data: DisputeOpenIn, user: dict = Depends(ge
     admins = await db.users.find({"role": "admin"}).to_list(10)
     for a in admins:
         await notify(str(a["_id"]), "Nouă dispută", f"Dispută deschisă pe '{req.get('title','')}' de către {role}.", type_="dispute", link="/admin")
+    await log_event(req_id, "dispute.opened", actor=user, payload={"reason": data.reason[:200], "opened_by_role": role})
     return {"ok": True, "id": str(result.inserted_id)}
 
 @api.get("/requests/{req_id}/dispute")
@@ -1423,6 +1584,8 @@ async def resolve_dispute(dispute_id: str, data: DisputeResolveIn, user: dict = 
         await notify(specialist_id, "Dispută rezolvată", f"Dispută rezolvată. Plată: {specialist_amount:.2f} RON.", type_="dispute", link="/specialist")
         if spec_u and spec_u.get("email") and specialist_amount > 0:
             await send_template(tpl_dispute_resolved, spec_u.get("name", ""), req.get("title", ""), specialist_amount, "specialist", to=spec_u["email"])
+    await log_event(dispute["request_id"], "dispute.resolved", actor=user,
+                    payload={"client_amount": client_amount, "specialist_amount": specialist_amount, "client_pct": data.client_pct, "resolution": data.resolution[:200]})
     return {"ok": True, "client_amount": client_amount, "specialist_amount": specialist_amount}
 
 # ============= OPERATOR (Maintenance validation) =============
@@ -1471,6 +1634,7 @@ async def request_twin_validation(prop_id: str, user: dict = Depends(get_current
     ops = await db.users.find({"role": "operator"}).to_list(10)
     for op in ops:
         await notify(str(op["_id"]), "Twin nou de validat", f"Proprietatea '{prop.get('name','')}' așteaptă validarea Digital Twin.", type_="twin", link="/operator")
+    await log_event(None, "twin.requested", actor=user, property_id=prop_id, payload={"property_name": prop.get("name")})
     return {"ok": True}
 
 @api.get("/operator/twins")
@@ -1577,6 +1741,8 @@ async def operator_validate_twin(prop_id: str, data: TwinValidateIn, user: dict 
             await notify(prop["owner_id"], "Digital Twin aprobat", f"Twin-ul proprietății '{prop.get('name','')}' a fost validat și activat.", type_="twin", link="/client")
         else:
             await notify(prop["owner_id"], "Twin necesită revizie", f"Twin-ul proprietății '{prop.get('name','')}' necesită ajustări. {data.notes or ''}", type_="twin", link="/client")
+    await log_event(None, "twin.validated", actor=user, property_id=prop_id,
+                    payload={"action": data.action, "new_status": new_status, "notes": (data.notes or "")[:200]})
     return {"ok": True, "status": new_status}
 
 # ============= INTERIOR DESIGN (eligible only for clients with Digital Twin unlocked) =============
@@ -2018,6 +2184,7 @@ async def create_checkout_session(request_id: str, request: Request, user: dict 
             "request_id": request_id, "session_id": fake_session_id, "demo": True,
             "created_at": now_iso,
         })
+        await log_event(request_id, "escrow.paid", actor=user, payload={"amount": amount, "demo_mode": True})
         # Notify specialist + email
         if req.get("specialist_id"):
             spec_u = await db.users.find_one({"_id": ObjectId(req["specialist_id"])})
@@ -2127,6 +2294,14 @@ async def payment_status(session_id: str, request: Request, user: dict = Depends
             "session_id": session_id,
             "created_at": now_iso,
         })
+        # Log activity event (system actor since this happens after Stripe redirect)
+        try:
+            client_doc = await db.users.find_one({"_id": ObjectId(payment["client_id"])})
+            await log_event(payment["request_id"], "escrow.paid",
+                            actor={"id": payment["client_id"], "name": client_doc.get("name") if client_doc else "Client", "role": "client"},
+                            payload={"amount": payment["amount"], "session_id": session_id})
+        except Exception:
+            pass
     elif session_status == "expired":
         await db.payment_transactions.update_one(
             {"session_id": session_id},
@@ -2413,6 +2588,30 @@ async def notify(user_id: str, title: str, message: str, type_: str = "info", li
         await send_email(user["email"], f"PropManage: {title}", html)
     # Best-effort web push (fire-and-forget so it doesn't block)
     asyncio.create_task(send_web_push(user_id, title, message, link))
+
+# ============= ACTIVITY EVENT LOGGING =============
+async def log_event(
+    request_id: Optional[str],
+    event_type: str,
+    actor: Optional[dict] = None,
+    payload: Optional[dict] = None,
+    property_id: Optional[str] = None,
+):
+    """Append an immutable event to activity_events. Best-effort, never raises."""
+    try:
+        doc = {
+            "request_id": request_id,
+            "property_id": property_id,
+            "event_type": event_type,
+            "actor_id": actor.get("id") if actor else None,
+            "actor_name": actor.get("name") if actor else "System",
+            "actor_role": (actor.get("active_view") or actor.get("role")) if actor else "system",
+            "payload": payload or {},
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.activity_events.insert_one(doc)
+    except Exception as e:
+        logging.warning(f"log_event failed: {e}")
 
 
 # ============= 2FA (TOTP) =============

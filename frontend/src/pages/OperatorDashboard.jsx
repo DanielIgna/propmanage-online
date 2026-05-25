@@ -4,12 +4,13 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import {
   Building, Clock, AlertTriangle, FileCheck, Wrench, ArrowRight,
-  Bell, Settings as SettingsIcon,
+  Bell, Settings as SettingsIcon, Flag,
 } from "lucide-react";
 import { TwinEditorModal, TWIN_STATUS_LABELS } from "./OperatorTwin";
 import { API, DashLayout, Stat } from "./DashShared";
 import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
+import { NonConformityFlagModal } from "./ActivityTimeline";
 
 export const OperatorDashboard = () => {
   const [queue, setQueue] = useState([]);
@@ -17,6 +18,7 @@ export const OperatorDashboard = () => {
   const [notifs, setNotifs] = useState([]);
   const [tab, setTab] = useState("twins");
   const [editingTwin, setEditingTwin] = useState(null);
+  const [flagTarget, setFlagTarget] = useState(null); // {target_type, target_id, label}
 
   const load = () => {
     axios.get(`${API}/operator/queue`).then(r => setQueue(r.data)).catch(() => {});
@@ -73,7 +75,10 @@ export const OperatorDashboard = () => {
               <div className="glass-strong rounded-3xl p-6">
                 <h3 className="font-serif text-xl mb-4">Istoric ({approvedTwins.length + revisionTwins.length})</h3>
                 <div className="grid sm:grid-cols-2 gap-3">
-                  {[...approvedTwins, ...revisionTwins].slice(0, 10).map(t => <TwinCard key={t.id} t={t} onOpen={() => setEditingTwin(t.property_id)} />)}
+                  {[...approvedTwins, ...revisionTwins].slice(0, 10).map(t => (
+                    <TwinCard key={t.id} t={t} onOpen={() => setEditingTwin(t.property_id)}
+                      onFlag={() => setFlagTarget({ target_type: "twin", target_id: t.id, label: t.property_name || "Twin" })} />
+                  ))}
                 </div>
               </div>
             )}
@@ -124,33 +129,52 @@ export const OperatorDashboard = () => {
       {tab === "settings" && <SettingsPanel />}
 
       {editingTwin && <TwinEditorModal propertyId={editingTwin} onClose={() => setEditingTwin(null)} onSaved={load} />}
+      {flagTarget && (
+        <NonConformityFlagModal
+          targetType={flagTarget.target_type}
+          targetId={flagTarget.target_id}
+          targetLabel={flagTarget.label}
+          onClose={() => setFlagTarget(null)}
+        />
+      )}
     </DashLayout>
   );
 };
 
-const TwinCard = ({ t, onOpen }) => {
+const TwinCard = ({ t, onOpen, onFlag }) => {
   const statusInfo = TWIN_STATUS_LABELS[t.status] || TWIN_STATUS_LABELS.draft;
   return (
-    <button onClick={onOpen} className="text-left bg-white/5 hover:bg-white/10 rounded-2xl p-4 transition border border-white/5" data-testid={`twin-card-${t.id || t.property_id}`}>
-      <div className="flex items-start justify-between gap-3 mb-2">
-        <div className="min-w-0">
-          <div className="font-medium text-sm truncate">{t.property_name || "Proprietate"}</div>
-          <div className="text-[10px] text-stone-500 truncate">{t.property_address || "—"}</div>
+    <div className="text-left bg-white/5 hover:bg-white/10 rounded-2xl p-4 transition border border-white/5" data-testid={`twin-card-${t.id || t.property_id}`}>
+      <button onClick={onOpen} className="text-left w-full">
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="min-w-0">
+            <div className="font-medium text-sm truncate">{t.property_name || "Proprietate"}</div>
+            <div className="text-[10px] text-stone-500 truncate">{t.property_address || "—"}</div>
+          </div>
+          <span className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-full whitespace-nowrap ${statusInfo.color}`}>{statusInfo.label}</span>
         </div>
-        <span className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-full whitespace-nowrap ${statusInfo.color}`}>{statusInfo.label}</span>
-      </div>
-      <div className="text-[10px] text-stone-500 mb-3">
-        Proprietar: {t.owner_name || "—"}
-      </div>
-      <div className="grid grid-cols-3 gap-2 text-xs">
-        <Pill label="Camere" value={(t.rooms || []).length} />
-        <Pill label="Asset-uri" value={(t.assets || []).length} />
-        <Pill label="Suprafață" value={t.property_surface ? `${t.property_surface}m²` : "—"} />
-      </div>
-      <div className="mt-3 text-[11px] text-[#d4ff3a] flex items-center gap-1">
-        Deschide editor <ArrowRight className="w-3 h-3" />
-      </div>
-    </button>
+        <div className="text-[10px] text-stone-500 mb-3">
+          Proprietar: {t.owner_name || "—"}
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <Pill label="Camere" value={(t.rooms || []).length} />
+          <Pill label="Asset-uri" value={(t.assets || []).length} />
+          <Pill label="Suprafață" value={t.property_surface ? `${t.property_surface}m²` : "—"} />
+        </div>
+        <div className="mt-3 text-[11px] text-[#d4ff3a] flex items-center gap-1">
+          Deschide editor <ArrowRight className="w-3 h-3" />
+        </div>
+      </button>
+      {onFlag && t.status === "approved" && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onFlag(); }}
+          className="mt-3 w-full bg-orange-500/10 hover:bg-orange-500/20 text-orange-300 border border-orange-500/30 py-1.5 rounded-lg text-[11px] flex items-center justify-center gap-1"
+          data-testid={`flag-twin-${t.id}`}
+        >
+          <Flag className="w-3 h-3" />Raportează neconformitate
+        </button>
+      )}
+    </div>
   );
 };
 

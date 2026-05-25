@@ -7,7 +7,7 @@ import {
   Wallet, Sparkles, Activity, Briefcase, Plus, MessageSquare,
   AlertTriangle, Star, CreditCard, Building, Camera, Shield, Calendar, Search, Palette, X,
   Bell, Settings as SettingsIcon, ClipboardList, Search as SearchIcon,
-  Home as HomeIcon, CheckCircle2, Lock,
+  Home as HomeIcon, CheckCircle2, Lock, Clock,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { useI18n } from "../i18n";
@@ -19,6 +19,7 @@ import { InteriorDesignCard, InteriorDesignModal, DesignPhasesPanel } from "./In
 import { API, DashLayout, Stat, StatusBadge } from "./DashShared";
 import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
+import { RequestTimelineModal } from "./ActivityTimeline";
 
 export const ClientDashboard = () => {
   const { user, refreshUser } = useAuth();
@@ -39,6 +40,7 @@ export const ClientDashboard = () => {
   const [filterStatus, setFilterStatus] = useState("");
   const [showDesign, setShowDesign] = useState(false);
   const [designPhasesFor, setDesignPhasesFor] = useState(null);
+  const [timelineRequestId, setTimelineRequestId] = useState(null);
   const [tab, setTab] = useState("request");
 
   const loadRequests = () => {
@@ -153,6 +155,7 @@ export const ClientDashboard = () => {
           payEscrow={payEscrow} confirmRequest={confirmRequest}
           setChatRequest={setChatRequest} setReviewFor={setReviewFor}
           setDisputeFor={setDisputeFor} setDesignPhasesFor={setDesignPhasesFor}
+          setTimelineRequestId={setTimelineRequestId}
         />
       )}
       {tab === "notifications" && <NotifsZone notifs={notifs} reload={loadNotifs} />}
@@ -165,6 +168,7 @@ export const ClientDashboard = () => {
       {disputeFor && <OpenDisputeModal requestId={disputeFor.id} requestTitle={disputeFor.title} onClose={() => setDisputeFor(null)} onOpened={() => loadRequests()} />}
       {showDesign && <InteriorDesignModal onClose={() => setShowDesign(false)} onCreated={() => loadRequests()} />}
       {designPhasesFor && <DesignPhasesViewer request={designPhasesFor} onClose={() => setDesignPhasesFor(null)} onUpdate={() => { loadRequests(); refreshUser(); }} />}
+      {timelineRequestId && <RequestTimelineModal requestId={timelineRequestId} onClose={() => setTimelineRequestId(null)} />}
       {show2FA && <TwoFASetupModal onClose={() => setShow2FA(false)} currentlyEnabled={false} />}
       {reviewFor && (
         <ReviewModal
@@ -422,7 +426,7 @@ const CyclePreview = ({ activeStep }) => {
 };
 
 // ============= TAB 2: Jobs Zone (all requests with filters) =============
-const JobsZone = ({ requests, searchQ, setSearchQ, filterCat, setFilterCat, filterStatus, setFilterStatus, loadRequests, payEscrow, confirmRequest, setChatRequest, setReviewFor, setDisputeFor, setDesignPhasesFor }) => {
+const JobsZone = ({ requests, searchQ, setSearchQ, filterCat, setFilterCat, filterStatus, setFilterStatus, loadRequests, payEscrow, confirmRequest, setChatRequest, setReviewFor, setDisputeFor, setDesignPhasesFor, setTimelineRequestId }) => {
   useEffect(() => { loadRequests(); /* eslint-disable-next-line */ }, [searchQ, filterCat, filterStatus]);
 
   return (
@@ -471,6 +475,9 @@ const JobsZone = ({ requests, searchQ, setSearchQ, filterCat, setFilterCat, filt
               {r.specialist_name && <span className="text-[#d4ff3a]">{r.specialist_name}</span>}
             </div>
             <div className="flex gap-2 mt-3">
+              <button onClick={() => setTimelineRequestId(r.id)} className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 py-2 px-3 rounded-lg text-xs flex items-center gap-1" data-testid={`client-timeline-${r.id}`} title="Vezi timeline complet">
+                <Clock className="w-3 h-3" />Timeline
+              </button>
               {r.specialist_id && ["assigned","in_progress","completed"].includes(r.status) && (
                 <button onClick={() => setChatRequest(r.id)} className="flex-1 bg-white/10 hover:bg-white/15 py-2 rounded-lg text-xs flex items-center justify-center gap-1" data-testid={`chat-${r.id}`}>
                   <MessageSquare className="w-3 h-3" />Chat
