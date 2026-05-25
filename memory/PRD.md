@@ -92,6 +92,21 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
   - Validări: max 30 items/specialist, 4MB cap pe imagine base64, ownership-scoped PUT/DELETE
   - Seed idempotent: 3 proiecte pre-populate (HVAC Pipera, baie industrială, bucătărie modernă)
 
+### Phase 14 — Activity Timeline + Cross-Role Visibility (43/43 tests ✅)
+- **Unified Activity Timeline** vizibil pe fiecare cerere — RBAC: client/specialist al cererii + admin + operator care a validat twin-ul
+- **12 event types** instrumentate cu `log_event()`: request.created, request.accepted, work.started, work.completed, work.confirmed, escrow.paid, twin.requested, twin.validated, dispute.opened, dispute.resolved, operator.flagged_nonconformity, admin.resolved_nonconformity
+- **Admin Activity Stream** live feed pe tab Sumar — auto-refresh 15s, badge-uri colorate per rol (CL/SP/AD/OP), click → deschide Timeline-ul cererii
+- **Schedule Proposal Modal** — specialistul propune data start/end + ore estimate + mesaj la acceptarea unei oportunități (înlocuiește accept direct); payload-ul vizibil ca block special în timeline
+- **Operator Non-Conformity Flag** — operator flag-uiește twin-uri/cereri/proprietăți (severity: low/medium/high); notifică automat toți admin-ii
+- **Admin Nonconformity Resolution** — admin vede sesizările în tab Dispute, le rezolvă cu un mesaj; operatorul primește notificare back
+- **Endpoint-uri noi**:
+  - `GET /api/requests/{id}/timeline` (RBAC strictă)
+  - `GET /api/admin/activity-stream?limit=&event_type=&actor_role=&since=`
+  - `POST /api/operator/flag-nonconformity`
+  - `GET /api/admin/nonconformities`
+  - `POST /api/admin/nonconformities/{id}/resolve`
+- **Modificat**: `POST /api/requests/{id}/accept` acceptă body opțional cu `proposed_start_date/end_date/estimated_hours/note` (backward compatible)
+
 ### Phase 13 — Onboarding Cycle + Digital Twin Pipeline (23/23 tests ✅)
 - **Empty-state CTA** "Începe cu prima ta proprietate" cu buton mare lime "Adaugă proprietate" — vizibil când clientul nu are imobile
 - **Cycle Preview** (4 pași): Proprietate → Digital Twin → Servicii → Escrow & Tokens, cu indicator vizual de progres (done/current/pending/disabled)
@@ -143,7 +158,8 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Phase 11: 25/25 ✅ (Dual-Role + GDPR + 4-zone bottom nav)
 - Phase 12: 14/14 ✅ (Referral + Web Push + Contact backend)
 - Phase 13: 23/23 ✅ (Onboarding cycle + Twin pipeline)
-- **TOTAL: 247/253 backend tests pass (97.6%)**
+- Phase 14: 43/43 ✅ (Activity Timeline + Cross-role visibility + Nonconformity)
+- **TOTAL: 290/296 backend tests pass (98%)**
 
 ## API Endpoints (60+)
 **Auth**: POST /api/auth/{login, register, logout, google/session}, GET /api/auth/{me, ws-token}
