@@ -2,12 +2,13 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import {
-  Wallet, Star, Briefcase, Award, Sparkles, FileCheck, MessageSquare, AlertTriangle, Palette, Plus,
+  Wallet, Star, Briefcase, Award, Sparkles, FileCheck, MessageSquare, AlertTriangle, Palette, Plus, Image,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { ChatPanel } from "./ChatPanel";
 import { OpenDisputeModal, SpecialistDocumentsModal } from "./AdminModals";
 import { ProposePhaseModal } from "./InteriorDesign";
+import { PortfolioManagerModal } from "./Portfolio";
 import { API, DashLayout, Stat, StatusBadge } from "./DashShared";
 
 export const SpecialistDashboard = () => {
@@ -17,6 +18,7 @@ export const SpecialistDashboard = () => {
   const [showDocs, setShowDocs] = useState(false);
   const [disputeFor, setDisputeFor] = useState(null);
   const [proposePhaseFor, setProposePhaseFor] = useState(null);
+  const [showPortfolio, setShowPortfolio] = useState(false);
 
   const load = () => axios.get(`${API}/requests`).then(r => setRequests(r.data)).catch(() => {});
   useEffect(() => { if (user) load(); }, [user]);
@@ -48,7 +50,10 @@ export const SpecialistDashboard = () => {
         </div>
       )}
       {user?.verified && (
-        <div className="mb-6 flex justify-end">
+        <div className="mb-6 flex justify-end gap-2">
+          <button onClick={() => setShowPortfolio(true)} className="px-4 py-2 bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 rounded-full text-xs flex items-center gap-2" data-testid="manage-portfolio-btn">
+            <Image className="w-3.5 h-3.5" />Portofoliu
+          </button>
           <button onClick={() => setShowDocs(true)} className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full text-xs flex items-center gap-2" data-testid="manage-docs-btn">
             <FileCheck className="w-3.5 h-3.5" />Documentele mele
           </button>
@@ -137,6 +142,7 @@ export const SpecialistDashboard = () => {
       {showDocs && <SpecialistDocumentsModal onClose={() => setShowDocs(false)} />}
       {disputeFor && <OpenDisputeModal requestId={disputeFor.id} requestTitle={disputeFor.title} onClose={() => setDisputeFor(null)} onOpened={() => load()} />}
       {proposePhaseFor && <ProposePhaseModal requestId={proposePhaseFor} onClose={() => setProposePhaseFor(null)} onProposed={() => load()} />}
+      {showPortfolio && <PortfolioManagerModal onClose={() => setShowPortfolio(false)} />}
     </DashLayout>
   );
 };

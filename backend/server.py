@@ -19,6 +19,7 @@ import io
 import base64 as b64
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
+from email_service import send_template, tpl_welcome, tpl_dispute_opened, tpl_dispute_resolved, tpl_design_phase_quote, tpl_specialist_verified, tpl_escrow_funded
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Literal, Dict
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, status, WebSocket, WebSocketDisconnect
@@ -258,6 +259,17 @@ class DesignPhaseQuoteIn(BaseModel):
 class DesignPhaseAcceptIn(BaseModel):
     quote_id: str
 
+class PortfolioItemIn(BaseModel):
+    title: str = Field(min_length=3, max_length=120)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    style: Optional[str] = None  # e.g. "modern", "scandinavian"
+    category: Literal["interior_design", "renovation", "hvac", "electric", "plumbing", "carpentry", "other"] = "interior_design"
+    cover_image: str  # base64 data URL or http URL
+    gallery: List[str] = Field(default_factory=list, max_length=12)  # additional photos
+    completion_date: Optional[str] = None  # ISO date
+    location: Optional[str] = None
+    surface: Optional[float] = None  # m²
+
 # ============= AUTH ENDPOINTS =============
 @api.post("/auth/register")
 async def register(data: RegisterIn, response: Response):
@@ -302,6 +314,8 @@ async def register(data: RegisterIn, response: Response):
     user["id"] = uid
     user.pop("_id", None)
     user.pop("password_hash", None)
+    # Welcome email (fire-and-forget, no blocking)
+    await send_template(tpl_welcome, data.name, data.role, to=email)
     return user
 
 # Simple in-memory rate limiter for /auth/login (per IP) - tracks FAILED attempts only
@@ -815,10 +829,15 @@ async def pending_specialists(user: dict = Depends(require_role("admin"))):
 
 @api.post("/admin/specialists/{spec_id}/verify")
 async def verify_specialist(spec_id: str, user: dict = Depends(require_role("admin"))):
+    spec = await db.users.find_one({"_id": ObjectId(spec_id), "role": "specialist"})
+    if not spec:
+        raise HTTPException(404, "Specialist not found")
     await db.users.update_one(
         {"_id": ObjectId(spec_id), "role": "specialist"},
         {"$set": {"verified": True, "tier": "VERIFIED"}}
     )
+    await notify(spec_id, "Cont verificat ✓", "Felicitări! Contul tău este acum VERIFIED. Ai acces la marketplace-ul de premium leads.", type_="verification", link="/specialist")
+    await send_template(tpl_specialist_verified, spec.get("name"), to=spec.get("email"))
     return {"ok": True}
 
 @api.get("/admin/disputes")
@@ -981,8 +1000,20 @@ async def open_dispute(req_id: str, data: DisputeOpenIn, user: dict = Depends(ge
     )
     # Notify the other party + admin (best-effort: pick first admin)
     other_user_id = req.get("specialist_id") if role == "client" else req.get("client_id")
+    other_user_doc = None
     if other_user_id:
+        other_user_doc = await db.users.find_one({"_id": ObjectId(other_user_id)})
         await notify(other_user_id, "Dispută deschisă", f"O dispută a fost deschisă pe lucrarea '{req.get('title','')}'. Echipa admin va analiza cazul.", type_="dispute", link="/" + ("specialist" if role == "client" else "client"))
+        if other_user_doc and other_user_doc.get("email"):
+            await send_template(
+                tpl_dispute_opened,
+                other_user_doc.get("name", ""),
+                req.get("title", ""),
+                role,
+                data.reason,
+                "specialist" if role == "client" else "client",
+                to=other_user_doc["email"],
+            )
     admins = await db.users.find({"role": "admin"}).to_list(10)
     for a in admins:
         await notify(str(a["_id"]), "Nouă dispută", f"Dispută deschisă pe '{req.get('title','')}' de către {role}.", type_="dispute", link="/admin")
@@ -1060,9 +1091,15 @@ async def resolve_dispute(dispute_id: str, data: DisputeResolveIn, user: dict = 
     )
     # Notify both parties
     if client_id:
+        client_u = await db.users.find_one({"_id": ObjectId(client_id)})
         await notify(client_id, "Dispută rezolvată", f"Dispută rezolvată. Rambursare: {client_amount:.2f} RON.", type_="dispute", link="/client")
+        if client_u and client_u.get("email") and client_amount > 0:
+            await send_template(tpl_dispute_resolved, client_u.get("name", ""), req.get("title", ""), client_amount, "client", to=client_u["email"])
     if specialist_id:
+        spec_u = await db.users.find_one({"_id": ObjectId(specialist_id)})
         await notify(specialist_id, "Dispută rezolvată", f"Dispută rezolvată. Plată: {specialist_amount:.2f} RON.", type_="dispute", link="/specialist")
+        if spec_u and spec_u.get("email") and specialist_amount > 0:
+            await send_template(tpl_dispute_resolved, spec_u.get("name", ""), req.get("title", ""), specialist_amount, "specialist", to=spec_u["email"])
     return {"ok": True, "client_amount": client_amount, "specialist_amount": specialist_amount}
 
 # ============= OPERATOR (Maintenance validation) =============
@@ -1371,7 +1408,20 @@ async def create_phase_quote(data: DesignPhaseQuoteIn, user: dict = Depends(requ
         {"_id": ObjectId(data.request_id)},
         {"$push": {"phases": quote}}
     )
+    client_u = await db.users.find_one({"_id": ObjectId(req["client_id"])})
     await notify(req["client_id"], "Ofertă fază nouă", f"{user.get('name','Specialistul')} a propus o fază nouă: {data.phase_name} — {data.price:.0f} RON", type_="design_phase", link="/client")
+    if client_u and client_u.get("email"):
+        await send_template(
+            tpl_design_phase_quote,
+            client_u.get("name", ""),
+            user.get("name", "Specialist"),
+            req.get("title", ""),
+            data.phase_name,
+            data.price,
+            data.estimated_days,
+            data.description,
+            to=client_u["email"],
+        )
     return quote
 
 
@@ -1434,7 +1484,100 @@ async def complete_phase(data: DesignPhaseAcceptIn, request_id: str, user: dict 
     return {"ok": True, "released_amount": specialist_share}
 
 
+# ============= SPECIALIST PORTFOLIO =============
 
+MAX_PORTFOLIO_ITEMS = 30
+MAX_IMAGE_SIZE_BYTES = 5_500_000  # ~4MB base64
+
+def _validate_image_payload(b64_or_url: str) -> bool:
+    if not b64_or_url:
+        return False
+    if b64_or_url.startswith("http"):
+        return True
+    if b64_or_url.startswith("data:image/") and len(b64_or_url) < MAX_IMAGE_SIZE_BYTES:
+        return True
+    return False
+
+@api.get("/specialists/{spec_id}/portfolio")
+async def list_portfolio(spec_id: str):
+    """Public: list portfolio items of any specialist (no auth required)."""
+    docs = await db.portfolio.find({"specialist_id": spec_id}).sort("created_at", -1).to_list(50)
+    return [serialize_doc(d) for d in docs]
+
+@api.get("/specialist/portfolio")
+async def my_portfolio(user: dict = Depends(require_role("specialist"))):
+    """List own portfolio items."""
+    docs = await db.portfolio.find({"specialist_id": user["id"]}).sort("created_at", -1).to_list(50)
+    return [serialize_doc(d) for d in docs]
+
+@api.post("/specialist/portfolio")
+async def add_portfolio_item(data: PortfolioItemIn, user: dict = Depends(require_role("specialist"))):
+    """Add a new portfolio item (own)."""
+    existing_count = await db.portfolio.count_documents({"specialist_id": user["id"]})
+    if existing_count >= MAX_PORTFOLIO_ITEMS:
+        raise HTTPException(400, f"Maximum {MAX_PORTFOLIO_ITEMS} proiecte în portofoliu. Șterge proiecte vechi pentru a adăuga altele noi.")
+
+    if not _validate_image_payload(data.cover_image):
+        raise HTTPException(400, "Imagine cover invalidă (max 4MB base64 sau URL http)")
+    for g in data.gallery:
+        if not _validate_image_payload(g):
+            raise HTTPException(400, "Una sau mai multe imagini din galerie sunt invalide")
+
+    doc = {
+        "specialist_id": user["id"],
+        "specialist_name": user.get("name"),
+        "title": data.title,
+        "description": data.description,
+        "style": data.style,
+        "category": data.category,
+        "cover_image": data.cover_image,
+        "gallery": data.gallery,
+        "completion_date": data.completion_date,
+        "location": data.location,
+        "surface": data.surface,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    res = await db.portfolio.insert_one(doc)
+    doc["id"] = str(res.inserted_id)
+    doc.pop("_id", None)
+    return doc
+
+@api.put("/specialist/portfolio/{item_id}")
+async def update_portfolio_item(item_id: str, data: PortfolioItemIn, user: dict = Depends(require_role("specialist"))):
+    item = await db.portfolio.find_one({"_id": ObjectId(item_id), "specialist_id": user["id"]})
+    if not item:
+        raise HTTPException(404, "Item not found")
+    if not _validate_image_payload(data.cover_image):
+        raise HTTPException(400, "Imagine cover invalidă")
+    for g in data.gallery:
+        if not _validate_image_payload(g):
+            raise HTTPException(400, "Una sau mai multe imagini din galerie sunt invalide")
+    await db.portfolio.update_one(
+        {"_id": ObjectId(item_id)},
+        {"$set": {
+            "title": data.title,
+            "description": data.description,
+            "style": data.style,
+            "category": data.category,
+            "cover_image": data.cover_image,
+            "gallery": data.gallery,
+            "completion_date": data.completion_date,
+            "location": data.location,
+            "surface": data.surface,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }}
+    )
+    return {"ok": True}
+
+@api.delete("/specialist/portfolio/{item_id}")
+async def delete_portfolio_item(item_id: str, user: dict = Depends(require_role("specialist"))):
+    res = await db.portfolio.delete_one({"_id": ObjectId(item_id), "specialist_id": user["id"]})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Item not found")
+    return {"ok": True}
+
+
+# ============= GOOGLE OAUTH (Emergent-managed) =============
 # REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
 
 @api.post("/auth/google/session")
@@ -1552,6 +1695,14 @@ async def create_checkout_session(request_id: str, request: Request, user: dict 
             "request_id": request_id, "session_id": fake_session_id, "demo": True,
             "created_at": now_iso,
         })
+        # Notify specialist + email
+        if req.get("specialist_id"):
+            spec_u = await db.users.find_one({"_id": ObjectId(req["specialist_id"])})
+            if spec_u and spec_u.get("email"):
+                await send_template(
+                    tpl_escrow_funded, spec_u.get("name", ""), req.get("title", ""), amount, user.get("name", "Client"),
+                    to=spec_u["email"],
+                )
         return {"checkout_url": f"{origin}/client?payment=success&request={request_id}&session_id={fake_session_id}&demo=1", "session_id": fake_session_id, "demo_mode": True}
 
     # REAL Stripe via emergentintegrations
@@ -2512,6 +2663,27 @@ async def seed():
                 })
     
     # Seed regions
+    
+    # Seed portfolio (idempotent)
+    if await db.portfolio.count_documents({}) == 0:
+        spec1 = await db.users.find_one({"email": "specialist@propmanage.io"})
+        spec2 = await db.users.find_one({"email": "specialist2@propmanage.io"})
+        if spec1 and spec2:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            await db.portfolio.insert_many([
+                {"specialist_id": str(spec1["_id"]), "specialist_name": spec1.get("name"), "title": "Sistem HVAC Premium - Vila Pipera",
+                 "description": "Instalare sistem complet de climatizare cu 4 unități interioare, ventilație controlată și recuperator de căldură.",
+                 "category": "hvac", "style": None, "cover_image": "https://picsum.photos/seed/portfolio-hvac-pipera/800/600",
+                 "gallery": ["https://picsum.photos/seed/portfolio-hvac-pipera-1/800/600"], "location": "Pipera", "surface": 220.0, "created_at": now_iso},
+                {"specialist_id": str(spec1["_id"]), "specialist_name": spec1.get("name"), "title": "Renovare baie loft industrial",
+                 "description": "Refacere completă instalație sanitară + climatizare locală pentru o baie cu duș italian și caldă.",
+                 "category": "hvac", "style": "industrial", "cover_image": "https://picsum.photos/seed/portfolio-bath-industrial/800/600",
+                 "gallery": [], "location": "București Centru", "surface": 18.0, "created_at": now_iso},
+                {"specialist_id": str(spec2["_id"]), "specialist_name": spec2.get("name"), "title": "Bucătărie modernă deschisă",
+                 "description": "Refacere completă rețea sanitară + instalare insulă centrală cu chiuvetă și mașină de spălat vase.",
+                 "category": "plumbing", "style": "modern", "cover_image": "https://picsum.photos/seed/portfolio-kitchen-modern/800/600",
+                 "gallery": ["https://picsum.photos/seed/portfolio-kitchen-modern-1/800/600"], "location": "Cluj-Napoca", "surface": 32.0, "created_at": now_iso},
+            ])
     sample_regions = [
         {"country": "România", "city": "București", "zone": "Bucuresti-Sector1"},
         {"country": "România", "city": "București", "zone": "Bucuresti-Sector2"},

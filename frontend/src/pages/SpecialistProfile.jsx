@@ -3,7 +3,8 @@ import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { Star, CheckCircle2, Award, Briefcase, Calendar, ArrowLeft, Building2 } from "lucide-react";
+import { Star, CheckCircle2, Award, Briefcase, Calendar, ArrowLeft, Building2, Image as ImageIcon } from "lucide-react";
+import { PortfolioGallery } from "./Portfolio";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -88,6 +89,14 @@ export const SpecialistProfile = () => {
             </div>
           )}
         </motion.div>
+
+        {/* Portfolio */}
+        <div className="glass-strong rounded-3xl p-8 mb-6">
+          <h2 className="font-serif text-2xl mb-6 flex items-center gap-2">
+            <ImageIcon className="w-5 h-5 text-[#d4ff3a]" />Portofoliu de proiecte
+          </h2>
+          <PortfolioGallery specialistId={id} />
+        </div>
 
         {/* Reviews */}
         <div className="glass-strong rounded-3xl p-8">
