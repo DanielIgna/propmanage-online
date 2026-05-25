@@ -1,12 +1,5 @@
 """PropManage Backend - FastAPI + MongoDB + JWT Auth + Marketplace + Stripe + Google OAuth + WebSocket"""
-from dotenv import load_dotenv
-from pathlib import Path
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
-
 import os
-import jwt
-import bcrypt
 import logging
 import json
 import uuid
@@ -19,6 +12,7 @@ import io
 import secrets
 import base64 as b64
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 import pytz
@@ -28,9 +22,40 @@ from email_service import send_template, tpl_welcome, tpl_dispute_opened, tpl_di
 from typing import Optional, List, Literal, Dict
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 from pydantic import BaseModel, EmailStr, Field
+import jwt  # used directly only in WebSocket chat handler
+
+# Internal modules (refactored Phase A)
+from db import db, client
+from core_utils import (
+    hash_password, verify_password, create_access_token, create_refresh_token,
+    serialize_doc, set_auth_cookies, effective_role, JWT_SECRET, JWT_ALGORITHM,
+)
+from deps import get_current_user, require_role
+from services import (
+    send_email, notify, send_web_push, log_event,
+    VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY_PEM, VAPID_CLAIM_EMAIL,
+    SENDGRID_API_KEY, SENDGRID_SENDER,
+)
+from models import (
+    Role, ALLOWED_SPECIALTIES,
+    DESIGN_CONCEPT_PRICE_PER_ROOM, DESIGN_MAX_TOKEN_DISCOUNT_PCT,
+    RegisterIn, LoginIn, TotpVerifyIn, PropertyIn, PropertyUpdateIn,
+    RegionIn, SpecialistZonesIn, AvailabilityIn, ServiceAvailabilityIn,
+    RequestIn, OfferIn, ReviewIn,
+    DocumentIn, DocumentReviewIn, SpecialistRejectIn,
+    DisputeOpenIn, DisputeResolveIn,
+    TwinRoom, TwinAsset, TwinUpsertIn, TwinValidateIn,
+    DesignConceptIn, DesignPhaseQuoteIn, DesignPhaseAcceptIn,
+    PortfolioItemIn,
+)
+from seed import seed
+from digest import (
+    DIGEST_BUILDERS, run_daily_digests, send_digest_to_user, BUCHAREST_TZ_NAME,
+)
+
+ROOT_DIR = Path(__file__).parent
 
 # Stripe configuration
 stripe.api_key = os.environ.get("STRIPE_API_KEY", "sk_test_emergent")
@@ -38,269 +63,12 @@ stripe.api_key = os.environ.get("STRIPE_API_KEY", "sk_test_emergent")
 # LLM key for AI assistant
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 
-# ============= DB SETUP =============
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
-
-JWT_SECRET = os.environ['JWT_SECRET']
-JWT_ALGORITHM = "HS256"
-
 app = FastAPI(title="PropManage API")
 api = APIRouter(prefix="/api")
 
-# ============= HELPERS =============
-def hash_password(pw: str) -> str:
-    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
 
-def verify_password(plain: str, hashed: str) -> bool:
-    try:
-        return bcrypt.checkpw(plain.encode(), hashed.encode())
-    except Exception:
-        return False
+# ============= LEGACY MODELS / HELPERS — extracted to core_utils, deps, models =============
 
-def create_access_token(user_id: str, email: str, role: str) -> str:
-    return jwt.encode({
-        "sub": user_id, "email": email, "role": role,
-        "exp": datetime.now(timezone.utc) + timedelta(hours=24),
-        "type": "access"
-    }, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-def create_refresh_token(user_id: str) -> str:
-    return jwt.encode({
-        "sub": user_id,
-        "exp": datetime.now(timezone.utc) + timedelta(days=7),
-        "type": "refresh"
-    }, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-def serialize_doc(doc):
-    if doc is None: return None
-    doc = dict(doc)
-    if "_id" in doc:
-        doc["id"] = str(doc.pop("_id"))
-    doc.pop("password_hash", None)
-    # Dual-role: ensure active_view + dual_role_enabled are always present
-    if doc.get("role") in ("client", "specialist", "admin", "operator"):
-        # Verified specialists can switch to client view
-        is_verified_spec = doc.get("role") == "specialist" and doc.get("verified") is True
-        doc["dual_role_enabled"] = is_verified_spec
-        # Default active_view = role; only specialist may have it = "client"
-        av = doc.get("active_view")
-        if doc.get("role") == "specialist" and is_verified_spec and av == "client":
-            doc["active_view"] = "client"
-        else:
-            doc["active_view"] = doc.get("role")
-    return doc
-
-async def get_current_user(request: Request) -> dict:
-    token = request.cookies.get("access_token")
-    if not token:
-        h = request.headers.get("Authorization", "")
-        if h.startswith("Bearer "): token = h[7:]
-    if not token:
-        raise HTTPException(401, "Not authenticated")
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        if payload.get("type") != "access":
-            raise HTTPException(401, "Invalid token type")
-        user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
-        if not user: raise HTTPException(401, "User not found")
-        return serialize_doc(user)
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(401, "Token expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(401, "Invalid token")
-
-def require_role(*allowed):
-    async def dep(user: dict = Depends(get_current_user)):
-        # Native role match
-        if user.get("role") in allowed:
-            return user
-        # Dual-role: verified specialist with active_view=client can access client-only endpoints
-        if (
-            user.get("role") == "specialist"
-            and user.get("dual_role_enabled") is True
-            and user.get("active_view") in allowed
-        ):
-            return user
-        raise HTTPException(403, "Insufficient permissions")
-    return dep
-
-def effective_role(user: dict) -> str:
-    """Returns active_view for dual-role specialists, otherwise the user's primary role."""
-    if user.get("role") == "specialist" and user.get("dual_role_enabled") is True:
-        return user.get("active_view") or "specialist"
-    return user.get("role", "client")
-
-def set_auth_cookies(response: Response, access: str, refresh: str):
-    response.set_cookie("access_token", access, httponly=True, secure=False, samesite="lax", max_age=86400, path="/")
-    response.set_cookie("refresh_token", refresh, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
-
-# ============= MODELS =============
-Role = Literal["client", "specialist", "admin", "operator"]
-
-ALLOWED_SPECIALTIES = {"hvac", "electric", "plumbing", "interior_design", "carpentry", "painting", "cleaning", "appliance_repair", "gardening", "other"}
-
-class RegisterIn(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=6)
-    name: str
-    role: Role = "client"
-    phone: Optional[str] = None
-    specialty: Optional[str] = None  # for role=specialist
-    service_categories: Optional[List[str]] = None  # multi-select
-    coverage_zones: Optional[List[str]] = None
-    zone: Optional[str] = None  # for role=client
-    referrer_id: Optional[str] = None  # ?ref={userId} on /register URL
-
-class LoginIn(BaseModel):
-    email: EmailStr
-    password: str
-    totp_code: Optional[str] = None  # Required if 2FA enabled
-
-class TotpVerifyIn(BaseModel):
-    code: str
-
-class PropertyIn(BaseModel):
-    name: str
-    address: str
-    type: str  # apartment, house, villa
-    surface: float
-    rooms: int
-
-class PropertyUpdateIn(BaseModel):
-    name: Optional[str] = None
-    address: Optional[str] = None
-    type: Optional[str] = None
-    surface: Optional[float] = None
-    rooms: Optional[int] = None
-
-# ============= REGIONS / ZONES =============
-class RegionIn(BaseModel):
-    country: str
-    city: str
-    zone: str  # neighborhood
-
-class SpecialistZonesIn(BaseModel):
-    zones: List[str]  # list of zone IDs the specialist covers
-    categories: List[str]  # service categories
-
-class AvailabilityIn(BaseModel):
-    status: Literal["available", "busy", "offline"]
-    available_hours: Optional[Dict] = None  # {monday: [{start: "09:00", end: "17:00"}], ...}
-
-class ServiceAvailabilityIn(BaseModel):
-    region_id: str
-    service: str  # plumbing, electric, hvac, interior_design, etc.
-    state: Literal["active", "inactive", "limited", "premium_only"]
-    min_specialists: int = 1
-
-class RequestIn(BaseModel):
-    property_id: str
-    category: str  # electric, plumbing, hvac, etc.
-    title: str
-    description: str
-    priority: Literal["normal", "urgent"] = "normal"
-    budget_estimate: Optional[float] = None
-    photos: Optional[List[str]] = None  # base64 data URLs
-
-class OfferIn(BaseModel):
-    request_id: str
-    price: float
-    eta_hours: int
-    message: str
-
-class ReviewIn(BaseModel):
-    job_id: str
-    rating: int = Field(ge=1, le=5)
-    comment: Optional[str] = None
-
-class DocumentIn(BaseModel):
-    type: Literal["id_card", "insurance", "certification", "company_cui", "other"]
-    name: str
-    url: str  # base64 data URL or http URL
-
-class DocumentReviewIn(BaseModel):
-    status: Literal["approved", "rejected"]
-    reason: Optional[str] = None
-
-class SpecialistRejectIn(BaseModel):
-    reason: str = Field(min_length=3)
-
-class DisputeOpenIn(BaseModel):
-    reason: str = Field(min_length=10)
-    evidence_urls: Optional[List[str]] = None  # photos
-
-class DisputeResolveIn(BaseModel):
-    resolution: Literal["refund_client", "pay_specialist", "split"]
-    client_pct: Optional[int] = None  # 0-100 if split
-    notes: Optional[str] = None
-
-# ============= DIGITAL TWIN MODELS =============
-class TwinRoom(BaseModel):
-    id: str
-    name: str
-    type: Literal["living", "bedroom", "kitchen", "bathroom", "hallway", "balcony", "office", "storage", "other"]
-    area: float = 0  # m²
-    x: float = 0
-    y: float = 0
-    w: float = 100
-    h: float = 100
-
-class TwinAsset(BaseModel):
-    id: str
-    type: Literal["hvac", "boiler", "electric_panel", "water_meter", "gas_meter", "appliance", "lighting", "plumbing", "other"]
-    name: str
-    room_id: Optional[str] = None
-    x: float = 0
-    y: float = 0
-    condition: Literal["good", "fair", "needs_service", "critical"] = "good"
-    last_service_date: Optional[str] = None
-    notes: Optional[str] = None
-
-class TwinUpsertIn(BaseModel):
-    rooms: List[TwinRoom] = []
-    assets: List[TwinAsset] = []
-    model_url: Optional[str] = None
-    notes: Optional[str] = None
-
-class TwinValidateIn(BaseModel):
-    action: Literal["approve", "request_revision"]
-    notes: Optional[str] = None
-
-# ============= INTERIOR DESIGN =============
-DESIGN_CONCEPT_PRICE_PER_ROOM = 2200.0  # RON / room (fixed, 1 working day = 8h)
-DESIGN_MAX_TOKEN_DISCOUNT_PCT = 50  # tokens can cover at most 50% of price
-
-class DesignConceptIn(BaseModel):
-    property_id: str
-    room_ids: List[str] = Field(min_length=1)  # rooms from the twin
-    tokens_to_use: int = Field(ge=0, default=0)
-    style_preference: Optional[str] = None  # e.g., "modern", "scandinavian", "minimalist"
-    notes: Optional[str] = None
-
-class DesignPhaseQuoteIn(BaseModel):
-    request_id: str
-    phase_name: str = Field(min_length=3)
-    description: str
-    price: float = Field(gt=0)
-    estimated_days: int = Field(ge=1)
-
-class DesignPhaseAcceptIn(BaseModel):
-    quote_id: str
-
-class PortfolioItemIn(BaseModel):
-    title: str = Field(min_length=3, max_length=120)
-    description: Optional[str] = Field(default=None, max_length=2000)
-    style: Optional[str] = None  # e.g. "modern", "scandinavian"
-    category: Literal["interior_design", "renovation", "hvac", "electric", "plumbing", "carpentry", "other"] = "interior_design"
-    cover_image: str  # base64 data URL or http URL
-    gallery: List[str] = Field(default_factory=list, max_length=12)  # additional photos
-    completion_date: Optional[str] = None  # ISO date
-    location: Optional[str] = None
-    surface: Optional[float] = None  # m²
-
-# ============= AUTH ENDPOINTS =============
 @api.post("/auth/register")
 async def register(data: RegisterIn, response: Response):
     email = data.email.lower()
@@ -568,11 +336,7 @@ async def support_contact(data: ContactIn, user: dict = Depends(get_current_user
     return {"ok": True}
 
 
-# ============= WEB PUSH (VAPID) =============
-VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY")
-VAPID_PRIVATE_KEY_PEM = os.environ.get("VAPID_PRIVATE_KEY_PEM")
-VAPID_CLAIM_EMAIL = os.environ.get("VAPID_CLAIM_EMAIL", "mailto:admin@propmanage.io")
-
+# ============= WEB PUSH (VAPID) — endpoints kept; helpers moved to services.py =============
 class PushSubscriptionKeys(BaseModel):
     p256dh: str
     auth: str
@@ -609,40 +373,6 @@ async def push_subscribe(data: PushSubscriptionIn, user: dict = Depends(get_curr
 async def push_unsubscribe(data: PushSubscriptionIn, user: dict = Depends(get_current_user)):
     await db.push_subscriptions.delete_one({"endpoint": data.endpoint, "user_id": user["id"]})
     return {"ok": True}
-
-async def send_web_push(user_id: str, title: str, message: str, link: Optional[str] = None):
-    """Fire-and-forget web push for all this user's subscribed devices."""
-    if not VAPID_PUBLIC_KEY or not VAPID_PRIVATE_KEY_PEM:
-        return
-    try:
-        from pywebpush import webpush, WebPushException
-    except Exception:
-        return
-    subs = await db.push_subscriptions.find({"user_id": user_id}).to_list(20)
-    if not subs:
-        return
-    payload = json.dumps({"title": title, "message": message, "link": link or "/"})
-    private_key = VAPID_PRIVATE_KEY_PEM.replace("\\n", "\n")
-    stale_endpoints = []
-    for sub in subs:
-        try:
-            webpush(
-                subscription_info={"endpoint": sub["endpoint"], "keys": sub["keys"]},
-                data=payload,
-                vapid_private_key=private_key,
-                vapid_claims={"sub": VAPID_CLAIM_EMAIL},
-                ttl=86400,
-            )
-        except WebPushException as e:
-            code = getattr(e.response, "status_code", None)
-            if code in (404, 410):  # Gone / Not Found -> remove stale subscription
-                stale_endpoints.append(sub["endpoint"])
-            else:
-                logging.warning(f"WebPush failed for user {user_id}: {e}")
-        except Exception as e:
-            logging.warning(f"WebPush error: {e}")
-    if stale_endpoints:
-        await db.push_subscriptions.delete_many({"endpoint": {"$in": stale_endpoints}})
 
 
 # ============= PROPERTIES (Client) =============
@@ -2542,47 +2272,7 @@ async def specialist_profile(spec_id: str):
     }
 
 
-# ============= EMAIL NOTIFICATIONS =============
-SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
-SENDGRID_SENDER = os.environ.get("SENDGRID_SENDER", "noreply@propmanage.io")
-
-async def send_email(to_email: str, subject: str, html_body: str):
-    """Send email via SendGrid with graceful fallback to console logging."""
-    if not SENDGRID_API_KEY or not SENDGRID_API_KEY.startswith("SG."):
-        # Demo mode: log to console + persist to db.email_log for in-app review
-        logger.info(f"[EMAIL DEMO] To: {to_email} | Subject: {subject}")
-        await db.email_log.insert_one({
-            "to": to_email,
-            "subject": subject,
-            "body": html_body,
-            "demo": True,
-            "sent_at": datetime.now(timezone.utc).isoformat(),
-        })
-        return {"status": "demo", "to": to_email}
-    
-    # Real SendGrid call
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.post(
-                "https://api.sendgrid.com/v3/mail/send",
-                headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
-                json={
-                    "personalizations": [{"to": [{"email": to_email}]}],
-                    "from": {"email": SENDGRID_SENDER, "name": "PropManage"},
-                    "subject": subject,
-                    "content": [{"type": "text/html", "value": html_body}],
-                }
-            )
-            await db.email_log.insert_one({
-                "to": to_email, "subject": subject,
-                "status_code": r.status_code,
-                "sent_at": datetime.now(timezone.utc).isoformat(),
-            })
-            return {"status": "sent" if r.status_code < 300 else "failed", "code": r.status_code}
-    except Exception as e:
-        logger.error(f"SendGrid error: {e}")
-        return {"status": "error", "error": str(e)}
-
+# ============= EMAIL / NOTIFICATIONS / ACTIVITY LOG — helpers moved to services.py =============
 
 @api.get("/notifications")
 async def list_notifications(user: dict = Depends(get_current_user)):
@@ -2598,52 +2288,6 @@ async def mark_read(notif_id: str, user: dict = Depends(get_current_user)):
         {"$set": {"read": True}}
     )
     return {"ok": True}
-
-
-async def notify(user_id: str, title: str, message: str, type_: str = "info", link: str = None):
-    """Create in-app notification + send email + web push"""
-    await db.notifications.insert_one({
-        "user_id": user_id,
-        "title": title,
-        "message": message,
-        "type": type_,
-        "link": link,
-        "read": False,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-    # Best-effort email
-    user = await db.users.find_one({"_id": ObjectId(user_id)})
-    if user and user.get("email"):
-        html = f"<h2>{title}</h2><p>{message}</p>"
-        if link:
-            html += f'<p><a href="{link}">Vezi detalii</a></p>'
-        await send_email(user["email"], f"PropManage: {title}", html)
-    # Best-effort web push (fire-and-forget so it doesn't block)
-    asyncio.create_task(send_web_push(user_id, title, message, link))
-
-# ============= ACTIVITY EVENT LOGGING =============
-async def log_event(
-    request_id: Optional[str],
-    event_type: str,
-    actor: Optional[dict] = None,
-    payload: Optional[dict] = None,
-    property_id: Optional[str] = None,
-):
-    """Append an immutable event to activity_events. Best-effort, never raises."""
-    try:
-        doc = {
-            "request_id": request_id,
-            "property_id": property_id,
-            "event_type": event_type,
-            "actor_id": actor.get("id") if actor else None,
-            "actor_name": actor.get("name") if actor else "System",
-            "actor_role": (actor.get("active_view") or actor.get("role")) if actor else "system",
-            "payload": payload or {},
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        await db.activity_events.insert_one(doc)
-    except Exception as e:
-        logging.warning(f"log_event failed: {e}")
 
 
 # ============= 2FA (TOTP) =============
@@ -3054,412 +2698,8 @@ app.add_middleware(
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ============= SEED DEMO DATA =============
-async def seed():
-    """Seed demo accounts + properties + sample requests (idempotent)"""
-    await db.users.create_index("email", unique=True)
-    
-    demo_users = [
-        {"email": "client@propmanage.io", "password": "Client123!", "name": "Andrei Popescu", "role": "client", "phone": "+40 712 345 678"},
-        {"email": "specialist@propmanage.io", "password": "Spec123!", "name": "Mihai Ionescu", "role": "specialist", "specialty": "hvac", "phone": "+40 723 456 789"},
-        {"email": "specialist2@propmanage.io", "password": "Spec123!", "name": "Elena Dumitru", "role": "specialist", "specialty": "plumbing", "phone": "+40 734 567 890"},
-        {"email": "pending@propmanage.io", "password": "Spec123!", "name": "Vasile Constantinescu", "role": "specialist", "specialty": "electric", "phone": "+40 745 678 901", "_pending": True},
-        {"email": "admin@propmanage.io", "password": "Admin123!", "name": "Administrator", "role": "admin", "phone": ""},
-        {"email": "operator@propmanage.io", "password": "Op123!", "name": "Lucian Stan", "role": "operator", "phone": ""},
-    ]
-    
-    user_ids = {}
-    for u in demo_users:
-        existing = await db.users.find_one({"email": u["email"]})
-        if existing:
-            user_ids[u["email"]] = str(existing["_id"])
-            # Update password if changed
-            update_fields = {}
-            if not verify_password(u["password"], existing["password_hash"]):
-                update_fields["password_hash"] = hash_password(u["password"])
-            # Always sync new zone/availability/categories fields
-            if u["role"] == "specialist":
-                update_fields["coverage_zones"] = ["Bucuresti-Sector1", "Bucuresti-Sector2"]
-                update_fields["service_categories"] = [u.get("specialty"), "interior_design"] if u.get("specialty") else ["interior_design"]
-                update_fields["availability_status"] = existing.get("availability_status") or "available"
-                # Preserve pending status across restarts
-                if u.get("_pending") and existing.get("verified"):
-                    update_fields["verified"] = False
-                    update_fields["tier"] = None
-                    update_fields["rating"] = None
-                    update_fields["reviews_count"] = 0
-                    if not (existing.get("documents") or []):
-                        now_iso = datetime.now(timezone.utc).isoformat()
-                        update_fields["documents"] = [
-                            {"id": str(uuid.uuid4()), "type": "id_card", "name": "CI Vasile Constantinescu.pdf", "url": "data:application/pdf;base64,JVBERi0xLjQK", "status": "pending", "uploaded_at": now_iso},
-                            {"id": str(uuid.uuid4()), "type": "certification", "name": "Atestat ANRE electrician.jpg", "url": "https://via.placeholder.com/600x400.jpg?text=Atestat+ANRE", "status": "pending", "uploaded_at": now_iso},
-                            {"id": str(uuid.uuid4()), "type": "insurance", "name": "Asigurare RCA.pdf", "url": "data:application/pdf;base64,JVBERi0xLjQK", "status": "pending", "uploaded_at": now_iso},
-                        ]
-            elif u["role"] == "client":
-                update_fields["zone"] = existing.get("zone") or "Bucuresti-Sector1"
-                # Bump tokens to 3500 if currently below 3000 (for demo eligibility)
-                if (existing.get("tokens") or 0) < 3000:
-                    update_fields["tokens"] = 3500
-            if update_fields:
-                await db.users.update_one({"_id": existing["_id"]}, {"$set": update_fields})
-            continue
-        doc = {
-            "email": u["email"],
-            "password_hash": hash_password(u["password"]),
-            "name": u["name"],
-            "role": u["role"],
-            "phone": u.get("phone", ""),
-            "wallet_balance": 800.0 if u["role"] == "specialist" else (5000.0 if u["role"] == "client" else 0.0),
-            "tokens": 3500 if u["role"] == "client" else 0,  # client gets enough tokens for interior design demo
-            "rating": 4.9 if u["role"] == "specialist" and not u.get("_pending") else None,
-            "reviews_count": 24 if u["role"] == "specialist" and not u.get("_pending") else 0,
-            "verified": u["role"] == "specialist" and not u.get("_pending"),
-            "tier": "VERIFIED" if u["role"] == "specialist" and not u.get("_pending") else None,
-            "specialty": u.get("specialty"),
-            "zone": "Bucuresti-Sector1" if u["role"] == "client" else None,
-            "coverage_zones": ["Bucuresti-Sector1", "Bucuresti-Sector2"] if u["role"] == "specialist" else [],
-            "service_categories": [u.get("specialty"), "interior_design"] if u["role"] == "specialist" and u.get("specialty") else [],
-            "availability_status": "available" if u["role"] == "specialist" else None,
-            "documents": [
-                {"id": str(uuid.uuid4()), "type": "id_card", "name": "CI Vasile Constantinescu.pdf", "url": "data:application/pdf;base64,placeholder", "status": "pending", "uploaded_at": datetime.now(timezone.utc).isoformat()},
-                {"id": str(uuid.uuid4()), "type": "certification", "name": "Atestat ANRE electrician.pdf", "url": "data:application/pdf;base64,placeholder", "status": "pending", "uploaded_at": datetime.now(timezone.utc).isoformat()},
-            ] if u.get("_pending") else [],
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
-        res = await db.users.insert_one(doc)
-        user_ids[u["email"]] = str(res.inserted_id)
-    
-    # Seed property for client
-    client_id = user_ids.get("client@propmanage.io")
-    if client_id:
-        existing_prop = await db.properties.find_one({"owner_id": client_id})
-        if not existing_prop:
-            prop = {
-                "name": "Skyline Loft A4",
-                "address": "Str. Unirii 42, București",
-                "type": "apartment",
-                "surface": 92.0,
-                "rooms": 3,
-                "owner_id": client_id,
-                "health_score": 75,
-                "structure_health": 90,
-                "utilities_health": 82,
-                "documents_health": 100,
-                "twin_unlocked": True,
-                "wallet_unlocked": True,
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-            prop_res = await db.properties.insert_one(prop)
-            prop_id = str(prop_res.inserted_id)
-            
-            # Seed sample requests
-            spec_id = user_ids.get("specialist@propmanage.io")
-            sample_requests = [
-                {
-                    "client_id": client_id, "client_name": "Andrei Popescu",
-                    "property_id": prop_id, "property_name": "Skyline Loft A4",
-                    "category": "hvac", "title": "Reparație Centrală Termică",
-                    "description": "Centrala face zgomot ciudat și nu mai încălzește optim.",
-                    "priority": "urgent", "budget_estimate": 450.0,
-                    "status": "in_progress", "specialist_id": spec_id, "specialist_name": "Mihai Ionescu",
-                    "escrow_amount": 450.0, "escrow_status": "held",
-                    "created_at": (datetime.now(timezone.utc) - timedelta(hours=4)).isoformat(),
-                    "assigned_at": (datetime.now(timezone.utc) - timedelta(hours=3)).isoformat(),
-                    "started_at": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
-                },
-                {
-                    "client_id": client_id, "client_name": "Andrei Popescu",
-                    "property_id": prop_id, "property_name": "Skyline Loft A4",
-                    "category": "electric", "title": "Înlocuire prize bucătărie",
-                    "description": "Două prize din bucătărie nu mai funcționează.",
-                    "priority": "normal", "budget_estimate": 200.0,
-                    "status": "open", "specialist_id": None, "specialist_name": None,
-                    "created_at": (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(),
-                },
-                {
-                    "client_id": client_id, "client_name": "Andrei Popescu",
-                    "property_id": prop_id, "property_name": "Skyline Loft A4",
-                    "category": "plumbing", "title": "Scurgere baie",
-                    "description": "Scurgere detectată sub chiuvetă.",
-                    "priority": "urgent", "budget_estimate": 350.0,
-                    "status": "open",
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                },
-            ]
-            for r in sample_requests:
-                await db.requests.insert_one(r)
-    
-    # Seed a sample Digital Twin pending validation
-    if client_id:
-        prop_for_twin = await db.properties.find_one({"owner_id": client_id})
-        if prop_for_twin:
-            prop_id_str = str(prop_for_twin["_id"])
-            existing_twin = await db.twins.find_one({"property_id": prop_id_str})
-            if not existing_twin:
-                now_iso = datetime.now(timezone.utc).isoformat()
-                await db.twins.insert_one({
-                    "property_id": prop_id_str,
-                    "status": "pending_validation",
-                    "rooms": [
-                        {"id": str(uuid.uuid4()), "name": "Living", "type": "living", "area": 32, "x": 50, "y": 50, "w": 220, "h": 180},
-                        {"id": str(uuid.uuid4()), "name": "Dormitor", "type": "bedroom", "area": 16, "x": 280, "y": 50, "w": 160, "h": 130},
-                        {"id": str(uuid.uuid4()), "name": "Bucătărie", "type": "kitchen", "area": 12, "x": 50, "y": 240, "w": 140, "h": 120},
-                        {"id": str(uuid.uuid4()), "name": "Baie", "type": "bathroom", "area": 6, "x": 200, "y": 240, "w": 90, "h": 120},
-                        {"id": str(uuid.uuid4()), "name": "Hol", "type": "hallway", "area": 8, "x": 300, "y": 200, "w": 140, "h": 160},
-                    ],
-                    "assets": [
-                        {"id": str(uuid.uuid4()), "type": "boiler", "name": "Centrală termică", "x": 220, "y": 280, "condition": "good"},
-                        {"id": str(uuid.uuid4()), "name": "Panou electric", "type": "electric_panel", "x": 330, "y": 220, "condition": "good"},
-                        {"id": str(uuid.uuid4()), "name": "HVAC living", "type": "hvac", "x": 150, "y": 120, "condition": "fair"},
-                    ],
-                    "requested_at": now_iso,
-                    "created_at": now_iso,
-                })
-    
-    # Seed regions
-    
-    # Seed portfolio (idempotent)
-    if await db.portfolio.count_documents({}) == 0:
-        spec1 = await db.users.find_one({"email": "specialist@propmanage.io"})
-        spec2 = await db.users.find_one({"email": "specialist2@propmanage.io"})
-        if spec1 and spec2:
-            now_iso = datetime.now(timezone.utc).isoformat()
-            await db.portfolio.insert_many([
-                {"specialist_id": str(spec1["_id"]), "specialist_name": spec1.get("name"), "title": "Sistem HVAC Premium - Vila Pipera",
-                 "description": "Instalare sistem complet de climatizare cu 4 unități interioare, ventilație controlată și recuperator de căldură.",
-                 "category": "hvac", "style": None, "cover_image": "https://picsum.photos/seed/portfolio-hvac-pipera/800/600",
-                 "gallery": ["https://picsum.photos/seed/portfolio-hvac-pipera-1/800/600"], "location": "Pipera", "surface": 220.0, "created_at": now_iso},
-                {"specialist_id": str(spec1["_id"]), "specialist_name": spec1.get("name"), "title": "Renovare baie loft industrial",
-                 "description": "Refacere completă instalație sanitară + climatizare locală pentru o baie cu duș italian și caldă.",
-                 "category": "hvac", "style": "industrial", "cover_image": "https://picsum.photos/seed/portfolio-bath-industrial/800/600",
-                 "gallery": [], "location": "București Centru", "surface": 18.0, "created_at": now_iso},
-                {"specialist_id": str(spec2["_id"]), "specialist_name": spec2.get("name"), "title": "Bucătărie modernă deschisă",
-                 "description": "Refacere completă rețea sanitară + instalare insulă centrală cu chiuvetă și mașină de spălat vase.",
-                 "category": "plumbing", "style": "modern", "cover_image": "https://picsum.photos/seed/portfolio-kitchen-modern/800/600",
-                 "gallery": ["https://picsum.photos/seed/portfolio-kitchen-modern-1/800/600"], "location": "Cluj-Napoca", "surface": 32.0, "created_at": now_iso},
-            ])
-    sample_regions = [
-        {"country": "România", "city": "București", "zone": "Bucuresti-Sector1"},
-        {"country": "România", "city": "București", "zone": "Bucuresti-Sector2"},
-        {"country": "România", "city": "București", "zone": "Bucuresti-Sector3"},
-        {"country": "România", "city": "Cluj-Napoca", "zone": "Centru"},
-        {"country": "România", "city": "Timișoara", "zone": "Iosefin"},
-    ]
-    for r in sample_regions:
-        existing = await db.regions.find_one(r)
-        if not existing:
-            await db.regions.insert_one({**r, "created_at": datetime.now(timezone.utc).isoformat()})
-    
-    # Write test credentials
-    creds_path = Path("/app/memory/test_credentials.md")
-    creds_path.parent.mkdir(exist_ok=True)
-    creds_path.write_text("""# PropManage Test Credentials
 
-## Demo Accounts (Pre-seeded, idempotent)
-
-| Role | Email | Password |
-|------|-------|----------|
-| Client | client@propmanage.io | Client123! |
-| Specialist (HVAC, verified) | specialist@propmanage.io | Spec123! |
-| Specialist (Plumbing, verified) | specialist2@propmanage.io | Spec123! |
-| Admin | admin@propmanage.io | Admin123! |
-| Operator | operator@propmanage.io | Op123! |
-
-## Auth Endpoints
-- POST /api/auth/login - Body: {email, password}
-- POST /api/auth/register - Body: {email, password, name, role}
-- POST /api/auth/logout
-- GET /api/auth/me
-
-## Test Flow
-1. Login as client → see properties + requests
-2. Login as specialist → see open requests, accept lead (pays 45 RON)
-3. Login as admin → see stats, verify specialists
-4. Login as operator → validate maintenance logs
-
-Client starts with 5000 RON wallet + 250 tokens
-Specialists start with 800 RON wallet, 4.9 rating, 24 reviews, VERIFIED tier
-""")
-    logger.info("Seed complete. Demo accounts ready.")
-
-# ============= DAILY DIGEST EMAILS (19:00 Europe/Bucharest) =============
-
-DIGEST_FROM_NAME = "PropManage"
-BUCHAREST_TZ_NAME = "Europe/Bucharest"
-
-def _digest_card_html(title: str, items: list, empty_text: str) -> str:
-    """Render a section card. items = list of {label, sub?, link?}"""
-    if not items:
-        body = f'<p style="color:#888;font-size:13px;margin:8px 0 0 0">{empty_text}</p>'
-    else:
-        rows = []
-        for it in items:
-            sub = f'<div style="color:#888;font-size:12px;margin-top:2px">{it["sub"]}</div>' if it.get("sub") else ""
-            rows.append(
-                f'<div style="padding:10px 12px;background:#0f0f10;border-radius:10px;margin-bottom:6px">'
-                f'<div style="color:#e7e5e4;font-size:13px;font-weight:500">{it["label"]}</div>{sub}</div>'
-            )
-        body = "".join(rows)
-    return (
-        f'<div style="background:#161617;border-radius:14px;padding:16px;margin-bottom:14px">'
-        f'<div style="color:#d4ff3a;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">{title}</div>'
-        f'{body}</div>'
-    )
-
-async def _build_client_digest(user: dict) -> Optional[dict]:
-    uid = user["id"]
-    # Active requests (assigned/in_progress/completed)
-    active = await db.requests.find({"client_id": uid, "status": {"$in": ["assigned", "in_progress", "completed"]}}).sort("created_at", -1).to_list(20)
-    # Open requests waiting for offers
-    open_reqs = await db.requests.find({"client_id": uid, "status": "open"}).sort("created_at", -1).to_list(10)
-    # Notifications today
-    today_start = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
-    notifs_unread = await db.notifications.count_documents({"user_id": uid, "read": False})
-    notifs_today = await db.notifications.count_documents({"user_id": uid, "created_at": {"$gte": today_start}})
-
-    if not (active or open_reqs) and notifs_unread == 0:
-        return None  # Nothing relevant — skip email
-
-    active_items = [{
-        "label": r.get("title", "—"),
-        "sub": f"Status: {r.get('status','?')} · Specialist: {r.get('specialist_name') or '—'}"
-    } for r in active]
-    open_items = [{
-        "label": r.get("title", "—"),
-        "sub": f"Buget: {r.get('budget_estimate','—')} RON · Categoria: {r.get('category','—')}"
-    } for r in open_reqs]
-    cards = [
-        _digest_card_html(f"Lucrări active ({len(active_items)})", active_items, "Nicio lucrare activă."),
-        _digest_card_html(f"Cereri deschise în așteptare oferte ({len(open_items)})", open_items, "Nicio cerere deschisă."),
-    ]
-    summary = f"Ai {notifs_unread} notificări necitite · {notifs_today} mesaje primite astăzi."
-    return {"summary": summary, "cards": "".join(cards), "cta_label": "Vezi dashboard-ul", "cta_link": "/client"}
-
-async def _build_specialist_digest(user: dict) -> Optional[dict]:
-    uid = user["id"]
-    # Open leads matching specialty (last 24h)
-    today_start = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
-    spec_query = {"status": "open"}
-    if user.get("specialty"):
-        spec_query["$or"] = [{"category": user["specialty"]}, {"category": None}]
-    open_leads = await db.requests.find(spec_query).sort("created_at", -1).to_list(15)
-    # Brand-new leads in last 24h
-    new_24h = [r for r in open_leads if r.get("created_at", "") >= today_start]
-    # Active jobs
-    active = await db.requests.find({"specialist_id": uid, "status": {"$in": ["assigned", "in_progress", "completed"]}}).sort("assigned_at", -1).to_list(20)
-
-    if not (new_24h or active):
-        return None
-
-    new_items = [{
-        "label": r.get("title", "—"),
-        "sub": f"{r.get('property_name','—')} · Buget: {r.get('budget_estimate','—')} RON · {r.get('priority','normal')}"
-    } for r in new_24h[:10]]
-    active_items = [{
-        "label": r.get("title", "—"),
-        "sub": f"Status: {r.get('status','?')} · Client: {r.get('client_name','—')}"
-    } for r in active]
-    cards = [
-        _digest_card_html(f"Lead-uri noi (ultimele 24h) ({len(new_items)})", new_items, "Niciun lead nou."),
-        _digest_card_html(f"Lucrările mele active ({len(active_items)})", active_items, "Nicio lucrare activă."),
-    ]
-    summary = f"Sold lead-uri: {user.get('wallet_balance', 0):.0f} RON · Tier {user.get('tier','ENTRY')}"
-    return {"summary": summary, "cards": "".join(cards), "cta_label": "Vezi oportunitățile", "cta_link": "/specialist"}
-
-async def _build_admin_digest(user: dict) -> Optional[dict]:
-    open_disputes = await db.disputes.find({"status": "open"}).sort("created_at", -1).to_list(20)
-    open_nc = await db.nonconformities.find({"status": "open"}).sort("created_at", -1).to_list(20)
-    pending_specs = await db.users.count_documents({"role": "specialist", "verified": {"$ne": True}})
-    today_start = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
-    events_24h = await db.activity_events.count_documents({"created_at": {"$gte": today_start}})
-
-    if not (open_disputes or open_nc) and pending_specs == 0:
-        return None
-
-    disp_items = [{
-        "label": d.get("reason", "Dispută")[:80],
-        "sub": f"Cerere: {d.get('request_id','—')[-6:]} · {d.get('opened_by_role','?')}"
-    } for d in open_disputes]
-    nc_items = [{
-        "label": f"[{n.get('severity','?').upper()}] {n.get('reason','')[:80]}",
-        "sub": f"De la operator: {n.get('operator_name','—')} · {n.get('target_type','?')}"
-    } for n in open_nc]
-    cards = [
-        _digest_card_html(f"Dispute deschise ({len(disp_items)})", disp_items, "Nicio dispută deschisă."),
-        _digest_card_html(f"Sesizări operator nerezolvate ({len(nc_items)})", nc_items, "Nicio sesizare deschisă."),
-    ]
-    summary = f"Specialiști în așteptare verificare: {pending_specs} · Evenimente platformă astăzi: {events_24h}"
-    return {"summary": summary, "cards": "".join(cards), "cta_label": "Deschide Admin", "cta_link": "/admin"}
-
-async def _build_operator_digest(user: dict) -> Optional[dict]:
-    pending = await db.twins.find({"status": "pending_validation"}).sort("requested_at", -1).to_list(20)
-    revision = await db.twins.find({"status": "needs_revision"}).sort("requested_at", -1).to_list(10)
-    if not (pending or revision):
-        return None
-    pending_items = []
-    for t in pending:
-        prop = await db.properties.find_one({"_id": ObjectId(t["property_id"])}) if t.get("property_id") else None
-        pending_items.append({
-            "label": (prop or {}).get("name", "Proprietate"),
-            "sub": f"{(prop or {}).get('address','—')} · Camere: {len(t.get('rooms') or [])}"
-        })
-    cards = [
-        _digest_card_html(f"Twins în validare ({len(pending_items)})", pending_items, "Niciun twin în coadă."),
-        _digest_card_html(f"Twins necesită revizie ({len(revision)})", [], f"{len(revision)} twin-uri așteaptă client.") if revision else "",
-    ]
-    summary = f"Coadă lucru: {len(pending)} twin-uri noi · {len(revision)} în revizie"
-    return {"summary": summary, "cards": "".join(cards), "cta_label": "Deschide cozile", "cta_link": "/operator"}
-
-DIGEST_BUILDERS = {
-    "client": _build_client_digest,
-    "specialist": _build_specialist_digest,
-    "admin": _build_admin_digest,
-    "operator": _build_operator_digest,
-}
-
-async def send_digest_to_user(user: dict) -> bool:
-    """Build + send digest email to a single user. Returns True if email was sent."""
-    role = user.get("role")
-    builder = DIGEST_BUILDERS.get(role)
-    if not builder or not user.get("email") or user.get("deleted") or user.get("digest_disabled"):
-        return False
-    digest = await builder(user)
-    if not digest:
-        return False
-    today_str = datetime.now(timezone.utc).strftime("%d %B %Y")
-    html = (
-        f'<div style="font-family:Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;background:#0a0a0b;padding:24px;color:#e7e5e4">'
-        f'<div style="text-align:center;margin-bottom:24px">'
-        f'<div style="display:inline-block;background:#d4ff3a;color:#000;padding:6px 14px;border-radius:20px;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase">{DIGEST_FROM_NAME}</div>'
-        f'</div>'
-        f'<h1 style="font-family:Georgia,serif;color:#fff;font-size:24px;margin:0 0 4px 0">Rezumat zilnic</h1>'
-        f'<p style="color:#888;font-size:13px;margin:0 0 4px 0">{today_str}</p>'
-        f'<p style="color:#d4ff3a;font-size:13px;margin:8px 0 20px 0">{digest["summary"]}</p>'
-        f'{digest["cards"]}'
-        f'<div style="text-align:center;margin-top:24px">'
-        f'<a href="{os.environ.get("FRONTEND_URL", "https://propmanage.io")}{digest["cta_link"]}" style="display:inline-block;background:#d4ff3a;color:#000;text-decoration:none;padding:12px 24px;border-radius:24px;font-weight:bold;font-size:14px">{digest["cta_label"]}</a>'
-        f'</div>'
-        f'<p style="color:#666;font-size:11px;margin-top:32px;text-align:center">'
-        f'Vrei să oprești aceste rezumate? Setări → Notificări zilnice → OFF.'
-        f'</p></div>'
-    )
-    await send_email(user["email"], f"Rezumat zilnic PropManage · {today_str}", html)
-    # Best-effort web push for active users
-    asyncio.create_task(send_web_push(user["id"], "Rezumat zilnic", digest["summary"], digest["cta_link"]))
-    return True
-
-async def run_daily_digests() -> dict:
-    """Iterate over all eligible users and send digests. Returns counts per role."""
-    counts = {"client": 0, "specialist": 0, "admin": 0, "operator": 0, "skipped": 0}
-    async for user in db.users.find({"role": {"$in": list(DIGEST_BUILDERS.keys())}, "deleted": {"$ne": True}}):
-        u = serialize_doc(user)
-        sent = await send_digest_to_user(u)
-        if sent:
-            counts[u.get("role")] = counts.get(u.get("role"), 0) + 1
-        else:
-            counts["skipped"] += 1
-    logging.info(f"Daily digests sent: {counts}")
-    return counts
+# ============= SEED + DIGEST builders moved to seed.py / digest.py =============
 
 
 # ============= DIGEST PREFERENCE & ADMIN TRIGGER =============

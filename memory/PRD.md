@@ -185,6 +185,7 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Phase 16: 43/43 ✅ (Daily digest emails @ 19:00 Europe/Bucharest)
 - **TOTAL: 363/369 backend tests pass (98.4%)**
 - Phase 17 (Hotfix): Mobile bottom-nav visibility fix — Emergent preview badge relocated from bottom-right to top-right via CSS override on screens ≤1023px, freeing tabs 3-4 (Notificări/Setări) to be visible AND clickable (26 Feb 2026)
+- Phase 18 (Refactor — Phase A): server.py monolith reduced 3518 → 2758 lines (-22%). Extracted 7 modules: db.py (12 lines), core_utils.py (67), deps.py (44), services.py (139, email+push+notify+log), models.py (194, all Pydantic), seed.py (234), digest.py (189). Zero regressions on Phase 11+16 critical tests (38/38 pass). Server.py still hosts 96 endpoints — Phase B will split into per-role routers. (26 Feb 2026)
 
 
 ## API Endpoints (60+)
