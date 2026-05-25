@@ -667,7 +667,18 @@ async def list_properties(user: dict = Depends(get_current_user)):
     # Clients (and dual-role specialists in client view) see their own properties
     q = {"owner_id": user["id"]} if eff in ("client", "specialist") else {}
     docs = await db.properties.find(q).to_list(100)
-    return [serialize_doc(d) for d in docs]
+    # Enrich with twin status (one query for all)
+    prop_ids = [str(d["_id"]) for d in docs]
+    twin_map = {}
+    if prop_ids:
+        async for t in db.twins.find({"property_id": {"$in": prop_ids}}):
+            twin_map[t["property_id"]] = t.get("status")
+    out = []
+    for d in docs:
+        s = serialize_doc(d)
+        s["twin_status"] = twin_map.get(s["id"])  # None | 'pending_validation' | 'approved' | 'needs_revision'
+        out.append(s)
+    return out
 
 @api.get("/properties/{prop_id}")
 async def get_property(prop_id: str, user: dict = Depends(get_current_user)):

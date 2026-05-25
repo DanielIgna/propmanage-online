@@ -7,7 +7,7 @@ import {
   Wallet, Sparkles, Activity, Briefcase, Plus, MessageSquare,
   AlertTriangle, Star, CreditCard, Building, Camera, Shield, Calendar, Search, Palette, X,
   Bell, Settings as SettingsIcon, ClipboardList, Search as SearchIcon,
-  Home as HomeIcon, CheckCircle2,
+  Home as HomeIcon, CheckCircle2, Lock,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { useI18n } from "../i18n";
@@ -138,7 +138,7 @@ export const ClientDashboard = () => {
       {tab === "request" && (
         <RequestZone
           user={user} prop={prop} properties={properties} requests={requests}
-          setSelectedPropId={setSelectedPropId}
+          setSelectedPropId={setSelectedPropId} setProperties={setProperties}
           setShowNewReq={setShowNewReq} setShowPropManager={setShowPropManager}
           setTimelineFor={setTimelineFor} setShow2FA={setShow2FA}
           setShowDesign={setShowDesign} setTab={setTab}
@@ -178,9 +178,62 @@ export const ClientDashboard = () => {
   );
 };
 
-// ============= TAB 1: Request Zone (Property + Digital Twin + Quick Actions) =============
-const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setShowNewReq, setShowPropManager, setTimelineFor, setShow2FA, setShowDesign, setTab }) => {
+// ============= TAB 1: Request Zone (Onboarding cycle: Property → Twin → Design) =============
+const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setProperties, setShowNewReq, setShowPropManager, setTimelineFor, setShow2FA, setShowDesign, setTab }) => {
   const { t } = useI18n();
+  const { refreshUser } = useAuth();
+  const noProps = properties.length === 0;
+  const twinStatus = prop?.twin_status; // null/'pending_validation'/'approved'/'needs_revision'
+  const twinUnlocked = !!prop?.twin_unlocked;
+
+  const requestTwin = async () => {
+    try {
+      await axios.post(`${API}/properties/${prop.id}/twin/request`);
+      alert("Cerere trimisă către operator. Vei fi notificat când Digital Twin-ul tău este aprobat.");
+      // Reload properties so twin_status updates
+      const { data } = await axios.get(`${API}/properties`);
+      setProperties(data);
+    } catch (e) { alert(formatApiError(e)); }
+  };
+
+  // ===== Empty state — no properties yet =====
+  if (noProps) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <Stat icon={Activity} label="Sănătate" value="—" sub="Niciun imobil" tid="stat-health" />
+          <Stat icon={Wallet} label={t("client.wallet")} value={`${user?.wallet_balance?.toFixed(0) || 0} RON`} sub="Sold" color="emerald" tid="stat-wallet" />
+          <Stat icon={Sparkles} label={t("client.tokens")} value={user?.tokens || 0} sub="Earned" color="amber" tid="stat-tokens" />
+          <Stat icon={Briefcase} label={t("client.requests")} value={requests.length} sub="Total" color="cyan" tid="stat-requests" />
+        </div>
+
+        <div className="glass-strong rounded-3xl p-8 sm:p-12 text-center relative overflow-hidden" data-testid="onboarding-empty">
+          <div className="absolute -top-32 -right-32 w-80 h-80 rounded-full bg-[#d4ff3a] blur-[120px] opacity-20" />
+          <div className="absolute -bottom-32 -left-32 w-80 h-80 rounded-full bg-emerald-500 blur-[120px] opacity-10" />
+          <div className="relative">
+            <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-[#d4ff3a] to-emerald-400 flex items-center justify-center mb-6">
+              <HomeIcon className="w-10 h-10 text-black" strokeWidth={1.6} />
+            </div>
+            <h2 className="font-serif text-3xl sm:text-4xl mb-3">Începe cu prima ta proprietate</h2>
+            <p className="text-sm text-stone-400 max-w-md mx-auto mb-8 leading-relaxed">
+              Adaugă-ți imobilul pentru a debloca: <span className="text-[#d4ff3a]">Digital Twin</span> (validat de operator), specialiști verificați, plăți escrow și serviciul premium de Design Interior.
+            </p>
+            <button
+              onClick={() => setShowPropManager(true)}
+              className="btn-accent px-8 py-4 rounded-full text-base font-medium inline-flex items-center gap-2"
+              data-testid="onboarding-add-prop"
+            >
+              <Plus className="w-5 h-5" />Adaugă proprietate
+            </button>
+          </div>
+        </div>
+
+        {/* Cycle preview */}
+        <CyclePreview activeStep={1} />
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -190,8 +243,11 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setS
         <Stat icon={Briefcase} label={t("client.requests")} value={requests.length} sub="Total" color="cyan" tid="stat-requests" />
       </div>
 
-      {/* Quick action CTA - Solicită serviciu (HomeRun pattern) */}
-      <div className="glass-strong rounded-3xl p-6 sm:p-8 mb-6 relative overflow-hidden">
+      {/* Step-by-step cycle visualization */}
+      <CyclePreview activeStep={twinUnlocked ? 3 : (twinStatus === "pending_validation" ? 2.5 : 2)} />
+
+      {/* Quick action CTA */}
+      <div className="glass-strong rounded-3xl p-6 sm:p-8 mb-6 mt-6 relative overflow-hidden">
         <div className="absolute -top-20 -right-20 w-60 h-60 rounded-full bg-[#d4ff3a] blur-[100px] opacity-15" />
         <div className="relative flex items-center justify-between flex-wrap gap-4">
           <div>
@@ -223,8 +279,8 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setS
                 {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             )}
-            <button onClick={() => setShowPropManager(true)} className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-white/5 hover:bg-white/10 flex items-center gap-1" data-testid="manage-props">
-              <Building className="w-3 h-3" />Gestionează ({properties.length})
+            <button onClick={() => setShowPropManager(true)} className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-[#d4ff3a]/15 hover:bg-[#d4ff3a]/25 text-[#d4ff3a] border border-[#d4ff3a]/30 flex items-center gap-1" data-testid="manage-props">
+              <Plus className="w-3 h-3" />Adaugă/Gestionează ({properties.length})
             </button>
             {prop && (
               <button onClick={() => setTimelineFor(prop.id)} className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-white/5 hover:bg-white/10 flex items-center gap-1" data-testid="timeline-btn">
@@ -234,9 +290,51 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setS
             <button onClick={() => setShow2FA(true)} className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-white/5 hover:bg-white/10 flex items-center gap-1" data-testid="2fa-btn">
               <Shield className="w-3 h-3" />2FA
             </button>
-            <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">LIVE 3D</span>
+            {twinUnlocked ? (
+              <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">LIVE 3D · ACTIVAT</span>
+            ) : twinStatus === "pending_validation" ? (
+              <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">⏳ ÎN VALIDARE</span>
+            ) : twinStatus === "needs_revision" ? (
+              <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/20">⚠ NECESITĂ REVIZIE</span>
+            ) : (
+              <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-stone-500/15 text-stone-400 border border-stone-500/20">INACTIV</span>
+            )}
           </div>
         </div>
+
+        {/* Twin call-to-action */}
+        {!twinUnlocked && (
+          <div className="mb-6 bg-gradient-to-br from-amber-500/10 to-orange-500/5 border border-amber-500/30 rounded-2xl p-5 flex items-start gap-4" data-testid="twin-cta">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5 text-amber-400" />
+            </div>
+            <div className="flex-1">
+              {twinStatus === "pending_validation" ? (
+                <>
+                  <div className="font-medium text-amber-300">Twin în validare la operator</div>
+                  <p className="text-xs text-stone-400 mt-1 leading-relaxed">Operatorul nostru verifică datele proprietății și construiește modelul 3D. Primești notificare imediat ce e gata (de obicei {"<24h"}).</p>
+                </>
+              ) : twinStatus === "needs_revision" ? (
+                <>
+                  <div className="font-medium text-red-300">Twin necesită revizie</div>
+                  <p className="text-xs text-stone-400 mt-1 mb-3 leading-relaxed">Operatorul are nevoie de informații suplimentare. Verifică notificările pentru detalii.</p>
+                  <button onClick={requestTwin} className="px-4 py-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 rounded-full text-xs font-medium" data-testid="resubmit-twin">
+                    Retrimite spre validare
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="font-medium text-amber-300">Activează Digital Twin gratuit</div>
+                  <p className="text-xs text-stone-400 mt-1 mb-3 leading-relaxed">Cerere către operator pentru a construi modelul 3D al proprietății tale (camere, sisteme, asset-uri). Necesar pentru serviciul de Design Interior.</p>
+                  <button onClick={requestTwin} className="btn-accent px-4 py-2 rounded-full text-xs font-medium flex items-center gap-1.5" data-testid="request-twin-btn">
+                    <Sparkles className="w-3 h-3" />Solicită activare
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="aspect-[16/8] rounded-2xl bg-gradient-to-br from-slate-900 via-cyan-950 to-slate-900 border border-white/10 flex items-center justify-center mb-6 relative overflow-hidden">
           <svg viewBox="0 0 400 200" className="w-full h-full p-6">
             <g fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1">
@@ -253,6 +351,14 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setS
               </g>
             ))}
           </svg>
+          {!twinUnlocked && (
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center">
+              <div className="text-center">
+                <Lock className="w-8 h-8 text-stone-400 mx-auto mb-2" />
+                <div className="text-sm text-stone-300">Twin neactivat</div>
+              </div>
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-3 gap-3 mb-6">
           {[
@@ -276,6 +382,42 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setS
         <InteriorDesignCard user={user} onOpen={() => setShowDesign(true)} />
       </div>
     </>
+  );
+};
+
+// ============= CYCLE PREVIEW (visible onboarding map) =============
+const CyclePreview = ({ activeStep }) => {
+  const steps = [
+    { n: 1, t: "Proprietate", d: "Adaugă imobilul", icon: HomeIcon },
+    { n: 2, t: "Digital Twin", d: "Validat de operator", icon: Building },
+    { n: 3, t: "Servicii", d: "Specialiști + Design", icon: Palette },
+    { n: 4, t: "Escrow & Tokens", d: "Plată sigură + recompense", icon: Sparkles },
+  ];
+  return (
+    <div className="glass rounded-2xl p-4 mb-2" data-testid="cycle-preview">
+      <div className="text-[10px] uppercase tracking-[0.2em] text-stone-500 mb-3">Ciclul tău complet</div>
+      <div className="grid grid-cols-4 gap-2 sm:gap-4">
+        {steps.map((s) => {
+          const done = activeStep > s.n;
+          const current = Math.floor(activeStep) === s.n;
+          const pending = activeStep > s.n - 1 && activeStep < s.n;
+          return (
+            <div key={s.n} className={`relative text-center ${done ? "" : current ? "" : "opacity-40"}`}>
+              <div className={`w-10 h-10 mx-auto rounded-2xl flex items-center justify-center mb-2 ${
+                done ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-300"
+                : current ? "bg-[#d4ff3a]/20 border border-[#d4ff3a]/40 text-[#d4ff3a]"
+                : pending ? "bg-amber-500/20 border border-amber-500/40 text-amber-300 animate-pulse"
+                : "bg-white/5 border border-white/10 text-stone-500"
+              }`}>
+                {done ? <CheckCircle2 className="w-5 h-5" /> : <s.icon className="w-4 h-4" />}
+              </div>
+              <div className="text-[10px] sm:text-xs font-medium">{s.t}</div>
+              <div className="text-[9px] text-stone-500 mt-0.5 hidden sm:block">{s.d}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 };
 
