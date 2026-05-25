@@ -1,0 +1,39 @@
+{
+  "summary": "Phase 16 — Daily Digest @ 19:00 Europe/Bucharest. Backend: 13/13 new Phase16 tests pass (preview for all 4 roles + admin trigger w/ counts + opt-out flow reflected via /auth/me + non-admin forbidden on trigger + unauth on preview/preference + scheduler endpoint routing + Phase14/15 regression). Phase14 + Phase15 regression: 30/30 pass. Backend logs confirm 'Daily digest scheduler started (19:00 Europe/Bucharest)'. Admin trigger logged 'Daily digests sent: {client:12, specialist:8, admin:1, operator:1, skipped:23}'. Frontend: client login → Setări → row-digest shows 'Rezumat zilnic: ACTIV (19:00)' initially with preview row visible; clicking row-digest-preview opens digest-preview-modal with non-empty content; toggling off changes label to 'Activează rezumat zilnic' AND removes the preview row; toggling back on restores both. Phase 15 regression: 12 last-action-banner elements rendered on JobsZone.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase16.py",
+    "/app/test_reports/pytest/phase16_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "/app/backend/server.py is now 3518 lines (Phase 16 added ~230). Module split (routers/*, services/digest.py, services/email.py) is overdue and was flagged in iteration_12 and iteration_13. Each new phase compounds maintenance risk.",
+    "run_daily_digests() awaits send_email sequentially per user inside an async-for loop. For 45 users today it's fine, but at scale this will block the scheduler tick. Consider asyncio.gather with bounded concurrency (asyncio.Semaphore) or batching.",
+    "_build_operator_digest builds a cards list where one entry can be the empty string '' when revision is falsy (line 3408). It still renders fine because '' joins cleanly, but the conditional is inverted vs. the other builders that always emit a card. Cosmetic — consider always emitting a section card for consistency or filter out empties before join.",
+    "_build_admin_digest skips when (open_disputes or open_nc) is empty AND pending_specs==0 — but events_24h could be non-zero (platform very active, no disputes). Right now those users get no digest. Possibly intentional, but worth confirming with product.",
+    "Footer text in HTML email says 'Setări → Notificări zilnice → OFF' but the actual menu label is 'Rezumat zilnic'. Minor inconsistency between marketing copy and UI label.",
+    "send_digest_to_user spawns asyncio.create_task(send_web_push(...)) without awaiting — fire-and-forget. If RESEND or webpush raise, the exception is silently swallowed. Logging on the task callback is recommended.",
+    "scheduler.add_job uses misfire_grace_time=3600 — fine, but no max_instances=1 is set; if a previous run lags >24h it could overlap. Add max_instances=1 for safety."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase16.py"
+  ],
+  "success_rate": {
+    "backend": "100% (13/13 Phase16 + 30/30 Phase14+Phase15 regression)",
+    "frontend": "100% on Phase 16 critical flows (toggle bidirectional, preview row gating, modal render, regression)"
+  },
+  "test_credentials": "client@propmanage.io / Client123! ; specialist@propmanage.io / Spec123! ; admin@propmanage.io / Admin123! ; operator@propmanage.io / Op123! — all pre-seeded.",
+  "seed_data_creation": "None. Existing seed + Phase 14 TEST_* data provided enough digest content.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Phase 16 endpoints: POST /api/auth/digest/preview, POST /api/auth/digest-preference {enabled:bool}, POST /api/admin/digest/trigger (admin-only, returns {ok, counts:{client,specialist,admin,operator,skipped}}). digest_disabled persists on user doc and is reflected on GET /api/auth/me. UI: data-testid row-digest (always visible), row-digest-preview (only visible when enabled), digest-preview-modal. Scheduler uses APScheduler AsyncIOScheduler with CronTrigger(hour=19, minute=0, tz=Europe/Bucharest, misfire_grace_time=3600, id='daily_digest'). DST handled by pytz. Emails MOCKED: send_email falls back to console when RESEND_API_KEY missing — backend logs show 'Daily digests sent: {...}' but no real delivery.",
+  "rca of the issue": "No production issues found. One test assertion in initial draft expected /api/requests/{id}/timeline to return a bare list; actual contract is {events, request} dict — adjusted the test, not the API. All Phase 16 functional requirements verified end-to-end."
+}

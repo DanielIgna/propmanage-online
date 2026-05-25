@@ -8,6 +8,7 @@ import {
   User as UserIcon, Settings as SettingsIcon, RefreshCw, Share2, Heart,
   LifeBuoy, MessageCircle, Lock, ChevronRight, X, Mail, Phone, MapPin,
   Download, Trash2, AlertTriangle, CheckCircle2, Shield, BellRing, BellOff,
+  Sun, Eye,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { API } from "./DashShared";
@@ -16,13 +17,18 @@ import { pushSupported, getPushStatus, subscribeToPush, unsubscribeFromPush, ens
 // ============= MAIN PANEL =============
 export const SettingsPanel = () => {
   const { user, refreshUser, logout } = useAuth();
-  const [modal, setModal] = useState(null); // "profile" | "password" | "privacy" | "referral" | "support" | "contact"
+  const [modal, setModal] = useState(null);
   const [pushStatus, setPushStatus] = useState("unsupported");
+  const [digestEnabled, setDigestEnabled] = useState(true);
 
   useEffect(() => {
     if (!pushSupported()) return;
     ensureServiceWorker().then(() => getPushStatus().then(setPushStatus));
   }, []);
+
+  useEffect(() => {
+    if (user) setDigestEnabled(!user.digest_disabled);
+  }, [user]);
 
   if (!user) return null;
 
@@ -56,6 +62,26 @@ export const SettingsPanel = () => {
       }
     } catch (e) {
       alert(e.message || formatApiError(e));
+    }
+  };
+
+  const toggleDigest = async () => {
+    const next = !digestEnabled;
+    try {
+      await axios.post(`${API}/auth/digest-preference`, { enabled: next });
+      setDigestEnabled(next);
+      await refreshUser();
+    } catch (e) {
+      alert(formatApiError(e));
+    }
+  };
+
+  const previewDigest = async () => {
+    try {
+      const { data } = await axios.post(`${API}/auth/digest/preview`);
+      setModal({ kind: "digest-preview", data });
+    } catch (e) {
+      alert(formatApiError(e));
     }
   };
 
@@ -156,6 +182,26 @@ export const SettingsPanel = () => {
           />
         )}
         <Row
+          icon={Sun}
+          title={digestEnabled ? "Rezumat zilnic: ACTIV (19:00)" : "Activează rezumat zilnic"}
+          subtitle={
+            digestEnabled
+              ? "Primești zilnic la 19:00 (ora României) un email cu activitatea relevantă pentru tine. Apasă pentru a dezactiva."
+              : "Email zilnic la 19:00 cu activitatea importantă: lucrări, lead-uri, dispute. Te ține la curent fără să intri pe app."
+          }
+          onClick={toggleDigest}
+          tid="row-digest"
+        />
+        {digestEnabled && (
+          <Row
+            icon={Eye}
+            title="Previzualizează rezumatul de azi"
+            subtitle="Vezi cum arată email-ul care va fi trimis astăzi, fără a-l trimite."
+            onClick={previewDigest}
+            tid="row-digest-preview"
+          />
+        )}
+        <Row
           icon={Heart}
           title="Evaluează aplicația"
           subtitle="Spune-ne ce îți place și ce am putea îmbunătăți."
@@ -213,6 +259,9 @@ export const SettingsPanel = () => {
         </div>
       </SimpleInfoModal>}
       {modal === "contact" && <ContactModal onClose={() => setModal(null)} />}
+      {modal && typeof modal === "object" && modal.kind === "digest-preview" && (
+        <DigestPreviewModal data={modal.data} onClose={() => setModal(null)} />
+      )}
     </div>
   );
 };
@@ -645,6 +694,29 @@ const Field = ({ label, icon: Icon, children }) => (
     {children}
   </div>
 );
+
+const DigestPreviewModal = ({ data, onClose }) => {
+  if (!data) return null;
+  return (
+    <ModalShell title="Rezumatul tău de astăzi" onClose={onClose} tid="digest-preview-modal">
+      {data.empty ? (
+        <div className="text-center py-8">
+          <Sun className="w-10 h-10 text-stone-700 mx-auto mb-2" />
+          <p className="text-sm text-stone-400">{data.summary}</p>
+          <p className="text-xs text-stone-600 mt-2">Email-ul nu va fi trimis dacă nu există activitate relevantă.</p>
+        </div>
+      ) : (
+        <>
+          <div className="text-xs text-[#d4ff3a] mb-3">{data.summary}</div>
+          <div dangerouslySetInnerHTML={{ __html: data.cards }} className="text-stone-300 text-sm" />
+          <p className="text-[10px] text-stone-600 mt-4 text-center">
+            Acesta este conținutul email-ului trimis astăzi la 19:00.
+          </p>
+        </>
+      )}
+    </ModalShell>
+  );
+};
 
 const SimpleInfoModal = ({ title, onClose, children }) => (
   <ModalShell title={title} onClose={onClose} tid={`info-${title.replace(/\s+/g, "-").toLowerCase()}`}>
