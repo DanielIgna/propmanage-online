@@ -148,6 +148,7 @@ class RegisterIn(BaseModel):
     service_categories: Optional[List[str]] = None  # multi-select
     coverage_zones: Optional[List[str]] = None
     zone: Optional[str] = None  # for role=client
+    referrer_id: Optional[str] = None  # ?ref={userId} on /register URL
 
 class LoginIn(BaseModel):
     email: EmailStr
@@ -332,6 +333,15 @@ async def register(data: RegisterIn, response: Response):
         user["documents"] = []
     elif data.role == "client":
         user["zone"] = data.zone
+    # Referral tracking — link to sponsor (only valid clients can be referred for bonus)
+    if data.referrer_id:
+        try:
+            sponsor = await db.users.find_one({"_id": ObjectId(data.referrer_id)})
+            if sponsor and not sponsor.get("deleted"):
+                user["referrer_id"] = data.referrer_id
+                user["referral_bonus_paid"] = False
+        except Exception:
+            pass  # invalid referrer id silently ignored
     result = await db.users.insert_one(user)
     uid = str(result.inserted_id)
     access = create_access_token(uid, email, data.role)
@@ -507,6 +517,129 @@ async def account_delete(data: AccountDeleteIn, response: Response, user: dict =
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/")
     return {"ok": True, "message": "Cont șters. Datele asociate au fost anonimizate conform GDPR."}
+
+
+# ============= REFERRAL INFO =============
+@api.get("/auth/referral")
+async def referral_info(user: dict = Depends(get_current_user)):
+    """Returns referral stats: how many users this person referred + how many converted (paid bonus)."""
+    uid = user["id"]
+    referred = await db.users.count_documents({"referrer_id": uid})
+    converted = await db.users.count_documents({"referrer_id": uid, "referral_bonus_paid": True})
+    return {
+        "user_id": uid,
+        "referred_total": referred,
+        "converted_total": converted,
+        "tokens_per_conversion": 500,
+        "referral_url": f"/register?ref={uid}",
+    }
+
+
+# ============= CONTACT / SUPPORT FORM =============
+class ContactIn(BaseModel):
+    subject: str = Field(min_length=2, max_length=200)
+    message: str = Field(min_length=5, max_length=5000)
+
+@api.post("/support/contact")
+async def support_contact(data: ContactIn, user: dict = Depends(get_current_user)):
+    """User contact form → emails the support team + confirmation back to user."""
+    admin_email = os.environ.get("SUPPORT_EMAIL", "admin@propmanage.io")
+    safe_subject = data.subject.strip()
+    safe_message = data.message.strip().replace("\n", "<br/>")
+    body_admin = (
+        f"<h2>Mesaj nou contact</h2>"
+        f"<p><b>De la:</b> {user.get('name','—')} ({user.get('email','—')})</p>"
+        f"<p><b>Rol:</b> {user.get('role','—')}</p>"
+        f"<p><b>Subiect:</b> {safe_subject}</p>"
+        f"<hr/><div>{safe_message}</div>"
+    )
+    body_user = (
+        f"<h2>Mesajul tău a fost primit</h2>"
+        f"<p>Salut {user.get('name','')},</p>"
+        f"<p>Confirmăm primirea mesajului tău cu subiectul: <b>{safe_subject}</b>.</p>"
+        f"<p>Echipa PropManage îți va răspunde în maximum 24h pe adresa <b>{user.get('email','')}</b>.</p>"
+    )
+    asyncio.create_task(send_email(admin_email, f"[PropManage Contact] {safe_subject}", body_admin))
+    if user.get("email"):
+        asyncio.create_task(send_email(user["email"], "Am primit mesajul tău - PropManage", body_user))
+    return {"ok": True}
+
+
+# ============= WEB PUSH (VAPID) =============
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY")
+VAPID_PRIVATE_KEY_PEM = os.environ.get("VAPID_PRIVATE_KEY_PEM")
+VAPID_CLAIM_EMAIL = os.environ.get("VAPID_CLAIM_EMAIL", "mailto:admin@propmanage.io")
+
+class PushSubscriptionKeys(BaseModel):
+    p256dh: str
+    auth: str
+
+class PushSubscriptionIn(BaseModel):
+    endpoint: str
+    keys: PushSubscriptionKeys
+    expirationTime: Optional[int] = None
+
+@api.get("/push/vapid-public-key")
+async def push_vapid_public():
+    if not VAPID_PUBLIC_KEY:
+        raise HTTPException(503, "Push notifications nu sunt configurate pe server.")
+    return {"public_key": VAPID_PUBLIC_KEY}
+
+@api.post("/push/subscribe")
+async def push_subscribe(data: PushSubscriptionIn, user: dict = Depends(get_current_user)):
+    # Upsert by endpoint
+    await db.push_subscriptions.update_one(
+        {"endpoint": data.endpoint},
+        {"$set": {
+            "user_id": user["id"],
+            "endpoint": data.endpoint,
+            "keys": {"p256dh": data.keys.p256dh, "auth": data.keys.auth},
+            "expiration_time": data.expirationTime,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        },
+         "$setOnInsert": {"created_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True
+    )
+    return {"ok": True}
+
+@api.post("/push/unsubscribe")
+async def push_unsubscribe(data: PushSubscriptionIn, user: dict = Depends(get_current_user)):
+    await db.push_subscriptions.delete_one({"endpoint": data.endpoint, "user_id": user["id"]})
+    return {"ok": True}
+
+async def send_web_push(user_id: str, title: str, message: str, link: Optional[str] = None):
+    """Fire-and-forget web push for all this user's subscribed devices."""
+    if not VAPID_PUBLIC_KEY or not VAPID_PRIVATE_KEY_PEM:
+        return
+    try:
+        from pywebpush import webpush, WebPushException
+    except Exception:
+        return
+    subs = await db.push_subscriptions.find({"user_id": user_id}).to_list(20)
+    if not subs:
+        return
+    payload = json.dumps({"title": title, "message": message, "link": link or "/"})
+    private_key = VAPID_PRIVATE_KEY_PEM.replace("\\n", "\n")
+    stale_endpoints = []
+    for sub in subs:
+        try:
+            webpush(
+                subscription_info={"endpoint": sub["endpoint"], "keys": sub["keys"]},
+                data=payload,
+                vapid_private_key=private_key,
+                vapid_claims={"sub": VAPID_CLAIM_EMAIL},
+                ttl=86400,
+            )
+        except WebPushException as e:
+            code = getattr(e.response, "status_code", None)
+            if code in (404, 410):  # Gone / Not Found -> remove stale subscription
+                stale_endpoints.append(sub["endpoint"])
+            else:
+                logging.warning(f"WebPush failed for user {user_id}: {e}")
+        except Exception as e:
+            logging.warning(f"WebPush error: {e}")
+    if stale_endpoints:
+        await db.push_subscriptions.delete_many({"endpoint": {"$in": stale_endpoints}})
 
 
 # ============= PROPERTIES (Client) =============
@@ -758,7 +891,50 @@ async def confirm_complete(req_id: str, user: dict = Depends(require_role("clien
         {"_id": ObjectId(user["id"])},
         {"$inc": {"tokens": 100}}
     )
-    
+
+    # Referral bonus — first confirmed request triggers reward for sponsor
+    client_doc = await db.users.find_one({"_id": ObjectId(user["id"])})
+    if client_doc and client_doc.get("referrer_id") and not client_doc.get("referral_bonus_paid"):
+        try:
+            sponsor_oid = ObjectId(client_doc["referrer_id"])
+            sponsor = await db.users.find_one({"_id": sponsor_oid})
+            if sponsor and not sponsor.get("deleted"):
+                # +500 tokens to sponsor
+                await db.users.update_one(
+                    {"_id": sponsor_oid},
+                    {"$inc": {"tokens": 500}}
+                )
+                # Activate Digital Twin on sponsor's first property (bonus perk)
+                sponsor_prop = await db.properties.find_one({"owner_id": str(sponsor_oid), "twin_unlocked": {"$ne": True}})
+                if sponsor_prop:
+                    await db.properties.update_one(
+                        {"_id": sponsor_prop["_id"]},
+                        {"$set": {"twin_unlocked": True, "twin_unlocked_via": "referral"}}
+                    )
+                # Mark bonus as paid (single-use)
+                await db.users.update_one(
+                    {"_id": ObjectId(user["id"])},
+                    {"$set": {"referral_bonus_paid": True, "referral_bonus_paid_at": datetime.now(timezone.utc).isoformat()}}
+                )
+                await db.transactions.insert_one({
+                    "user_id": str(sponsor_oid),
+                    "type": "referral_bonus",
+                    "amount": 500,
+                    "currency": "tokens",
+                    "referred_user_id": user["id"],
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                })
+                await notify(
+                    str(sponsor_oid),
+                    "Bonus referral activat! 🎉",
+                    f"Prietenul tău {client_doc.get('name','')} și-a finalizat prima cerere. Ai primit +500 tokeni"
+                    + (" și Digital Twin activat pe prima ta proprietate." if sponsor_prop else "."),
+                    type_="referral",
+                    link="/client" if sponsor.get("role") == "client" else f"/{sponsor.get('role','client')}"
+                )
+        except Exception as e:
+            logging.warning(f"Referral bonus failed: {e}")
+
     # Update property health (+5%)
     await db.properties.update_one(
         {"_id": ObjectId(req["property_id"])},
@@ -2207,7 +2383,7 @@ async def mark_read(notif_id: str, user: dict = Depends(get_current_user)):
 
 
 async def notify(user_id: str, title: str, message: str, type_: str = "info", link: str = None):
-    """Create in-app notification + send email if user has email"""
+    """Create in-app notification + send email + web push"""
     await db.notifications.insert_one({
         "user_id": user_id,
         "title": title,
@@ -2224,6 +2400,8 @@ async def notify(user_id: str, title: str, message: str, type_: str = "info", li
         if link:
             html += f'<p><a href="{link}">Vezi detalii</a></p>'
         await send_email(user["email"], f"PropManage: {title}", html)
+    # Best-effort web push (fire-and-forget so it doesn't block)
+    asyncio.create_task(send_web_push(user_id, title, message, link))
 
 
 # ============= 2FA (TOTP) =============

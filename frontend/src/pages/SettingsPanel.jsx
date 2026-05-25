@@ -1,21 +1,28 @@
 // PropManage - Settings panel (shown under "Setări" tab for all roles)
 // Includes: Profile edit, Change password, Dual-role switcher, Referrals, Support,
 // Contact, Data & Privacy (GDPR).
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import axios from "axios";
 import {
   User as UserIcon, Settings as SettingsIcon, RefreshCw, Share2, Heart,
   LifeBuoy, MessageCircle, Lock, ChevronRight, X, Mail, Phone, MapPin,
-  Download, Trash2, AlertTriangle, CheckCircle2, Shield,
+  Download, Trash2, AlertTriangle, CheckCircle2, Shield, BellRing, BellOff,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { API } from "./DashShared";
+import { pushSupported, getPushStatus, subscribeToPush, unsubscribeFromPush, ensureServiceWorker } from "../push";
 
 // ============= MAIN PANEL =============
 export const SettingsPanel = () => {
   const { user, refreshUser, logout } = useAuth();
   const [modal, setModal] = useState(null); // "profile" | "password" | "privacy" | "referral" | "support" | "contact"
+  const [pushStatus, setPushStatus] = useState("unsupported");
+
+  useEffect(() => {
+    if (!pushSupported()) return;
+    ensureServiceWorker().then(() => getPushStatus().then(setPushStatus));
+  }, []);
 
   if (!user) return null;
 
@@ -35,6 +42,22 @@ export const SettingsPanel = () => {
 
   const showDualRole = user.role === "specialist" && user.dual_role_enabled;
   const inClientView = user.active_view === "client";
+
+  const togglePush = async () => {
+    try {
+      if (pushStatus === "subscribed") {
+        const s = await unsubscribeFromPush();
+        setPushStatus(s);
+        alert("Notificările push au fost dezactivate.");
+      } else {
+        const s = await subscribeToPush();
+        setPushStatus(s);
+        alert("Notificările push au fost activate. Vei primi alerte pentru oportunități noi.");
+      }
+    } catch (e) {
+      alert(e.message || formatApiError(e));
+    }
+  };
 
   const Row = ({ icon: Icon, title, subtitle, onClick, danger, tid }) => (
     <button
@@ -113,10 +136,25 @@ export const SettingsPanel = () => {
         <Row
           icon={Share2}
           title="Recomandă prietenilor tăi"
-          subtitle="Trimite invitația și câștigă tokeni pentru fiecare prieten care se înregistrează."
+          subtitle="Trimite invitația și câștigă tokeni + Digital Twin pentru fiecare prieten care finalizează prima cerere."
           onClick={() => setModal("referral")}
           tid="row-referral"
         />
+        {pushStatus !== "unsupported" && (
+          <Row
+            icon={pushStatus === "subscribed" ? BellRing : BellOff}
+            title={pushStatus === "subscribed" ? "Notificări push: ACTIVE" : "Activează notificări push"}
+            subtitle={
+              pushStatus === "denied"
+                ? "Browser-ul a blocat permisiunea. Activează manual din setări site."
+                : pushStatus === "subscribed"
+                ? "Primești alerte pe browser pentru oportunități și actualizări. Apasă pentru a dezactiva."
+                : "Primește alerte pe browser/telefon pentru lead-uri noi și notificări importante."
+            }
+            onClick={pushStatus === "denied" ? () => alert("Permisiunea pentru notificări este blocată. Resetează din browser settings.") : togglePush}
+            tid="row-push"
+          />
+        )}
         <Row
           icon={Heart}
           title="Evaluează aplicația"
@@ -160,21 +198,7 @@ export const SettingsPanel = () => {
       {modal === "profile" && <ProfileModal onClose={() => setModal(null)} />}
       {modal === "password" && <PasswordModal onClose={() => setModal(null)} />}
       {modal === "privacy" && <PrivacyModal onClose={() => setModal(null)} />}
-      {modal === "referral" && <SimpleInfoModal title="Recomandă PropManage" onClose={() => setModal(null)}>
-        <p className="text-sm text-stone-300 leading-relaxed">
-          Trimite linkul de mai jos prietenilor. Pentru fiecare cont creat, primești <span className="text-[#d4ff3a] font-medium">+500 tokeni</span>.
-        </p>
-        <div className="mt-4 bg-white/5 rounded-xl p-3 text-xs text-stone-300 break-all border border-white/10" data-testid="referral-link">
-          {window.location.origin}/register?ref={user.id}
-        </div>
-        <button
-          onClick={() => navigator.clipboard.writeText(`${window.location.origin}/register?ref=${user.id}`)}
-          className="mt-3 w-full btn-accent py-2.5 rounded-xl text-sm font-medium"
-          data-testid="copy-referral-btn"
-        >
-          Copiază linkul
-        </button>
-      </SimpleInfoModal>}
+      {modal === "referral" && <ReferralModal onClose={() => setModal(null)} />}
       {modal === "review-app" && <SimpleInfoModal title="Evaluează PropManage" onClose={() => setModal(null)}>
         <p className="text-sm text-stone-300 leading-relaxed">
           Apreciem feedback-ul tău. Sistemul de evaluare publică va fi disponibil când aplicația este publicată în App Store / Google Play.
@@ -482,16 +506,77 @@ const PrivacyModal = ({ onClose }) => {
   );
 };
 
+// ============= REFERRAL MODAL (real stats + copy link) =============
+const ReferralModal = ({ onClose }) => {
+  const [stats, setStats] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    axios.get(`${API}/auth/referral`).then(r => setStats(r.data)).catch(() => setStats({ referred_total: 0, converted_total: 0 }));
+  }, []);
+
+  const link = stats ? `${window.location.origin}${stats.referral_url}` : "";
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch (_e) { /* clipboard may be blocked */ }
+  };
+
+  return (
+    <ModalShell title="Recomandă PropManage" onClose={onClose} tid="referral-modal">
+      <p className="text-sm text-stone-300 leading-relaxed mb-4">
+        Pentru fiecare prieten invitat care își <span className="text-[#d4ff3a] font-medium">finalizează prima cerere</span>,
+        primești <span className="text-[#d4ff3a] font-medium">+500 tokeni</span> și
+        Digital Twin <span className="text-[#d4ff3a] font-medium">activat gratuit</span> pe prima ta proprietate.
+      </p>
+
+      {stats && (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="bg-white/5 rounded-2xl p-4">
+            <div className="text-[10px] uppercase tracking-wider text-stone-500">Invitați</div>
+            <div className="font-serif text-3xl mt-1" data-testid="ref-stat-referred">{stats.referred_total}</div>
+          </div>
+          <div className="bg-[#d4ff3a]/5 border border-[#d4ff3a]/20 rounded-2xl p-4">
+            <div className="text-[10px] uppercase tracking-wider text-[#d4ff3a]">Convertiți</div>
+            <div className="font-serif text-3xl mt-1 text-[#d4ff3a]" data-testid="ref-stat-converted">{stats.converted_total}</div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white/5 rounded-xl p-3 text-xs text-stone-300 break-all border border-white/10" data-testid="referral-link">
+        {link || "—"}
+      </div>
+      <button
+        onClick={copy}
+        className="mt-3 w-full btn-accent py-2.5 rounded-xl text-sm font-medium"
+        data-testid="copy-referral-btn"
+      >
+        {copied ? "✓ Copiat" : "Copiază linkul"}
+      </button>
+    </ModalShell>
+  );
+};
+
 // ============= CONTACT MODAL =============
 const ContactModal = ({ onClose }) => {
   const [form, setForm] = useState({ subject: "", message: "" });
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    // Mock: real send would call backend → Resend
-    setSent(true);
-    setTimeout(onClose, 1800);
+    setLoading(true);
+    try {
+      await axios.post(`${API}/support/contact`, form);
+      setSent(true);
+      setTimeout(onClose, 1800);
+    } catch (err) {
+      alert(formatApiError(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -523,7 +608,7 @@ const ContactModal = ({ onClose }) => {
               data-testid="contact-message"
             />
           </Field>
-          <button type="submit" className="w-full btn-accent py-3 rounded-xl text-sm font-medium" data-testid="contact-send">Trimite mesaj</button>
+          <button type="submit" disabled={loading} className="w-full btn-accent py-3 rounded-xl text-sm font-medium" data-testid="contact-send">{loading ? "Se trimite..." : "Trimite mesaj"}</button>
         </form>
       )}
     </ModalShell>

@@ -187,12 +187,14 @@ export const RegisterPage = () => {
   const { user, register } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
+  const referrerId = new URLSearchParams(window.location.search).get("ref");
   const [form, setForm] = useState({
     email: "", password: "", name: "", role: "client", phone: "",
     specialty: "hvac",
     service_categories: ["hvac"],
     coverage_zones: ["Bucuresti-Sector1"],
     zone: "Bucuresti-Sector1",
+    referrer_id: referrerId || undefined,
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -253,6 +255,15 @@ export const RegisterPage = () => {
       <Backdrop /><TopBar />
       <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
         <div className="glass-strong rounded-3xl p-8 sm:p-10">
+          {referrerId && (
+            <div className="mb-6 bg-[#d4ff3a]/10 border border-[#d4ff3a]/30 rounded-2xl p-4 flex items-start gap-3" data-testid="referral-banner">
+              <Sparkles className="w-5 h-5 text-[#d4ff3a] shrink-0 mt-0.5" />
+              <div className="text-xs">
+                <div className="font-medium text-[#d4ff3a]">Te-ai înregistrat prin invitație 🎉</div>
+                <div className="text-stone-400 mt-0.5">Prietenul tău va primi +500 tokeni și Digital Twin activat când finalizezi prima cerere.</div>
+              </div>
+            </div>
+          )}
           <h1 className="font-serif text-4xl mb-2" data-testid="register-title">{t("register.title")}</h1>
           <p className="text-sm text-stone-400 mb-6">{t("register.subtitle")}</p>
           

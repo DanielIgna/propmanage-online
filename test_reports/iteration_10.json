@@ -1,0 +1,63 @@
+{
+  "summary": "Phase 12 — Referral tracking, Web Push (VAPID + sub/unsub), and Contact form backend — fully tested end-to-end. 14/14 backend pytest tests pass; 7/7 frontend Playwright scenarios pass. Phase 11 regression suite re-run: 25/25 still green. Zero regressions detected.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase12.py",
+    "/app/test_reports/pytest/phase12_results.xml"
+  ],
+  "tests_executed": {
+    "backend": {
+      "TestVapidPublicKey.test_public_key_no_auth": "PASS",
+      "TestPushSubscribe.test_subscribe_requires_auth": "PASS",
+      "TestPushSubscribe.test_subscribe_and_idempotent": "PASS (upsert verified — same endpoint stays 1 doc)",
+      "TestReferralStats.test_referral_endpoint_shape": "PASS (referral_url ends with /register?ref=<id>, tokens_per_conversion=500)",
+      "TestRegisterWithReferrer.test_invalid_referrer_id_silently_ignored": "PASS (register OK, doc has no referrer_id)",
+      "TestRegisterWithReferrer.test_valid_referrer_id_stored": "PASS (referrer_id stored, referral_bonus_paid=false)",
+      "TestReferralEndToEnd.test_first_confirm_pays_sponsor_500_tokens": "PASS (sponsor +500 tokens, referral_bonus transaction with currency=tokens, referred user flagged paid, sponsor property twin_unlocked=true via='referral')",
+      "TestReferralEndToEnd.test_second_confirm_does_not_pay_again": "PASS (single-use enforced)",
+      "TestContactForm.test_requires_auth": "PASS",
+      "TestContactForm.test_validates_min_length": "PASS (422 for subject<2 and message<5)",
+      "TestContactForm.test_success": "PASS",
+      "TestRegressionSmoke.test_demo_logins_work": "PASS (all 4 demo accounts)",
+      "TestRegressionSmoke.test_properties_list_for_client": "PASS",
+      "TestRegressionSmoke.test_requests_list": "PASS",
+      "Phase11_regression": "PASS (25/25 in /app/backend/tests/test_phase11.py)"
+    },
+    "frontend": {
+      "STEP1_referral_banner_on_register": "PASS (data-testid='referral-banner' visible with RO copy)",
+      "STEP2_settings_referral_modal": "PASS (referred=3, converted=0, referral-link contains ref=, copy-referral-btn present)",
+      "STEP3_row_push_visible": "PASS (data-testid='row-push' visible; copy reflects 'denied' state under headless Chromium, no JS error on render/click)",
+      "STEP4_contact_form_submit": "PASS (subject+message → POST /api/support/contact → contact-sent state with CheckCircle2)",
+      "STEP5_profile_modal_regression": "PASS (Phase 11 profile modal opens normally)",
+      "STEP6_admin_dashboard_regression": "PASS (4 bottom-nav admin-tab-* testids)",
+      "STEP7_specialist_dashboard_regression": "PASS (4 bottom-nav spec-tab-* testids)"
+    }
+  },
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now 3051 lines — consider splitting into routers (auth, requests, push, support, referral) for maintainability. Not blocking.",
+    "Push delivery itself is not exercised in tests (no real push service in env). The fire-and-forget pattern via asyncio.create_task in notify()→send_web_push was verified to not crash the request flow; full E2E push delivery would need a staging push service.",
+    "Referral payout uses currency='tokens' in the transactions collection — confirmed consistent with the assertion contract requested by the spec."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase12.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14 phase12 + 25/25 phase11 regression)",
+    "frontend": "100% (7/7 scenarios)"
+  },
+  "test_credentials": "Used /app/memory/test_credentials.md — client@propmanage.io/Client123!, specialist@propmanage.io/Spec123!, admin@propmanage.io/Admin123! (all valid).",
+  "seed_data_creation": "Test created transient users prefixed test_phase12_*@test.io, TEST_Phase12_Prop properties, TEST_Phase12_request requests, and TEST_SponsorProp (only if needed). All cleaned up in fixture teardown / inline delete_many.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 12 surface: GET /api/push/vapid-public-key (public), POST /api/push/{subscribe,unsubscribe} (auth), GET /api/auth/referral, POST /api/support/contact, ?ref= on /register. Frontend testids: referral-banner, referral-modal, referral-modal-close, ref-stat-referred, ref-stat-converted, referral-link, copy-referral-btn, row-push, row-referral, row-contact, contact-subject, contact-message, contact-send, contact-sent. Headless Chromium reports pushSupported()=true but permission is denied — row-push appears with denied copy; no real push delivery happens in CI. Referral payout is keyed by referred user's referral_bonus_paid=true flag, so it is genuinely single-use even across multiple requests.",
+  "rca of the issue": "No issues found."
+}
