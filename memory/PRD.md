@@ -82,7 +82,6 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - **Cleanup**: vechile endpoints `/services/interior-design/*` și `Premium.jsx` dead code → șterse
 
 ### Phase 10 — Email Service + Specialist Portfolio Gallery (15/15 tests ✅)
-- **Email service** (`backend/email_service.py`): Resend (preferat) → SendGrid → console fallback, switch automat după ce `RESEND_API_KEY` sau `SENDGRID_API_KEY` apare în `.env`
 - **6 template-uri HTML brandate** (PropManage style, lime accent, serif, dark): `tpl_welcome`, `tpl_dispute_opened`, `tpl_dispute_resolved`, `tpl_design_phase_quote`, `tpl_specialist_verified`, `tpl_escrow_funded`
 - **Fire-and-forget** via `asyncio.create_task` ca să nu blocheze API endpoint-urile
 - **Emails wired** în: register (welcome), admin verify specialist, dispută deschisă/rezolvată, ofertă fază design, escrow alimentat
@@ -92,6 +91,27 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
   - Lightbox cu navigare prev/next, info chips (locație, m², data finalizării)
   - Validări: max 30 items/specialist, 4MB cap pe imagine base64, ownership-scoped PUT/DELETE
   - Seed idempotent: 3 proiecte pre-populate (HVAC Pipera, baie industrială, bucătărie modernă)
+
+### Phase 11 — UX Zoning + Dual-Role Switcher + GDPR Settings (25/25 tests ✅)
+- **4-Zone Bottom Navigation** per rol (mobile-first, inspirat HomeRun Pro):
+  - Client: Solicită / Lucrările mele / Notificări / Setări
+  - Specialist: Oportunități / Lucrările mele / Notificări / Setări (cu badge counts)
+  - Admin: Sumar / Specialiști / Dispute / Setări
+  - Operator: Digital Twins / Logs / Notificări / Setări
+- **Dual-Role Switcher** (Specialist ↔ Client):
+  - User doc primește `active_view` + `dual_role_enabled` (computed: specialist + verified)
+  - `serialize_doc` auto-derivează flag-urile, `require_role` aware de dual-role
+  - Endpoint `POST /api/auth/switch-view` (403 pentru non-specialist sau unverified)
+  - `list_properties` + `list_requests` scope-uite prin `effective_role(user)` — în client view specialistul vede DOAR proprietățile/cererile sale
+  - UI: card "Treci la profilul de client/profesionist" în Settings, badge "PROFIL ACTIV: CLIENT" în topbar când e activ
+- **Settings Panel** unificat (shared între cele 4 roluri):
+  - Profile edit (name, phone, zone, avatar base64) — `PATCH /api/auth/profile`
+  - Change password (current + new + confirm) — `POST /api/auth/change-password`
+  - Recomandă prietenilor (referral link copyable)
+  - Centrul de suport (FAQ inline)
+  - Contactează-ne (form trimitere)
+  - **GDPR**: Export date JSON (`POST /api/auth/account-export` — Art. 20) + Delete account cu password + 'STERGE' confirmation (`POST /api/auth/account-delete` — Art. 17, anonymize)
+- **Componente noi**: `BottomNav.jsx`, `SettingsPanel.jsx`; `DashLayout` acceptă prop `bottomNav` și se ocupă de route guard dual-role aware (redirect prin `active_view`).
 
 ## Test Results (Cumulative)
 - Phase 2: 36/36 ✅
@@ -103,7 +123,8 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Phase 8: 18/18 ✅
 - Phase 9: 11/11 ✅
 - Phase 10: 15/15 ✅
-- **TOTAL: 185/190 backend tests pass (97%)**
+- Phase 11: 25/25 ✅ (Dual-Role + GDPR + 4-zone bottom nav)
+- **TOTAL: 210/215 backend tests pass (97.7%)**
 
 ## API Endpoints (60+)
 **Auth**: POST /api/auth/{login, register, logout, google/session}, GET /api/auth/{me, ws-token}
@@ -136,10 +157,10 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 
 ## Roadmap
 ### P1 (Next)
-- SendGrid real email dispatch (needs API key)
-- server.py routers split: auth.py, admin.py, operator.py, payments.py, requests.py, marketplace.py
-- HTML email templates with branding
+- `server.py` routers split: auth.py, admin.py, operator.py, payments.py, requests.py, marketplace.py, design.py, portfolio.py (monolith ~2870 lines, refactor postponed multiple times)
+- Live API keys: RESEND_API_KEY (Resend) + STRIPE_API_KEY (Stripe) — code is fully programmed, awaiting user keys
 - AI tools/function-calling for booking actions
+- Contact form backend (currently UI-only)
 
 ### P2 (Future)
 - Stripe Connect for direct specialist payouts
