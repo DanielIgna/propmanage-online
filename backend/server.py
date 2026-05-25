@@ -265,12 +265,15 @@ async def register(data: RegisterIn, response: Response):
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     if data.role == "specialist":
-        # Validate categories
+        # Validate categories - require at least one
         cats = data.service_categories or ([data.specialty] if data.specialty else [])
+        cats = [c for c in cats if c]  # drop empty/None
+        if not cats:
+            raise HTTPException(400, "Selectează cel puțin o categorie de specialitate")
         invalid = [c for c in cats if c not in ALLOWED_SPECIALTIES]
         if invalid:
             raise HTTPException(400, f"Categorii invalide: {', '.join(invalid)}")
-        user["specialty"] = data.specialty
+        user["specialty"] = data.specialty or cats[0]
         user["service_categories"] = cats
         user["coverage_zones"] = data.coverage_zones or []
         user["availability_status"] = "available"
@@ -287,19 +290,23 @@ async def register(data: RegisterIn, response: Response):
     user.pop("password_hash", None)
     return user
 
-# Simple in-memory rate limiter for /auth/login (per IP)
+# Simple in-memory rate limiter for /auth/login (per IP) - tracks FAILED attempts only
 _login_attempts: Dict[str, List[datetime]] = {}
 LOGIN_MAX_ATTEMPTS = 8
 LOGIN_WINDOW_SECONDS = 60
 
 def _check_login_rate_limit(ip: str):
+    """Raise 429 if too many recent FAILED attempts. Does not auto-increment."""
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(seconds=LOGIN_WINDOW_SECONDS)
     attempts = [t for t in _login_attempts.get(ip, []) if t > cutoff]
+    _login_attempts[ip] = attempts  # pruned
     if len(attempts) >= LOGIN_MAX_ATTEMPTS:
         raise HTTPException(429, "Prea multe încercări. Reîncearcă în 60 secunde.")
-    attempts.append(now)
-    _login_attempts[ip] = attempts
+
+def _record_failed_login(ip: str):
+    now = datetime.now(timezone.utc)
+    _login_attempts.setdefault(ip, []).append(now)
 
 @api.post("/auth/login")
 async def login(data: LoginIn, request: Request, response: Response):
@@ -308,6 +315,7 @@ async def login(data: LoginIn, request: Request, response: Response):
     email = data.email.lower()
     user = await db.users.find_one({"email": email})
     if not user or not verify_password(data.password, user["password_hash"]):
+        _record_failed_login(ip)
         raise HTTPException(401, "Invalid credentials")
     
     # 2FA gate
@@ -316,8 +324,11 @@ async def login(data: LoginIn, request: Request, response: Response):
             raise HTTPException(202, {"error": "totp_required", "message": "2FA code required"})
         totp = pyotp.TOTP(user["totp_secret"])
         if not totp.verify(data.totp_code, valid_window=1):
+            _record_failed_login(ip)
             raise HTTPException(401, "Invalid 2FA code")
     
+    # Success - clear attempts for this IP
+    _login_attempts.pop(ip, None)
     uid = str(user["_id"])
     access = create_access_token(uid, email, user.get("role", "client"))
     refresh = create_refresh_token(uid)
