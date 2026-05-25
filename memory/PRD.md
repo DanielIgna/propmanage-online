@@ -81,6 +81,18 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - **Frontend**: `InteriorDesign.jsx` cu `InteriorDesignCard` (gated CTA pe dashboard client), `InteriorDesignModal` (ordering), `DesignPhasesPanel` (vizualizare faze), `ProposePhaseModal` (specialist)
 - **Cleanup**: vechile endpoints `/services/interior-design/*` și `Premium.jsx` dead code → șterse
 
+### Phase 10 — Email Service + Specialist Portfolio Gallery (15/15 tests ✅)
+- **Email service** (`backend/email_service.py`): Resend (preferat) → SendGrid → console fallback, switch automat după ce `RESEND_API_KEY` sau `SENDGRID_API_KEY` apare în `.env`
+- **6 template-uri HTML brandate** (PropManage style, lime accent, serif, dark): `tpl_welcome`, `tpl_dispute_opened`, `tpl_dispute_resolved`, `tpl_design_phase_quote`, `tpl_specialist_verified`, `tpl_escrow_funded`
+- **Fire-and-forget** via `asyncio.create_task` ca să nu blocheze API endpoint-urile
+- **Emails wired** în: register (welcome), admin verify specialist, dispută deschisă/rezolvată, ofertă fază design, escrow alimentat
+- **Specialist Portfolio Gallery**: specialiști încarcă proiecte (titlu, descriere, stil, categorie, locație, suprafață, cover_image + gallery până la 12 poze)
+  - Public: `/specialists/{id}/portfolio` (no auth) afișat pe profilul public deasupra recenziilor
+  - Privat: `/specialist/portfolio` CRUD complet — Add/Edit/Delete via PortfolioManagerModal cu PortfolioEditor (upload base64 + URL)
+  - Lightbox cu navigare prev/next, info chips (locație, m², data finalizării)
+  - Validări: max 30 items/specialist, 4MB cap pe imagine base64, ownership-scoped PUT/DELETE
+  - Seed idempotent: 3 proiecte pre-populate (HVAC Pipera, baie industrială, bucătărie modernă)
+
 ## Test Results (Cumulative)
 - Phase 2: 36/36 ✅
 - Phase 3: 20/23 ✅
@@ -90,7 +102,8 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Phase 7: 22/22 ✅
 - Phase 8: 18/18 ✅
 - Phase 9: 11/11 ✅
-- **TOTAL: 170/175 backend tests pass (97%)**
+- Phase 10: 15/15 ✅
+- **TOTAL: 185/190 backend tests pass (97%)**
 
 ## API Endpoints (60+)
 **Auth**: POST /api/auth/{login, register, logout, google/session}, GET /api/auth/{me, ws-token}
