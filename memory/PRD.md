@@ -92,6 +92,23 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
   - Validări: max 30 items/specialist, 4MB cap pe imagine base64, ownership-scoped PUT/DELETE
   - Seed idempotent: 3 proiecte pre-populate (HVAC Pipera, baie industrială, bucătărie modernă)
 
+### Phase 13 — Onboarding Cycle + Digital Twin Pipeline (23/23 tests ✅)
+- **Empty-state CTA** "Începe cu prima ta proprietate" cu buton mare lime "Adaugă proprietate" — vizibil când clientul nu are imobile
+- **Cycle Preview** (4 pași): Proprietate → Digital Twin → Servicii → Escrow & Tokens, cu indicator vizual de progres (done/current/pending/disabled)
+- **Twin CTA inline** pe property card: "Activează Digital Twin gratuit" → "Solicită activare" buton; tranziție automată la "Twin în validare la operator" după click; "Retrimite spre validare" dacă status=needs_revision
+- **Status pills** pentru twin: INACTIV / ⏳ ÎN VALIDARE / ⚠ NECESITĂ REVIZIE / LIVE 3D · ACTIVAT
+- **Twin visualization** locked cu overlay "Twin neactivat" până la aprobare
+- **Backend**: `GET /api/properties` enrich cu `twin_status` (join cu db.twins) — o singură query batched
+- **E2E pipeline**: client → adaugă prop → cere twin → operator vede în Pending Tab → aprobă → notificare → client vede LIVE 3D + InteriorDesignCard devine activ
+
+### Phase 12 — Referral Tracking + Web Push + Contact Form (14/14 tests ✅)
+- **Referral tracking**: `?ref={userId}` în /register → `referrer_id` salvat pe user; la prima cerere confirmată → sponsor primește +500 tokeni + Digital Twin activat pe prima sa proprietate + tranzacție inregistrată; bonus single-use (`referral_bonus_paid`)
+- **Endpoint nou**: `GET /api/auth/referral` (stats real: invitați + convertiți)
+- **Web Push (VAPID)**: chei generate la setup, salvate în `.env`; endpoint-uri `GET /push/vapid-public-key`, `POST /push/subscribe`, `POST /push/unsubscribe`; service worker `/sw.js`; helper `/src/push.js`; integrare automată în `notify()` (fire-and-forget pe orice notificare nouă) + cleanup automatic 404/410 endpoints
+- **Contact form backend**: `POST /api/support/contact` trimite email la admin + confirmare la user via Resend (cu fallback console)
+- **UI**: Banner verde "Te-ai înregistrat prin invitație" pe register cu `?ref`; ReferralModal cu stats live; toggle Notificări push în Settings; ContactModal hits real endpoint
+- **Dependențe noi**: pywebpush, py-vapid, http-ece
+
 ### Phase 11 — UX Zoning + Dual-Role Switcher + GDPR Settings (25/25 tests ✅)
 - **4-Zone Bottom Navigation** per rol (mobile-first, inspirat HomeRun Pro):
   - Client: Solicită / Lucrările mele / Notificări / Setări
@@ -124,7 +141,9 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Phase 9: 11/11 ✅
 - Phase 10: 15/15 ✅
 - Phase 11: 25/25 ✅ (Dual-Role + GDPR + 4-zone bottom nav)
-- **TOTAL: 210/215 backend tests pass (97.7%)**
+- Phase 12: 14/14 ✅ (Referral + Web Push + Contact backend)
+- Phase 13: 23/23 ✅ (Onboarding cycle + Twin pipeline)
+- **TOTAL: 247/253 backend tests pass (97.6%)**
 
 ## API Endpoints (60+)
 **Auth**: POST /api/auth/{login, register, logout, google/session}, GET /api/auth/{me, ws-token}
