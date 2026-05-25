@@ -92,6 +92,21 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
   - Validări: max 30 items/specialist, 4MB cap pe imagine base64, ownership-scoped PUT/DELETE
   - Seed idempotent: 3 proiecte pre-populate (HVAC Pipera, baie industrială, bucătărie modernă)
 
+### Phase 16 — Daily Digest Emails @ 19:00 Europe/Bucharest (43/43 tests ✅)
+- **APScheduler** cu `CronTrigger(hour=19, minute=0, tz=Europe/Bucharest)` (gestionează automat EET/EEST)
+- **4 digest builders** personalizate per rol:
+  - **Client**: lucrări active + cereri deschise + count notificări necitite/24h
+  - **Specialist**: lead-uri noi 24h matching specialty + lucrări active + wallet/tier
+  - **Admin**: dispute deschise + sesizări operator + specialiști pending + evenimente platformă 24h
+  - **Operator**: twins pending_validation + needs_revision
+- **Skip inteligent**: dacă nu există conținut relevant, NU se trimite email (counts.skipped++)
+- **Opt-out per user** (`digest_disabled` flag) — toggle în Settings → "Rezumat zilnic: ACTIV/OFF"
+- **Preview endpoint**: `POST /api/auth/digest/preview` — user vede ce ar primi astăzi
+- **Admin manual trigger**: `POST /api/admin/digest/trigger` (testing/forced send)
+- **HTML branded email**: dark theme cu accent #d4ff3a, card-uri secționate, CTA button, footer cu instrucțiuni unsubscribe
+- **Integrare Web Push**: digest trimite + push notification (fire-and-forget)
+- **Dependențe noi**: apscheduler, pytz, tzlocal
+
 ### Phase 15 — LastActionBanner pe request cards (30/30 tests ✅)
 - **Status Banner** pe fiecare card cerere (Client + Specialist) — afișează ultima acțiune cu: dot colorat per rol, actor_name, label român, extras inline (programare/sumă), time-ago ("acum 11m")
 - **Backend**: `GET /api/requests` enrich cu `last_event` (aggregation Mongo batched per request_id) — performanță O(1) query extra per listă
@@ -167,7 +182,8 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Phase 13: 23/23 ✅ (Onboarding cycle + Twin pipeline)
 - Phase 14: 43/43 ✅ (Activity Timeline + Cross-role visibility + Nonconformity)
 - Phase 15: 30/30 ✅ (LastActionBanner pe request cards)
-- **TOTAL: 320/326 backend tests pass (98%)**
+- Phase 16: 43/43 ✅ (Daily digest emails @ 19:00 Europe/Bucharest)
+- **TOTAL: 363/369 backend tests pass (98.4%)**
 
 ## API Endpoints (60+)
 **Auth**: POST /api/auth/{login, register, logout, google/session}, GET /api/auth/{me, ws-token}
