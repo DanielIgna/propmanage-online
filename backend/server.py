@@ -18,6 +18,7 @@ import qrcode
 import io
 import base64 as b64
 from emergentintegrations.llm.chat import LlmChat, UserMessage
+from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Literal, Dict
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, status, WebSocket, WebSocketDisconnect
@@ -108,12 +109,18 @@ def set_auth_cookies(response: Response, access: str, refresh: str):
 # ============= MODELS =============
 Role = Literal["client", "specialist", "admin", "operator"]
 
+ALLOWED_SPECIALTIES = {"hvac", "electric", "plumbing", "interior_design", "carpentry", "painting", "cleaning", "appliance_repair", "gardening", "other"}
+
 class RegisterIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6)
     name: str
     role: Role = "client"
     phone: Optional[str] = None
+    specialty: Optional[str] = None  # for role=specialist
+    service_categories: Optional[List[str]] = None  # multi-select
+    coverage_zones: Optional[List[str]] = None
+    zone: Optional[str] = None  # for role=client
 
 class LoginIn(BaseModel):
     email: EmailStr
@@ -257,6 +264,19 @@ async def register(data: RegisterIn, response: Response):
         "tier": "ENTRY" if data.role == "specialist" else None,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
+    if data.role == "specialist":
+        # Validate categories
+        cats = data.service_categories or ([data.specialty] if data.specialty else [])
+        invalid = [c for c in cats if c not in ALLOWED_SPECIALTIES]
+        if invalid:
+            raise HTTPException(400, f"Categorii invalide: {', '.join(invalid)}")
+        user["specialty"] = data.specialty
+        user["service_categories"] = cats
+        user["coverage_zones"] = data.coverage_zones or []
+        user["availability_status"] = "available"
+        user["documents"] = []
+    elif data.role == "client":
+        user["zone"] = data.zone
     result = await db.users.insert_one(user)
     uid = str(result.inserted_id)
     access = create_access_token(uid, email, data.role)
@@ -267,8 +287,24 @@ async def register(data: RegisterIn, response: Response):
     user.pop("password_hash", None)
     return user
 
+# Simple in-memory rate limiter for /auth/login (per IP)
+_login_attempts: Dict[str, List[datetime]] = {}
+LOGIN_MAX_ATTEMPTS = 8
+LOGIN_WINDOW_SECONDS = 60
+
+def _check_login_rate_limit(ip: str):
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(seconds=LOGIN_WINDOW_SECONDS)
+    attempts = [t for t in _login_attempts.get(ip, []) if t > cutoff]
+    if len(attempts) >= LOGIN_MAX_ATTEMPTS:
+        raise HTTPException(429, "Prea multe încercări. Reîncearcă în 60 secunde.")
+    attempts.append(now)
+    _login_attempts[ip] = attempts
+
 @api.post("/auth/login")
-async def login(data: LoginIn, response: Response):
+async def login(data: LoginIn, request: Request, response: Response):
+    ip = request.client.host if request.client else "unknown"
+    _check_login_rate_limit(ip)
     email = data.email.lower()
     user = await db.users.find_one({"email": email})
     if not user or not verify_password(data.password, user["password_hash"]):
@@ -645,6 +681,108 @@ async def admin_stats(user: dict = Depends(require_role("admin"))):
         "completed_jobs": completed_jobs
     }
 
+@api.get("/admin/analytics")
+async def admin_analytics(days: int = 14, user: dict = Depends(require_role("admin"))):
+    """Live analytics: time-series of jobs/disputes/users + breakdowns by category/status"""
+    if days < 1 or days > 90:
+        days = 14
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(days=days)
+    start_iso = start.isoformat()
+
+    # Time-series via single aggregation pipeline per collection (batch-optimized)
+    async def daily_buckets(collection, date_field):
+        pipeline = [
+            {"$match": {date_field: {"$gte": start_iso}}},
+            {"$project": {"day": {"$substr": [f"${date_field}", 0, 10]}}},
+            {"$group": {"_id": "$day", "count": {"$sum": 1}}},
+        ]
+        docs = await collection.aggregate(pipeline).to_list(200)
+        return {d["_id"]: d["count"] for d in docs}
+
+    jobs_created_map, jobs_confirmed_map, users_map, disputes_map = await asyncio.gather(
+        daily_buckets(db.requests, "created_at"),
+        daily_buckets(db.requests, "confirmed_at"),
+        daily_buckets(db.users, "created_at"),
+        daily_buckets(db.disputes, "created_at"),
+    )
+
+    series = []
+    for i in range(days):
+        day = (start + timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
+        key = day.strftime("%Y-%m-%d")
+        series.append({
+            "date": day.strftime("%d %b"),
+            "jobs_created": jobs_created_map.get(key, 0),
+            "jobs_confirmed": jobs_confirmed_map.get(key, 0),
+            "users": users_map.get(key, 0),
+            "disputes": disputes_map.get(key, 0),
+        })
+
+    # Category + status breakdowns (parallel)
+    cat_pipeline = [
+        {"$match": {"created_at": {"$gte": start_iso}}},
+        {"$group": {"_id": "$category", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+    status_pipeline = [{"$group": {"_id": "$status", "count": {"$sum": 1}}}]
+
+    cat_docs, status_docs, confirmed_requests, leads_count, disputes_total, disputes_open, disputes_resolved = await asyncio.gather(
+        db.requests.aggregate(cat_pipeline).to_list(20),
+        db.requests.aggregate(status_pipeline).to_list(20),
+        db.requests.find({"status": "confirmed", "escrow_amount": {"$gt": 0}, "confirmed_at": {"$gte": start_iso}}).to_list(2000),
+        db.requests.count_documents({"specialist_id": {"$ne": None}, "assigned_at": {"$gte": start_iso}}),
+        db.disputes.count_documents({}),
+        db.disputes.count_documents({"status": "open"}),
+        db.disputes.count_documents({"status": "resolved"}),
+    )
+
+    by_category = [{"name": (d["_id"] or "other"), "value": d["count"]} for d in cat_docs]
+    by_status = [{"name": d["_id"] or "unknown", "value": d["count"]} for d in status_docs]
+
+    gmv = sum((r.get("escrow_amount") or 0) for r in confirmed_requests)
+    platform_revenue_fees = gmv * 0.05
+    lead_fees = leads_count * 45.0
+    avg_job_value = (gmv / len(confirmed_requests)) if confirmed_requests else 0
+
+    # Top specialists - batch lookup users in 1 query
+    top_pipeline = [
+        {"$match": {"status": "confirmed", "specialist_id": {"$ne": None}}},
+        {"$group": {"_id": "$specialist_id", "jobs": {"$sum": 1}, "revenue": {"$sum": "$escrow_amount"}}},
+        {"$sort": {"jobs": -1}},
+        {"$limit": 5},
+    ]
+    top_docs = await db.requests.aggregate(top_pipeline).to_list(5)
+    spec_ids = [ObjectId(t["_id"]) for t in top_docs if t.get("_id")]
+    specs_lookup = {}
+    if spec_ids:
+        async for sp in db.users.find({"_id": {"$in": spec_ids}}):
+            specs_lookup[str(sp["_id"])] = sp
+    top_specialists = []
+    for t in top_docs:
+        sp = specs_lookup.get(t.get("_id"))
+        if sp:
+            top_specialists.append({
+                "id": str(sp["_id"]),
+                "name": sp.get("name", "—"),
+                "specialty": sp.get("specialty"),
+                "rating": sp.get("rating"),
+                "jobs": t["jobs"],
+                "revenue": t["revenue"],
+            })
+
+    return {
+        "series": series,
+        "by_category": by_category,
+        "by_status": by_status,
+        "gmv": round(gmv, 2),
+        "platform_revenue": round(platform_revenue_fees + lead_fees, 2),
+        "lead_fees": round(lead_fees, 2),
+        "avg_job_value": round(avg_job_value, 2),
+        "disputes": {"total": disputes_total, "open": disputes_open, "resolved": disputes_resolved},
+        "top_specialists": top_specialists,
+    }
+
 @api.get("/admin/specialists/pending")
 async def pending_specialists(user: dict = Depends(require_role("admin"))):
     docs = await db.users.find({"role": "specialist", "verified": False}).to_list(100)
@@ -661,17 +799,29 @@ async def verify_specialist(spec_id: str, user: dict = Depends(require_role("adm
 @api.get("/admin/disputes")
 async def list_disputes(user: dict = Depends(require_role("admin"))):
     docs = await db.disputes.find({}).sort("created_at", -1).to_list(50)
-    # Enrich with request + client + specialist names
+    # Batch enrich: collect all request_ids then fetch in 1 query, same for users
+    req_ids = [ObjectId(d["request_id"]) for d in docs if d.get("request_id")]
+    reqs_map = {}
+    user_ids_set = set()
+    if req_ids:
+        async for r in db.requests.find({"_id": {"$in": req_ids}}):
+            reqs_map[str(r["_id"])] = r
+            if r.get("client_id"): user_ids_set.add(r["client_id"])
+            if r.get("specialist_id"): user_ids_set.add(r["specialist_id"])
+    users_map = {}
+    if user_ids_set:
+        async for u2 in db.users.find({"_id": {"$in": [ObjectId(uid) for uid in user_ids_set]}}):
+            users_map[str(u2["_id"])] = u2
     out = []
     for d in docs:
         d = serialize_doc(d)
-        req = await db.requests.find_one({"_id": ObjectId(d["request_id"])}) if d.get("request_id") else None
+        req = reqs_map.get(d.get("request_id"))
         if req:
             d["request_title"] = req.get("title")
             d["request_status"] = req.get("status")
             d["escrow_amount"] = req.get("escrow_amount", 0)
-            client_u = await db.users.find_one({"_id": ObjectId(req["client_id"])}) if req.get("client_id") else None
-            spec_u = await db.users.find_one({"_id": ObjectId(req["specialist_id"])}) if req.get("specialist_id") else None
+            client_u = users_map.get(req.get("client_id"))
+            spec_u = users_map.get(req.get("specialist_id"))
             d["client_name"] = client_u.get("name") if client_u else None
             d["specialist_name"] = spec_u.get("name") if spec_u else None
         out.append(d)
@@ -940,20 +1090,30 @@ async def request_twin_validation(prop_id: str, user: dict = Depends(get_current
 
 @api.get("/operator/twins")
 async def operator_list_twins(user: dict = Depends(require_role("operator", "admin"))):
-    """List all twins (pending + approved)"""
+    """List all twins (pending + approved) with batched enrichment"""
     docs = await db.twins.find({}).sort("requested_at", -1).to_list(100)
+    prop_ids = [ObjectId(d["property_id"]) for d in docs if d.get("property_id")]
+    props_map = {}
+    owner_ids = set()
+    if prop_ids:
+        async for p in db.properties.find({"_id": {"$in": prop_ids}}):
+            props_map[str(p["_id"])] = p
+            if p.get("owner_id"): owner_ids.add(p["owner_id"])
+    owners_map = {}
+    if owner_ids:
+        async for o in db.users.find({"_id": {"$in": [ObjectId(oid) for oid in owner_ids]}}):
+            owners_map[str(o["_id"])] = o
     out = []
     for d in docs:
         d = serialize_doc(d)
-        # Enrich with property + owner
-        prop = await db.properties.find_one({"_id": ObjectId(d["property_id"])}) if d.get("property_id") else None
+        prop = props_map.get(d.get("property_id"))
         if prop:
             d["property_name"] = prop.get("name")
             d["property_address"] = prop.get("address")
             d["property_type"] = prop.get("type")
             d["property_surface"] = prop.get("surface")
             d["property_rooms"] = prop.get("rooms")
-            owner = await db.users.find_one({"_id": ObjectId(prop["owner_id"])}) if prop.get("owner_id") else None
+            owner = owners_map.get(prop.get("owner_id"))
             d["owner_name"] = owner.get("name") if owner else None
             d["owner_email"] = owner.get("email") if owner else None
         out.append(d)
@@ -1102,146 +1262,203 @@ async def google_session_exchange(request: Request, response: Response):
 
 # ============= STRIPE ESCROW =============
 
+STRIPE_KEY = os.environ.get("STRIPE_API_KEY", "sk_test_emergent")
+# Demo mode if key is the Emergent placeholder or doesn't look like a real Stripe key
+DEMO_STRIPE = (STRIPE_KEY == "sk_test_emergent") or (not STRIPE_KEY.startswith(("sk_test_", "sk_live_")))
+
 @api.post("/payments/checkout-session")
 async def create_checkout_session(request_id: str, request: Request, user: dict = Depends(require_role("client"))):
-    """Create Stripe Checkout session for escrow funding"""
+    """Create Stripe Checkout session for escrow funding (real or demo)"""
     req = await db.requests.find_one({"_id": ObjectId(request_id), "client_id": user["id"]})
     if not req:
         raise HTTPException(404, "Request not found")
     if req.get("status") not in ["open", "assigned"]:
         raise HTTPException(400, "Request not eligible for payment")
-    
-    amount = req.get("budget_estimate") or 100.0
-    amount_cents = int(amount * 100)
-    
-    # Derive origin from request for dynamic redirect URLs
+
+    # Amount is SERVER-SIDE only (security) - derived from request budget
+    amount = float(req.get("budget_estimate") or 100.0)
+    if amount <= 0 or amount > 100000:
+        raise HTTPException(400, "Invalid amount")
+
+    # Origin from frontend (used for redirect URLs)
     origin = request.headers.get("origin") or request.headers.get("referer", "").rstrip("/")
     if not origin:
         raise HTTPException(400, "Missing origin header")
-    
-    # Demo mode: if Stripe key is the placeholder, simulate a successful payment
-    if stripe.api_key in ("sk_test_emergent", "", None) or not stripe.api_key.startswith("sk_"):
+
+    # DEMO mode: stripe_test_emergent placeholder - simulate success
+    if DEMO_STRIPE:
         fake_session_id = f"cs_demo_{uuid.uuid4().hex[:16]}"
-        await db.payments.insert_one({
+        now_iso = datetime.now(timezone.utc).isoformat()
+        await db.payment_transactions.insert_one({
             "session_id": fake_session_id,
             "request_id": request_id,
             "client_id": user["id"],
+            "user_email": user.get("email"),
             "amount": amount,
-            "status": "demo_pending",
+            "currency": "ron",
+            "status": "completed",
+            "payment_status": "paid",
+            "metadata": {"request_id": request_id, "client_id": user["id"]},
             "demo": True,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": now_iso,
+            "completed_at": now_iso,
         })
-        # In demo mode, we immediately mark as paid and redirect to success
-        await db.payments.update_one(
-            {"session_id": fake_session_id},
-            {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}}
-        )
         await db.requests.update_one(
             {"_id": ObjectId(request_id)},
-            {"$set": {"escrow_amount": amount, "escrow_status": "held", "paid_at": datetime.now(timezone.utc).isoformat()}}
+            {"$set": {"escrow_amount": amount, "escrow_status": "held", "paid_at": now_iso}}
         )
         await db.transactions.insert_one({
-            "user_id": user["id"],
-            "type": "escrow_deposit",
-            "amount": -amount,
-            "request_id": request_id,
-            "session_id": fake_session_id,
-            "demo": True,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "user_id": user["id"], "type": "escrow_deposit", "amount": -amount,
+            "request_id": request_id, "session_id": fake_session_id, "demo": True,
+            "created_at": now_iso,
         })
-        return {"checkout_url": f"{origin}/client?payment=success&request={request_id}&demo=1", "session_id": fake_session_id, "demo_mode": True}
-    
-    try:
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            line_items=[{
-                "price_data": {
-                    "currency": "ron",
-                    "product_data": {
-                        "name": f"Escrow: {req.get('title', 'Service')}",
-                        "description": f"Property service deposit - {req.get('property_name', '')}",
-                    },
-                    "unit_amount": amount_cents,
-                },
-                "quantity": 1,
-            }],
-            mode="payment",
-            success_url=f"{origin}/client?payment=success&request={request_id}",
-            cancel_url=f"{origin}/client?payment=cancelled",
-            metadata={
-                "request_id": request_id,
-                "client_id": user["id"],
-                "specialist_id": req.get("specialist_id") or "",
-                "amount_ron": str(amount),
-            },
-        )
-        
-        # Track the payment session
-        await db.payments.insert_one({
-            "session_id": session.id,
+        return {"checkout_url": f"{origin}/client?payment=success&request={request_id}&session_id={fake_session_id}&demo=1", "session_id": fake_session_id, "demo_mode": True}
+
+    # REAL Stripe via emergentintegrations
+    host_url = origin
+    webhook_url = f"{host_url}/api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=STRIPE_KEY, webhook_url=webhook_url)
+    success_url = f"{origin}/client?payment=success&request={request_id}&session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{origin}/client?payment=cancelled&request={request_id}"
+    checkout_req = CheckoutSessionRequest(
+        amount=amount,
+        currency="ron",
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata={
             "request_id": request_id,
             "client_id": user["id"],
-            "amount": amount,
-            "status": "pending",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        })
-        
-        return {"checkout_url": session.url, "session_id": session.id}
-    except stripe.error.StripeError as e:
+            "specialist_id": req.get("specialist_id") or "",
+        },
+    )
+    try:
+        session = await stripe_checkout.create_checkout_session(checkout_req)
+    except Exception as e:
         raise HTTPException(500, f"Stripe error: {str(e)}")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.payment_transactions.insert_one({
+        "session_id": session.session_id,
+        "request_id": request_id,
+        "client_id": user["id"],
+        "user_email": user.get("email"),
+        "amount": amount,
+        "currency": "ron",
+        "status": "initiated",
+        "payment_status": "pending",
+        "metadata": checkout_req.metadata,
+        "created_at": now_iso,
+    })
+    return {"checkout_url": session.url, "session_id": session.session_id}
 
 
 @api.get("/payments/status/{session_id}")
-async def payment_status(session_id: str, user: dict = Depends(get_current_user)):
-    """Check Stripe Checkout session status and finalize escrow if paid"""
-    payment = await db.payments.find_one({"session_id": session_id})
+async def payment_status(session_id: str, request: Request, user: dict = Depends(get_current_user)):
+    """Poll Stripe Checkout status. Idempotent: only fulfills escrow once."""
+    payment = await db.payment_transactions.find_one({"session_id": session_id})
     if not payment:
         raise HTTPException(404, "Payment session not found")
-    
-    # Demo mode short-circuit
+
+    # Demo short-circuit
     if payment.get("demo"):
         return {
-            "status": "paid",
+            "status": "complete",
+            "payment_status": "paid",
             "amount": payment["amount"],
+            "currency": payment.get("currency", "ron"),
             "request_id": payment["request_id"],
-            "stripe_status": "complete",
             "demo_mode": True,
         }
-    
+
+    # Idempotency: if already completed, return cached
+    if payment.get("status") == "completed" and payment.get("payment_status") == "paid":
+        return {
+            "status": "complete",
+            "payment_status": "paid",
+            "amount": payment["amount"],
+            "currency": payment.get("currency", "ron"),
+            "request_id": payment["request_id"],
+        }
+
+    origin = request.headers.get("origin") or request.headers.get("referer", "").rstrip("/") or ""
+    stripe_checkout = StripeCheckout(api_key=STRIPE_KEY, webhook_url=f"{origin}/api/webhook/stripe")
     try:
-        session = stripe.checkout.Session.retrieve(session_id)
-    except stripe.error.StripeError as e:
+        status_resp = await stripe_checkout.get_checkout_status(session_id)
+    except Exception as e:
         raise HTTPException(500, f"Stripe error: {e}")
-    
-    status_val = session.payment_status  # "paid", "unpaid", "no_payment_required"
-    
-    # Update payment record (idempotent)
-    if status_val == "paid" and payment.get("status") != "completed":
-        await db.payments.update_one(
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    payment_status_val = status_resp.payment_status
+    session_status = status_resp.status
+
+    # Fulfill on first 'paid' transition only
+    if payment_status_val == "paid" and payment.get("payment_status") != "paid":
+        await db.payment_transactions.update_one(
             {"session_id": session_id},
-            {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}}
+            {"$set": {
+                "status": "completed",
+                "payment_status": "paid",
+                "completed_at": now_iso,
+            }}
         )
-        # Place funds in escrow on the request
         await db.requests.update_one(
             {"_id": ObjectId(payment["request_id"])},
-            {"$set": {"escrow_amount": payment["amount"], "escrow_status": "held", "paid_at": datetime.now(timezone.utc).isoformat()}}
+            {"$set": {"escrow_amount": payment["amount"], "escrow_status": "held", "paid_at": now_iso}}
         )
-        # Log transaction
         await db.transactions.insert_one({
             "user_id": payment["client_id"],
             "type": "escrow_deposit",
             "amount": -payment["amount"],
             "request_id": payment["request_id"],
             "session_id": session_id,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": now_iso,
         })
-    
+    elif session_status == "expired":
+        await db.payment_transactions.update_one(
+            {"session_id": session_id},
+            {"$set": {"status": "expired", "payment_status": "unpaid"}}
+        )
+
     return {
-        "status": status_val,
+        "status": session_status,
+        "payment_status": payment_status_val,
         "amount": payment["amount"],
+        "currency": payment.get("currency", "ron"),
         "request_id": payment["request_id"],
-        "stripe_status": session.status,
     }
+
+
+@api.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhook events for payment confirmation"""
+    if DEMO_STRIPE:
+        return {"received": True, "demo": True}
+    body = await request.body()
+    signature = request.headers.get("Stripe-Signature", "")
+    origin = request.headers.get("origin") or ""
+    stripe_checkout = StripeCheckout(api_key=STRIPE_KEY, webhook_url=f"{origin}/api/webhook/stripe")
+    try:
+        evt = await stripe_checkout.handle_webhook(body, signature)
+    except Exception as e:
+        raise HTTPException(400, f"Webhook error: {e}")
+    if evt.payment_status == "paid":
+        payment = await db.payment_transactions.find_one({"session_id": evt.session_id})
+        if payment and payment.get("payment_status") != "paid":
+            now_iso = datetime.now(timezone.utc).isoformat()
+            await db.payment_transactions.update_one(
+                {"session_id": evt.session_id},
+                {"$set": {"status": "completed", "payment_status": "paid", "completed_at": now_iso}}
+            )
+            await db.requests.update_one(
+                {"_id": ObjectId(payment["request_id"])},
+                {"$set": {"escrow_amount": payment["amount"], "escrow_status": "held", "paid_at": now_iso}}
+            )
+            await db.transactions.insert_one({
+                "user_id": payment["client_id"], "type": "escrow_deposit", "amount": -payment["amount"],
+                "request_id": payment["request_id"], "session_id": evt.session_id, "via_webhook": True,
+                "created_at": now_iso,
+            })
+    return {"received": True, "event_type": evt.event_type, "session_id": evt.session_id}
 
 
 # ============= WEBSOCKET CHAT =============

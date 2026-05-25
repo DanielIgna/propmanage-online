@@ -187,30 +187,74 @@ export const RegisterPage = () => {
   const { user, register } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ email: "", password: "", name: "", role: "client", phone: "" });
+  const [form, setForm] = useState({
+    email: "", password: "", name: "", role: "client", phone: "",
+    specialty: "hvac",
+    service_categories: ["hvac"],
+    coverage_zones: ["Bucuresti-Sector1"],
+    zone: "Bucuresti-Sector1",
+  });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   
   if (user && user !== false) return <Navigate to={`/${user.role}`} replace />;
-  
+
+  const SPECIALTIES = [
+    { value: "hvac", label: "HVAC / Climatizare", icon: "🌬" },
+    { value: "electric", label: "Electric", icon: "⚡" },
+    { value: "plumbing", label: "Sanitar / Instalații apă", icon: "💧" },
+    { value: "interior_design", label: "Design Interior", icon: "🏠" },
+    { value: "carpentry", label: "Tâmplărie / Mobilă", icon: "🪚" },
+    { value: "painting", label: "Zugrăveli / Vopsitor", icon: "🎨" },
+    { value: "cleaning", label: "Curățenie", icon: "🧽" },
+    { value: "appliance_repair", label: "Reparații electrocasnice", icon: "🔧" },
+    { value: "gardening", label: "Grădinărit", icon: "🌱" },
+    { value: "other", label: "Alte servicii", icon: "🛠" },
+  ];
+
+  const ZONES = [
+    "Bucuresti-Sector1", "Bucuresti-Sector2", "Bucuresti-Sector3",
+    "Bucuresti-Sector4", "Bucuresti-Sector5", "Bucuresti-Sector6",
+    "Cluj-Centru", "Cluj-Manastur",
+    "Timisoara-Iosefin", "Timisoara-Fabric",
+    "Iasi-Centru", "Brasov-Centru", "Constanta-Centru",
+  ];
+
+  const toggleCategory = (val) => {
+    const exists = form.service_categories.includes(val);
+    const newCats = exists ? form.service_categories.filter(c => c !== val) : [...form.service_categories, val];
+    setForm({ ...form, service_categories: newCats, specialty: newCats[0] || val });
+  };
+
+  const toggleZone = (val) => {
+    const exists = form.coverage_zones.includes(val);
+    setForm({ ...form, coverage_zones: exists ? form.coverage_zones.filter(z => z !== val) : [...form.coverage_zones, val] });
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
+      if (form.role === "specialist" && form.service_categories.length === 0) {
+        throw new Error("Selectează cel puțin o categorie de specialitate");
+      }
+      if (form.role === "specialist" && form.coverage_zones.length === 0) {
+        throw new Error("Selectează cel puțin o zonă de acoperire");
+      }
       const u = await register(form);
       navigate(`/${u.role}`);
     } catch (err) {
-      setError(formatApiError(err));
+      setError(err.message || formatApiError(err));
     } finally { setLoading(false); }
   };
   
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-6">
+    <div className="min-h-screen relative flex items-center justify-center p-6 py-12">
       <Backdrop /><TopBar />
       <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
-        <div className="glass-strong rounded-3xl p-10">
+        <div className="glass-strong rounded-3xl p-8 sm:p-10">
           <h1 className="font-serif text-4xl mb-2" data-testid="register-title">{t("register.title")}</h1>
-          <p className="text-sm text-stone-400 mb-8">{t("register.subtitle")}</p>
+          <p className="text-sm text-stone-400 mb-6">{t("register.subtitle")}</p>
           
           <form onSubmit={submit} className="space-y-4">
             <div>
@@ -232,6 +276,13 @@ export const RegisterPage = () => {
                 data-testid="register-password" />
             </div>
             <div>
+              <label className="text-xs uppercase tracking-wider text-stone-400 mb-1.5 block">Telefon (opțional)</label>
+              <input type="tel" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}
+                placeholder="+40 7XX XXX XXX"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#d4ff3a]/50"
+                data-testid="register-phone" />
+            </div>
+            <div>
               <label className="text-xs uppercase tracking-wider text-stone-400 mb-1.5 block">{t("register.role")}</label>
               <div className="grid grid-cols-2 gap-2">
                 {[{v:"client", l:t("register.client")}, {v:"specialist", l:t("register.specialist")}].map(o => (
@@ -241,6 +292,68 @@ export const RegisterPage = () => {
                 ))}
               </div>
             </div>
+
+            {/* SPECIALIST ONLY: Categories */}
+            {form.role === "specialist" && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-4 overflow-hidden">
+                <div>
+                  <label className="text-xs uppercase tracking-wider text-stone-400 mb-1.5 block">
+                    Specialitățile tale <span className="text-stone-600">(selectează una sau mai multe)</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2" data-testid="specialty-grid">
+                    {SPECIALTIES.map(s => {
+                      const sel = form.service_categories.includes(s.value);
+                      return (
+                        <button type="button" key={s.value} onClick={() => toggleCategory(s.value)}
+                          className={`p-3 rounded-xl text-left text-xs border transition ${sel ? "bg-[#d4ff3a]/15 border-[#d4ff3a]/50 text-white" : "bg-white/5 border-white/10 text-stone-400 hover:bg-white/10"}`}
+                          data-testid={`spec-${s.value}`}>
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{s.icon}</span>
+                            <span className="font-medium">{s.label}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {form.service_categories.length > 0 && (
+                    <div className="mt-2 text-[11px] text-stone-400">
+                      Selectat: {form.service_categories.length} {form.service_categories.length === 1 ? "categorie" : "categorii"}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-xs uppercase tracking-wider text-stone-400 mb-1.5 block">
+                    Zone de acoperire <span className="text-stone-600">(unde lucrezi)</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1" data-testid="zone-grid">
+                    {ZONES.map(z => {
+                      const sel = form.coverage_zones.includes(z);
+                      return (
+                        <button type="button" key={z} onClick={() => toggleZone(z)}
+                          className={`px-2.5 py-2 rounded-lg text-[11px] border transition ${sel ? "bg-[#d4ff3a]/15 border-[#d4ff3a]/50 text-white" : "bg-white/5 border-white/10 text-stone-400 hover:bg-white/10"}`}
+                          data-testid={`zone-${z}`}>
+                          {z.replace(/-/g, " ")}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* CLIENT ONLY: Zone */}
+            {form.role === "client" && (
+              <div>
+                <label className="text-xs uppercase tracking-wider text-stone-400 mb-1.5 block">Zona ta</label>
+                <select value={form.zone} onChange={e => setForm({...form, zone: e.target.value})}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#d4ff3a]/50"
+                  data-testid="register-zone">
+                  {ZONES.map(z => <option key={z} value={z}>{z.replace(/-/g, " ")}</option>)}
+                </select>
+              </div>
+            )}
+
             {error && <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3" data-testid="register-error">{error}</div>}
             <button type="submit" disabled={loading} className="btn-accent w-full py-3 rounded-xl font-medium disabled:opacity-50" data-testid="register-submit">
               {loading ? t("common.loading") : t("register.submit")}
