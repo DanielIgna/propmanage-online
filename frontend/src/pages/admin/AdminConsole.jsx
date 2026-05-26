@@ -10,6 +10,7 @@ import { AdminCMS, AdminEmailTemplates, AdminZones } from "./AdminContentTools";
 import {
   AdminTrustWeights, AdminPlatformSettings, AdminFinance, AdminProjects, AdminActivityFull
 } from "./AdminPlatformTools";
+import { AdminABTests } from "./AdminABTests";
 
 const TITLES = {
   overview: { title: "Dashboard", subtitle: "Privire de ansamblu asupra platformei" },
@@ -22,6 +23,7 @@ const TITLES = {
   cms: { title: "Texte (CMS)", subtitle: "Editează landing page, etichete UI, categorii" },
   emails: { title: "Template-uri Email", subtitle: "Modifică subiectul și HTML-ul emailurilor automate" },
   zones: { title: "Zone Acoperire", subtitle: "Adaugă orașe / cartiere sau dezactivează cele existente" },
+  abtests: { title: "Experimente A/B", subtitle: "Testează variante și măsoară CTR în timp real" },
   trust: { title: "Trust Score Weights", subtitle: "Ajustează ponderea fiecărui factor (suma = 100%)" },
   settings: { title: "Setări Platformă", subtitle: "Feature flags, comisioane, branding" },
 };
@@ -49,6 +51,7 @@ export const AdminDashboard = () => {
       {active === "emails" && <AdminEmailTemplates />}
       {active === "zones" && <AdminZones />}
       {active === "trust" && <AdminTrustWeights />}
+      {active === "abtests" && <AdminABTests />}
       {active === "settings" && <AdminPlatformSettings />}
     </AdminLayoutMetronic>
   );

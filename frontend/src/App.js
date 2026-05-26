@@ -79,6 +79,8 @@ const Nav = () => {
 // ============= HERO =============
 const Hero = () => {
   const { t } = useI18n();
+  const { variant, trackClick } = useABTest("hero_cta1");
+  const ctaText = t(`hero.cta1.variant_${variant}`) || t("hero.cta1");
   return (
   <section id="top" className="relative min-h-screen flex items-center pt-32 pb-20 px-6 overflow-hidden">
     <div className="absolute inset-0 dotted-bg opacity-30" />
@@ -101,8 +103,8 @@ const Hero = () => {
         </p>
         
         <div className="flex flex-col sm:flex-row gap-4">
-          <a href="#problem" className="btn-accent px-8 py-4 rounded-full font-medium inline-flex items-center gap-2 group" data-testid="hero-start-btn">
-            {t("hero.cta1")}
+          <a href="#problem" onClick={trackClick} className="btn-accent px-8 py-4 rounded-full font-medium inline-flex items-center gap-2 group" data-testid="hero-start-btn" data-ab-variant={variant}>
+            {ctaText}
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </a>
           <a href="#journey" className="glass px-8 py-4 rounded-full font-medium inline-flex items-center gap-2 hover:bg-white/10 transition-colors" data-testid="hero-journey-btn">

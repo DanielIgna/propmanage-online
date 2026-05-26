@@ -44,6 +44,7 @@ const NAV_SECTIONS = [
   {
     title: "CONFIGURARE",
     items: [
+      { id: "abtests", label: "A/B Tests", icon: Sparkles },
       { id: "trust", label: "Trust Score Weights", icon: Award },
       { id: "settings", label: "Setări Platformă", icon: Settings },
     ],

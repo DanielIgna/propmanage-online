@@ -40,6 +40,8 @@ DEFAULT_CMS = {
     "hero.title3": "digital.",
     "hero.subtitle": "PropManage creează un Digital Twin high-fidelity al locuinței tale, monitorizând starea structurală și performanța financiară în timp real. Liniștea structurată pentru proprietarul modern.",
     "hero.cta1": "Explorează Demo",
+    "hero.cta1.variant_a": "Explorează Demo",
+    "hero.cta1.variant_b": "Începe gratuit acum",
     "hero.cta2": "Vezi Flux Complet",
     "cta.badge": "READY TO BUILD",
     "cta.title1": "Gata să digitalizezi",
@@ -637,3 +639,105 @@ async def get_public_cms():
     overrides = {d["key"]: d.get("value", "") for d in docs}
     merged = {**DEFAULT_CMS, **overrides}
     return merged
+
+
+# ============= A/B TESTING =============
+class ABEventIn(BaseModel):
+    experiment: str = Field(min_length=2, max_length=64)
+    variant: str = Field(pattern="^(a|b)$")
+    event: str = Field(pattern="^(impression|click)$")
+    session_id: Optional[str] = None
+
+
+@public_router.post("/ab/track")
+async def ab_track(data: ABEventIn):
+    """Track A/B test event. Public — no auth. Deduplicates impressions per (session, exp, variant)."""
+    now = datetime.now(timezone.utc).isoformat()
+    if data.event == "impression" and data.session_id:
+        # 1 impression per session per (exp, variant)
+        exists = await db.ab_events.find_one({
+            "experiment": data.experiment,
+            "variant": data.variant,
+            "event": "impression",
+            "session_id": data.session_id,
+        })
+        if exists:
+            return {"ok": True, "deduplicated": True}
+    await db.ab_events.insert_one({
+        "experiment": data.experiment,
+        "variant": data.variant,
+        "event": data.event,
+        "session_id": data.session_id,
+        "created_at": now,
+    })
+    return {"ok": True}
+
+
+@router.get("/ab/stats")
+async def ab_stats(user: dict = Depends(require_role("admin"))):
+    """Return per-experiment, per-variant counts + CTR."""
+    pipeline = [
+        {"$group": {
+            "_id": {"experiment": "$experiment", "variant": "$variant", "event": "$event"},
+            "count": {"$sum": 1},
+        }},
+    ]
+    rows = await db.ab_events.aggregate(pipeline).to_list(200)
+    # Reshape: experiment -> variant -> {impressions, clicks}
+    exp_map = {}
+    for r in rows:
+        eid = r["_id"]["experiment"]
+        var = r["_id"]["variant"]
+        evt = r["_id"]["event"]
+        exp_map.setdefault(eid, {}).setdefault(var, {"impressions": 0, "clicks": 0})[f"{evt}s"] = r["count"]
+
+    out = []
+    KNOWN = {"hero_cta1": {"label": "Hero CTA principal", "keys": ["hero.cta1.variant_a", "hero.cta1.variant_b"]}}
+    for eid, vmap in exp_map.items():
+        meta = KNOWN.get(eid, {"label": eid, "keys": []})
+        variants = []
+        for v in ["a", "b"]:
+            stats = vmap.get(v, {"impressions": 0, "clicks": 0})
+            impr = stats.get("impressions", 0)
+            clk = stats.get("clicks", 0)
+            ctr = (clk / impr * 100) if impr else 0
+            variants.append({
+                "variant": v,
+                "impressions": impr,
+                "clicks": clk,
+                "ctr": round(ctr, 2),
+            })
+        # Winner: highest CTR if both have >= 30 impressions
+        winner = None
+        if variants[0]["impressions"] >= 30 and variants[1]["impressions"] >= 30:
+            if variants[0]["ctr"] > variants[1]["ctr"]:
+                winner = "a"
+            elif variants[1]["ctr"] > variants[0]["ctr"]:
+                winner = "b"
+        out.append({
+            "experiment": eid,
+            "label": meta["label"],
+            "keys": meta["keys"],
+            "variants": variants,
+            "winner": winner,
+        })
+    # Ensure known experiments appear even with zero data
+    for eid, meta in KNOWN.items():
+        if not any(o["experiment"] == eid for o in out):
+            out.append({
+                "experiment": eid,
+                "label": meta["label"],
+                "keys": meta["keys"],
+                "variants": [
+                    {"variant": "a", "impressions": 0, "clicks": 0, "ctr": 0},
+                    {"variant": "b", "impressions": 0, "clicks": 0, "ctr": 0},
+                ],
+                "winner": None,
+            })
+    return out
+
+
+@router.delete("/ab/{experiment}/reset")
+async def ab_reset(experiment: str, user: dict = Depends(require_role("admin"))):
+    res = await db.ab_events.delete_many({"experiment": experiment})
+    return {"ok": True, "deleted": res.deleted_count}
