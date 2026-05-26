@@ -10,6 +10,7 @@ import {
 import { AuthProvider, useAuth } from "./auth";
 import { I18nProvider, useI18n } from "./i18n";
 import { LoginPage, RegisterPage } from "./pages/Auth";
+import { ThemeToggle } from "./pages/DashShared";
 import { ClientDashboard, SpecialistDashboard, AdminDashboard, OperatorDashboard } from "./pages/Dashboards";
 import { AuthCallback } from "./pages/AuthCallback";
 import { SpecialistProfile } from "./pages/SpecialistProfile";

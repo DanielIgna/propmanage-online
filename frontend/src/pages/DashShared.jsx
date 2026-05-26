@@ -2,12 +2,40 @@
 import React, { useState, useEffect } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { Building2, Home, Wrench, ShieldCheck, Settings, LogOut, Languages, Bell } from "lucide-react";
+import { Building2, Home, Wrench, ShieldCheck, Settings, LogOut, Languages, Bell, Sun, Moon } from "lucide-react";
 import { useAuth } from "../auth";
 import { useI18n } from "../i18n";
 import { AIAssistant } from "./AIAssistant";
 
 export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+// ============= THEME TOGGLE (light/dark) =============
+export const ThemeToggle = () => {
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === "undefined") return "dark";
+    return localStorage.getItem("pm_theme") || "dark";
+  });
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("pm_theme", theme);
+  }, [theme]);
+  const toggle = () => setTheme(t => t === "dark" ? "light" : "dark");
+  return (
+    <button
+      onClick={toggle}
+      className="p-2 hover:bg-white/5 rounded-full transition-colors flex items-center justify-center"
+      data-testid="theme-toggle"
+      title={theme === "dark" ? "Comută la mod luminos" : "Comută la mod întunecat"}
+      aria-label="Toggle theme"
+    >
+      {theme === "dark" ? (
+        <Sun className="w-4 h-4 text-amber-300" />
+      ) : (
+        <Moon className="w-4 h-4 text-indigo-400" />
+      )}
+    </button>
+  );
+};
 
 // ============= NAVIGATE BUTTONS (Google Maps / Waze deep-links) =============
 export const NavigateButtons = ({ address, lat, lng, compact = false }) => {
@@ -167,6 +195,7 @@ export const DashLayout = ({ children, role, title, bottomNav }) => {
             )}
           </div>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <ThemeToggle />
             <NotificationsBell />
             <button onClick={toggle} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 hover:bg-white/5 rounded-full text-xs uppercase tracking-wider" data-testid="dash-lang">
               <Languages className="w-3.5 h-3.5" />{lang.toUpperCase()}
