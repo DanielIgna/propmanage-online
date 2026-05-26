@@ -1,0 +1,243 @@
+"""PropManage router: admin."""
+import os
+import asyncio
+import json
+import logging
+from typing import Optional, List, Literal, Dict
+from datetime import datetime, timezone, timedelta
+from bson import ObjectId
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from pydantic import BaseModel, Field
+
+from db import db
+from core_utils import serialize_doc, effective_role
+from deps import get_current_user, require_role
+from services import send_email, notify, send_web_push, log_event
+from models import *
+from email_service import (
+    send_template, tpl_welcome, tpl_dispute_opened, tpl_dispute_resolved,
+    tpl_design_phase_quote, tpl_specialist_verified, tpl_escrow_funded,
+)
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api", tags=["admin"])
+
+# ============= ADMIN =============
+@router.get("/admin/stats")
+async def admin_stats(user: dict = Depends(require_role("admin"))):
+    users_count = await db.users.count_documents({})
+    specialists_count = await db.users.count_documents({"role": "specialist"})
+    verified_count = await db.users.count_documents({"role": "specialist", "verified": True})
+    pending_count = await db.users.count_documents({"role": "specialist", "verified": False})
+    active_jobs = await db.requests.count_documents({"status": {"$in": ["assigned", "in_progress"]}})
+    completed_jobs = await db.requests.count_documents({"status": "confirmed"})
+    return {
+        "users": users_count,
+        "specialists": specialists_count,
+        "verified": verified_count,
+        "pending_verification": pending_count,
+        "active_jobs": active_jobs,
+        "completed_jobs": completed_jobs
+    }
+
+@router.get("/admin/analytics")
+async def admin_analytics(days: int = 14, user: dict = Depends(require_role("admin"))):
+    """Live analytics: time-series of jobs/disputes/users + breakdowns by category/status"""
+    if days < 1 or days > 90:
+        days = 14
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(days=days)
+    start_iso = start.isoformat()
+
+    # Time-series via single aggregation pipeline per collection (batch-optimized)
+    async def daily_buckets(collection, date_field):
+        pipeline = [
+            {"$match": {date_field: {"$gte": start_iso}}},
+            {"$project": {"day": {"$substr": [f"${date_field}", 0, 10]}}},
+            {"$group": {"_id": "$day", "count": {"$sum": 1}}},
+        ]
+        docs = await collection.aggregate(pipeline).to_list(200)
+        return {d["_id"]: d["count"] for d in docs}
+
+    jobs_created_map, jobs_confirmed_map, users_map, disputes_map = await asyncio.gather(
+        daily_buckets(db.requests, "created_at"),
+        daily_buckets(db.requests, "confirmed_at"),
+        daily_buckets(db.users, "created_at"),
+        daily_buckets(db.disputes, "created_at"),
+    )
+
+    series = []
+    for i in range(days):
+        day = (start + timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
+        key = day.strftime("%Y-%m-%d")
+        series.append({
+            "date": day.strftime("%d %b"),
+            "jobs_created": jobs_created_map.get(key, 0),
+            "jobs_confirmed": jobs_confirmed_map.get(key, 0),
+            "users": users_map.get(key, 0),
+            "disputes": disputes_map.get(key, 0),
+        })
+
+    # Category + status breakdowns (parallel)
+    cat_pipeline = [
+        {"$match": {"created_at": {"$gte": start_iso}}},
+        {"$group": {"_id": "$category", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+    status_pipeline = [{"$group": {"_id": "$status", "count": {"$sum": 1}}}]
+
+    cat_docs, status_docs, confirmed_requests, leads_count, disputes_total, disputes_open, disputes_resolved = await asyncio.gather(
+        db.requests.aggregate(cat_pipeline).to_list(20),
+        db.requests.aggregate(status_pipeline).to_list(20),
+        db.requests.find({"status": "confirmed", "escrow_amount": {"$gt": 0}, "confirmed_at": {"$gte": start_iso}}).to_list(2000),
+        db.requests.count_documents({"specialist_id": {"$ne": None}, "assigned_at": {"$gte": start_iso}}),
+        db.disputes.count_documents({}),
+        db.disputes.count_documents({"status": "open"}),
+        db.disputes.count_documents({"status": "resolved"}),
+    )
+
+    by_category = [{"name": (d["_id"] or "other"), "value": d["count"]} for d in cat_docs]
+    by_status = [{"name": d["_id"] or "unknown", "value": d["count"]} for d in status_docs]
+
+    gmv = sum((r.get("escrow_amount") or 0) for r in confirmed_requests)
+    platform_revenue_fees = gmv * 0.05
+    lead_fees = leads_count * 45.0
+    avg_job_value = (gmv / len(confirmed_requests)) if confirmed_requests else 0
+
+    # Top specialists - batch lookup users in 1 query
+    top_pipeline = [
+        {"$match": {"status": "confirmed", "specialist_id": {"$ne": None}}},
+        {"$group": {"_id": "$specialist_id", "jobs": {"$sum": 1}, "revenue": {"$sum": "$escrow_amount"}}},
+        {"$sort": {"jobs": -1}},
+        {"$limit": 5},
+    ]
+    top_docs = await db.requests.aggregate(top_pipeline).to_list(5)
+    spec_ids = [ObjectId(t["_id"]) for t in top_docs if t.get("_id")]
+    specs_lookup = {}
+    if spec_ids:
+        async for sp in db.users.find({"_id": {"$in": spec_ids}}):
+            specs_lookup[str(sp["_id"])] = sp
+    top_specialists = []
+    for t in top_docs:
+        sp = specs_lookup.get(t.get("_id"))
+        if sp:
+            top_specialists.append({
+                "id": str(sp["_id"]),
+                "name": sp.get("name", "—"),
+                "specialty": sp.get("specialty"),
+                "rating": sp.get("rating"),
+                "jobs": t["jobs"],
+                "revenue": t["revenue"],
+            })
+
+    return {
+        "series": series,
+        "by_category": by_category,
+        "by_status": by_status,
+        "gmv": round(gmv, 2),
+        "platform_revenue": round(platform_revenue_fees + lead_fees, 2),
+        "lead_fees": round(lead_fees, 2),
+        "avg_job_value": round(avg_job_value, 2),
+        "disputes": {"total": disputes_total, "open": disputes_open, "resolved": disputes_resolved},
+        "top_specialists": top_specialists,
+    }
+
+@router.get("/admin/specialists/pending")
+async def pending_specialists(user: dict = Depends(require_role("admin"))):
+    docs = await db.users.find({"role": "specialist", "verified": False}).to_list(100)
+    return [serialize_doc(d) for d in docs]
+
+@router.post("/admin/specialists/{spec_id}/verify")
+async def verify_specialist(spec_id: str, user: dict = Depends(require_role("admin"))):
+    spec = await db.users.find_one({"_id": ObjectId(spec_id), "role": "specialist"})
+    if not spec:
+        raise HTTPException(404, "Specialist not found")
+    await db.users.update_one(
+        {"_id": ObjectId(spec_id), "role": "specialist"},
+        {"$set": {"verified": True, "tier": "VERIFIED"}}
+    )
+    await notify(spec_id, "Cont verificat ✓", "Felicitări! Contul tău este acum VERIFIED. Ai acces la marketplace-ul de premium leads.", type_="verification", link="/specialist")
+    await send_template(tpl_specialist_verified, spec.get("name"), to=spec.get("email"))
+    return {"ok": True}
+
+@router.get("/admin/disputes")
+async def list_disputes(user: dict = Depends(require_role("admin"))):
+    docs = await db.disputes.find({}).sort("created_at", -1).to_list(50)
+    # Batch enrich: collect all request_ids then fetch in 1 query, same for users
+    req_ids = [ObjectId(d["request_id"]) for d in docs if d.get("request_id")]
+    reqs_map = {}
+    user_ids_set = set()
+    if req_ids:
+        async for r in db.requests.find({"_id": {"$in": req_ids}}):
+            reqs_map[str(r["_id"])] = r
+            if r.get("client_id"): user_ids_set.add(r["client_id"])
+            if r.get("specialist_id"): user_ids_set.add(r["specialist_id"])
+    users_map = {}
+    if user_ids_set:
+        async for u2 in db.users.find({"_id": {"$in": [ObjectId(uid) for uid in user_ids_set]}}):
+            users_map[str(u2["_id"])] = u2
+    out = []
+    for d in docs:
+        d = serialize_doc(d)
+        req = reqs_map.get(d.get("request_id"))
+        if req:
+            d["request_title"] = req.get("title")
+            d["request_status"] = req.get("status")
+            d["escrow_amount"] = req.get("escrow_amount", 0)
+            client_u = users_map.get(req.get("client_id"))
+            spec_u = users_map.get(req.get("specialist_id"))
+            d["client_name"] = client_u.get("name") if client_u else None
+            d["specialist_name"] = spec_u.get("name") if spec_u else None
+        out.append(d)
+    return out
+
+@router.get("/admin/specialists/{spec_id}")
+async def admin_specialist_detail(spec_id: str, user: dict = Depends(require_role("admin"))):
+    doc = await db.users.find_one({"_id": ObjectId(spec_id), "role": "specialist"})
+    if not doc:
+        raise HTTPException(404, "Specialist not found")
+    return serialize_doc(doc)
+
+@router.post("/admin/specialists/{spec_id}/reject")
+async def reject_specialist(spec_id: str, data: SpecialistRejectIn, user: dict = Depends(require_role("admin"))):
+    spec = await db.users.find_one({"_id": ObjectId(spec_id), "role": "specialist"})
+    if not spec:
+        raise HTTPException(404, "Specialist not found")
+    await db.users.update_one(
+        {"_id": ObjectId(spec_id)},
+        {"$set": {
+            "verified": False,
+            "tier": "REJECTED",
+            "rejection_reason": data.reason,
+            "rejected_at": datetime.now(timezone.utc).isoformat(),
+            "rejected_by": user["id"],
+        }}
+    )
+    await notify(spec_id, "Verificare respinsă", f"Cererea de verificare a fost respinsă. Motiv: {data.reason}", type_="verification", link="/specialist")
+    return {"ok": True}
+
+@router.post("/admin/specialists/{spec_id}/documents/{doc_id}/review")
+async def review_specialist_document(spec_id: str, doc_id: str, data: DocumentReviewIn, user: dict = Depends(require_role("admin"))):
+    spec = await db.users.find_one({"_id": ObjectId(spec_id), "role": "specialist"})
+    if not spec:
+        raise HTTPException(404, "Specialist not found")
+    docs = spec.get("documents") or []
+    found = False
+    for d in docs:
+        if d.get("id") == doc_id:
+            d["status"] = data.status
+            d["reason"] = data.reason
+            d["validated_at"] = datetime.now(timezone.utc).isoformat()
+            d["validated_by"] = user["id"]
+            found = True
+            break
+    if not found:
+        raise HTTPException(404, "Document not found")
+    await db.users.update_one({"_id": ObjectId(spec_id)}, {"$set": {"documents": docs}})
+    title = "Document aprobat" if data.status == "approved" else "Document respins"
+    msg = f"Documentul '{next((d['name'] for d in docs if d.get('id')==doc_id), '')}' a fost {('aprobat' if data.status=='approved' else 'respins')}."
+    if data.reason:
+        msg += f" Motiv: {data.reason}"
+    await notify(spec_id, title, msg, type_="verification", link="/specialist")
+    return {"ok": True}
+
