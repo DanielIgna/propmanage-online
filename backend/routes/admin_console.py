@@ -33,6 +33,7 @@ router = APIRouter(prefix="/api/admin", tags=["admin_console"])
 
 # ============= DEFAULTS =============
 DEFAULT_CMS = {
+    "landing.promo_banner": "",
     "hero.badge": "PROPERTY OPERATING SYSTEM • V4.2",
     "hero.title1": "Proprietatea ta,",
     "hero.title2": "perfecționată",

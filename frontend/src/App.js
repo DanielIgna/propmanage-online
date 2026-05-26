@@ -1288,25 +1288,49 @@ const Footer = () => (
   </footer>
 );
 
+// ============= PROMO BANNER (CMS-driven) =============
+const PromoBanner = () => {
+  const { t } = useI18n();
+  const [dismissed, setDismissed] = useState(() => sessionStorage.getItem("pm_promo_dismissed") === "1");
+  const text = t("landing.promo_banner");
+  if (dismissed || !text || text === "landing.promo_banner") return null;
+  const close = () => { sessionStorage.setItem("pm_promo_dismissed", "1"); setDismissed(true); };
+  return (
+    <div className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-[#d4ff3a] via-[#a8e028] to-[#d4ff3a] text-black text-center text-xs sm:text-sm font-medium py-2 px-12 flex items-center justify-center gap-2" data-testid="promo-banner">
+      <Sparkles className="w-3.5 h-3.5" />
+      <span className="truncate max-w-[80vw]">{text}</span>
+      <button onClick={close} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-black/10 rounded-full" data-testid="promo-banner-close" aria-label="Închide">
+        <Minus className="w-3.5 h-3.5 rotate-45" />
+      </button>
+    </div>
+  );
+};
+
 // ============= LANDING PAGE =============
-const LandingPage = () => (
-  <div className="grain min-h-screen bg-[#0a0a0b] text-stone-100">
-    <Nav />
-    <Hero />
-    <Problem />
-    <Solution />
-    <UserJourney />
-    <SpecialistJourney />
-    <WalletEcosystem />
-    <DigitalTwin />
-    <AdminTrust />
-    <BusinessModel />
-    <ValueProp />
-    <GoldenPath />
-    <CTA />
-    <Footer />
-  </div>
-);
+const LandingPage = () => {
+  const { t } = useI18n();
+  const promoText = t("landing.promo_banner");
+  const hasPromo = !!promoText && promoText !== "landing.promo_banner" && sessionStorage.getItem("pm_promo_dismissed") !== "1";
+  return (
+    <div className={`grain min-h-screen bg-[#0a0a0b] text-stone-100 ${hasPromo ? "pt-9 sm:pt-10" : ""}`}>
+      <PromoBanner />
+      <Nav />
+      <Hero />
+      <Problem />
+      <Solution />
+      <UserJourney />
+      <SpecialistJourney />
+      <WalletEcosystem />
+      <DigitalTwin />
+      <AdminTrust />
+      <BusinessModel />
+      <ValueProp />
+      <GoldenPath />
+      <CTA />
+      <Footer />
+    </div>
+  );
+};
 
 // ============= MAIN APP =============
 function App() {
