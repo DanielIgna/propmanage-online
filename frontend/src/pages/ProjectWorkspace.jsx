@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import {
   ArrowLeft, Plus, Users, CheckCircle2, Clock, AlertTriangle, MessageSquare,
   Trash2, X, Building2, Palette, Send, ListChecks, Loader2, Flag,
+  Wallet, Calendar, Paperclip, Image as ImageIcon, ShieldCheck, Hourglass, AlertOctagon,
 } from "lucide-react";
 import { useAuth } from "../auth";
 
@@ -110,12 +111,12 @@ export const ProjectWorkspace = () => {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 text-sm">
-          {["tasks", "members", "activity"].map(k => (
+        <div className="flex gap-2 text-sm flex-wrap">
+          {["tasks", "payments", "timeline", "members", "activity"].map(k => (
             <button key={k} onClick={() => setTab(k)}
               className={`px-4 py-2 rounded-full transition ${tab === k ? "bg-[#d4ff3a] text-black font-medium" : "bg-white/5 text-stone-400 hover:bg-white/10"}`}
               data-testid={`proj-tab-${k}`}>
-              {{ tasks: "Task-uri", members: "Echipa", activity: "Activitate" }[k]}
+              {{ tasks: "Task-uri", payments: "Plăți", timeline: "Timeline", members: "Echipa", activity: "Activitate" }[k]}
             </button>
           ))}
         </div>
@@ -125,6 +126,14 @@ export const ProjectWorkspace = () => {
             onNewTask={() => setNewTaskOpen(true)}
             onOpenTask={(t) => setTaskDetail(t)}
             onUpdate={load} />
+        )}
+
+        {tab === "payments" && (
+          <PaymentsTab project={project} isDesigner={isDesigner} isClient={isClient} onUpdate={load} />
+        )}
+
+        {tab === "timeline" && (
+          <TimelineTab tasks={tasks} project={project} onOpenTask={(t) => setTaskDetail(t)} />
         )}
 
         {tab === "members" && (
@@ -151,14 +160,33 @@ export const ProjectWorkspace = () => {
   );
 };
 
-// ============= TASKS BOARD =============
+// ============= TASKS BOARD (with HTML5 drag & drop) =============
 const TasksBoard = ({ tasks, isDesigner, project, onNewTask, onOpenTask, onUpdate }) => {
+  const [dragOver, setDragOver] = useState(null);
   const grouped = STATUS_COLS.reduce((acc, c) => ({ ...acc, [c.id]: tasks.filter(t => t.status === c.id) }), {});
+
+  const handleDrop = async (e, colId) => {
+    e.preventDefault();
+    setDragOver(null);
+    const taskId = e.dataTransfer.getData("text/plain");
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || task.status === colId) return;
+    // Permission: designer OR assignee can change status
+    const canChange = isDesigner || task.assignee_id === project.designer_id;
+    try {
+      await axios.patch(`${API}/tasks/${taskId}`, { status: colId });
+      onUpdate();
+    } catch (err) {
+      alert(err?.response?.data?.detail || "Mutarea task-ului nu este permisă (doar designerul sau persoana asignată poate schimba status-ul).");
+    }
+  };
+
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center flex-wrap gap-2">
+        <div className="text-[11px] text-stone-500 italic hidden sm:block">💡 Trage task-urile între coloane (drag & drop)</div>
         {isDesigner && (
-          <button onClick={onNewTask} className="btn-accent px-4 py-2 rounded-full text-sm flex items-center gap-1.5" data-testid="new-task-btn">
+          <button onClick={onNewTask} className="btn-accent px-4 py-2 rounded-full text-sm flex items-center gap-1.5 ml-auto" data-testid="new-task-btn">
             <Plus className="w-4 h-4" />Task nou
           </button>
         )}
@@ -167,7 +195,12 @@ const TasksBoard = ({ tasks, isDesigner, project, onNewTask, onOpenTask, onUpdat
         {STATUS_COLS.map(col => {
           const Icon = col.icon;
           return (
-            <div key={col.id} className="bg-white/[0.03] border border-white/5 rounded-2xl p-3" data-testid={`col-${col.id}`}>
+            <div key={col.id}
+              onDragOver={e => { e.preventDefault(); setDragOver(col.id); }}
+              onDragLeave={() => setDragOver(prev => prev === col.id ? null : prev)}
+              onDrop={e => handleDrop(e, col.id)}
+              className={`bg-white/[0.03] border rounded-2xl p-3 transition-all ${dragOver === col.id ? "border-[#d4ff3a]/60 bg-[#d4ff3a]/5 scale-[1.01]" : "border-white/5"}`}
+              data-testid={`col-${col.id}`}>
               <div className={`flex items-center gap-2 mb-3 text-${col.color}-300`}>
                 <Icon className="w-4 h-4" />
                 <div className="text-[10px] uppercase tracking-wider font-medium">{col.label}</div>
@@ -177,8 +210,11 @@ const TasksBoard = ({ tasks, isDesigner, project, onNewTask, onOpenTask, onUpdat
                 {grouped[col.id].length === 0 ? (
                   <div className="text-[11px] text-stone-600 italic py-2 text-center">— gol —</div>
                 ) : grouped[col.id].map(t => (
-                  <button key={t.id} onClick={() => onOpenTask(t)}
-                    className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-3 transition group"
+                  <div key={t.id}
+                    draggable
+                    onDragStart={e => e.dataTransfer.setData("text/plain", t.id)}
+                    onClick={() => onOpenTask(t)}
+                    className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-3 transition group cursor-grab active:cursor-grabbing"
                     data-testid={`task-card-${t.id}`}>
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <div className="text-sm font-medium leading-tight">{t.title}</div>
@@ -189,18 +225,391 @@ const TasksBoard = ({ tasks, isDesigner, project, onNewTask, onOpenTask, onUpdat
                     {t.assignee_name && (
                       <div className="text-[10px] uppercase tracking-wider text-stone-500 mt-1">→ {t.assignee_name}</div>
                     )}
-                    {t.comments_count > 0 && (
-                      <div className="text-[10px] text-stone-500 mt-1 flex items-center gap-1">
-                        <MessageSquare className="w-2.5 h-2.5" />{t.comments_count}
-                      </div>
-                    )}
-                  </button>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      {t.attachments?.length > 0 && (
+                        <div className="text-[10px] text-stone-500 flex items-center gap-1">
+                          <Paperclip className="w-2.5 h-2.5" />{t.attachments.length}
+                        </div>
+                      )}
+                      {t.comments_count > 0 && (
+                        <div className="text-[10px] text-stone-500 flex items-center gap-1">
+                          <MessageSquare className="w-2.5 h-2.5" />{t.comments_count}
+                        </div>
+                      )}
+                      {t.due_date && (
+                        <div className="text-[10px] text-stone-500 flex items-center gap-1 ml-auto">
+                          <Calendar className="w-2.5 h-2.5" />{new Date(t.due_date).toLocaleDateString("ro-RO", { day: "2-digit", month: "short" })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
           );
         })}
       </div>
+    </div>
+  );
+};
+
+// ============= PAYMENTS TAB (milestone-based escrow + 30-day warranty) =============
+const MILESTONE_STATE = {
+  pending_funding: { label: "Așteaptă plată", color: "stone", icon: Wallet },
+  funded: { label: "În escrow", color: "amber", icon: ShieldCheck },
+  released: { label: "Eliberat", color: "emerald", icon: CheckCircle2 },
+  warranty_hold: { label: "Garanție 30 zile", color: "cyan", icon: Hourglass },
+  warranty_released: { label: "Plătit final", color: "emerald", icon: CheckCircle2 },
+};
+
+const PaymentsTab = ({ project, isDesigner, isClient, onUpdate }) => {
+  const milestones = project.milestones || [];
+  const [showInit, setShowInit] = useState(false);
+  const [busy, setBusy] = useState(null);
+  const [claimFor, setClaimFor] = useState(null);
+
+  const fund = async (mid) => {
+    if (!window.confirm("Confirmi plata acestei tranșe din portofelul tău?")) return;
+    setBusy(mid);
+    try {
+      await axios.post(`${API}/projects/${project.id}/milestones/${mid}/fund`, { confirm: true });
+      onUpdate();
+    } catch (e) { alert(e?.response?.data?.detail || "Eroare la plată"); }
+    finally { setBusy(null); }
+  };
+  const release = async (mid, isFinal) => {
+    if (!window.confirm(isFinal
+      ? "Marchezi lucrarea ca finalizată. Tranșa finală va intra în perioada de garanție 30 zile (clientul poate raporta probleme)."
+      : "Eliberezi tranșa către specialiști?")) return;
+    setBusy(mid);
+    try {
+      await axios.post(`${API}/projects/${project.id}/milestones/${mid}/release`, {});
+      onUpdate();
+    } catch (e) { alert(e?.response?.data?.detail || "Eroare la eliberare"); }
+    finally { setBusy(null); }
+  };
+  const resolve = async (mid) => {
+    if (!window.confirm("Confirmi că problema a fost rezolvată? Banii se eliberează acum specialiștilor.")) return;
+    setBusy(mid);
+    try {
+      await axios.post(`${API}/projects/${project.id}/milestones/${mid}/warranty-resolve`);
+      onUpdate();
+    } catch (e) { alert(e?.response?.data?.detail || "Eroare"); }
+    finally { setBusy(null); }
+  };
+
+  if (milestones.length === 0) {
+    if (!isDesigner) {
+      return (
+        <div className="glass-strong rounded-3xl p-6 text-center text-stone-400">
+          <Wallet className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          Designerul nu a configurat încă planul de plăți pentru acest proiect.
+        </div>
+      );
+    }
+    return (
+      <>
+        <div className="glass-strong rounded-3xl p-6 text-center">
+          <Wallet className="w-10 h-10 mx-auto mb-3 text-[#d4ff3a]" />
+          <h3 className="font-serif text-xl mb-2">Setează planul de plăți</h3>
+          <p className="text-sm text-stone-400 mb-4 max-w-sm mx-auto">
+            4 tranșe egale de 25% — avans, început, 75% finalizare, finalizare (garanție 30 zile).
+          </p>
+          <button onClick={() => setShowInit(true)} className="btn-accent px-5 py-2.5 rounded-full text-sm font-medium" data-testid="init-milestones-btn">
+            Configurează tranșele
+          </button>
+        </div>
+        {showInit && <InitMilestonesModal project={project} onClose={() => setShowInit(false)} onCreated={onUpdate} />}
+      </>
+    );
+  }
+
+  const totalFunded = milestones.filter(m => ["funded", "released", "warranty_hold", "warranty_released"].includes(m.status)).reduce((s, m) => s + m.amount, 0);
+  const totalReleased = milestones.filter(m => ["released", "warranty_released"].includes(m.status)).reduce((s, m) => s + m.amount, 0);
+
+  return (
+    <div className="space-y-4">
+      {/* Progress overview */}
+      <div className="glass-strong rounded-3xl p-5">
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-stone-500">Buget total</div>
+            <div className="font-serif text-xl text-[#d4ff3a]">{project.total_budget?.toFixed(0)} RON</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-stone-500">Plătit în escrow</div>
+            <div className="font-serif text-xl text-amber-300">{totalFunded.toFixed(0)} RON</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-stone-500">Eliberat</div>
+            <div className="font-serif text-xl text-emerald-300">{totalReleased.toFixed(0)} RON</div>
+          </div>
+        </div>
+        <div className="h-2 bg-white/5 rounded-full overflow-hidden flex">
+          {milestones.map(m => (
+            <div key={m.id}
+              className={`h-full ${
+                m.status === "warranty_released" || m.status === "released" ? "bg-emerald-400" :
+                m.status === "warranty_hold" ? "bg-cyan-400" :
+                m.status === "funded" ? "bg-amber-400" :
+                "bg-stone-700"
+              }`}
+              style={{ width: `${m.pct}%` }}
+              title={`${m.name}: ${m.status}`}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Milestone cards */}
+      <div className="space-y-2.5">
+        {milestones.map((m, idx) => {
+          const stateInfo = MILESTONE_STATE[m.status] || MILESTONE_STATE.pending_funding;
+          const Icon = stateInfo.icon;
+          const prevReleased = idx === 0 || ["released", "warranty_hold", "warranty_released"].includes(milestones[idx - 1]?.status);
+          const daysLeft = m.warranty_release_at ? Math.max(0, Math.ceil((new Date(m.warranty_release_at) - new Date()) / 86400000)) : null;
+          return (
+            <div key={m.id}
+              className={`glass-strong rounded-2xl p-4 border ${m.warranty_dispute_open ? "border-red-500/50" : "border-white/10"}`}
+              data-testid={`milestone-${idx + 1}`}>
+              <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-9 h-9 rounded-xl bg-${stateInfo.color}-500/15 border border-${stateInfo.color}-500/30 flex items-center justify-center shrink-0`}>
+                    <Icon className={`w-4 h-4 text-${stateInfo.color}-300`} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] uppercase tracking-wider text-stone-500">Tranșa {idx + 1}/4 · {m.pct}%</div>
+                    <div className="font-medium text-sm">{m.name}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-${stateInfo.color}-500/15 text-${stateInfo.color}-300 border border-${stateInfo.color}-500/30`}>
+                    {stateInfo.label}
+                  </span>
+                  <span className="font-serif text-lg text-[#d4ff3a]">{m.amount} RON</span>
+                </div>
+              </div>
+              <p className="text-xs text-stone-400 leading-relaxed mb-3">{m.description}</p>
+
+              {m.warranty_dispute_open && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 mb-3 flex items-start gap-2">
+                  <AlertOctagon className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                  <div className="flex-1 text-xs">
+                    <div className="font-medium text-red-300 mb-1">Reclamație garanție deschisă</div>
+                    <div className="text-stone-400">{m.warranty_dispute_reason}</div>
+                  </div>
+                </div>
+              )}
+
+              {m.status === "warranty_hold" && !m.warranty_dispute_open && daysLeft !== null && (
+                <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-3 mb-3 text-xs flex items-center gap-2">
+                  <Hourglass className="w-3.5 h-3.5 text-cyan-300" />
+                  <span className="text-cyan-200">Eliberare automată în <b>{daysLeft} zile</b> (fără reclamații)</span>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                {/* Client actions */}
+                {isClient && m.status === "pending_funding" && prevReleased && (
+                  <button onClick={() => fund(m.id)} disabled={busy === m.id}
+                    className="btn-accent px-4 py-2 rounded-full text-xs font-medium disabled:opacity-50 flex items-center gap-1.5"
+                    data-testid={`fund-${idx + 1}`}>
+                    <Wallet className="w-3.5 h-3.5" />{busy === m.id ? "..." : `Plătește ${m.amount} RON`}
+                  </button>
+                )}
+                {isClient && m.status === "pending_funding" && !prevReleased && (
+                  <span className="text-[11px] text-stone-500 italic">Așteaptă eliberarea tranșei anterioare.</span>
+                )}
+                {isClient && m.status === "warranty_hold" && !m.warranty_dispute_open && (
+                  <button onClick={() => setClaimFor(m)}
+                    className="px-4 py-2 rounded-full text-xs bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/40 flex items-center gap-1.5"
+                    data-testid={`claim-${idx + 1}`}>
+                    <AlertOctagon className="w-3.5 h-3.5" />Raportează problemă
+                  </button>
+                )}
+                {(isClient || isDesigner) && m.status === "warranty_hold" && m.warranty_dispute_open && (
+                  <button onClick={() => resolve(m.id)} disabled={busy === m.id}
+                    className="px-4 py-2 rounded-full text-xs bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5"
+                    data-testid={`resolve-${idx + 1}`}>
+                    <CheckCircle2 className="w-3.5 h-3.5" />Marchează rezolvat
+                  </button>
+                )}
+
+                {/* Designer actions */}
+                {isDesigner && m.status === "funded" && (
+                  <button onClick={() => release(m.id, m.is_final)} disabled={busy === m.id}
+                    className="px-4 py-2 rounded-full text-xs bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5"
+                    data-testid={`release-${idx + 1}`}>
+                    <CheckCircle2 className="w-3.5 h-3.5" />{m.is_final ? "Marchează finalizat (intră garanție)" : "Eliberează către specialiști"}
+                  </button>
+                )}
+
+                {/* Timestamps */}
+                {m.funded_at && <span className="text-[10px] text-stone-500 ml-auto">Finanțat: {new Date(m.funded_at).toLocaleDateString("ro-RO")}</span>}
+                {m.released_at && <span className="text-[10px] text-emerald-400/70">Eliberat: {new Date(m.released_at).toLocaleDateString("ro-RO")}</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {claimFor && <WarrantyClaimModal project={project} milestone={claimFor} onClose={() => setClaimFor(null)} onSubmitted={onUpdate} />}
+    </div>
+  );
+};
+
+const InitMilestonesModal = ({ project, onClose, onCreated }) => {
+  const [budget, setBudget] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await axios.post(`${API}/projects/${project.id}/milestones/init`, { total_budget: parseFloat(budget) });
+      onCreated(); onClose();
+    } catch (e) { alert(e?.response?.data?.detail || "Eroare"); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-3" onClick={onClose}>
+      <form onSubmit={submit} onClick={e => e.stopPropagation()}
+        className="bg-stone-950 border border-white/10 rounded-3xl p-5 w-full max-w-md space-y-3" data-testid="init-milestones-modal">
+        <h3 className="font-serif text-xl">Configurează plățile</h3>
+        <p className="text-xs text-stone-400">Bugetul se împarte automat în 4 tranșe egale (25% fiecare). Tranșa finală are 30 zile de garanție.</p>
+        <div>
+          <label className="text-[10px] uppercase tracking-wider text-stone-400 mb-1 block">Buget total (RON)</label>
+          <input type="number" required min="100" step="100" value={budget} onChange={e => setBudget(e.target.value)}
+            placeholder="ex: 12000"
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm" data-testid="init-budget-input" />
+        </div>
+        {budget && parseFloat(budget) > 0 && (
+          <div className="bg-white/5 rounded-xl p-3 text-xs space-y-1">
+            <div className="text-[10px] uppercase tracking-wider text-stone-400 mb-1">Previzualizare tranșe</div>
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="flex justify-between">
+                <span>Tranșa {i} (25%)</span>
+                <span className="text-[#d4ff3a]">{(parseFloat(budget) / 4).toFixed(0)} RON</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-2 pt-2">
+          <button type="button" onClick={onClose} className="flex-1 py-2 bg-white/5 rounded-full text-sm">Anulează</button>
+          <button type="submit" disabled={busy || !budget} className="flex-1 py-2 btn-accent rounded-full text-sm disabled:opacity-40" data-testid="init-milestones-submit">
+            {busy ? "..." : "Setează planul"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+const WarrantyClaimModal = ({ project, milestone, onClose, onSubmitted }) => {
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await axios.post(`${API}/projects/${project.id}/milestones/${milestone.id}/warranty-claim`, { reason });
+      onSubmitted(); onClose();
+    } catch (e) { alert(e?.response?.data?.detail || "Eroare"); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-3" onClick={onClose}>
+      <form onSubmit={submit} onClick={e => e.stopPropagation()}
+        className="bg-stone-950 border border-red-500/40 rounded-3xl p-5 w-full max-w-md space-y-3" data-testid="warranty-claim-modal">
+        <h3 className="font-serif text-xl text-red-300">Raportează o problemă de garanție</h3>
+        <p className="text-xs text-stone-400">Descrie clar problema apărută. Specialiștii vor fi notificați automat. Banii rămân blocați până la rezolvare.</p>
+        <textarea required rows={4} minLength={10} value={reason} onChange={e => setReason(e.target.value)}
+          placeholder="Ex: După 5 zile de la finalizare, 2 plăci de gresie din baie s-au crăpat și un întrerupător nu mai funcționează corect..."
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm" data-testid="warranty-reason" />
+        <div className="flex gap-2 pt-2">
+          <button type="button" onClick={onClose} className="flex-1 py-2 bg-white/5 rounded-full text-sm">Anulează</button>
+          <button type="submit" disabled={busy || reason.length < 10}
+            className="flex-1 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/40 rounded-full text-sm disabled:opacity-40" data-testid="warranty-claim-submit">
+            {busy ? "..." : "Trimite reclamația"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+// ============= TIMELINE TAB (simple chronological bar chart) =============
+const TimelineTab = ({ tasks, project, onOpenTask }) => {
+  const tasksWithDates = tasks.filter(t => t.due_date).sort((a, b) => (a.due_date || "").localeCompare(b.due_date || ""));
+  const tasksWithoutDates = tasks.filter(t => !t.due_date);
+
+  if (tasks.length === 0) return (
+    <div className="glass-strong rounded-3xl p-6 text-center text-stone-400">
+      <Calendar className="w-10 h-10 mx-auto mb-3 opacity-30" />Niciun task încă.
+    </div>
+  );
+
+  // Determine date range
+  const allDates = tasksWithDates.map(t => new Date(t.due_date));
+  const startDates = tasksWithDates.map(t => new Date(t.created_at));
+  const minDate = startDates.length ? new Date(Math.min(...startDates)) : new Date();
+  const maxDate = allDates.length ? new Date(Math.max(...allDates)) : new Date();
+  const totalSpan = Math.max(1, (maxDate - minDate) / 86400000) || 1;
+
+  return (
+    <div className="space-y-4">
+      {tasksWithDates.length > 0 && (
+        <div className="glass-strong rounded-3xl p-5" data-testid="timeline-chart">
+          <div className="text-[10px] uppercase tracking-wider text-stone-400 mb-4 flex justify-between">
+            <span>{minDate.toLocaleDateString("ro-RO", { day: "numeric", month: "short" })}</span>
+            <span>Timeline · {tasksWithDates.length} task-uri cu termen</span>
+            <span>{maxDate.toLocaleDateString("ro-RO", { day: "numeric", month: "short" })}</span>
+          </div>
+          <div className="space-y-2">
+            {tasksWithDates.map(t => {
+              const start = new Date(t.created_at);
+              const end = new Date(t.due_date);
+              const startPct = Math.max(0, ((start - minDate) / 86400000) / totalSpan * 100);
+              const widthPct = Math.max(3, ((end - start) / 86400000) / totalSpan * 100);
+              const isDone = t.status === "done";
+              const overdue = !isDone && end < new Date();
+              return (
+                <button key={t.id} onClick={() => onOpenTask(t)}
+                  className="w-full text-left group" data-testid={`timeline-task-${t.id}`}>
+                  <div className="flex items-center gap-3 hover:bg-white/5 rounded-xl p-2 transition">
+                    <div className="text-xs w-32 sm:w-40 truncate text-stone-300">{t.title}</div>
+                    <div className="flex-1 relative h-5 bg-white/[0.03] rounded-full overflow-hidden">
+                      <div
+                        className={`absolute top-0 h-full rounded-full ${
+                          isDone ? "bg-emerald-400/70" : overdue ? "bg-red-400/70" :
+                          t.status === "in_progress" ? "bg-amber-400/70" : "bg-stone-400/40"
+                        }`}
+                        style={{ left: `${startPct}%`, width: `${Math.min(100 - startPct, widthPct)}%` }}
+                      />
+                    </div>
+                    <div className="text-[10px] text-stone-500 w-20 text-right shrink-0">
+                      {new Date(t.due_date).toLocaleDateString("ro-RO", { day: "2-digit", month: "short" })}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {tasksWithoutDates.length > 0 && (
+        <div className="glass-strong rounded-3xl p-5">
+          <div className="text-[10px] uppercase tracking-wider text-stone-400 mb-3">Fără termen · {tasksWithoutDates.length}</div>
+          <div className="space-y-1.5">
+            {tasksWithoutDates.map(t => (
+              <button key={t.id} onClick={() => onOpenTask(t)}
+                className="w-full text-left bg-white/[0.03] hover:bg-white/[0.07] rounded-xl px-3 py-2 text-sm flex items-center justify-between transition">
+                <span>{t.title}</span>
+                <span className="text-[10px] text-stone-500 capitalize">{t.status.replace("_", " ")}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -411,6 +820,8 @@ const TaskDetailModal = ({ task, project, onClose, onUpdate, currentUser }) => {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [busy, setBusy] = useState(false);
+  const [attachments, setAttachments] = useState(task.attachments || []);
+  const fileInputRef = React.useRef(null);
   const isDesigner = project.designer_id === currentUser?.id;
   const isAssignee = task.assignee_id === currentUser?.id;
   const canEditStatus = isDesigner || isAssignee;
@@ -436,6 +847,30 @@ const TaskDetailModal = ({ task, project, onClose, onUpdate, currentUser }) => {
       setNewComment("");
     } catch (e) { alert(e?.response?.data?.detail || "Eroare"); }
     finally { setBusy(false); }
+  };
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2_500_000) { alert("Fișier prea mare (max 2.5MB)"); return; }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const { data } = await axios.post(`${API}/tasks/${task.id}/attachments`, {
+          url: reader.result, name: file.name, mime: file.type,
+        });
+        setAttachments([...(attachments || []), data.attachment]);
+      } catch (err) { alert(err?.response?.data?.detail || "Eroare upload"); }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeAttachment = async (attId) => {
+    if (!window.confirm("Ștergi acest atașament?")) return;
+    try {
+      await axios.delete(`${API}/tasks/${task.id}/attachments/${attId}`);
+      setAttachments(attachments.filter(a => a.id !== attId));
+    } catch (e) { alert(e?.response?.data?.detail || "Eroare"); }
   };
 
   return (
@@ -467,6 +902,49 @@ const TaskDetailModal = ({ task, project, onClose, onUpdate, currentUser }) => {
             ))}
           </div>
         )}
+
+        {/* Attachments */}
+        <div className="border-t border-white/5 pt-3 mb-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[10px] uppercase tracking-wider text-stone-400 flex items-center gap-1">
+              <Paperclip className="w-3 h-3" />Atașamente ({attachments.length})
+            </div>
+            <button onClick={() => fileInputRef.current?.click()}
+              className="text-xs px-2.5 py-1 rounded-full bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 flex items-center gap-1" data-testid="upload-attachment-btn">
+              <ImageIcon className="w-3 h-3" />Adaugă foto/fișier
+            </button>
+            <input type="file" ref={fileInputRef} onChange={handleFile} accept="image/*,application/pdf" className="hidden" data-testid="attachment-file-input" />
+          </div>
+          {attachments.length === 0 ? (
+            <div className="text-[11px] text-stone-500 italic">Nicio fotografie încă. Adaugă poze de progres pentru lucrare.</div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {attachments.map(a => {
+                const isImg = (a.mime || "").startsWith("image/") || /\.(jpg|jpeg|png|gif|webp)$/i.test(a.name);
+                return (
+                  <div key={a.id} className="relative group bg-white/5 rounded-xl overflow-hidden aspect-square" data-testid={`attachment-${a.id}`}>
+                    {isImg ? (
+                      <img src={a.url} alt={a.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-stone-400 p-2 text-center">
+                        <Paperclip className="w-5 h-5 mb-1" />
+                        <div className="text-[9px] truncate w-full">{a.name}</div>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/70 transition flex items-end p-1.5 opacity-0 group-hover:opacity-100">
+                      <div className="text-[9px] text-white truncate flex-1">{a.uploaded_by_name}</div>
+                      <button onClick={(e) => { e.stopPropagation(); removeAttachment(a.id); }}
+                        className="text-red-300 hover:text-red-200">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         <div className="border-t border-white/5 pt-3 space-y-2">
           <div className="text-[10px] uppercase tracking-wider text-stone-400">Comentarii ({comments.length})</div>
           <div className="space-y-2 max-h-48 overflow-y-auto">

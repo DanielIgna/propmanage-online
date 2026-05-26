@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from db import client
 from seed import seed
 from digest import run_daily_digests, BUCHAREST_TZ_NAME
+from routes.projects import auto_release_warranty_holds
 
 # Routers (1 file per domain)
 from routes.auth import router as auth_router
@@ -81,8 +82,16 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=3600,
         )
+        scheduler.add_job(
+            auto_release_warranty_holds,
+            CronTrigger(hour=6, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="warranty_auto_release",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
         scheduler.start()
         logger.info("Daily digest scheduler started (19:00 Europe/Bucharest).")
+        logger.info("Warranty auto-release scheduler started (06:00 Europe/Bucharest).")
 
 
 @app.on_event("shutdown")
