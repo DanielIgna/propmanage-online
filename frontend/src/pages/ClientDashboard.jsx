@@ -16,6 +16,7 @@ import { PhotoUploader, ReviewModal, PropertyManagerModal } from "./Components";
 import { TwoFASetupModal, PropertyTimelineModal } from "./Marketplace";
 import { OpenDisputeModal } from "./AdminModals";
 import { InteriorDesignCard, InteriorDesignModal, DesignPhasesPanel } from "./InteriorDesign";
+import { ClientTwinViewerModal, DesignersBrowse } from "./ClientTwinViewer";
 import { API, DashLayout, Stat, StatusBadge } from "./DashShared";
 import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
@@ -39,6 +40,7 @@ export const ClientDashboard = () => {
   const [filterCat, setFilterCat] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [showDesign, setShowDesign] = useState(false);
+  const [showTwinViewer, setShowTwinViewer] = useState(false);
   const [designPhasesFor, setDesignPhasesFor] = useState(null);
   const [timelineRequestId, setTimelineRequestId] = useState(null);
   const [tab, setTab] = useState("request");
@@ -143,7 +145,7 @@ export const ClientDashboard = () => {
           setSelectedPropId={setSelectedPropId} setProperties={setProperties}
           setShowNewReq={setShowNewReq} setShowPropManager={setShowPropManager}
           setTimelineFor={setTimelineFor} setShow2FA={setShow2FA}
-          setShowDesign={setShowDesign} setTab={setTab}
+          setShowDesign={setShowDesign} setTab={setTab} setShowTwinViewer={setShowTwinViewer}
         />
       )}
       {tab === "jobs" && (
@@ -167,6 +169,7 @@ export const ClientDashboard = () => {
       {timelineFor && <PropertyTimelineModal propertyId={timelineFor} onClose={() => setTimelineFor(null)} />}
       {disputeFor && <OpenDisputeModal requestId={disputeFor.id} requestTitle={disputeFor.title} onClose={() => setDisputeFor(null)} onOpened={() => loadRequests()} />}
       {showDesign && <InteriorDesignModal onClose={() => setShowDesign(false)} onCreated={() => loadRequests()} />}
+      {showTwinViewer && prop && <ClientTwinViewerModal propertyId={prop.id} propertyName={prop.name} onClose={() => setShowTwinViewer(false)} />}
       {designPhasesFor && <DesignPhasesViewer request={designPhasesFor} onClose={() => setDesignPhasesFor(null)} onUpdate={() => { loadRequests(); refreshUser(); }} />}
       {timelineRequestId && <RequestTimelineModal requestId={timelineRequestId} onClose={() => setTimelineRequestId(null)} />}
       {show2FA && <TwoFASetupModal onClose={() => setShow2FA(false)} currentlyEnabled={false} />}
@@ -183,7 +186,7 @@ export const ClientDashboard = () => {
 };
 
 // ============= TAB 1: Request Zone (Onboarding cycle: Property → Twin → Design) =============
-const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setProperties, setShowNewReq, setShowPropManager, setTimelineFor, setShow2FA, setShowDesign, setTab }) => {
+const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setProperties, setShowNewReq, setShowPropManager, setTimelineFor, setShow2FA, setShowDesign, setTab, setShowTwinViewer }) => {
   const { t } = useI18n();
   const { refreshUser } = useAuth();
   const noProps = properties.length === 0;
@@ -295,7 +298,9 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setP
               <Shield className="w-3 h-3" />2FA
             </button>
             {twinUnlocked ? (
-              <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">LIVE 3D · ACTIVAT</span>
+              <button onClick={() => setShowTwinViewer(true)} className="text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 transition" data-testid="open-twin-viewer">
+                <Sparkles className="w-3 h-3" />Deschide Twin 3D
+              </button>
             ) : twinStatus === "pending_validation" ? (
               <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">⏳ ÎN VALIDARE</span>
             ) : twinStatus === "needs_revision" ? (
@@ -383,7 +388,30 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setP
           ))}
         </div>
 
+        {/* ALWAYS VISIBLE Twin primary CTA */}
+        {twinUnlocked && (
+          <button
+            onClick={() => setShowTwinViewer(true)}
+            className="w-full mb-4 bg-gradient-to-r from-emerald-500/20 via-[#d4ff3a]/15 to-cyan-500/20 hover:from-emerald-500/30 hover:via-[#d4ff3a]/25 hover:to-cyan-500/30 border border-emerald-500/40 rounded-2xl px-5 py-4 flex items-center justify-between gap-3 transition-all group"
+            data-testid="twin-cta-big"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-emerald-500/25 border border-emerald-500/50 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <Sparkles className="w-5 h-5 text-emerald-300" />
+              </div>
+              <div className="text-left">
+                <div className="font-medium text-sm text-emerald-200">Digital Twin activ · Vezi modelul 3D</div>
+                <div className="text-xs text-stone-400">Camere, asset-uri tehnice și stare în timp real</div>
+              </div>
+            </div>
+            <div className="text-[10px] uppercase tracking-wider text-emerald-300 px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 shrink-0">DESCHIDE →</div>
+          </button>
+        )}
+
         <InteriorDesignCard user={user} onOpen={() => setShowDesign(true)} />
+
+        {/* Designers list — connected when twin is unlocked */}
+        {twinUnlocked && <DesignersBrowse onSelect={() => setShowDesign(true)} />}
       </div>
     </>
   );

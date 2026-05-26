@@ -32,9 +32,10 @@ async def public_marketplace(
     sort: str = "rating",  # rating, reviews, recent
 ):
     """Public endpoint: browse all specialists with filters. No auth required."""
-    q = {"role": "specialist"}
+    q = {"role": "specialist", "deleted": {"$ne": True}}
     if category:
-        q["specialty"] = category
+        # Match primary specialty OR any of service_categories (multi-specialty)
+        q["$or"] = [{"specialty": category}, {"service_categories": category}]
     if verified_only:
         q["verified"] = True
     if min_rating is not None:
@@ -52,11 +53,15 @@ async def public_marketplace(
         "id": str(d["_id"]),
         "name": d.get("name"),
         "picture": d.get("picture"),
+        "avatar": d.get("avatar"),
         "specialty": d.get("specialty"),
+        "service_categories": d.get("service_categories", []),
+        "coverage_zones": d.get("coverage_zones", []),
         "rating": d.get("rating"),
         "reviews_count": d.get("reviews_count", 0),
         "tier": d.get("tier"),
         "verified": d.get("verified", False),
+        "availability_status": d.get("availability_status"),
     } for d in docs]
 
 

@@ -139,33 +139,42 @@ async def seed():
             for r in sample_requests:
                 await db.requests.insert_one(r)
 
-    # Seed sample Digital Twin pending validation
+    # Seed sample Digital Twin APPROVED (so client has access to Interior Design flow)
     if client_id:
         prop_for_twin = await db.properties.find_one({"owner_id": client_id})
         if prop_for_twin:
             from bson import ObjectId  # local import to avoid top-level coupling
             prop_id_str = str(prop_for_twin["_id"])
             existing_twin = await db.twins.find_one({"property_id": prop_id_str})
-            if not existing_twin:
-                now_iso = datetime.now(timezone.utc).isoformat()
-                await db.twins.insert_one({
-                    "property_id": prop_id_str,
-                    "status": "pending_validation",
-                    "rooms": [
-                        {"id": str(uuid.uuid4()), "name": "Living", "type": "living", "area": 32, "x": 50, "y": 50, "w": 220, "h": 180},
-                        {"id": str(uuid.uuid4()), "name": "Dormitor", "type": "bedroom", "area": 16, "x": 280, "y": 50, "w": 160, "h": 130},
-                        {"id": str(uuid.uuid4()), "name": "Bucătărie", "type": "kitchen", "area": 12, "x": 50, "y": 240, "w": 140, "h": 120},
-                        {"id": str(uuid.uuid4()), "name": "Baie", "type": "bathroom", "area": 6, "x": 200, "y": 240, "w": 90, "h": 120},
-                        {"id": str(uuid.uuid4()), "name": "Hol", "type": "hallway", "area": 8, "x": 300, "y": 200, "w": 140, "h": 160},
-                    ],
-                    "assets": [
-                        {"id": str(uuid.uuid4()), "type": "boiler", "name": "Centrală termică", "x": 220, "y": 280, "condition": "good"},
-                        {"id": str(uuid.uuid4()), "name": "Panou electric", "type": "electric_panel", "x": 330, "y": 220, "condition": "good"},
-                        {"id": str(uuid.uuid4()), "name": "HVAC living", "type": "hvac", "x": 150, "y": 120, "condition": "fair"},
-                    ],
-                    "requested_at": now_iso,
-                    "created_at": now_iso,
-                })
+            now_iso = datetime.now(timezone.utc).isoformat()
+            twin_doc = {
+                "property_id": prop_id_str,
+                "status": "approved",
+                "rooms": [
+                    {"id": str(uuid.uuid4()), "name": "Living", "type": "living", "area": 32, "x": 50, "y": 50, "w": 220, "h": 180},
+                    {"id": str(uuid.uuid4()), "name": "Dormitor", "type": "bedroom", "area": 16, "x": 280, "y": 50, "w": 160, "h": 130},
+                    {"id": str(uuid.uuid4()), "name": "Bucătărie", "type": "kitchen", "area": 12, "x": 50, "y": 240, "w": 140, "h": 120},
+                    {"id": str(uuid.uuid4()), "name": "Baie", "type": "bathroom", "area": 6, "x": 200, "y": 240, "w": 90, "h": 120},
+                    {"id": str(uuid.uuid4()), "name": "Hol", "type": "hallway", "area": 8, "x": 300, "y": 200, "w": 140, "h": 160},
+                ],
+                "assets": [
+                    {"id": str(uuid.uuid4()), "type": "boiler", "name": "Centrală termică", "x": 220, "y": 280, "condition": "good"},
+                    {"id": str(uuid.uuid4()), "name": "Panou electric", "type": "electric_panel", "x": 330, "y": 220, "condition": "good"},
+                    {"id": str(uuid.uuid4()), "name": "HVAC living", "type": "hvac", "x": 150, "y": 120, "condition": "fair"},
+                ],
+                "requested_at": now_iso,
+                "validated_at": now_iso,
+                "created_at": now_iso,
+            }
+            if existing_twin:
+                # Self-heal: ensure demo twin remains approved (resilient to test data drift)
+                if existing_twin.get("status") != "approved":
+                    await db.twins.update_one(
+                        {"_id": existing_twin["_id"]},
+                        {"$set": {"status": "approved", "validated_at": now_iso}}
+                    )
+            else:
+                await db.twins.insert_one(twin_doc)
 
     # Seed portfolio (idempotent)
     if await db.portfolio.count_documents({}) == 0:

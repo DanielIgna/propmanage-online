@@ -71,6 +71,27 @@ async def request_twin_validation(prop_id: str, user: dict = Depends(get_current
     await log_event(None, "twin.requested", actor=user, property_id=prop_id, payload={"property_name": prop.get("name")})
     return {"ok": True}
 
+@router.get("/properties/{prop_id}/twin")
+async def get_my_property_twin(prop_id: str, user: dict = Depends(get_current_user)):
+    """Read-only twin view for the property OWNER (client). Returns rooms + assets if approved."""
+    prop = await db.properties.find_one({"_id": ObjectId(prop_id)})
+    if not prop:
+        raise HTTPException(404, "Property not found")
+    if prop.get("owner_id") != user["id"] and user.get("role") not in ("admin", "operator"):
+        raise HTTPException(403, "Not allowed")
+    twin = await db.twins.find_one({"property_id": prop_id})
+    if not twin:
+        return {"status": "not_requested", "rooms": [], "assets": []}
+    return {
+        "status": twin.get("status"),
+        "rooms": twin.get("rooms") or [],
+        "assets": twin.get("assets") or [],
+        "notes": twin.get("notes"),
+        "requested_at": twin.get("requested_at"),
+        "validated_at": twin.get("validated_at"),
+    }
+
+
 @router.get("/operator/twins")
 async def operator_list_twins(user: dict = Depends(require_role("operator", "admin"))):
     """List all twins (pending + approved) with batched enrichment"""
