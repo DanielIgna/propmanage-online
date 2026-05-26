@@ -39,6 +39,7 @@ from routes.regions import router as regions_router
 from routes.matching import router as matching_router
 from routes.services_avail import router as services_avail_router
 from routes.projects import router as projects_router
+from routes.trust import router as trust_router
 from routes.root import router as root_router
 
 logging.basicConfig(level=logging.INFO)
@@ -63,7 +64,7 @@ for r in (
     payments_router, chat_router, specialist_profile_router,
     notifications_router, ai_router, marketplace_router,
     property_timeline_router, regions_router, matching_router,
-    services_avail_router, projects_router, root_router,
+    services_avail_router, projects_router, trust_router, root_router,
 ):
     app.include_router(r)
 

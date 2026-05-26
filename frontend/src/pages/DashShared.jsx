@@ -9,6 +9,50 @@ import { AIAssistant } from "./AIAssistant";
 
 export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// ============= NAVIGATE BUTTONS (Google Maps / Waze deep-links) =============
+export const NavigateButtons = ({ address, lat, lng, compact = false }) => {
+  if (!address && !lat) return null;
+  const query = address ? encodeURIComponent(address) : `${lat},${lng}`;
+  const gmaps = `https://www.google.com/maps/dir/?api=1&destination=${query}&travelmode=driving`;
+  const waze = lat && lng
+    ? `https://www.waze.com/ul?ll=${lat}%2C${lng}&navigate=yes`
+    : `https://waze.com/ul?q=${query}`;
+  if (compact) {
+    return (
+      <div className="flex gap-1.5" data-testid="navigate-buttons-compact">
+        <a href={gmaps} target="_blank" rel="noopener noreferrer"
+          className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/40 flex items-center gap-1"
+          data-testid="open-gmaps-btn" title="Deschide în Google Maps">
+          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8 2 5 5 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-4-3-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg>
+          Maps
+        </a>
+        <a href={waze} target="_blank" rel="noopener noreferrer"
+          className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 flex items-center gap-1"
+          data-testid="open-waze-btn" title="Deschide în Waze">
+          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+          Waze
+        </a>
+      </div>
+    );
+  }
+  return (
+    <div className="flex gap-2 flex-wrap" data-testid="navigate-buttons">
+      <a href={gmaps} target="_blank" rel="noopener noreferrer"
+        className="px-3 py-2 rounded-full bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/40 text-xs flex items-center gap-1.5 font-medium"
+        data-testid="open-gmaps-btn">
+        Mergi cu Google Maps
+      </a>
+      <a href={waze} target="_blank" rel="noopener noreferrer"
+        className="px-3 py-2 rounded-full bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 text-xs flex items-center gap-1.5 font-medium"
+        data-testid="open-waze-btn">
+        Mergi cu Waze
+      </a>
+    </div>
+  );
+};
+
+
+
 // ============= NOTIFICATIONS BELL =============
 export const NotificationsBell = () => {
   const [notifs, setNotifs] = useState([]);

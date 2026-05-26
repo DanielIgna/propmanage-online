@@ -197,18 +197,15 @@ async def seed():
                  "gallery": ["https://picsum.photos/seed/portfolio-kitchen-modern-1/800/600"], "location": "Cluj-Napoca", "surface": 32.0, "created_at": now_iso},
             ])
 
-    # Seed regions
-    sample_regions = [
-        {"country": "România", "city": "București", "zone": "Bucuresti-Sector1"},
-        {"country": "România", "city": "București", "zone": "Bucuresti-Sector2"},
-        {"country": "România", "city": "București", "zone": "Bucuresti-Sector3"},
-        {"country": "România", "city": "Cluj-Napoca", "zone": "Centru"},
-        {"country": "România", "city": "Timișoara", "zone": "Iosefin"},
-    ]
-    for r in sample_regions:
-        existing = await db.regions.find_one(r)
+    # Seed regions — comprehensive Romanian list
+    from romania_zones import ROMANIAN_ZONES
+    for country, city, zone in ROMANIAN_ZONES:
+        existing = await db.regions.find_one({"country": country, "city": city, "zone": zone})
         if not existing:
-            await db.regions.insert_one({**r, "created_at": datetime.now(timezone.utc).isoformat()})
+            await db.regions.insert_one({
+                "country": country, "city": city, "zone": zone,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
 
     # Write test credentials
     creds_path = Path("/app/memory/test_credentials.md")

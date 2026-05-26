@@ -6,9 +6,9 @@ import { motion } from "framer-motion";
 import axios from "axios";
 import {
   User as UserIcon, Settings as SettingsIcon, RefreshCw, Share2, Heart,
-  LifeBuoy, MessageCircle, Lock, ChevronRight, X, Mail, Phone, MapPin,
+  LifeBuoy, MessageCircle, Lock, ChevronRight, X, Mail, Phone, MapPin as MapPinIcon,
   Download, Trash2, AlertTriangle, CheckCircle2, Shield, BellRing, BellOff,
-  Sun, Eye,
+  Sun, Eye, Globe, Clock,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { API } from "./DashShared";
@@ -146,6 +146,15 @@ export const SettingsPanel = () => {
           onClick={() => setModal("password")}
           tid="row-password"
         />
+        {user.role === "specialist" && (
+          <Row
+            icon={MapPinIcon}
+            title="Aria de acoperire"
+            subtitle={`Scope: ${user.coverage_scope || "local"} · ${(user.coverage_zones || []).length} zone · răspuns ≤ ${user.response_time_minutes || 60} min`}
+            onClick={() => setModal("coverage")}
+            tid="row-coverage"
+          />
+        )}
         {showDualRole && (
           <Row
             icon={RefreshCw}
@@ -243,6 +252,7 @@ export const SettingsPanel = () => {
 
       {modal === "profile" && <ProfileModal onClose={() => setModal(null)} />}
       {modal === "password" && <PasswordModal onClose={() => setModal(null)} />}
+      {modal === "coverage" && <CoverageModal user={user} refreshUser={refreshUser} onClose={() => setModal(null)} />}
       {modal === "privacy" && <PrivacyModal onClose={() => setModal(null)} />}
       {modal === "referral" && <ReferralModal onClose={() => setModal(null)} />}
       {modal === "review-app" && <SimpleInfoModal title="Evaluează PropManage" onClose={() => setModal(null)}>
@@ -733,6 +743,149 @@ const FAQItem = ({ q, a }) => {
         <ChevronRight className={`w-4 h-4 text-stone-400 transition-transform ${open ? "rotate-90" : ""}`} />
       </button>
       {open && <div className="px-4 pb-3 text-xs text-stone-400 leading-relaxed">{a}</div>}
+    </div>
+  );
+};
+
+
+
+// ============= COVERAGE MODAL (specialist's work scope + zones + response time) =============
+const CoverageModal = ({ user, refreshUser, onClose }) => {
+  const isDesigner = (user.service_categories || []).includes("interior_design");
+  const [scope, setScope] = useState(user.coverage_scope || "local");
+  const [zones, setZones] = useState(user.coverage_zones || []);
+  const [responseTime, setResponseTime] = useState(user.response_time_minutes || 60);
+  const [grouped, setGrouped] = useState([]);
+  const [search, setSearch] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [expandedCity, setExpandedCity] = useState(null);
+
+  useEffect(() => {
+    axios.get(`${API}/regions/grouped`).then(r => setGrouped(r.data || [])).catch(() => setGrouped([]));
+  }, []);
+
+  const toggleZone = (z) => {
+    setZones(prev => prev.includes(z) ? prev.filter(x => x !== z) : [...prev, z]);
+  };
+
+  const submit = async () => {
+    if (scope !== "national" && zones.length === 0) {
+      alert("Pentru scope local/regional, alege cel puțin o zonă.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await axios.post(`${API}/specialists/coverage-scope`, {
+        scope, zones, response_time_minutes: parseInt(responseTime),
+      });
+      await refreshUser();
+      onClose();
+    } catch (e) { alert(e?.response?.data?.detail || "Eroare"); }
+    finally { setBusy(false); }
+  };
+
+  const filteredGrouped = search
+    ? grouped.map(g => ({ ...g, zones: g.zones.filter(z => z.zone.toLowerCase().includes(search.toLowerCase()) || g.city.toLowerCase().includes(search.toLowerCase())) })).filter(g => g.zones.length > 0)
+    : grouped;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-3" onClick={onClose}>
+      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={e => e.stopPropagation()}
+        className="bg-stone-950 border border-white/10 rounded-3xl p-5 w-full max-w-lg max-h-[90vh] overflow-y-auto" data-testid="coverage-modal">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-serif text-xl">Aria de acoperire</h3>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center" data-testid="coverage-close"><X className="w-4 h-4" /></button>
+        </div>
+        <p className="text-xs text-stone-400 mb-4">
+          Definește unde lucrezi și în cât timp ajungi la client. Pentru intervenții rapide, alege zone apropiate.
+        </p>
+
+        {/* Scope chooser */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          {[
+            { id: "local", label: "Local", desc: "Cartiere apropiate" },
+            { id: "regional", label: "Regional", desc: "Multi-oraș" },
+            { id: "national", label: "Național", desc: "Doar designer", locked: !isDesigner },
+          ].map(s => (
+            <button key={s.id}
+              disabled={s.locked}
+              onClick={() => setScope(s.id)}
+              className={`text-left rounded-xl p-3 border transition ${
+                scope === s.id ? "bg-[#d4ff3a]/10 border-[#d4ff3a]/40" : "bg-white/5 border-white/10 hover:bg-white/10"
+              } ${s.locked ? "opacity-40 cursor-not-allowed" : ""}`}
+              data-testid={`scope-${s.id}`}>
+              <div className="flex items-center gap-1.5 mb-1">
+                <Globe className="w-3 h-3" />
+                <span className="text-xs font-medium">{s.label}</span>
+                {s.locked && <Lock className="w-2.5 h-2.5" />}
+              </div>
+              <div className="text-[10px] text-stone-400 leading-tight">{s.desc}</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Response time slider */}
+        <div className="bg-white/5 rounded-xl p-3 mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5 text-xs text-stone-300">
+              <Clock className="w-3.5 h-3.5" />Timp maxim de răspuns
+            </div>
+            <span className="font-medium text-sm text-[#d4ff3a]" data-testid="response-time-value">{responseTime} min</span>
+          </div>
+          <input type="range" min="15" max="240" step="15" value={responseTime} onChange={e => setResponseTime(e.target.value)}
+            className="w-full accent-[#d4ff3a]" data-testid="response-time-slider" />
+          <div className="flex justify-between text-[10px] text-stone-500 mt-1">
+            <span>15 min (urgent)</span>
+            <span>1h</span>
+            <span>4h</span>
+          </div>
+        </div>
+
+        {/* Zones picker (hidden if national) */}
+        {scope !== "national" && (
+          <>
+            <div className="text-[10px] uppercase tracking-wider text-stone-400 mb-2 flex justify-between items-center">
+              <span>Zone acoperite ({zones.length} selectate)</span>
+              {zones.length > 0 && <button onClick={() => setZones([])} className="text-stone-500 hover:text-stone-300 normal-case">Resetează</button>}
+            </div>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Caută cartier sau oraș..."
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm mb-3" data-testid="zone-search" />
+            <div className="space-y-1 mb-3 max-h-64 overflow-y-auto">
+              {filteredGrouped.map(g => (
+                <div key={g.city} className="bg-white/[0.03] rounded-xl">
+                  <button onClick={() => setExpandedCity(expandedCity === g.city ? null : g.city)}
+                    className="w-full px-3 py-2 flex items-center justify-between text-left text-xs">
+                    <span className="font-medium">{g.city}</span>
+                    <span className="text-stone-500">{g.zones.filter(z => zones.includes(z.zone)).length} / {g.zones.length}</span>
+                  </button>
+                  {(expandedCity === g.city || search) && (
+                    <div className="px-3 pb-2 flex flex-wrap gap-1">
+                      {g.zones.map(z => (
+                        <button key={z.zone} onClick={() => toggleZone(z.zone)}
+                          className={`text-[10px] px-2 py-1 rounded-full border transition ${zones.includes(z.zone) ? "bg-[#d4ff3a]/20 text-[#d4ff3a] border-[#d4ff3a]/40" : "bg-white/5 text-stone-400 border-white/10 hover:bg-white/10"}`}
+                          data-testid={`zone-chip-${z.zone}`}>
+                          {z.zone}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {scope === "national" && (
+          <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-3 mb-3 text-xs text-purple-200">
+            ✨ Cu scope-ul național, primești proiecte din toată România. Recomandat doar pentru designeri care coordonează la distanță.
+          </div>
+        )}
+
+        <button onClick={submit} disabled={busy}
+          className="w-full py-2.5 btn-accent rounded-full text-sm font-medium disabled:opacity-50" data-testid="coverage-save">
+          {busy ? "..." : "Salvează aria"}
+        </button>
+      </motion.div>
     </div>
   );
 };

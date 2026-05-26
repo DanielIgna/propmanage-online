@@ -32,6 +32,7 @@ async def create_request(data: RequestIn, user: dict = Depends(require_role("cli
         "client_id": user["id"],
         "client_name": user["name"],
         "property_name": prop["name"],
+        "property_address": prop.get("address"),
         "status": "open",  # open, assigned, in_progress, completed, confirmed
         "specialist_id": None,
         "specialist_name": None,

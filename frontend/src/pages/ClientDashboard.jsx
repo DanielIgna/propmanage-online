@@ -18,7 +18,7 @@ import { OpenDisputeModal } from "./AdminModals";
 import { InteriorDesignCard, InteriorDesignModal, DesignPhasesPanel } from "./InteriorDesign";
 import { ClientTwinViewerModal, DesignersBrowse } from "./ClientTwinViewer";
 import { ProjectListSection } from "./ProjectWorkspace";
-import { API, DashLayout, Stat, StatusBadge } from "./DashShared";
+import { API, DashLayout, Stat, StatusBadge, NavigateButtons } from "./DashShared";
 import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
 import { RequestTimelineModal, LastActionBanner } from "./ActivityTimeline";
@@ -381,6 +381,7 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setP
             <div className="text-xs uppercase tracking-wider text-stone-400 mb-1">Digital Twin</div>
             <h2 className="font-serif text-2xl" data-testid="property-name">{prop?.name || "—"}</h2>
             <div className="text-sm text-stone-400">{prop?.address}</div>
+            {prop?.address && <div className="mt-2"><NavigateButtons address={prop.address} compact /></div>}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {properties.length > 1 && (

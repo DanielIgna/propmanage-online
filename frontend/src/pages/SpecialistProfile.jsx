@@ -3,10 +3,88 @@ import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { Star, CheckCircle2, Award, Briefcase, Calendar, ArrowLeft, Building2, Image as ImageIcon } from "lucide-react";
+import { Star, CheckCircle2, Award, Briefcase, Calendar, ArrowLeft, Building2, Image as ImageIcon, Shield, Clock, Camera, AlertOctagon } from "lucide-react";
 import { PortfolioGallery } from "./Portfolio";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+const LEVEL_LABELS = {
+  exemplary: { label: "Exemplar", color: "emerald", desc: "Performanță constant excelentă" },
+  excellent: { label: "Excelent", color: "[#d4ff3a]", desc: "Foarte fiabil pentru proiecte importante" },
+  good: { label: "Bun", color: "amber", desc: "Recomandat" },
+  improving: { label: "În progres", color: "stone", desc: "Specialist nou în creștere" },
+  new: { label: "Nou", color: "stone", desc: "Specialist nou pe platformă" },
+};
+
+const FACTOR_ICONS = { on_time_delivery: Clock, positive_feedback: Star, progress_photos: Camera, warranty_clean: Shield };
+const FACTOR_LABELS = {
+  on_time_delivery: "Livrare la timp",
+  positive_feedback: "Recenzii pozitive",
+  progress_photos: "Fotografii progres",
+  warranty_clean: "Lipsa reclamațiilor",
+};
+
+const TrustScoreCard = ({ specialistId }) => {
+  const [trust, setTrust] = useState(null);
+  useEffect(() => {
+    axios.get(`${API}/specialists/${specialistId}/trust-score`)
+      .then(r => setTrust(r.data))
+      .catch(() => setTrust(null));
+  }, [specialistId]);
+  if (!trust) return null;
+  const lvl = LEVEL_LABELS[trust.level] || LEVEL_LABELS.new;
+  return (
+    <div className="glass-strong rounded-3xl p-6 mb-6" data-testid="trust-score-card">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className={`w-12 h-12 rounded-2xl bg-${lvl.color}-500/15 border border-${lvl.color}-500/40 flex items-center justify-center`}>
+            <Shield className={`w-6 h-6 text-${lvl.color === "[#d4ff3a]" ? "[#d4ff3a]" : `${lvl.color}-300`}`} />
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-stone-400">Scor de încredere PropManage</div>
+            <div className="flex items-baseline gap-2">
+              <span className={`font-serif text-3xl text-${lvl.color === "[#d4ff3a]" ? "[#d4ff3a]" : `${lvl.color}-300`}`} data-testid="trust-score-value">{trust.score}</span>
+              <span className="text-sm text-stone-500">/ 100</span>
+              <span className={`text-xs uppercase tracking-wider px-2 py-0.5 rounded-full bg-${lvl.color}-500/15 text-${lvl.color === "[#d4ff3a]" ? "[#d4ff3a]" : `${lvl.color}-300`} border border-${lvl.color}-500/30 ml-2`}>
+                {lvl.label}
+              </span>
+            </div>
+            <div className="text-xs text-stone-400 mt-0.5">{lvl.desc}</div>
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {Object.entries(trust.factors).map(([key, f]) => {
+          const Icon = FACTOR_ICONS[key];
+          const pct = (f.points / f.max_points) * 100;
+          return (
+            <div key={key} className="bg-white/[0.03] rounded-2xl p-3" data-testid={`trust-factor-${key}`}>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Icon className="w-3 h-3 text-stone-400" />
+                <span className="text-[10px] uppercase tracking-wider text-stone-400">{FACTOR_LABELS[key]}</span>
+              </div>
+              <div className="text-sm font-medium">{f.points} / {f.max_points} pct</div>
+              <div className="h-1 bg-white/5 rounded mt-1.5 overflow-hidden">
+                <div className={`h-full bg-${lvl.color === "[#d4ff3a]" ? "[#d4ff3a]" : `${lvl.color}-400`}`} style={{ width: `${pct}%` }} />
+              </div>
+              {key === "on_time_delivery" && f.total_tasks > 0 && (
+                <div className="text-[9px] text-stone-500 mt-1">{f.completed_tasks}/{f.total_tasks} task done · {f.rate}% la timp</div>
+              )}
+              {key === "warranty_clean" && (
+                <div className="text-[9px] text-stone-500 mt-1">
+                  {f.disputes > 0 ? `${f.disputes} reclamații` : "Zero reclamații"}
+                </div>
+              )}
+              {key === "progress_photos" && (
+                <div className="text-[9px] text-stone-500 mt-1">{f.uploaded} poze încărcate</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 export const SpecialistProfile = () => {
   const { id } = useParams();
@@ -89,6 +167,9 @@ export const SpecialistProfile = () => {
             </div>
           )}
         </motion.div>
+
+        {/* Trust Score */}
+        <TrustScoreCard specialistId={id} />
 
         {/* Portfolio */}
         <div className="glass-strong rounded-3xl p-8 mb-6">
