@@ -1,8 +1,9 @@
 // Read-only Digital Twin viewer for clients + Designers browse panel
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { X, Building, Star, CheckCircle2, Palette, Sparkles, MapPin, Users } from "lucide-react";
+import { X, Building, Star, CheckCircle2, Palette, Sparkles, MapPin, Users, SlidersHorizontal } from "lucide-react";
 import { API } from "./DashShared";
 
 const ROOM_COLORS = {
@@ -179,18 +180,38 @@ export const ClientTwinViewerModal = ({ propertyId, propertyName, onClose }) => 
 
 // ============= DESIGNERS BROWSE PANEL (inline) =============
 export const DesignersBrowse = ({ onSelect }) => {
+  const navigate = useNavigate();
   const [designers, setDesigners] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [zone, setZone] = useState("");
+  const [style, setStyle] = useState("");
+  const [availableZones, setAvailableZones] = useState([]);
+  const [availableStyles, setAvailableStyles] = useState([]);
 
+  // Load filter dropdown options once
   useEffect(() => {
-    axios.get(`${API}/marketplace/specialists?category=interior_design&verified_only=true&sort=rating`)
+    axios.get(`${API}/marketplace/filters?category=interior_design`)
+      .then(r => {
+        setAvailableZones(r.data.zones || []);
+        setAvailableStyles(r.data.styles || []);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Reload designers when filters change
+  useEffect(() => {
+    setLoading(true);
+    const params = new URLSearchParams({ category: "interior_design", verified_only: "true", sort: "rating" });
+    if (zone) params.set("zone", zone);
+    if (style) params.set("style", style);
+    axios.get(`${API}/marketplace/specialists?${params}`)
       .then(r => setDesigners(r.data || []))
       .catch(() => setDesigners([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [zone, style]);
 
-  if (loading) return null;
-  if (designers.length === 0) return null;
+  const hasAnyFilters = availableZones.length > 0 || availableStyles.length > 0;
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
@@ -202,52 +223,132 @@ export const DesignersBrowse = ({ onSelect }) => {
           </div>
           <div>
             <h3 className="font-serif text-lg leading-tight">Designerii noștri</h3>
-            <div className="text-[10px] uppercase tracking-wider text-stone-400">{designers.length} specialiști interior design · verificați</div>
+            <div className="text-[10px] uppercase tracking-wider text-stone-400">
+              {loading ? "Caut designeri..." : `${designers.length} ${designers.length === 1 ? "designer" : "designeri"} · verificați`}
+            </div>
           </div>
         </div>
-        <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/30">DESIGN INTERIOR</span>
+        <div className="flex items-center gap-2">
+          {hasAnyFilters && (
+            <button onClick={() => setFiltersOpen(o => !o)}
+              className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-full border flex items-center gap-1 transition ${(zone || style) ? "bg-purple-500/25 text-purple-200 border-purple-500/50" : "bg-white/5 text-stone-400 border-white/10 hover:bg-white/10"}`}
+              data-testid="designers-filters-toggle">
+              <SlidersHorizontal className="w-3 h-3" />
+              Filtre{(zone || style) ? ` · ${[zone, style].filter(Boolean).length}` : ""}
+            </button>
+          )}
+          <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/30">DESIGN INTERIOR</span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {designers.slice(0, 6).map(d => (
-          <button key={d.id} onClick={() => onSelect && onSelect(d)}
-            className="text-left bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-500/40 rounded-2xl p-4 transition-all group"
-            data-testid={`designer-card-${d.id}`}>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-500/30 to-pink-500/30 border border-white/10 flex items-center justify-center font-serif text-lg text-purple-200 shrink-0 overflow-hidden">
-                {d.avatar || d.picture ? <img src={d.avatar || d.picture} alt={d.name} className="w-full h-full object-cover" /> : (d.name || "?").charAt(0)}
+      {/* Filter panel */}
+      {filtersOpen && hasAnyFilters && (
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-3 mb-4 space-y-3" data-testid="designers-filters-panel">
+          {availableZones.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-stone-400 mb-1.5 flex items-center gap-1">
+                <MapPin className="w-3 h-3" />Zonă acoperire
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="font-medium text-sm truncate flex items-center gap-1.5">
-                  {d.name}
-                  {d.verified && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
-                </div>
-                <div className="flex items-center gap-1 text-xs text-stone-400">
-                  <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                  <span className="text-amber-300">{d.rating?.toFixed(1) || "—"}</span>
-                  <span className="text-stone-500">· {d.reviews_count || 0} recenzii</span>
-                </div>
-              </div>
-              {d.tier && (
-                <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d4ff3a]/15 text-[#d4ff3a] border border-[#d4ff3a]/30 shrink-0">{d.tier}</span>
-              )}
-            </div>
-            {(d.service_categories && d.service_categories.length > 0) && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {d.service_categories.slice(0, 3).map(c => (
-                  <span key={c} className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5 text-stone-400 border border-white/5">{c.replace("_", " ")}</span>
+              <div className="flex flex-wrap gap-1.5">
+                <button onClick={() => setZone("")}
+                  className={`text-xs px-3 py-1 rounded-full border transition ${zone === "" ? "bg-[#d4ff3a]/20 text-[#d4ff3a] border-[#d4ff3a]/40" : "bg-white/5 text-stone-400 border-white/10 hover:bg-white/10"}`}
+                  data-testid="filter-zone-all">Toate</button>
+                {availableZones.map(z => (
+                  <button key={z} onClick={() => setZone(z)}
+                    className={`text-xs px-3 py-1 rounded-full border transition ${zone === z ? "bg-[#d4ff3a]/20 text-[#d4ff3a] border-[#d4ff3a]/40" : "bg-white/5 text-stone-400 border-white/10 hover:bg-white/10"}`}
+                    data-testid={`filter-zone-${z}`}>{z}</button>
                 ))}
               </div>
-            )}
-            <div className="mt-3 flex items-center justify-between">
-              <div className="text-[10px] uppercase tracking-wider text-stone-500">{d.availability_status === "available" ? "Disponibil" : (d.availability_status || "")}</div>
-              <span className="text-xs text-purple-300 group-hover:text-purple-200 flex items-center gap-1">
-                Vezi profilul <Sparkles className="w-3 h-3" />
-              </span>
             </div>
-          </button>
-        ))}
-      </div>
+          )}
+          {availableStyles.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-stone-400 mb-1.5 flex items-center gap-1">
+                <Palette className="w-3 h-3" />Stil portfolio
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <button onClick={() => setStyle("")}
+                  className={`text-xs px-3 py-1 rounded-full border transition ${style === "" ? "bg-purple-500/20 text-purple-300 border-purple-500/40" : "bg-white/5 text-stone-400 border-white/10 hover:bg-white/10"}`}
+                  data-testid="filter-style-all">Toate</button>
+                {availableStyles.map(s => (
+                  <button key={s} onClick={() => setStyle(s)}
+                    className={`text-xs px-3 py-1 rounded-full border capitalize transition ${style === s ? "bg-purple-500/20 text-purple-300 border-purple-500/40" : "bg-white/5 text-stone-400 border-white/10 hover:bg-white/10"}`}
+                    data-testid={`filter-style-${s}`}>{s}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          {(zone || style) && (
+            <button onClick={() => { setZone(""); setStyle(""); }} className="text-xs text-stone-500 hover:text-stone-300 underline" data-testid="filter-clear">
+              Resetează filtrele
+            </button>
+          )}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-center py-8 text-stone-500 text-sm">Se caută designeri...</div>
+      ) : designers.length === 0 ? (
+        <div className="text-center py-8 text-stone-500 text-sm" data-testid="designers-empty">
+          <Palette className="w-10 h-10 mx-auto mb-2 opacity-30" />
+          Nu am găsit designeri pentru filtrele selectate. Încearcă alte criterii.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {designers.slice(0, 6).map(d => (
+            <div key={d.id}
+              className="bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-500/40 rounded-2xl p-4 transition-all group flex flex-col"
+              data-testid={`designer-card-${d.id}`}>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-500/30 to-pink-500/30 border border-white/10 flex items-center justify-center font-serif text-lg text-purple-200 shrink-0 overflow-hidden">
+                  {d.avatar || d.picture ? <img src={d.avatar || d.picture} alt={d.name} className="w-full h-full object-cover" /> : (d.name || "?").charAt(0)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-sm truncate flex items-center gap-1.5">
+                    {d.name}
+                    {d.verified && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-stone-400">
+                    <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                    <span className="text-amber-300">{d.rating?.toFixed(1) || "—"}</span>
+                    <span className="text-stone-500">· {d.reviews_count || 0} recenzii</span>
+                  </div>
+                </div>
+                {d.tier && (
+                  <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d4ff3a]/15 text-[#d4ff3a] border border-[#d4ff3a]/30 shrink-0">{d.tier}</span>
+                )}
+              </div>
+              {(d.service_categories && d.service_categories.length > 0) && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {d.service_categories.slice(0, 3).map(c => (
+                    <span key={c} className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5 text-stone-400 border border-white/5">{c.replace("_", " ")}</span>
+                  ))}
+                </div>
+              )}
+              <div className="text-[10px] uppercase tracking-wider text-stone-500 mt-2">
+                {d.availability_status === "available" ? "✓ Disponibil" : (d.availability_status || "")}
+                {d.coverage_zones && d.coverage_zones.length > 0 && ` · ${d.coverage_zones.length} zone`}
+              </div>
+              <div className="flex gap-2 mt-3 pt-3 border-t border-white/5">
+                <button
+                  onClick={() => navigate(`/specialists/${d.id}`)}
+                  className="flex-1 text-xs px-3 py-2 rounded-full bg-white/5 hover:bg-white/10 text-stone-300 border border-white/10 transition flex items-center justify-center gap-1"
+                  data-testid={`designer-view-profile-${d.id}`}
+                >
+                  Vezi profil
+                </button>
+                <button
+                  onClick={() => onSelect && onSelect(d)}
+                  className="flex-1 text-xs px-3 py-2 rounded-full bg-purple-500/15 hover:bg-purple-500/25 text-purple-200 border border-purple-500/40 transition flex items-center justify-center gap-1"
+                  data-testid={`designer-request-${d.id}`}
+                >
+                  <Sparkles className="w-3 h-3" />Solicită
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 };
