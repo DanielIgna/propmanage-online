@@ -17,6 +17,7 @@ import logging
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
+from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -288,11 +289,22 @@ async def list_zones(user: dict = Depends(require_role("admin"))):
 
 @router.post("/zones")
 async def add_zone(data: ZoneIn, user: dict = Depends(require_role("admin"))):
-    # Avoid exact duplicates
-    exists = await db.zones_custom.find_one({"country": data.country, "city": data.city, "zone": data.zone})
+    norm = {
+        "country": data.country.strip(),
+        "city": data.city.strip(),
+        "zone": data.zone.strip(),
+    }
+    if not norm["city"] or not norm["zone"]:
+        raise HTTPException(400, "City and zone required")
+    # Case-insensitive duplicate check
+    exists = await db.zones_custom.find_one({
+        "country": {"$regex": f"^{norm['country']}$", "$options": "i"},
+        "city": {"$regex": f"^{norm['city']}$", "$options": "i"},
+        "zone": {"$regex": f"^{norm['zone']}$", "$options": "i"},
+    })
     if exists:
         raise HTTPException(400, "Zone already exists")
-    doc = data.model_dump()
+    doc = dict(norm)
     doc["created_at"] = datetime.now(timezone.utc).isoformat()
     doc["created_by"] = user["id"]
     res = await db.zones_custom.insert_one(doc)
