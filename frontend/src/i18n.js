@@ -1,5 +1,8 @@
-// PropManage i18n - bilingv RO/EN
+// PropManage i18n - bilingv RO/EN + CMS overrides for landing texts
 import React, { createContext, useContext, useState, useEffect } from "react";
+import axios from "axios";
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const translations = {
   ro: {
@@ -160,14 +163,26 @@ const I18nContext = createContext(null);
 
 export const I18nProvider = ({ children }) => {
   const [lang, setLang] = useState(() => localStorage.getItem("propmanage_lang") || "ro");
-  
+  const [cms, setCms] = useState({}); // CMS overrides (RO only)
+
   useEffect(() => { localStorage.setItem("propmanage_lang", lang); }, [lang]);
-  
-  const t = (key) => translations[lang][key] || key;
+
+  useEffect(() => {
+    // Fetch CMS public overrides once at mount. Silent fail keeps i18n working offline.
+    axios.get(`${API}/cms/public`)
+      .then(r => setCms(r.data || {}))
+      .catch(() => setCms({}));
+  }, []);
+
+  // CMS overrides take priority for RO; EN falls back to translations as before.
+  const t = (key) => {
+    if (lang === "ro" && cms[key] !== undefined && cms[key] !== "") return cms[key];
+    return translations[lang][key] || key;
+  };
   const toggle = () => setLang(l => l === "ro" ? "en" : "ro");
-  
+
   return (
-    <I18nContext.Provider value={{ lang, setLang, toggle, t }}>
+    <I18nContext.Provider value={{ lang, setLang, toggle, t, cms }}>
       {children}
     </I18nContext.Provider>
   );
