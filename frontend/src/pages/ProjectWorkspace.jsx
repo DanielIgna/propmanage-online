@@ -7,6 +7,7 @@ import {
   ArrowLeft, Plus, Users, CheckCircle2, Clock, AlertTriangle, MessageSquare,
   Trash2, X, Building2, Palette, Send, ListChecks, Loader2, Flag,
   Wallet, Calendar, Paperclip, Image as ImageIcon, ShieldCheck, Hourglass, AlertOctagon,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "../auth";
 
@@ -376,6 +377,9 @@ const PaymentsTab = ({ project, isDesigner, isClient, onUpdate }) => {
         </div>
       </div>
 
+      {/* Renegotiation panel (designer or client can propose) */}
+      <RenegotiatePanel project={project} isDesigner={isDesigner} isClient={isClient} onUpdate={onUpdate} />
+
       {/* Milestone cards */}
       <div className="space-y-2.5">
         {milestones.map((m, idx) => {
@@ -469,6 +473,182 @@ const PaymentsTab = ({ project, isDesigner, isClient, onUpdate }) => {
       </div>
 
       {claimFor && <WarrantyClaimModal project={project} milestone={claimFor} onClose={() => setClaimFor(null)} onSubmitted={onUpdate} />}
+    </div>
+  );
+};
+
+// ============= MILESTONE RENEGOTIATION =============
+const RenegotiatePanel = ({ project, isDesigner, isClient, onUpdate }) => {
+  const [proposals, setProposals] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const milestones = project.milestones || [];
+  const unfunded = milestones.filter(m => m.status === "pending_funding");
+
+  const load = () => axios.get(`${API}/projects/${project.id}/milestones/renegotiate`).then(r => setProposals(r.data.proposals || [])).catch(() => {});
+  React.useEffect(() => { load(); }, [project.id, project.updated_at]);
+
+  const pending = proposals.filter(p => p.status === "pending");
+  const history = proposals.filter(p => p.status !== "pending").slice(-3);
+
+  const respond = async (proposalId, accept) => {
+    const note = accept ? null : (window.prompt("Motiv respingere (opțional):") || null);
+    if (accept && !window.confirm("Confirmi noua împărțire a tranșelor? Această acțiune este definitivă.")) return;
+    try {
+      await axios.post(`${API}/projects/${project.id}/milestones/renegotiate/${proposalId}/respond`, { accept, note });
+      await load(); onUpdate();
+    } catch (e) { alert(e?.response?.data?.detail || "Eroare"); }
+  };
+
+  if (unfunded.length < 2 && pending.length === 0 && history.length === 0) return null;
+
+  return (
+    <>
+      <div className="glass-strong rounded-2xl p-4" data-testid="renegotiate-panel">
+        <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-300" />
+            <span className="text-sm font-medium">Modificare tranșe</span>
+            {pending.length > 0 && <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">{pending.length} în așteptare</span>}
+          </div>
+          {(isClient || isDesigner) && unfunded.length >= 2 && (
+            <button onClick={() => setShowModal(true)} className="px-3 py-1.5 rounded-full text-xs bg-white/5 hover:bg-white/10 border border-white/10 flex items-center gap-1.5" data-testid="renegotiate-open-btn">
+              Cere modificare
+            </button>
+          )}
+        </div>
+
+        {pending.map(p => (
+          <PendingProposalCard key={p.id} proposal={p} canRespond={(isClient && p.proposed_by_role === "designer") || (isDesigner && p.proposed_by_role === "client")} onRespond={respond} />
+        ))}
+
+        {history.length > 0 && (
+          <details className="mt-2">
+            <summary className="text-[11px] text-stone-500 cursor-pointer hover:text-stone-300">Istoric propuneri ({history.length})</summary>
+            <div className="mt-2 space-y-1">
+              {history.map(p => (
+                <div key={p.id} className="text-[11px] text-stone-400 flex justify-between bg-white/[0.03] rounded-lg p-2">
+                  <span>{p.proposed_by_name} → {p.pcts.map(x => `${x}%`).join("/")} </span>
+                  <span className={p.status === "accepted" ? "text-emerald-400" : "text-red-400"}>{p.status === "accepted" ? "Acceptată" : p.status === "rejected" ? "Respinsă" : "Anulată"}</span>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+      </div>
+
+      {showModal && <RenegotiateModal project={project} unfunded={unfunded} onClose={() => setShowModal(false)} onCreated={() => { setShowModal(false); load(); onUpdate(); }} />}
+    </>
+  );
+};
+
+const PendingProposalCard = ({ proposal, canRespond, onRespond }) => (
+  <div className="bg-amber-500/5 border border-amber-500/30 rounded-xl p-3 mt-2" data-testid={`proposal-${proposal.id}`}>
+    <div className="flex justify-between items-center text-xs mb-2">
+      <span><b>{proposal.proposed_by_name}</b> propune o nouă împărțire</span>
+      <span className="text-[10px] text-stone-500">{new Date(proposal.created_at).toLocaleString("ro-RO")}</span>
+    </div>
+    {proposal.note && <div className="text-xs italic text-stone-300 mb-2">"{proposal.note}"</div>}
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2">
+      {proposal.preview.map((v, i) => (
+        <div key={i} className="bg-black/30 rounded-lg p-2 text-center">
+          <div className="text-[9px] text-stone-500 uppercase truncate">{v.name}</div>
+          <div className="font-serif text-sm text-amber-200">{v.pct}%</div>
+          <div className="text-[10px] text-stone-400">{v.amount} RON</div>
+        </div>
+      ))}
+    </div>
+    {canRespond ? (
+      <div className="flex gap-2 mt-2">
+        <button onClick={() => onRespond(proposal.id, true)} className="flex-1 btn-accent py-1.5 rounded-full text-xs font-medium" data-testid={`accept-proposal-${proposal.id}`}>Acceptă</button>
+        <button onClick={() => onRespond(proposal.id, false)} className="px-3 py-1.5 rounded-full text-xs bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/40" data-testid={`reject-proposal-${proposal.id}`}>Respinge</button>
+      </div>
+    ) : (
+      <div className="text-[11px] text-stone-500 italic mt-1">Așteptăm răspunsul celeilalte părți...</div>
+    )}
+  </div>
+);
+
+const RenegotiateModal = ({ project, unfunded, onClose, onCreated }) => {
+  const [pcts, setPcts] = useState(() => {
+    const eq = +(100 / unfunded.length).toFixed(2);
+    const arr = Array(unfunded.length).fill(eq);
+    // Adjust last to make sum exact 100
+    arr[arr.length - 1] = +(100 - eq * (unfunded.length - 1)).toFixed(2);
+    return arr;
+  });
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const total = pcts.reduce((s, p) => s + parseFloat(p || 0), 0);
+  const valid = Math.abs(total - 100) < 0.05 && pcts.every(p => parseFloat(p) > 0);
+  const remaining = unfunded.reduce((s, m) => s + m.amount, 0);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!valid) return;
+    setBusy(true);
+    try {
+      await axios.post(`${API}/projects/${project.id}/milestones/renegotiate`, {
+        pcts: pcts.map(p => parseFloat(p)),
+        note: note || null,
+      });
+      onCreated();
+    } catch (err) { alert(err?.response?.data?.detail || "Eroare"); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-3" onClick={onClose}>
+      <form onSubmit={submit} onClick={e => e.stopPropagation()} className="glass-strong rounded-3xl p-6 max-w-md w-full" data-testid="renegotiate-modal">
+        <h3 className="font-serif text-2xl mb-2">Modifică tranșe</h3>
+        <p className="text-xs text-stone-400 mb-4">
+          Buget rămas: <b className="text-[#d4ff3a]">{remaining.toFixed(0)} RON</b> ({unfunded.length} tranșe nefinanțate).<br />
+          Trimite o propunere către cealaltă parte. Va trebui acceptată ca să intre în vigoare.
+        </p>
+
+        <div className="space-y-2 mb-4">
+          {unfunded.map((m, i) => {
+            const pct = parseFloat(pcts[i] || 0);
+            const amount = remaining * pct / 100;
+            return (
+              <div key={m.id} className="flex items-center gap-2 bg-white/5 rounded-xl p-2.5">
+                <span className="text-[10px] uppercase tracking-wider text-stone-500 w-24 truncate">{m.name}</span>
+                <input
+                  type="number"
+                  step="0.01" min="0.01" max="100"
+                  value={pcts[i]}
+                  onChange={e => setPcts(p => p.map((v, j) => j === i ? e.target.value : v))}
+                  className="w-20 px-2 py-1 bg-white/5 rounded-lg text-sm text-center"
+                  data-testid={`renegotiate-pct-${i}`}
+                />
+                <span className="text-xs text-stone-500">%</span>
+                <span className="ml-auto text-sm text-[#d4ff3a]">{amount.toFixed(0)} RON</span>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className={`flex items-center justify-between text-xs mb-4 px-3 py-2 rounded-lg ${valid ? "bg-emerald-500/10 text-emerald-300" : "bg-red-500/10 text-red-300"}`}>
+          <span>Sumă procente:</span>
+          <b>{total.toFixed(2)}% {valid ? "✓" : `(trebuie 100%)`}</b>
+        </div>
+
+        <textarea
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          placeholder="Notă opțională (ex: 'Mărim avansul pentru a comanda materialele mai devreme')"
+          rows={2}
+          className="w-full bg-white/5 rounded-xl px-3 py-2 text-sm mb-4"
+          data-testid="renegotiate-note"
+          maxLength={1000}
+        />
+
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 rounded-full bg-white/5 hover:bg-white/10 text-sm">Anulează</button>
+          <button type="submit" disabled={!valid || busy} className="flex-1 btn-accent py-2.5 rounded-full text-sm font-medium disabled:opacity-50" data-testid="renegotiate-submit">
+            {busy ? "..." : "Trimite propunere"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 };

@@ -361,6 +361,17 @@ class WarrantyClaimIn(BaseModel):
     reason: str = Field(min_length=10, max_length=2000)
 
 
+class MilestoneRenegotiateIn(BaseModel):
+    pcts: List[float] = Field(min_length=2, max_length=8)  # ex: [25, 30, 25, 20]
+    names: Optional[List[str]] = None
+    note: Optional[str] = Field(default=None, max_length=1000)
+
+
+class MilestoneRenegotiateRespondIn(BaseModel):
+    accept: bool
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
 def _build_default_milestones(total_budget: float, names: Optional[List[str]] = None) -> List[dict]:
     final_names = (names + DEFAULT_TRANCHE_NAMES[len(names):])[:4] if names else DEFAULT_TRANCHE_NAMES
     out = []
@@ -633,3 +644,156 @@ async def remove_attachment(task_id: str, att_id: str, user: dict = Depends(get_
         {"$pull": {"attachments": {"id": att_id}}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     return {"ok": True}
+
+
+
+# ============= MILESTONE RENEGOTIATION =============
+# Either client or designer can propose changing the % distribution of the *unfunded* milestones.
+# The other party accepts or rejects. Funded/released milestones are NOT touched.
+
+@router.post("/projects/{project_id}/milestones/renegotiate")
+async def propose_renegotiate(project_id: str, data: MilestoneRenegotiateIn, user: dict = Depends(get_current_user)):
+    proj = await _load_project_or_403(project_id, user)
+    if user["id"] not in (proj.get("client_id"), proj.get("designer_id")):
+        raise HTTPException(403, "Doar clientul sau designerul pot propune renegocierea.")
+    if abs(sum(data.pcts) - 100.0) > 0.01:
+        raise HTTPException(400, "Suma procentelor trebuie să fie 100%.")
+    if any(p <= 0 or p > 100 for p in data.pcts):
+        raise HTTPException(400, "Fiecare procent trebuie să fie între 0 și 100.")
+    milestones = proj.get("milestones") or []
+    if not milestones:
+        raise HTTPException(400, "Planul de plăți nu este inițializat.")
+    # Find unfunded slice (last consecutive pending_funding milestones)
+    unfunded_start = next((i for i, m in enumerate(milestones) if m.get("status") == "pending_funding"), None)
+    if unfunded_start is None:
+        raise HTTPException(400, "Toate tranșele sunt deja finanțate; nu mai există ce renegocia.")
+    unfunded = milestones[unfunded_start:]
+    if any(m.get("status") != "pending_funding" for m in unfunded):
+        raise HTTPException(400, "Pot fi renegociate doar tranșele consecutive nefinanțate.")
+    if len(data.pcts) != len(unfunded):
+        raise HTTPException(400, f"Trebuie să trimiți exact {len(unfunded)} procente (pentru tranșele nefinanțate rămase).")
+
+    # Recompute totals based on remaining budget (sum of unfunded amounts)
+    remaining_budget = sum(m.get("amount", 0) for m in unfunded)
+    proposal = {
+        "id": str(uuid.uuid4()),
+        "proposed_by": user["id"],
+        "proposed_by_role": "client" if user["id"] == proj.get("client_id") else "designer",
+        "proposed_by_name": user.get("name"),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "status": "pending",  # pending | accepted | rejected | cancelled
+        "note": data.note,
+        "start_index": unfunded_start,
+        "remaining_budget": round(remaining_budget, 2),
+        "pcts": data.pcts,
+        "names": data.names or [m.get("name") for m in unfunded],
+        "preview": [
+            {"name": (data.names[i] if data.names and i < len(data.names) else unfunded[i].get("name")),
+             "pct": data.pcts[i],
+             "amount": round(remaining_budget * data.pcts[i] / 100, 2)}
+            for i in range(len(data.pcts))
+        ],
+    }
+    await db.projects.update_one(
+        {"_id": ObjectId(project_id)},
+        {"$push": {"renegotiation_proposals": proposal},
+         "$set": {"updated_at": proposal["created_at"]}}
+    )
+    counterparty_id = proj.get("designer_id") if user["id"] == proj.get("client_id") else proj.get("client_id")
+    await notify(counterparty_id,
+                 "Cerere de renegociere milestone",
+                 f"{user.get('name')} propune o nouă împărțire a tranșelor rămase. Vezi detaliile și acceptă/respinge.",
+                 type_="payment", link=f"/projects/{project_id}")
+    await log_event(None, "project.milestones_renegotiate_proposed", actor=user, payload={"project_id": project_id, "proposal_id": proposal["id"]})
+    return {"ok": True, "proposal": proposal}
+
+
+@router.get("/projects/{project_id}/milestones/renegotiate")
+async def list_renegotiate(project_id: str, user: dict = Depends(get_current_user)):
+    proj = await _load_project_or_403(project_id, user)
+    return {"proposals": proj.get("renegotiation_proposals") or []}
+
+
+@router.post("/projects/{project_id}/milestones/renegotiate/{proposal_id}/respond")
+async def respond_renegotiate(project_id: str, proposal_id: str, data: MilestoneRenegotiateRespondIn, user: dict = Depends(get_current_user)):
+    proj = await _load_project_or_403(project_id, user)
+    proposals = proj.get("renegotiation_proposals") or []
+    prop = next((p for p in proposals if p.get("id") == proposal_id), None)
+    if not prop:
+        raise HTTPException(404, "Propunerea nu există.")
+    if prop.get("status") != "pending":
+        raise HTTPException(400, f"Propunerea este deja '{prop.get('status')}'.")
+    # Only the counterparty can respond
+    if prop.get("proposed_by") == user["id"]:
+        raise HTTPException(403, "Doar partea care nu a făcut propunerea poate răspunde.")
+    if user["id"] not in (proj.get("client_id"), proj.get("designer_id")):
+        raise HTTPException(403, "Doar clientul sau designerul pot răspunde.")
+
+    now = datetime.now(timezone.utc).isoformat()
+    # Re-validate that all tranches from start_index are still pending_funding
+    milestones = proj.get("milestones") or []
+    start = prop.get("start_index", 0)
+    affected = milestones[start:]
+    if any(m.get("status") != "pending_funding" for m in affected):
+        # Auto-cancel proposal — situation changed
+        await db.projects.update_one(
+            {"_id": ObjectId(project_id), "renegotiation_proposals.id": proposal_id},
+            {"$set": {"renegotiation_proposals.$.status": "cancelled",
+                      "renegotiation_proposals.$.responded_at": now,
+                      "renegotiation_proposals.$.cancel_reason": "Tranșele s-au schimbat între timp"}}
+        )
+        raise HTTPException(400, "Tranșele afectate s-au schimbat. Propunerea a fost auto-anulată.")
+
+    if not data.accept:
+        await db.projects.update_one(
+            {"_id": ObjectId(project_id), "renegotiation_proposals.id": proposal_id},
+            {"$set": {"renegotiation_proposals.$.status": "rejected",
+                      "renegotiation_proposals.$.responded_at": now,
+                      "renegotiation_proposals.$.respond_note": data.note}}
+        )
+        await notify(prop.get("proposed_by"), "Propunere renegociere respinsă",
+                     f"{user.get('name')} a respins propunerea de modificare a tranșelor.",
+                     type_="payment", link=f"/projects/{project_id}")
+        await log_event(None, "project.milestones_renegotiate_rejected", actor=user, payload={"project_id": project_id, "proposal_id": proposal_id})
+        return {"ok": True, "status": "rejected"}
+
+    # ACCEPT: replace unfunded milestones with proposal preview (keep funded ones intact)
+    pcts = prop.get("pcts") or []
+    names = prop.get("names") or []
+    remaining_budget = prop.get("remaining_budget") or 0
+    new_unfunded = []
+    for i, pct in enumerate(pcts):
+        original = milestones[start + i] if start + i < len(milestones) else None
+        is_final = (start + i) == (start + len(pcts) - 1) and (start + len(pcts)) == len(milestones)
+        new_unfunded.append({
+            "id": (original or {}).get("id") or str(uuid.uuid4()),
+            "name": names[i] if i < len(names) else (original or {}).get("name", f"Tranșa {start + i + 1}"),
+            "description": (original or {}).get("description", ""),
+            "pct": pct,
+            "amount": round(remaining_budget * pct / 100, 2),
+            "status": "pending_funding",
+            "is_final": is_final,
+            "warranty_days": WARRANTY_DAYS_DEFAULT if is_final else 0,
+            "funded_at": None,
+            "released_at": None,
+            "warranty_release_at": None,
+            "warranty_dispute_open": False,
+            "warranty_dispute_reason": None,
+        })
+    new_milestones = milestones[:start] + new_unfunded
+    await db.projects.update_one(
+        {"_id": ObjectId(project_id), "renegotiation_proposals.id": proposal_id},
+        {"$set": {
+            "milestones": new_milestones,
+            "renegotiation_proposals.$.status": "accepted",
+            "renegotiation_proposals.$.responded_at": now,
+            "renegotiation_proposals.$.respond_note": data.note,
+            "updated_at": now,
+        }}
+    )
+    await notify(prop.get("proposed_by"), "Propunere renegociere acceptată!",
+                 f"{user.get('name')} a acceptat noua împărțire a tranșelor.",
+                 type_="payment", link=f"/projects/{project_id}")
+    await log_event(None, "project.milestones_renegotiate_accepted", actor=user,
+                    payload={"project_id": project_id, "proposal_id": proposal_id})
+    return {"ok": True, "status": "accepted", "milestones": new_milestones}

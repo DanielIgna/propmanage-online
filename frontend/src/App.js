@@ -16,6 +16,8 @@ import { AuthCallback } from "./pages/AuthCallback";
 import { SpecialistProfile } from "./pages/SpecialistProfile";
 import { PublicMarketplace } from "./pages/Marketplace";
 import { ProjectWorkspace } from "./pages/ProjectWorkspace";
+import { PaymentSuccess } from "./pages/PaymentSuccess";
+import { TutorialOverlay } from "./pages/TutorialOverlay";
 import "./App.css";
 
 // ============= NAV =============
@@ -1353,8 +1355,10 @@ function App() {
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/operator" element={<OperatorDashboard />} />
               <Route path="/projects/:id" element={<ProjectWorkspace />} />
+              <Route path="/payment-success" element={<PaymentSuccess />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            <TutorialOverlay />
           </BrowserRouter>
         </AuthProvider>
       </I18nProvider>

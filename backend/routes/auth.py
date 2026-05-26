@@ -140,7 +140,30 @@ async def logout(response: Response):
 
 @router.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
+    # Load tutorial seen flag fresh from DB so it reflects across sessions
+    doc = await db.users.find_one({"_id": ObjectId(user["id"])}, {"tutorial_seen": 1})
+    user["tutorial_seen"] = bool((doc or {}).get("tutorial_seen", False))
     return user
+
+
+@router.post("/auth/tutorial-seen")
+async def mark_tutorial_seen(user: dict = Depends(get_current_user)):
+    """Mark the first-login tutorial as completed/dismissed by the user."""
+    await db.users.update_one(
+        {"_id": ObjectId(user["id"])},
+        {"$set": {"tutorial_seen": True, "tutorial_seen_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"ok": True}
+
+
+@router.post("/auth/tutorial-reset")
+async def reset_tutorial(user: dict = Depends(get_current_user)):
+    """Allow user to re-trigger the tutorial."""
+    await db.users.update_one(
+        {"_id": ObjectId(user["id"])},
+        {"$unset": {"tutorial_seen": "", "tutorial_seen_at": ""}}
+    )
+    return {"ok": True}
 
 
 @router.get("/auth/ws-token")

@@ -1,0 +1,43 @@
+{
+  "summary": "Phase 26 (P1 Stripe Checkout topup demo + P2a Milestone renegotiation + P2b First-login tutorial) tested end-to-end. 14/14 backend pytest cases pass. Frontend flows verified: TutorialOverlay for client/specialist/admin, WalletTopupBar with presets, PaymentSuccess page, RenegotiatePanel + Modal. Found and fixed ONE blocking import bug (Sparkles missing in ProjectWorkspace.jsx). Identified one environment quirk where checkout_url is built using inbound Origin header, which can resolve to internal cluster hostname when proxied — recommend hardening.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/wallet/topup-checkout-session", "issue": "checkout_url uses request.headers['origin'] verbatim. When the request passes through k8s ingress that rewrites Origin/Host, the returned URL contains the internal cluster hostname (e.g. cluster-5.preview.emergentcf.cloud) which serves 403. Suggest deriving FRONTEND_URL from env var or trusting X-Forwarded-Host / configured CORS allowed origin instead of raw Origin header."},
+      {"endpoint": "/api/projects/{id}/milestones/renegotiate", "issue": "Wrong-length pcts returns 422 (pydantic min_items) instead of the documented 400. Functionally correct; just inconsistent with docstring."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ProjectWorkspace > RenegotiatePanel", "issue": "FIXED by tester: `Sparkles` icon was used (line ~508) but missing from `lucide-react` import (line 6-10), causing 'ReferenceError: Sparkles is not defined' and crashing the entire Plăți tab with a runtime error overlay.", "selector": "[data-testid='renegotiate-panel']", "priority": "HIGH (now FIXED)"}
+    ],
+    "integration_issues": [
+      {"flow": "Wallet topup → Stripe demo redirect", "issue": "Clicking topup-preset-500 in real browser redirects to the cluster-5 internal host returned by backend (see backend minor issue) → end-user sees 403 Forbidden instead of /payment-success. The PaymentSuccess page itself works correctly when accessed via the public preview URL.", "affected_selectors": ["[data-testid='topup-preset-500']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase26.py",
+    "/app/test_reports/pytest/phase26_results.xml"
+  ],
+  "action_items": [
+    "Backend: in routes/wallet.py topup-checkout-session, construct checkout_url from a trusted source (env FRONTEND_URL or CORS allowed_origins[0]) rather than the raw inbound Origin header to avoid leaking internal cluster hostnames. The same applies to any other place using `request.headers['origin']`.",
+    "(Optional) align renegotiate length-validation status code: either tighten pydantic to error 400 explicitly or update docs."
+  ],
+  "critical_code_review_comments": [
+    "ProjectWorkspace.jsx is now 1225 lines — exceeds the 700-line guideline. Recommend splitting PaymentsTab/RenegotiatePanel/RenegotiateModal/PendingProposalCard into their own files.",
+    "wallet.py topup-checkout-session relies on inbound Origin header for the success/cancel redirect URL — a security/UX smell. Prefer a single source of truth (env var) so the redirect host is always correct regardless of proxy hops.",
+    "Tutorial UX: admin tutorial has 3 steps vs 5 for client/specialist. Verify with PM whether 3 is intentional (review_request says 'admin-specific steps' without a count, so OK)."
+  ],
+  "updated_files": [
+    "/app/frontend/src/pages/ProjectWorkspace.jsx (added Sparkles to lucide-react import)",
+    "/app/backend/tests/test_phase26.py (new test suite)"
+  ],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "95% (all features verified; only redirect-domain quirk remains, infra-related)"},
+  "test_credentials": "client@propmanage.io / Client123!, specialist@propmanage.io / Spec123!, admin@propmanage.io / Admin123!",
+  "seed_data_creation": "Reused existing project id 6a1558e238cead4d6ef159f3 (Renovare Skyline Loft A4) between client and specialist with 4 pending_funding milestones. Test suite creates topup demo sessions and renegotiation proposals; idempotent.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest suite at /app/backend/tests/test_phase26.py covers: tutorial flag (reset/seen/idempotent), wallet topup-checkout-session (demo creation, validation, idempotent crediting, cross-user 404, legacy /wallet/topup), and milestone renegotiation (validation, full accept flow, reject flow, proposer-cannot-respond, already-decided-cannot-respond). Run with: `pytest backend/tests/test_phase26.py -v`. Frontend: TutorialOverlay shows 5 client / 5 specialist / 3 admin steps; WalletTopupBar and RenegotiatePanel render correctly after the Sparkles import fix in ProjectWorkspace.jsx.",
+  "rca of the issue": "Sparkles ReferenceError: ProjectWorkspace.jsx used <Sparkles/> in the new RenegotiatePanel (line ~508) without adding it to the lucide-react import block. React renders threw ReferenceError, which the dev error overlay caught — hiding the entire Plăți tab. FIX applied: appended `Sparkles` to the imports on line 10."
+}

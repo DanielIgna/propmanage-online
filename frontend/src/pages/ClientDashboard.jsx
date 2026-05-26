@@ -337,12 +337,14 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setP
 
   return (
     <>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <Stat icon={Activity} label={t("client.health")} value={`${prop?.health_score || 0}/100`} sub="Property" tid="stat-health" />
         <Stat icon={Wallet} label={t("client.wallet")} value={`${user?.wallet_balance?.toFixed(0) || 0} RON`} sub="Sold" color="emerald" tid="stat-wallet" />
         <Stat icon={Sparkles} label={t("client.tokens")} value={user?.tokens || 0} sub="Earned" color="amber" tid="stat-tokens" />
         <Stat icon={Briefcase} label={t("client.requests")} value={requests.length} sub="Total" color="cyan" tid="stat-requests" />
       </div>
+
+      <WalletTopupBar onSuccess={refreshUser} />
 
       {/* Step-by-step cycle visualization */}
       <CyclePreview activeStep={twinUnlocked ? 3 : (twinStatus === "pending_validation" ? 2.5 : 2)} />
@@ -794,6 +796,71 @@ const DesignPhasesViewer = ({ request, onClose, onUpdate }) => {
         )}
         <DesignPhasesPanel request={request} onUpdate={onUpdate} />
       </motion.div>
+    </div>
+  );
+};
+
+
+// ============= WALLET TOPUP BAR (Stripe Checkout) =============
+const WalletTopupBar = ({ onSuccess }) => {
+  const [amount, setAmount] = useState("");
+  const [busy, setBusy] = useState(false);
+  const presets = [100, 250, 500, 1000];
+
+  const topup = async (val) => {
+    const amt = parseFloat(val || amount);
+    if (!amt || amt <= 0 || amt > 50000) {
+      alert("Sumă invalidă (1-50,000 RON)");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { data } = await axios.post(`${API}/wallet/topup-checkout-session`, { amount: amt });
+      // Redirect to Stripe Checkout (or demo success page)
+      window.location.href = data.checkout_url;
+    } catch (e) {
+      alert(formatApiError(e));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="glass-strong rounded-2xl p-4 mb-8 flex flex-wrap items-center gap-3" data-testid="wallet-topup-bar">
+      <div className="flex items-center gap-2 mr-auto">
+        <CreditCard className="w-4 h-4 text-[#d4ff3a]" />
+        <span className="text-sm font-medium">Alimentează wallet</span>
+        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300">via Stripe</span>
+      </div>
+      {presets.map(p => (
+        <button
+          key={p}
+          onClick={() => topup(p)}
+          disabled={busy}
+          className="px-3 py-1.5 rounded-full text-xs bg-white/5 hover:bg-white/10 border border-white/10 disabled:opacity-50"
+          data-testid={`topup-preset-${p}`}
+        >
+          +{p} RON
+        </button>
+      ))}
+      <div className="flex gap-1.5">
+        <input
+          type="number"
+          value={amount}
+          onChange={e => setAmount(e.target.value)}
+          placeholder="Sumă"
+          min="1" max="50000"
+          className="w-24 px-2 py-1.5 rounded-full bg-white/5 text-xs text-center border border-white/10"
+          data-testid="topup-custom-amount"
+        />
+        <button
+          onClick={() => topup()}
+          disabled={busy || !amount}
+          className="btn-accent px-3 py-1.5 rounded-full text-xs font-medium disabled:opacity-50"
+          data-testid="topup-custom-btn"
+        >
+          {busy ? "..." : "Plătește"}
+        </button>
+      </div>
     </div>
   );
 };
