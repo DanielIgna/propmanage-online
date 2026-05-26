@@ -12,6 +12,7 @@ import { ChatPanel } from "./ChatPanel";
 import { OpenDisputeModal, SpecialistDocumentsModal } from "./AdminModals";
 import { ProposePhaseModal } from "./InteriorDesign";
 import { PortfolioManagerModal } from "./Portfolio";
+import { ProjectListSection } from "./ProjectWorkspace";
 import { API, DashLayout, Stat, StatusBadge } from "./DashShared";
 import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
@@ -26,6 +27,7 @@ export const SpecialistDashboard = () => {
   const [disputeFor, setDisputeFor] = useState(null);
   const [proposePhaseFor, setProposePhaseFor] = useState(null);
   const [showPortfolio, setShowPortfolio] = useState(false);
+  const [showNewProject, setShowNewProject] = useState(false);
   const [tab, setTab] = useState("opportunities");
   const [searchQ, setSearchQ] = useState("");
   const [acceptingReq, setAcceptingReq] = useState(null);  // {id, title} for ScheduleProposalModal
@@ -126,12 +128,22 @@ export const SpecialistDashboard = () => {
         <>
           {user?.verified && (
             <div className="mb-4 flex justify-end gap-2 flex-wrap">
+              {(user?.service_categories || []).includes("interior_design") && (
+                <button onClick={() => setShowNewProject(true)} className="px-4 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-purple-200 border border-purple-500/40 rounded-full text-xs flex items-center gap-2 font-medium" data-testid="new-project-btn">
+                  <Plus className="w-3.5 h-3.5" />Proiect nou coordonare
+                </button>
+              )}
               <button onClick={() => setShowPortfolio(true)} className="px-4 py-2 bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 rounded-full text-xs flex items-center gap-2" data-testid="manage-portfolio-btn">
                 <ImageIcon className="w-3.5 h-3.5" />Portofoliu
               </button>
               <button onClick={() => setShowDocs(true)} className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full text-xs flex items-center gap-2" data-testid="manage-docs-btn">
                 <FileCheck className="w-3.5 h-3.5" />Documentele mele
               </button>
+            </div>
+          )}
+          {(user?.service_categories || []).includes("interior_design") && (
+            <div className="mb-4">
+              <ProjectListSection title="Proiectele tale de coordonare" />
             </div>
           )}
           <FilterBar searchQ={searchQ} setSearchQ={setSearchQ} />
@@ -224,7 +236,86 @@ export const SpecialistDashboard = () => {
       {showPortfolio && <PortfolioManagerModal onClose={() => setShowPortfolio(false)} />}
       {acceptingReq && <ScheduleProposalModal requestId={acceptingReq.id} requestTitle={acceptingReq.title} onClose={() => setAcceptingReq(null)} onAccepted={async () => { await refreshUser(); load(); }} />}
       {timelineRequestId && <RequestTimelineModal requestId={timelineRequestId} onClose={() => setTimelineRequestId(null)} />}
+      {showNewProject && <NewProjectModal onClose={() => setShowNewProject(false)} />}
     </DashLayout>
+  );
+};
+
+// ============= NEW PROJECT MODAL (Designer creates coordination project) =============
+const NewProjectModal = ({ onClose }) => {
+  const [clients, setClients] = useState([]);
+  const [form, setForm] = useState({ name: "", description: "", client_id: "", style: "modern", budget_estimate: "" });
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    // Load past clients (clients who interacted with this specialist)
+    axios.get(`${API}/requests`).then(r => {
+      const seen = new Map();
+      (r.data || []).forEach(req => {
+        if (req.client_id && !seen.has(req.client_id)) {
+          seen.set(req.client_id, { id: req.client_id, name: req.client_name });
+        }
+      });
+      setClients([...seen.values()]);
+    }).catch(() => setClients([]));
+  }, []);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.client_id) { alert("Selectează clientul."); return; }
+    setBusy(true);
+    try {
+      const payload = { ...form, budget_estimate: form.budget_estimate ? parseFloat(form.budget_estimate) : null };
+      const { data } = await axios.post(`${API}/projects`, payload);
+      onClose();
+      // Navigate to the newly created project workspace
+      window.location.href = `/projects/${data.id}`;
+    } catch (e) {
+      alert(e?.response?.data?.detail || "Eroare creare proiect");
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-3" onClick={onClose}>
+      <form onSubmit={submit} onClick={e => e.stopPropagation()}
+        className="bg-stone-950 border border-white/10 rounded-3xl p-5 w-full max-w-md space-y-3" data-testid="new-project-modal">
+        <h3 className="font-serif text-xl">Proiect nou de coordonare</h3>
+        <p className="text-xs text-stone-400">Creezi un workspace ClickUp-style unde adaugi clientul + specialiști (parchet, zugrăvit, faianță etc.) și aloci task-uri.</p>
+        <input required placeholder="Nume proiect (ex: Renovare apartament Pipera)" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm" data-testid="new-proj-name" />
+        <textarea rows={3} placeholder="Descriere (opțional)" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm" />
+        <select required value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value })}
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm" data-testid="new-proj-client">
+          <option value="">— Selectează client —</option>
+          {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        {clients.length === 0 && (
+          <div className="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-xl p-2">
+            Nu ai clienți încă. Acceptă mai întâi o lucrare ca să apară clienții aici.
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-2">
+          <select value={form.style} onChange={e => setForm({ ...form, style: e.target.value })}
+            className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm">
+            <option value="modern">Modern</option>
+            <option value="scandinavian">Scandinavian</option>
+            <option value="minimalist">Minimalist</option>
+            <option value="industrial">Industrial</option>
+            <option value="boho">Boho</option>
+            <option value="classic">Clasic</option>
+          </select>
+          <input type="number" placeholder="Buget (RON)" value={form.budget_estimate} onChange={e => setForm({ ...form, budget_estimate: e.target.value })}
+            className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm" />
+        </div>
+        <div className="flex gap-2 pt-2">
+          <button type="button" onClick={onClose} className="flex-1 py-2 bg-white/5 rounded-full text-sm">Anulează</button>
+          <button type="submit" disabled={busy || !form.client_id} className="flex-1 py-2 btn-accent rounded-full text-sm disabled:opacity-40" data-testid="new-proj-submit">
+            {busy ? "..." : "Creează proiect"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 };
 

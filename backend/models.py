@@ -7,6 +7,8 @@ Role = Literal["client", "specialist", "admin", "operator"]
 ALLOWED_SPECIALTIES = {
     "hvac", "electric", "plumbing", "interior_design", "carpentry",
     "painting", "cleaning", "appliance_repair", "gardening", "other",
+    # New: interior finishing specialties (managed by interior designer projects)
+    "parchet", "zugravit", "faianta", "handyman", "gips_carton",
 }
 
 # Interior design constants

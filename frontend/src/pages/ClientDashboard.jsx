@@ -17,6 +17,7 @@ import { TwoFASetupModal, PropertyTimelineModal } from "./Marketplace";
 import { OpenDisputeModal } from "./AdminModals";
 import { InteriorDesignCard, InteriorDesignModal, DesignPhasesPanel } from "./InteriorDesign";
 import { ClientTwinViewerModal, DesignersBrowse } from "./ClientTwinViewer";
+import { ProjectListSection } from "./ProjectWorkspace";
 import { API, DashLayout, Stat, StatusBadge } from "./DashShared";
 import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
@@ -41,6 +42,7 @@ export const ClientDashboard = () => {
   const [filterStatus, setFilterStatus] = useState("");
   const [showDesign, setShowDesign] = useState(false);
   const [showTwinViewer, setShowTwinViewer] = useState(false);
+  const [newReqCategory, setNewReqCategory] = useState(null);
   const [designPhasesFor, setDesignPhasesFor] = useState(null);
   const [timelineRequestId, setTimelineRequestId] = useState(null);
   const [tab, setTab] = useState("request");
@@ -146,6 +148,7 @@ export const ClientDashboard = () => {
           setShowNewReq={setShowNewReq} setShowPropManager={setShowPropManager}
           setTimelineFor={setTimelineFor} setShow2FA={setShow2FA}
           setShowDesign={setShowDesign} setTab={setTab} setShowTwinViewer={setShowTwinViewer}
+          setNewReqCategory={setNewReqCategory}
         />
       )}
       {tab === "jobs" && (
@@ -163,7 +166,7 @@ export const ClientDashboard = () => {
       {tab === "notifications" && <NotifsZone notifs={notifs} reload={loadNotifs} />}
       {tab === "settings" && <SettingsPanel />}
 
-      {showNewReq && <NewRequestModal onClose={() => setShowNewReq(false)} property={prop} onCreated={r => setRequests([r, ...requests])} />}
+      {showNewReq && <NewRequestModal onClose={() => { setShowNewReq(false); setNewReqCategory(null); }} property={prop} initialCategory={newReqCategory} onCreated={r => setRequests([r, ...requests])} />}
       {chatRequest && <ChatPanel requestId={chatRequest} onClose={() => setChatRequest(null)} />}
       {showPropManager && <PropertyManagerModal properties={properties} onClose={() => setShowPropManager(false)} onChange={setProperties} />}
       {timelineFor && <PropertyTimelineModal propertyId={timelineFor} onClose={() => setTimelineFor(null)} />}
@@ -186,7 +189,98 @@ export const ClientDashboard = () => {
 };
 
 // ============= TAB 1: Request Zone (Onboarding cycle: Property → Twin → Design) =============
-const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setProperties, setShowNewReq, setShowPropManager, setTimelineFor, setShow2FA, setShowDesign, setTab, setShowTwinViewer }) => {
+// ============= QUICK SERVICES GRID (visible category shortcuts) =============
+const QUICK_SERVICES = [
+  { id: "interior_design", label: "Design Interior", icon: Palette, color: "purple", twin: true, premium: true },
+  { id: "parchet", label: "Parchet", icon: Building, color: "amber", twin: false },
+  { id: "zugravit", label: "Zugrăvit", icon: Palette, color: "cyan", twin: false },
+  { id: "faianta", label: "Faianță / Gresie", icon: Building, color: "emerald", twin: false },
+  { id: "handyman", label: "Handyman", icon: Briefcase, color: "stone", twin: false },
+  { id: "gips_carton", label: "Gips-carton", icon: Building, color: "rose", twin: false },
+];
+
+const QuickServicesGrid = ({ twinUnlocked, twinStatus, onPick, onDesignPick, onRequestTwin }) => {
+  const [lockMsgFor, setLockMsgFor] = useState(null);
+  return (
+    <div className="glass-strong rounded-3xl p-5 sm:p-6 mb-6 relative" data-testid="quick-services-grid">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-stone-500 mb-1">Servicii rapide</div>
+          <h3 className="font-serif text-lg">Amenajări interioare · alege categoria</h3>
+        </div>
+        {!twinUnlocked && (
+          <div className="text-[10px] uppercase tracking-wider text-amber-400 px-2 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center gap-1">
+            <Lock className="w-3 h-3" />Design necesită Twin
+          </div>
+        )}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+        {QUICK_SERVICES.map(s => {
+          const locked = s.twin && !twinUnlocked;
+          const Icon = s.icon;
+          return (
+            <button key={s.id}
+              onClick={() => {
+                if (locked) { setLockMsgFor(s.id); return; }
+                if (s.id === "interior_design") { onDesignPick(); }
+                else { onPick(s.id); }
+              }}
+              className={`text-left rounded-2xl p-3 border transition-all group relative overflow-hidden ${
+                locked
+                  ? "bg-white/[0.02] border-white/5 opacity-70 hover:opacity-90"
+                  : "bg-white/5 hover:bg-white/10 border-white/10 hover:border-[#d4ff3a]/40"
+              }`}
+              data-testid={`quick-service-${s.id}`}
+            >
+              {s.premium && (
+                <span className="absolute top-1.5 right-1.5 text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40">PRO</span>
+              )}
+              <div className={`w-9 h-9 rounded-xl mb-2 flex items-center justify-center bg-${s.color}-500/15 border border-${s.color}-500/30`}>
+                {locked ? <Lock className={`w-4 h-4 text-${s.color}-300/60`} /> : <Icon className={`w-4 h-4 text-${s.color}-300`} />}
+              </div>
+              <div className="text-sm font-medium leading-tight">{s.label}</div>
+              <div className="text-[10px] uppercase tracking-wider text-stone-500 mt-1">
+                {locked ? "Necesită Twin" : "Solicită ofertă →"}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Lock explanation inline */}
+      {lockMsgFor && (
+        <div className="mt-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-start gap-3" data-testid="twin-required-msg">
+          <Lock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <div className="font-medium text-sm text-amber-300">Activează Digital Twin mai întâi</div>
+            <p className="text-xs text-stone-400 mt-1 mb-3 leading-relaxed">
+              Serviciul de Design Interior se bazează pe modelul 3D al proprietății tale (camere + dimensiuni reale). Solicită acum activarea twin-ului — durează sub 24h.
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              {twinStatus !== "pending_validation" && (
+                <button onClick={() => { onRequestTwin(); setLockMsgFor(null); }}
+                  className="btn-accent px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5"
+                  data-testid="twin-required-request-btn">
+                  <Sparkles className="w-3 h-3" />Solicită activare Twin
+                </button>
+              )}
+              {twinStatus === "pending_validation" && (
+                <span className="px-3 py-1.5 rounded-full text-xs bg-amber-500/15 text-amber-300 border border-amber-500/40">
+                  ⏳ Twin în validare la operator
+                </span>
+              )}
+              <button onClick={() => setLockMsgFor(null)} className="text-xs text-stone-500 hover:text-stone-300 px-3 py-1.5" data-testid="twin-required-close">
+                Înțeleg, închide
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setProperties, setShowNewReq, setShowPropManager, setTimelineFor, setShow2FA, setShowDesign, setTab, setShowTwinViewer, setNewReqCategory }) => {
   const { t } = useI18n();
   const { refreshUser } = useAuth();
   const noProps = properties.length === 0;
@@ -270,6 +364,15 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setP
           </button>
         </div>
       </div>
+
+      {/* Quick Services Grid — visible category shortcuts with twin gating */}
+      <QuickServicesGrid
+        twinUnlocked={twinUnlocked}
+        twinStatus={twinStatus}
+        onPick={(cat) => { setNewReqCategory(cat); setShowNewReq(true); }}
+        onDesignPick={() => setShowDesign(true)}
+        onRequestTwin={requestTwin}
+      />
 
       {/* Digital Twin Card */}
       <div className="glass-strong rounded-3xl p-6 sm:p-8">
@@ -413,6 +516,9 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setP
         {/* Designers list — connected when twin is unlocked */}
         {twinUnlocked && <DesignersBrowse onSelect={() => setShowDesign(true)} />}
       </div>
+
+      {/* Projects where this client is a member (read-only view) */}
+      <ProjectListSection title="Proiectele tale de amenajare" />
     </>
   );
 };
@@ -594,8 +700,8 @@ const NotifsZone = ({ notifs, reload }) => {
 };
 
 // ============= MODALS (unchanged) =============
-const NewRequestModal = ({ onClose, property, onCreated }) => {
-  const [form, setForm] = useState({ title: "", description: "", category: "hvac", priority: "normal", budget_estimate: 200 });
+const NewRequestModal = ({ onClose, property, onCreated, initialCategory }) => {
+  const [form, setForm] = useState({ title: "", description: "", category: initialCategory || "hvac", priority: "normal", budget_estimate: 200 });
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
   const submit = async (e) => {
@@ -622,7 +728,17 @@ const NewRequestModal = ({ onClose, property, onCreated }) => {
           <textarea required rows={3} placeholder="Descriere" value={form.description} onChange={e => setForm({...form, description: e.target.value})}
             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" data-testid="newreq-desc" />
           <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" data-testid="newreq-cat">
-            <option value="hvac">HVAC</option><option value="electric">Electric</option><option value="plumbing">Sanitar</option><option value="other">Altele</option>
+            <option value="interior_design">Design Interior</option>
+            <option value="parchet">Parchet</option>
+            <option value="zugravit">Zugrăvit</option>
+            <option value="faianta">Faianță / Gresie</option>
+            <option value="handyman">Handyman</option>
+            <option value="gips_carton">Gips-carton</option>
+            <option value="hvac">HVAC / Climatizare</option>
+            <option value="electric">Electric</option>
+            <option value="plumbing">Sanitar</option>
+            <option value="carpentry">Dulgherie</option>
+            <option value="other">Altele</option>
           </select>
           <div className="grid grid-cols-2 gap-2">
             <button type="button" onClick={() => setForm({...form, priority: "normal"})} className={`py-3 rounded-xl text-sm ${form.priority === "normal" ? "bg-white text-black" : "bg-white/5 text-stone-400"}`}>Normal</button>

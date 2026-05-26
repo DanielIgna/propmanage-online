@@ -14,6 +14,7 @@ import { ClientDashboard, SpecialistDashboard, AdminDashboard, OperatorDashboard
 import { AuthCallback } from "./pages/AuthCallback";
 import { SpecialistProfile } from "./pages/SpecialistProfile";
 import { PublicMarketplace } from "./pages/Marketplace";
+import { ProjectWorkspace } from "./pages/ProjectWorkspace";
 import "./App.css";
 
 // ============= NAV =============
@@ -1324,6 +1325,7 @@ function App() {
               <Route path="/specialist" element={<SpecialistDashboard />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/operator" element={<OperatorDashboard />} />
+              <Route path="/projects/:id" element={<ProjectWorkspace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
