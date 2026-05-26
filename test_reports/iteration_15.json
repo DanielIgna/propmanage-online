@@ -1,0 +1,40 @@
+{
+  "summary": "Metronic-style Admin Console (Phase 17): backend 24/24 admin_console tests pass (CMS CRUD + public, email templates, zones add/toggle/delete, trust weights with sum=1 validation, settings partial update, users list/patch/ban-unban, global search, finance overview, projects, activity feed, 3 CSV exports, RBAC 403 for client). Frontend Metronic console renders at /admin replacing old dashboard. Sidebar shows all 5 sections (OVERVIEW, USERI, OPERATIONS, CONTINUT, CONFIGURARE) with 12 nav items including admin-nav-overview (Dashboard). Theme toggle flips data-admin-theme attribute and persists pm_admin_theme in localStorage. Global search dropdown shows results for 2+ chars. CMS page lists 25 entries with cms-search + 25 cms-input fields. Trust weights page has trust-save. Settings page exposes all 5 testids (stripe/resend/maintenance/commission/color-picker). Zones page has zones-search. Users table renders rows with edit + ban actions.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin_console.py",
+    "/app/test_reports/pytest/admin_console_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Request mentions data-testid='admin-nav-dashboard' but the implementation uses admin-nav-overview (Dashboard nav item id is 'overview'). Cosmetic mismatch between spec and code; only the spec wording is wrong. Consider aligning by renaming the id to 'dashboard' for clarity OR updating the spec.",
+    "admin_console.py uses bson.ObjectId without try/except around ObjectId(user_id) in PATCH/ban/unban; an invalid id raises 500 instead of 400/404. Wrap in try/except InvalidId -> 400.",
+    "GET /api/admin/finance/overview iterates db.requests with async for and sums escrow_amount client-side. For platforms with many requests, switch to a $match+$group aggregation for consistency with the tx pipeline above.",
+    "GET /api/admin/users returns serialize_doc(d) but the listing endpoint paginates by skip/limit only on the find result, not on a sorted aggregation. Sort field 'created_at' may not be indexed; consider an index on (role, created_at desc) for fast admin filtering at scale.",
+    "_csv_response with rows=[{\"info\": \"no data\"}] when collection is empty produces a CSV with a header column 'info' which is unexpected for downstream consumers. Prefer returning an empty CSV (header only) using the expected fieldnames.",
+    "POST /api/admin/zones accepts ZoneIn but does not normalize whitespace/case before the duplicate check; 'Bucuresti' vs 'bucuresti' would both insert. Trim+lower for the equality check.",
+    "PUT /api/admin/cms allows arbitrary keys (no validation against DEFAULT_CMS); admins can create unbounded 'custom' CMS keys. If intentional, add an /api/admin/cms/{key} DELETE that already supports cleanup -- already implemented, OK. Otherwise add a key whitelist.",
+    "Trust weights tolerance is 0.001 in backend; frontend slider step appears finer. Confirm slider snapping prevents 0.0009 rounding failures (manual UI test passed at coarse steps; recommend keeping a small tolerance buffer)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_admin_console.py"
+  ],
+  "success_rate": {
+    "backend": "100% (24/24 admin_console tests)",
+    "frontend": "100% on Phase 17 critical flows (auth gated render, sidebar nav, theme persistence, global search, CMS list/inputs, Trust save button, Settings testids, Zones search, Users table)"
+  },
+  "test_credentials": "admin@propmanage.io / Admin123! ; client@propmanage.io / Client123! ; specialist@propmanage.io / Spec123!",
+  "seed_data_creation": "Tests create-and-cleanup: TEST_OVERRIDE CMS key (reset via DELETE), TEST_SUBJ email template (reset), TEST_City/TEST_Zone_Custom zone (deleted), tier=GOLD patched + ban/unban on first client user (banned state cleared at end). No persistent test rows left.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Admin Console routes mounted at /api/admin via admin_console_router; public CMS at /api/cms/public (cms_public_router). Frontend entry /admin → AdminConsole.jsx wraps AdminLayoutMetronic.jsx. Dashboard nav id is 'overview' (testid admin-nav-overview) not 'dashboard'. Theme attribute: data-admin-theme on <html>, localStorage key pm_admin_theme. CMS inputs have testid cms-input-<key> with sibling cms-save-<key>. Trust weights save: trust-save. Settings: settings-stripe-live, settings-resend-live, settings-maintenance, settings-commission, settings-color-picker. Zones search: zones-search. Users page renders standard table (no per-row testid needed for current spec). Phase14-16 regression NOT re-run this iteration (kept scoped to Phase 17 per request).",
+  "rca of the issue": "No defects found in Phase 17. The only spec/code discrepancy is the admin-nav-dashboard vs admin-nav-overview testid naming — code is internally consistent and works; only the testing request document used the older name."
+}
