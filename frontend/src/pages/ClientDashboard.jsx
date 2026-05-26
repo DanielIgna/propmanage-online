@@ -815,7 +815,10 @@ const WalletTopupBar = ({ onSuccess }) => {
     }
     setBusy(true);
     try {
-      const { data } = await axios.post(`${API}/wallet/topup-checkout-session`, { amount: amt });
+      const { data } = await axios.post(`${API}/wallet/topup-checkout-session`, {
+        amount: amt,
+        origin: window.location.origin,
+      });
       // Redirect to Stripe Checkout (or demo success page)
       window.location.href = data.checkout_url;
     } catch (e) {

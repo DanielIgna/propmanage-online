@@ -54,14 +54,16 @@ DEMO_STRIPE = (STRIPE_KEY == "sk_test_emergent") or (not STRIPE_KEY.startswith((
 
 class TopupCheckoutIn(BaseModel):
     amount: float = Field(gt=0, le=50000)
+    origin: Optional[str] = None  # Public-facing origin from window.location.origin
 
 
 @router.post("/wallet/topup-checkout-session")
 async def topup_checkout_session(data: TopupCheckoutIn, request: Request, user: dict = Depends(get_current_user)):
     """Create Stripe Checkout session for wallet topup. Returns demo URL in DEMO mode."""
-    origin = request.headers.get("origin") or request.headers.get("referer", "").rstrip("/")
+    # Prefer client-supplied origin (set from window.location.origin) — bypasses k8s ingress rewrites.
+    origin = (data.origin or "").rstrip("/") or request.headers.get("origin", "").rstrip("/") or request.headers.get("referer", "").rstrip("/")
     if not origin:
-        raise HTTPException(400, "Missing origin header")
+        raise HTTPException(400, "Missing origin")
 
     if DEMO_STRIPE:
         fake_session_id = f"cs_topup_demo_{_uuid.uuid4().hex[:16]}"
