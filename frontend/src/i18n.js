@@ -51,6 +51,8 @@ const translations = {
     "hero.title1": "Proprietatea ta,", "hero.title2": "perfecționată", "hero.title3": "digital.",
     "hero.subtitle": "PropManage creează un Digital Twin de înaltă fidelitate al locuinței tale, monitorizând starea structurală și performanța financiară în timp real. Liniștea structurată pentru proprietarul modern.",
     "hero.cta1": "Explorează Demo", "hero.cta2": "Vezi Flux Complet",
+    "hero.cta1.variant_a": "Explorează Demo", "hero.cta1.variant_b": "Începe gratuit acum",
+    "hero.cta2.variant_a": "Vezi Flux Complet", "hero.cta2.variant_b": "Vezi cum funcționează în 2 min",
     "hero.stat1": "Utilizatori activi", "hero.stat2": "Joburi în execuție",
     "hero.stat3": "Specialiști verificați", "hero.stat4": "Sănătate portofoliu",
     // Sections
@@ -79,6 +81,7 @@ const translations = {
     "cta.title1": "Gata să digitalizezi", "cta.title2": "tot ecosistemul?",
     "cta.intro": "Alătură-te celor 12,842 de utilizatori care au transformat proprietățile lor în active digitale gestionabile, valoroase și liniștitoare.",
     "cta.btn1": "Creează cont gratuit", "cta.btn2": "Vorbește cu un specialist",
+    "cta.btn1.variant_a": "Creează cont gratuit", "cta.btn1.variant_b": "Începe gratuit · 14 zile",
     "cta.footer": "Fără card de credit · Anulezi oricând · Probă 14 zile",
   },
   en: {
@@ -127,6 +130,8 @@ const translations = {
     "hero.title1": "Your property,", "hero.title2": "perfected", "hero.title3": "digitally.",
     "hero.subtitle": "PropManage builds a high-fidelity Digital Twin of your home, monitoring structural condition and financial performance in real time. Structured peace of mind for the modern owner.",
     "hero.cta1": "Explore Demo", "hero.cta2": "See Full Flow",
+    "hero.cta1.variant_a": "Explore Demo", "hero.cta1.variant_b": "Start free now",
+    "hero.cta2.variant_a": "See Full Flow", "hero.cta2.variant_b": "See how it works in 2 min",
     "hero.stat1": "Active users", "hero.stat2": "Active jobs",
     "hero.stat3": "Verified specialists", "hero.stat4": "Portfolio health",
     // Sections
@@ -155,6 +160,7 @@ const translations = {
     "cta.title1": "Ready to digitize", "cta.title2": "your entire ecosystem?",
     "cta.intro": "Join the 12,842 users who turned their properties into manageable, valuable, peace-of-mind digital assets.",
     "cta.btn1": "Create free account", "cta.btn2": "Talk to specialist",
+    "cta.btn1.variant_a": "Create free account", "cta.btn1.variant_b": "Start free · 14 days",
     "cta.footer": "No credit card required · Cancel anytime · 14-day trial",
   }
 };

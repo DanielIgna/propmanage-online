@@ -67,11 +67,15 @@ DEFAULT_CMS = {
     "hero.cta1.variant_a": "Explorează Demo",
     "hero.cta1.variant_b": "Începe gratuit acum",
     "hero.cta2": "Vezi Flux Complet",
+    "hero.cta2.variant_a": "Vezi Flux Complet",
+    "hero.cta2.variant_b": "Vezi cum funcționează în 2 min",
     "cta.badge": "GATA DE LANSARE",
     "cta.title1": "Gata să digitalizezi",
     "cta.title2": "tot ecosistemul?",
     "cta.intro": "Alătură-te celor 12,842 de utilizatori care au transformat proprietățile lor în active digitale gestionabile, valoroase și liniștitoare.",
     "cta.btn1": "Creează cont gratuit",
+    "cta.btn1.variant_a": "Creează cont gratuit",
+    "cta.btn1.variant_b": "Începe gratuit · 14 zile",
     "cta.btn2": "Vorbește cu un specialist",
     "cta.footer": "Fără card de credit · Anulezi oricând · Probă 14 zile",
     "label.request.create": "Cere o ofertă",
@@ -788,7 +792,11 @@ async def ab_stats(user: dict = Depends(require_role("admin"))):
         exp_map.setdefault(eid, {}).setdefault(var, {"impressions": 0, "clicks": 0})[f"{evt}s"] = r["count"]
 
     out = []
-    KNOWN = {"hero_cta1": {"label": "Hero CTA principal", "keys": ["hero.cta1.variant_a", "hero.cta1.variant_b"]}}
+    KNOWN = {
+        "hero_cta1": {"label": "Hero CTA principal", "keys": ["hero.cta1.variant_a", "hero.cta1.variant_b"]},
+        "hero_cta2": {"label": "Hero CTA secundar (Flux Complet)", "keys": ["hero.cta2.variant_a", "hero.cta2.variant_b"]},
+        "cta_btn1": {"label": "CTA bottom — Creează cont", "keys": ["cta.btn1.variant_a", "cta.btn1.variant_b"]},
+    }
     for eid, vmap in exp_map.items():
         meta = KNOWN.get(eid, {"label": eid, "keys": []})
         variants = []

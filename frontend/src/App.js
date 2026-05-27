@@ -101,7 +101,9 @@ const Nav = () => {
 const Hero = () => {
   const { t } = useI18n();
   const { variant, trackClick } = useABTest("hero_cta1");
+  const { variant: variant2, trackClick: trackClick2 } = useABTest("hero_cta2");
   const ctaText = t(`hero.cta1.variant_${variant}`) || t("hero.cta1");
+  const cta2Text = t(`hero.cta2.variant_${variant2}`) || t("hero.cta2");
   return (
   <section id="top" className="relative min-h-screen flex items-center pt-32 pb-20 px-6 overflow-hidden">
     <div className="absolute inset-0 dotted-bg opacity-30" />
@@ -131,9 +133,9 @@ const Hero = () => {
             {ctaText}
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </a>
-          <a href="#journey" className="glass px-8 py-4 rounded-full font-medium inline-flex items-center gap-2 hover:bg-white/10 transition-colors" data-testid="hero-journey-btn">
+          <a href="#journey" onClick={trackClick2} className="glass px-8 py-4 rounded-full font-medium inline-flex items-center gap-2 hover:bg-white/10 transition-colors" data-testid="hero-journey-btn" data-ab-variant={variant2}>
             <Play className="w-4 h-4" />
-            {t("hero.cta2")}
+            {cta2Text}
           </a>
         </div>
       </motion.div>
@@ -1269,6 +1271,8 @@ const GoldenPath = () => {
 // ============= CTA + FOOTER =============
 const CTA = () => {
   const { t } = useI18n();
+  const { variant: ctaVariant, trackClick: trackCtaClick } = useABTest("cta_btn1");
+  const ctaBtn1Text = t(`cta.btn1.variant_${ctaVariant}`) || t("cta.btn1");
   return (
   <section id="cta" className="py-32 px-6 relative">
     <div className="max-w-7xl mx-auto">
@@ -1288,8 +1292,8 @@ const CTA = () => {
             {t("cta.intro")}
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
-            <Link to="/register" className="btn-accent px-8 py-4 rounded-full font-medium inline-flex items-center gap-2 group" data-testid="cta-primary">
-              {t("cta.btn1")}
+            <Link to="/register" onClick={trackCtaClick} className="btn-accent px-8 py-4 rounded-full font-medium inline-flex items-center gap-2 group" data-testid="cta-primary" data-ab-variant={ctaVariant}>
+              {ctaBtn1Text}
               <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
             </Link>
             <Link to="/login" className="glass px-8 py-4 rounded-full font-medium inline-flex items-center gap-2 hover:bg-white/10 transition-colors" data-testid="cta-secondary">
