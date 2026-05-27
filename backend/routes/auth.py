@@ -141,8 +141,9 @@ async def logout(response: Response):
 @router.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
     # Load tutorial seen flag fresh from DB so it reflects across sessions
-    doc = await db.users.find_one({"_id": ObjectId(user["id"])}, {"tutorial_seen": 1})
+    doc = await db.users.find_one({"_id": ObjectId(user["id"])}, {"tutorial_seen": 1, "ai_admin_tour_seen": 1})
     user["tutorial_seen"] = bool((doc or {}).get("tutorial_seen", False))
+    user["ai_admin_tour_seen"] = bool((doc or {}).get("ai_admin_tour_seen", False))
     return user
 
 
@@ -162,6 +163,28 @@ async def reset_tutorial(user: dict = Depends(get_current_user)):
     await db.users.update_one(
         {"_id": ObjectId(user["id"])},
         {"$unset": {"tutorial_seen": "", "tutorial_seen_at": ""}}
+    )
+    return {"ok": True}
+
+
+@router.post("/auth/ai-admin-tour-seen")
+async def mark_ai_admin_tour_seen(user: dict = Depends(get_current_user)):
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Admin only")
+    await db.users.update_one(
+        {"_id": ObjectId(user["id"])},
+        {"$set": {"ai_admin_tour_seen": True, "ai_admin_tour_seen_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"ok": True}
+
+
+@router.post("/auth/ai-admin-tour-reset")
+async def reset_ai_admin_tour(user: dict = Depends(get_current_user)):
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Admin only")
+    await db.users.update_one(
+        {"_id": ObjectId(user["id"])},
+        {"$unset": {"ai_admin_tour_seen": "", "ai_admin_tour_seen_at": ""}}
     )
     return {"ok": True}
 

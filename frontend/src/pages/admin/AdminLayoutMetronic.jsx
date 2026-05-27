@@ -10,6 +10,7 @@ import {
 import { useAuth } from "../../auth";
 import { API } from "../DashShared";
 import { HealthScoreBadge } from "./HealthScoreBadge";
+import { AIAdminTour, ReplayAIAdminTourButton } from "./AIAdminTour";
 
 const NAV_SECTIONS = [
   {
@@ -261,6 +262,7 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
           </button>
           <GlobalSearch theme={theme} />
           <HealthScoreBadge dark={dark} />
+          <ReplayAIAdminTourButton />
           <button onClick={toggleTheme} className={`p-2 rounded-lg ${dark ? "hover:bg-slate-800 text-slate-300" : "hover:bg-slate-100 text-slate-600"}`} data-testid="admin-theme-toggle">
             {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
@@ -279,6 +281,7 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
           {children}
         </main>
       </div>
+      <AIAdminTour />
     </div>
   );
 };
