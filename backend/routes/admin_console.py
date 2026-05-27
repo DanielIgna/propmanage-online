@@ -763,3 +763,139 @@ async def ab_stats(user: dict = Depends(require_role("admin"))):
 async def ab_reset(experiment: str, user: dict = Depends(require_role("admin"))):
     res = await db.ab_events.delete_many({"experiment": experiment})
     return {"ok": True, "deleted": res.deleted_count}
+
+
+# ============= LANDING PRESETS =============
+LANDING_FLAG_KEYS = [
+    "landing_show_admin_trust",
+    "landing_show_business_model",
+    "landing_show_unit_economics",
+    "landing_show_value_proposition",
+    "landing_show_golden_path",
+]
+
+DEFAULT_PRESETS = [
+    {
+        "name": "Public Client",
+        "description": "Pentru utilizatorul obișnuit — fără pitch investitor",
+        "flags": {"landing_show_admin_trust": False, "landing_show_business_model": False,
+                  "landing_show_unit_economics": False, "landing_show_value_proposition": True,
+                  "landing_show_golden_path": True},
+        "system": True,
+    },
+    {
+        "name": "Pitch Investitor",
+        "description": "Toate secțiunile vizibile, incl. Business Model + KPI financiari",
+        "flags": {"landing_show_admin_trust": True, "landing_show_business_model": True,
+                  "landing_show_unit_economics": True, "landing_show_value_proposition": True,
+                  "landing_show_golden_path": True},
+        "system": True,
+    },
+    {
+        "name": "Demo Minimal",
+        "description": "Doar Hero + Golden Path — pentru screenshot-uri marketing",
+        "flags": {"landing_show_admin_trust": False, "landing_show_business_model": False,
+                  "landing_show_unit_economics": False, "landing_show_value_proposition": False,
+                  "landing_show_golden_path": True},
+        "system": True,
+    },
+]
+
+
+class PresetIn(BaseModel):
+    name: str = Field(min_length=2, max_length=80)
+    description: Optional[str] = Field(default=None, max_length=300)
+    flags: dict
+
+
+async def _ensure_default_presets():
+    """Idempotent — seed default presets if none of type system exist."""
+    existing = await db.landing_presets.count_documents({"system": True})
+    if existing < len(DEFAULT_PRESETS):
+        for p in DEFAULT_PRESETS:
+            await db.landing_presets.update_one(
+                {"name": p["name"], "system": True},
+                {"$setOnInsert": {
+                    "name": p["name"],
+                    "description": p["description"],
+                    "flags": p["flags"],
+                    "system": True,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }},
+                upsert=True,
+            )
+
+
+@router.get("/landing-presets")
+async def list_landing_presets(user: dict = Depends(require_role("admin"))):
+    await _ensure_default_presets()
+    docs = await db.landing_presets.find({}).sort([("system", -1), ("created_at", 1)]).to_list(100)
+    out = []
+    for d in docs:
+        out.append({
+            "id": str(d["_id"]),
+            "name": d.get("name"),
+            "description": d.get("description"),
+            "flags": d.get("flags", {}),
+            "system": bool(d.get("system", False)),
+            "created_at": d.get("created_at"),
+        })
+    return out
+
+
+@router.post("/landing-presets")
+async def create_landing_preset(data: PresetIn, user: dict = Depends(require_role("admin"))):
+    # Sanitize flags — keep only known keys
+    flags = {k: bool(data.flags.get(k, False)) for k in LANDING_FLAG_KEYS}
+    if await db.landing_presets.find_one({"name": data.name}):
+        raise HTTPException(400, "Un preset cu acest nume există deja.")
+    doc = {
+        "name": data.name.strip(),
+        "description": data.description,
+        "flags": flags,
+        "system": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": user["id"],
+    }
+    res = await db.landing_presets.insert_one(doc)
+    return {"ok": True, "id": str(res.inserted_id)}
+
+
+@router.delete("/landing-presets/{preset_id}")
+async def delete_landing_preset(preset_id: str, user: dict = Depends(require_role("admin"))):
+    try:
+        oid = ObjectId(preset_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid preset id")
+    doc = await db.landing_presets.find_one({"_id": oid})
+    if not doc:
+        raise HTTPException(404, "Preset not found")
+    if doc.get("system"):
+        raise HTTPException(400, "Preset-urile sistem nu pot fi șterse.")
+    await db.landing_presets.delete_one({"_id": oid})
+    return {"ok": True}
+
+
+@router.post("/landing-presets/{preset_id}/apply")
+async def apply_landing_preset(preset_id: str, user: dict = Depends(require_role("admin"))):
+    """Persist this preset's flags into platform settings."""
+    try:
+        oid = ObjectId(preset_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid preset id")
+    preset = await db.landing_presets.find_one({"_id": oid})
+    if not preset:
+        raise HTTPException(404, "Preset not found")
+    settings_doc = await db.platform_config.find_one({"key": "settings"})
+    current = (settings_doc or {}).get("value", {})
+    merged = {**DEFAULT_SETTINGS, **current, **preset.get("flags", {})}
+    await db.platform_config.update_one(
+        {"key": "settings"},
+        {"$set": {
+            "key": "settings", "value": merged,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_by": user["id"],
+        }},
+        upsert=True,
+    )
+    return {"ok": True, "applied": preset.get("name"), "flags": preset.get("flags")}

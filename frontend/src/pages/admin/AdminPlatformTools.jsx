@@ -143,6 +143,18 @@ export const AdminPlatformSettings = () => {
           </div>
         </div>
       </AdminCard>
+      <LandingPresetsCard
+        currentFlags={Object.fromEntries([
+          "landing_show_admin_trust","landing_show_business_model",
+          "landing_show_unit_economics","landing_show_value_proposition",
+          "landing_show_golden_path"
+        ].map(k => [k, !!val(k)]))}
+        onApply={(flags) => {
+          // Merge applied flags into dirty (so they show in toggles immediately)
+          setDirty(d => ({ ...d, ...flags }));
+        }}
+        onPersistedApply={load}
+      />
 
       <AdminCard title="🎬 Vizibilitate secțiuni Landing" testid="settings-landing-vis-card">
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
@@ -404,3 +416,154 @@ export const AdminActivityFull = () => {
     </AdminCard>
   );
 };
+
+// ============= LANDING PRESETS CARD =============
+const LandingPresetsCard = ({ currentFlags, onApply, onPersistedApply }) => {
+  const [presets, setPresets] = useState([]);
+  const [showSaveForm, setShowSaveForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState("");
+
+  const load = () => axios.get(`${API}/admin/landing-presets`).then(r => setPresets(r.data));
+  useEffect(() => { load(); }, []);
+
+  const flash = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
+
+  const apply = (preset) => {
+    onApply(preset.flags);
+    flash(`✓ Preset "${preset.name}" aplicat — apasă Salvează pentru a-l face permanent`);
+  };
+
+  const applyAndSave = async (preset) => {
+    setBusy(true);
+    try {
+      await axios.post(`${API}/admin/landing-presets/${preset.id}/apply`);
+      flash(`✓ "${preset.name}" aplicat & salvat instant`);
+      onPersistedApply && onPersistedApply();
+    } catch (e) { flash(`❌ ${e?.response?.data?.detail || "Eroare"}`); }
+    finally { setBusy(false); }
+  };
+
+  const sharePreviewLink = async (preset) => {
+    const params = new URLSearchParams({ preview: "1" });
+    Object.entries(preset.flags).forEach(([k, v]) => params.set(k, String(!!v)));
+    const url = `${window.location.origin}/?${params.toString()}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      flash(`🔗 Link copiat pentru "${preset.name}"`);
+    } catch {
+      window.open(url, "_blank");
+    }
+  };
+
+  const saveCurrentAsPreset = async (e) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    setBusy(true);
+    try {
+      await axios.post(`${API}/admin/landing-presets`, {
+        name: newName.trim(), description: newDesc.trim() || null, flags: currentFlags,
+      });
+      setNewName(""); setNewDesc(""); setShowSaveForm(false);
+      await load();
+      flash("✓ Preset nou salvat");
+    } catch (e) { flash(`❌ ${e?.response?.data?.detail || "Eroare"}`); }
+    finally { setBusy(false); }
+  };
+
+  const remove = async (preset) => {
+    if (!window.confirm(`Șterge preset-ul "${preset.name}"?`)) return;
+    try {
+      await axios.delete(`${API}/admin/landing-presets/${preset.id}`);
+      await load();
+      flash("✓ Preset șters");
+    } catch (e) { flash(`❌ ${e?.response?.data?.detail || "Eroare"}`); }
+  };
+
+  const renderFlags = (flags) => {
+    const labels = {
+      landing_show_admin_trust: "Admin",
+      landing_show_business_model: "Business",
+      landing_show_unit_economics: "KPI",
+      landing_show_value_proposition: "Value",
+      landing_show_golden_path: "Path",
+    };
+    return Object.entries(labels).map(([k, lbl]) => (
+      <span key={k} className={`inline-block text-[10px] px-1.5 py-0.5 rounded ${flags[k] ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400" : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600"}`}>
+        {flags[k] ? "✓" : "✗"} {lbl}
+      </span>
+    ));
+  };
+
+  return (
+    <AdminCard
+      title="💾 Preset-uri Configurare Landing"
+      testid="presets-card"
+      action={
+        <AdminBtn onClick={() => setShowSaveForm(s => !s)} data-testid="preset-new-btn">
+          {showSaveForm ? "Anulează" : "+ Salvează curent ca preset"}
+        </AdminBtn>
+      }
+    >
+      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+        Switch instant între configurări — ex: <i>Pitch Investitor</i> înainte de un meeting, apoi <i>Public Client</i> înapoi. Preset-urile sistem (🔒) nu pot fi șterse.
+      </p>
+
+      {showSaveForm && (
+        <form onSubmit={saveCurrentAsPreset} className="mb-3 p-3 rounded-lg border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/5" data-testid="preset-save-form">
+          <input
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            placeholder="Nume preset (ex: Marketing Run Q1)"
+            className="w-full mb-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+            data-testid="preset-name-input"
+            required
+            minLength={2}
+            maxLength={80}
+          />
+          <input
+            value={newDesc}
+            onChange={e => setNewDesc(e.target.value)}
+            placeholder="Descriere (opțional)"
+            className="w-full mb-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+            data-testid="preset-desc-input"
+            maxLength={300}
+          />
+          <div className="flex gap-2 flex-wrap mb-2">{renderFlags(currentFlags)}</div>
+          <AdminBtn type="submit" disabled={busy} data-testid="preset-save-submit">{busy ? "..." : "Salvează preset"}</AdminBtn>
+        </form>
+      )}
+
+      <div className="space-y-2">
+        {presets.map(p => (
+          <div key={p.id} className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30" data-testid={`preset-${p.id}`}>
+            <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
+              <div className="min-w-0 flex-1">
+                <div className="font-medium flex items-center gap-1.5">
+                  {p.system && <span title="Preset sistem (read-only)" className="text-[10px] text-slate-400">🔒</span>}
+                  {p.name}
+                </div>
+                {p.description && <div className="text-xs text-slate-500 mt-0.5">{p.description}</div>}
+                <div className="flex gap-1 flex-wrap mt-1.5">{renderFlags(p.flags)}</div>
+              </div>
+              <div className="flex gap-1.5 shrink-0">
+                <AdminBtn variant="ghost" onClick={() => sharePreviewLink(p)} title="Copiază link preview" data-testid={`preset-share-${p.id}`}>🔗</AdminBtn>
+                <AdminBtn variant="secondary" onClick={() => apply(p)} title="Pune valorile în toggle-uri (nu salvează)" data-testid={`preset-apply-${p.id}`}>Aplică</AdminBtn>
+                <AdminBtn variant="primary" onClick={() => applyAndSave(p)} disabled={busy} title="Aplică și salvează instant" data-testid={`preset-applysave-${p.id}`}>Aplică + Salvează</AdminBtn>
+                {!p.system && (
+                  <AdminBtn variant="ghost" onClick={() => remove(p)} title="Șterge preset" data-testid={`preset-delete-${p.id}`}>🗑️</AdminBtn>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+        {presets.length === 0 && <div className="text-center py-6 text-sm text-slate-500">Niciun preset încă</div>}
+      </div>
+
+      {toast && <div className="mt-3 text-sm font-medium text-emerald-600 dark:text-emerald-400" data-testid="presets-toast">{toast}</div>}
+    </AdminCard>
+  );
+};
+
