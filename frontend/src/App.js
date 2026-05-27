@@ -5,7 +5,7 @@ import {
   Home, Wrench, Shield, Wallet, Box, Users, AlertTriangle, CheckCircle2,
   ArrowRight, ArrowUpRight, Zap, Droplet, Wind, Building2, Coins, TrendingUp,
   Eye, Lock, Star, Sparkles, FileCheck, Gavel, ChevronRight, Play, Pause,
-  Activity, Layers, Cpu, Award, MessageSquare, Camera, Bell, Plus, Minus, Languages, LogIn, LayoutDashboard, ShieldCheck
+  Activity, Layers, Cpu, Award, MessageSquare, Camera, Bell, Plus, Minus, Languages, LogIn, LogOut, LayoutDashboard, ShieldCheck
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./auth";
 import { I18nProvider, useI18n } from "./i18n";
@@ -33,13 +33,18 @@ import "./App.css";
 // ============= NAV =============
 const Nav = () => {
   const [scrolled, setScrolled] = useState(false);
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { lang, toggle, t } = useI18n();
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  const handleLogout = async () => {
+    try { await logout(); } catch (_) { /* ignore */ }
+    window.location.href = "/";
+  };
 
   const links = [
     { href: "#problem", label: t("nav.problem") },
@@ -84,9 +89,19 @@ const Nav = () => {
             </Link>
           )}
           {user && user !== false ? (
-            <Link to={`/${user.role}`} className="btn-accent px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium inline-flex items-center gap-1.5" data-testid="nav-dashboard">
-              <LayoutDashboard className="w-3.5 h-3.5" /><span className="hidden sm:inline">{t("nav.dashboard")}</span>
-            </Link>
+            <>
+              <Link to={`/${user.role}`} className="btn-accent px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium inline-flex items-center gap-1.5" data-testid="nav-dashboard">
+                <LayoutDashboard className="w-3.5 h-3.5" /><span className="hidden sm:inline">{t("nav.dashboard")}</span>
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium bg-white/5 hover:bg-white/10 text-stone-300 border border-white/10 transition-colors"
+                data-testid="nav-logout"
+                title="Deconectare"
+              >
+                <LogOut className="w-3.5 h-3.5" /><span className="hidden sm:inline">Logout</span>
+              </button>
+            </>
           ) : (
             <Link to="/login" className="btn-accent px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium inline-flex items-center gap-1.5" data-testid="nav-login">
               <LogIn className="w-3.5 h-3.5" /><span className="hidden sm:inline">{t("nav.login")}</span>
