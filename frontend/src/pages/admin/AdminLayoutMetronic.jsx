@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { API } from "../DashShared";
+import { HealthScoreBadge } from "./HealthScoreBadge";
 
 const NAV_SECTIONS = [
   {
@@ -259,6 +260,7 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
             <Menu className={dark ? "text-slate-300" : "text-slate-700"} />
           </button>
           <GlobalSearch theme={theme} />
+          <HealthScoreBadge dark={dark} />
           <button onClick={toggleTheme} className={`p-2 rounded-lg ${dark ? "hover:bg-slate-800 text-slate-300" : "hover:bg-slate-100 text-slate-600"}`} data-testid="admin-theme-toggle">
             {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
