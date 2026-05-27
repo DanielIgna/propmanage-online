@@ -228,7 +228,7 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - **Stripe Checkout** — emergentintegrations integrated. DEMO mode active while `STRIPE_API_KEY=sk_test_emergent` placeholder. Swap to real `sk_test_*` or `sk_live_*` to enable real Stripe + webhook signature verification.
 - **SendGrid** — emails print to console. Needs `SENDGRID_API_KEY` for production dispatch.
 
-### Phase 36 — Audit Diff Compare (Feb 2026)
+### Phase 36 — Audit Diff Compare + Shareable Links (Feb 2026)
 - Checkbox-uri pe rândurile din Audit Log (max 2 selectate simultan, FIFO drop)
 - Buton "🔬 Compară selectate (2)" în toolbar care deschide modal Diff Compare
 - Modal afișează cronologic Mai vechi (stânga) / Mai nou (dreapta) cu header (acțiune, actor, timestamp)
@@ -236,8 +236,10 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
   1. **Tabel câmpuri** — key-by-key comparison pentru obiecte, marker amber `●` pe câmpuri schimbate
   2. **Diff linie cu linie** — GitHub-style side-by-side cu numere de linie, LCS algorithm, fundal roșu/verde, prefixe `−`/`+`, statistici `+N −N linii modificate`
 - Smart state pick: `cms.reset` → folosește `before`, alte acțiuni → `after`
-- Avertisment vizibil dacă țintele sunt diferite (compararea poate fi mai puțin relevantă)
-- Toate testate vizual cu screenshot pe Setări Platform changes
+- **Shareable Diff Links** — buton "🔗 Copiază link Diff" generează URL `?compare=ID1,ID2`
+- Auto-deschide modalul când pagina e accesată cu `?compare=` (cu fetch fallback prin nou endpoint `GET /api/admin/audit-log/{entry_id}` dacă intrările nu sunt pe pagina curentă)
+- Banner roșu "⚠️ Link de compare invalid" dacă una/ambele intrări au fost șterse
+- URL e șters din browser history la închiderea modalului (no auto-reopen on refresh)
 
 ## Roadmap
 ### P1 (Next)

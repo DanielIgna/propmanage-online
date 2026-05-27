@@ -55,6 +55,8 @@ export const AdminAuditLog = () => {
   const [toast, setToast] = useState("");
   const [selected, setSelected] = useState([]); // up to 2 ids for diff compare
   const [showCompare, setShowCompare] = useState(false);
+  const [pendingCompare, setPendingCompare] = useState(null); // [id1, id2] from URL ?compare=
+  const [missingCompare, setMissingCompare] = useState(false); // shareable link entries not found
 
   const toggleSelect = (id) => {
     setSelected(prev => {
@@ -93,9 +95,50 @@ export const AdminAuditLog = () => {
 
   useEffect(() => {
     axios.get(`${API}/admin/audit-log/actions`).then(r => setActions(r.data)).catch(() => {});
+    // Parse ?compare=ID1,ID2 from URL for shareable diff links
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const cmp = sp.get("compare");
+      if (cmp) {
+        const ids = cmp.split(",").map(s => s.trim()).filter(Boolean).slice(0, 2);
+        if (ids.length === 2) setPendingCompare(ids);
+      }
+    } catch { /* ignore */ }
   }, []);
 
   useEffect(() => { load(); }, [filterAction, skip]);
+
+  // Auto-resolve shareable compare link once data is loaded
+  useEffect(() => {
+    if (!pendingCompare || data.items.length === 0) return;
+    const [a, b] = pendingCompare;
+    const foundA = data.items.find(i => i.id === a);
+    const foundB = data.items.find(i => i.id === b);
+    if (foundA && foundB) {
+      setSelected([a, b]);
+      setShowCompare(true);
+      setPendingCompare(null);
+      setMissingCompare(false);
+    } else {
+      // Try fetch directly (entries may be older than current page)
+      Promise.all([
+        axios.get(`${API}/admin/audit-log/${a}`).then(r => r.data).catch(() => null),
+        axios.get(`${API}/admin/audit-log/${b}`).then(r => r.data).catch(() => null),
+      ]).then(([eA, eB]) => {
+        if (eA && eB) {
+          // Inject into data.items so modal can find them
+          setData(prev => ({ ...prev, items: [eA, eB, ...prev.items.filter(i => i.id !== a && i.id !== b)] }));
+          setSelected([a, b]);
+          setShowCompare(true);
+          setMissingCompare(false);
+        } else {
+          setMissingCompare(true);
+          flash("❌ Una sau ambele intrări din link-ul de compare nu au fost găsite (poate au fost șterse).");
+        }
+        setPendingCompare(null);
+      });
+    }
+  }, [pendingCompare, data.items]);
 
   const onSearch = (e) => { e.preventDefault(); setSkip(0); load(); };
 
@@ -254,9 +297,33 @@ export const AdminAuditLog = () => {
         <CompareDiffModal
           entryA={data.items.find(i => i.id === selected[0])}
           entryB={data.items.find(i => i.id === selected[1])}
-          onClose={() => setShowCompare(false)}
-          onClear={() => { setSelected([]); setShowCompare(false); }}
+          onClose={() => {
+            setShowCompare(false);
+            // Strip ?compare= from URL so refresh doesn't auto-reopen
+            try {
+              const url = new URL(window.location.href);
+              if (url.searchParams.has("compare")) {
+                url.searchParams.delete("compare");
+                window.history.replaceState({}, "", url.toString());
+              }
+            } catch { /* ignore */ }
+          }}
+          onClear={() => {
+            setSelected([]);
+            setShowCompare(false);
+            try {
+              const url = new URL(window.location.href);
+              url.searchParams.delete("compare");
+              window.history.replaceState({}, "", url.toString());
+            } catch { /* ignore */ }
+          }}
+          onCopiedLink={() => flash("✓ Link copiat în clipboard — îl poți trimite oricui are acces admin.")}
         />
+      )}
+      {missingCompare && (
+        <div className="fixed bottom-4 right-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 text-sm px-4 py-2 rounded-lg shadow-lg" data-testid="compare-missing-banner">
+          ⚠️ Link de compare invalid — intrările nu mai există.
+        </div>
       )}
     </div>
   );
@@ -350,8 +417,9 @@ const LineDiffView = ({ left, right }) => {
 };
 
 // ============= COMPARE DIFF MODAL =============
-const CompareDiffModal = ({ entryA, entryB, onClose, onClear }) => {
+const CompareDiffModal = ({ entryA, entryB, onClose, onClear, onCopiedLink }) => {
   const [view, setView] = useState("auto"); // auto | lines | keys
+  const [linkCopied, setLinkCopied] = useState(false);
   if (!entryA || !entryB) return null;
   // Order chronologically: older = A, newer = B
   const [older, newer] = (new Date(entryA.created_at) <= new Date(entryB.created_at))
@@ -454,9 +522,35 @@ const CompareDiffModal = ({ entryA, entryB, onClose, onClear }) => {
           <LineDiffView left={olderState} right={newerState} />
         )}
 
-        <div className="flex justify-end gap-2 mt-5">
-          <AdminBtn variant="secondary" onClick={onClear} data-testid="compare-clear">Deselectează & închide</AdminBtn>
-          <AdminBtn variant="primary" onClick={onClose} data-testid="compare-close">Închide</AdminBtn>
+        <div className="flex justify-between items-center gap-2 mt-5 flex-wrap">
+          <button
+            onClick={async () => {
+              const url = `${window.location.origin}${window.location.pathname}?compare=${entryA.id},${entryB.id}`;
+              try {
+                await navigator.clipboard.writeText(url);
+              } catch {
+                // Fallback for browsers without clipboard API
+                const ta = document.createElement("textarea");
+                ta.value = url;
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand("copy"); } catch { /* ignore */ }
+                document.body.removeChild(ta);
+              }
+              setLinkCopied(true);
+              setTimeout(() => setLinkCopied(false), 2500);
+              if (onCopiedLink) onCopiedLink();
+            }}
+            className="text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5"
+            data-testid="compare-copy-link"
+            title="Generează un URL permanent care deschide automat acest compare. Util pentru investitori, auditori, sau colegi de echipă."
+          >
+            {linkCopied ? <>✓ Copiat!</> : <>🔗 Copiază link Diff</>}
+          </button>
+          <div className="flex gap-2">
+            <AdminBtn variant="secondary" onClick={onClear} data-testid="compare-clear">Deselectează & închide</AdminBtn>
+            <AdminBtn variant="primary" onClick={onClose} data-testid="compare-close">Închide</AdminBtn>
+          </div>
         </div>
       </div>
     </div>

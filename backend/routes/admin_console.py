@@ -1397,6 +1397,33 @@ async def delete_snapshot(snapshot_id: str, user: dict = Depends(require_role("a
     return {"ok": True}
 
 
+@router.get("/audit-log/{entry_id}")
+async def get_audit_entry(entry_id: str, user: dict = Depends(require_role("admin"))):
+    """Fetch a single audit entry by id — used by shareable diff compare links."""
+    try:
+        oid = ObjectId(entry_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid entry id")
+    d = await db.admin_audit_log.find_one({"_id": oid})
+    if not d:
+        raise HTTPException(404, "Audit entry not found")
+    return {
+        "id": str(d["_id"]),
+        "action": d.get("action"),
+        "actor_id": d.get("actor_id"),
+        "actor_name": d.get("actor_name"),
+        "actor_email": d.get("actor_email"),
+        "target_type": d.get("target_type"),
+        "target_id": d.get("target_id"),
+        "target_label": d.get("target_label"),
+        "before": d.get("before"),
+        "after": d.get("after"),
+        "note": d.get("note"),
+        "created_at": d.get("created_at"),
+        "rollbackable": d.get("action") in ROLLBACKABLE_ACTIONS,
+    }
+
+
 @router.post("/audit-log/{entry_id}/rollback")
 async def rollback_audit_entry(entry_id: str, user: dict = Depends(require_role("admin"))):
     """Restore the `before` state of an audit entry. Idempotent within reason — creates a new audit entry."""
