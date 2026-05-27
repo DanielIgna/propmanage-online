@@ -84,6 +84,7 @@ export const AdminPlatformSettings = () => {
   const [s, setS] = useState(null);
   const [dirty, setDirty] = useState({});
   const [saving, setSaving] = useState(false);
+  const [copyMsg, setCopyMsg] = useState("");
 
   const load = () => axios.get(`${API}/admin/settings`).then(r => { setS(r.data); setDirty({}); });
   useEffect(() => { load(); }, []);
@@ -192,23 +193,55 @@ export const AdminPlatformSettings = () => {
       </AdminCard>
 
       <div className="flex justify-between gap-2 flex-wrap">
-        <AdminBtn
-          variant="secondary"
-          onClick={() => {
-            // Build preview URL — include all current values (saved + dirty) for landing flags
-            const flagKeys = [
-              "landing_show_admin_trust", "landing_show_business_model",
-              "landing_show_unit_economics", "landing_show_value_proposition",
-              "landing_show_golden_path",
-            ];
-            const params = new URLSearchParams({ preview: "1" });
-            flagKeys.forEach(k => { params.set(k, String(!!val(k))); });
-            window.open(`/?${params.toString()}`, "_blank");
-          }}
-          data-testid="settings-preview-landing"
-        >
-          👁 Preview Landing {Object.keys(dirty).length > 0 && <span className="ml-1 text-[10px] bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-full">cu modificări nesalvate</span>}
-        </AdminBtn>
+        <div className="flex gap-2 flex-wrap items-center">
+          <AdminBtn
+            variant="secondary"
+            onClick={() => {
+              const flagKeys = [
+                "landing_show_admin_trust", "landing_show_business_model",
+                "landing_show_unit_economics", "landing_show_value_proposition",
+                "landing_show_golden_path",
+              ];
+              const params = new URLSearchParams({ preview: "1" });
+              flagKeys.forEach(k => { params.set(k, String(!!val(k))); });
+              window.open(`/?${params.toString()}`, "_blank");
+            }}
+            data-testid="settings-preview-landing"
+          >
+            👁 Preview Landing {Object.keys(dirty).length > 0 && <span className="ml-1 text-[10px] bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-full">cu modificări nesalvate</span>}
+          </AdminBtn>
+          <AdminBtn
+            variant="ghost"
+            onClick={async () => {
+              const flagKeys = [
+                "landing_show_admin_trust", "landing_show_business_model",
+                "landing_show_unit_economics", "landing_show_value_proposition",
+                "landing_show_golden_path",
+              ];
+              const params = new URLSearchParams({ preview: "1" });
+              flagKeys.forEach(k => { params.set(k, String(!!val(k))); });
+              const url = `${window.location.origin}/?${params.toString()}`;
+              try {
+                await navigator.clipboard.writeText(url);
+                setCopyMsg("✓ Link copiat în clipboard!");
+              } catch {
+                // Fallback for non-secure contexts
+                const ta = document.createElement("textarea");
+                ta.value = url;
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand("copy"); setCopyMsg("✓ Link copiat!"); }
+                catch { setCopyMsg("❌ Nu am putut copia. Selectează URL-ul manual."); }
+                document.body.removeChild(ta);
+              }
+              setTimeout(() => setCopyMsg(""), 3500);
+            }}
+            data-testid="settings-copy-preview-link"
+          >
+            🔗 Copiază link preview
+          </AdminBtn>
+          {copyMsg && <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium" data-testid="copy-toast">{copyMsg}</span>}
+        </div>
         <div className="flex gap-2">
           <AdminBtn variant="secondary" onClick={() => setDirty({})} disabled={!Object.keys(dirty).length}>Anulează</AdminBtn>
           <AdminBtn onClick={save} disabled={saving || !Object.keys(dirty).length} data-testid="settings-save">
