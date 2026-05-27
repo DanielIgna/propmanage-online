@@ -1787,6 +1787,8 @@ async def operator_create_project_for_client(
     client = await db.users.find_one(_user_filter(client_id))
     if not client:
         raise HTTPException(404, "Client inexistent.")
+    if (client.get("role") or "").lower() != "client":
+        raise HTTPException(400, "Doar clientii pot avea proiecte Digital Twin.")
     if not client.get("digital_twin_pro"):
         raise HTTPException(400, "Clientul nu are acces Digital Twin Pro. Acordă mai întâi accesul.")
     pid = _new_id()

@@ -561,6 +561,22 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Validated AutoReminderSettingsModal frontend (iteration_28): 7/7 scenarios pass — enable toggle, thresholds CSV input, pause-until date, stop-forever switch, save & toast
 - Custom domain propmanage.ro stuck in "pending": deployment scan confirms codebase is deploy-ready (CORS=*, env vars clean, OAuth uses window.location.origin); user must delete existing A records at registrar then re-link via Entri (15-30 min DNS propagation expected)
 
+## Changelog — 2026-03-01 — Operator Digital Twin Pro onboarding
+- New backend file: `routes/digital_twin.py` extended with `operator_router` (`/api/operator/digital-twin/*`):
+  - `POST /grant-access` — operator (or admin) toggles `digital_twin_pro` flag on a client; audit-logged with `via=operator_panel`
+  - `GET /clients-queue?status=all|needs_setup|in_progress|delivered` — paginated queue with counters
+  - `POST /clients/{client_id}/projects` — creates a DT project owned by the client; records `created_by_operator_id` + role guard (only clients can have DT projects)
+- File format expansion: ALLOWED_EXTS now includes `.skp` (SketchUp); .glb/.gltf render as 3D in viewer, .skp stored as kind=archive + downloadable from `/api/digital-twin/files/...`
+- `upload_model`: differentiates model vs archive; only viewable formats set `model_url` on project
+- New frontend `OperatorDigitalTwin.jsx`:
+  - GrantAccessModal · CreateProjectModal · UploadFilesModal (with 3D/2D tabs + version history)
+  - ClientCard with status pill (needs_setup/in_progress/delivered), counters, project rows
+  - Filter pills (Toți / Setup necesar / În lucru / Livrat)
+- OperatorDashboard: new `dt_pro` bottom-nav tab + shortcut card on Twins overview (dublat — user choice 3c+3a)
+- Cross-role visibility: file uploads by operator appear INSTANT in client's `/digital-twin` (no approval flow per user choice 4a)
+- Validated (iteration_30): backend 18/18 pytest (1 xfail fixed post-test — role guard added), frontend Playwright 95% cross-role confirmed
+- Hardened post-test: added explicit `role=='client'` check in `operator_create_project_for_client` so a stale `digital_twin_pro=true` flag on a non-client no longer allows project creation
+
 ## Changelog — 2026-02-28 — Admin Impersonation (GDPR)
 - New backend route `/app/backend/routes/impersonation.py` with endpoints:
   - `POST /api/admin/impersonate` (reason ≥10ch, returns 2h JWT)
