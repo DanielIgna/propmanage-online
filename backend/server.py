@@ -46,7 +46,7 @@ from routes.admin_console import router as admin_console_router, public_router a
 from routes.admin_ai import router as admin_ai_router, run_daily_ai_digest, send_daily_ai_digest_email, run_ai_effectiveness_alert_check
 from routes.security_guard import router as security_guard_router
 from routes.concierge import router as concierge_router, admin_router as concierge_admin_router
-from routes.public import router as public_router, admin_router as public_admin_router
+from routes.public import router as public_router, admin_router as public_admin_router, record_health_ping
 from routes.demo_time_machine import router as demo_time_machine_router
 from routes.gdpr import router as gdpr_router, admin_router as gdpr_admin_router
 from demo_reset import reset_demo_accounts
@@ -158,7 +158,19 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=3600,
         )
+        scheduler.add_job(
+            record_health_ping,
+            CronTrigger(minute="*/15", timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="health_ping",
+            replace_existing=True,
+            misfire_grace_time=900,
+        )
         scheduler.start()
+        # Record an immediate ping on startup so sparkline is non-empty from minute 1.
+        try:
+            await record_health_ping()
+        except Exception:  # noqa: BLE001
+            pass
         logger.info("Daily digest scheduler started (19:00 Europe/Bucharest).")
         logger.info("Warranty auto-release scheduler started (06:00 Europe/Bucharest).")
         logger.info("Preset schedules scheduler started (every minute, Europe/Bucharest).")
@@ -167,6 +179,7 @@ async def startup():
         logger.info("AI daily digest email scheduler started (08:00 Europe/Bucharest).")
         logger.info("AI effectiveness low-alert scheduler started (Monday 09:00 Europe/Bucharest).")
         logger.info("Demo accounts auto-reset scheduler started (daily 02:00 Europe/Bucharest).")
+        logger.info("Health ping scheduler started (every 15 min, powers /status sparkline).")
 
 
 @app.on_event("shutdown")

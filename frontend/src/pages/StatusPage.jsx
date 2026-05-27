@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Activity, CheckCircle2, AlertTriangle, XCircle, RefreshCw } from "lucide-react";
+import { ArrowLeft, Activity, CheckCircle2, AlertTriangle, XCircle, RefreshCw, TrendingUp } from "lucide-react";
 import { API } from "./DashShared";
 
 const COMP_LABELS = {
@@ -26,8 +26,115 @@ const GLOBAL_STATUS = {
   outage: { label: "Întrerupere serviciu", color: "text-red-400", bg: "from-red-500/20 to-red-500/5" },
 };
 
+// ============= UPTIME SPARKLINE =============
+const UptimeSparkline = ({ history }) => {
+  if (!history?.days?.length) return null;
+  const days = history.days;
+  const summary = history.summary || {};
+  const W = 600;
+  const H = 80;
+  const PAD = 4;
+
+  // Treat null (no data) as 100 for line continuity, but render bar marker only when pings>0.
+  const points = days.map((d, i) => {
+    const x = PAD + (i / Math.max(1, days.length - 1)) * (W - PAD * 2);
+    const v = d.uptime_pct == null ? 100 : d.uptime_pct;
+    // Map 95-100% range to full height; below 95 amplified.
+    const norm = Math.max(0, Math.min(1, (v - 90) / 10));
+    const y = PAD + (1 - norm) * (H - PAD * 2);
+    return { x, y, day: d, v };
+  });
+
+  const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
+  const areaD = `${pathD} L ${points[points.length - 1].x.toFixed(1)} ${H - PAD} L ${PAD} ${H - PAD} Z`;
+
+  const overallPct = summary.uptime_pct;
+  const trackingSince = summary.tracking_since;
+  const daysOfData = days.filter(d => d.pings > 0).length;
+
+  return (
+    <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-emerald-500/[0.04] to-transparent p-6 mb-6" data-testid="uptime-sparkline-card">
+      <div className="flex items-start justify-between mb-4 flex-wrap gap-3">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
+            <h2 className="text-base font-semibold text-white">Uptime ultimele 30 zile</h2>
+          </div>
+          <div className="text-xs text-stone-400">
+            {daysOfData === 0
+              ? "Începem să colectăm date — graficul se umple în timp."
+              : `${summary.pings_total} probe înregistrate · tracking de la ${new Date(trackingSince).toLocaleDateString("ro-RO")}`}
+          </div>
+        </div>
+        {overallPct != null && (
+          <div className="text-right">
+            <div className="text-[10px] uppercase tracking-wider text-stone-500">Disponibilitate medie</div>
+            <div className="font-mono text-2xl font-semibold text-emerald-300" data-testid="uptime-overall-pct">{overallPct}%</div>
+          </div>
+        )}
+      </div>
+
+      {/* SVG sparkline */}
+      <div className="relative">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-20" preserveAspectRatio="none" data-testid="uptime-svg">
+          <defs>
+            <linearGradient id="upgrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#34d399" stopOpacity="0.45" />
+              <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {/* baseline 99.9% reference */}
+          <line x1={PAD} y1={PAD + 0.01 * (H - PAD * 2)} x2={W - PAD} y2={PAD + 0.01 * (H - PAD * 2)} stroke="#34d39933" strokeDasharray="2 4" />
+          <path d={areaD} fill="url(#upgrad)" />
+          <path d={pathD} fill="none" stroke="#34d399" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          {points.map((p, i) => (
+            <g key={i}>
+              {p.day.pings > 0 && (
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={p.v < 99 ? 2.5 : 1.5}
+                  fill={p.v >= 99 ? "#34d399" : p.v >= 95 ? "#fbbf24" : "#f87171"}
+                />
+              )}
+              <title>
+                {new Date(p.day.date).toLocaleDateString("ro-RO", { day: "2-digit", month: "short" })} · {p.day.pings === 0 ? "fără date" : `${p.day.uptime_pct}% (${p.day.pings} probe)`}
+              </title>
+            </g>
+          ))}
+        </svg>
+      </div>
+
+      {/* Day strip — last 30 days mini cells */}
+      <div className="mt-3 grid grid-cols-30 gap-0.5" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }} data-testid="uptime-strip">
+        {days.map((d, i) => {
+          let cls = "bg-white/5"; // no data
+          if (d.pings > 0) {
+            if (d.uptime_pct >= 99) cls = "bg-emerald-400/80";
+            else if (d.uptime_pct >= 95) cls = "bg-amber-400/80";
+            else cls = "bg-red-400/80";
+          }
+          return (
+            <div
+              key={i}
+              className={`h-3 rounded-sm ${cls}`}
+              title={`${new Date(d.date).toLocaleDateString("ro-RO", { day: "2-digit", month: "short" })} · ${d.pings === 0 ? "fără date" : d.uptime_pct + "%"}`}
+            />
+          );
+        })}
+      </div>
+      <div className="flex items-center justify-between mt-2 text-[10px] uppercase tracking-wider text-stone-500">
+        <span>{new Date(days[0].date).toLocaleDateString("ro-RO", { day: "2-digit", month: "short" })}</span>
+        <span className="hidden sm:inline">Verde ≥99% · Amber ≥95% · Roșu &lt;95% · Gri = fără date</span>
+        <span>azi</span>
+      </div>
+    </div>
+  );
+};
+
 export const StatusPage = () => {
   const [data, setData] = useState(null);
+  const [history, setHistory] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const load = async () => {
@@ -36,6 +143,10 @@ export const StatusPage = () => {
       const r = await axios.get(`${API}/public/status`);
       setData(r.data);
     } catch {/* ignore */} finally { setLoading(false); }
+    try {
+      const h = await axios.get(`${API}/public/status-history?days=30`);
+      setHistory(h.data);
+    } catch {/* ignore */}
   };
   useEffect(() => {
     load();
@@ -84,6 +195,9 @@ export const StatusPage = () => {
             </div>
           )}
         </div>
+
+        {/* Sparkline 30-day uptime */}
+        <UptimeSparkline history={history} />
 
         {/* Components */}
         <div className="space-y-2 mb-6" data-testid="status-components">

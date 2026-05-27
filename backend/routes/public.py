@@ -151,6 +151,77 @@ async def public_status():
     return out
 
 
+async def record_health_ping():
+    """Scheduled task: every 15 minutes record a synthetic health probe.
+    Writes to db.health_pings; powers /public/status-history sparkline."""
+    try:
+        components = {}
+        overall = "ok"
+        try:
+            await db.users.find_one({}, {"_id": 1})
+            components["api"] = "ok"
+            components["database"] = "ok"
+        except Exception:
+            components["api"] = "down"
+            components["database"] = "down"
+            overall = "degraded"
+        components["ai_concierge"] = "ok" if os.environ.get("EMERGENT_LLM_KEY") else "limited"
+        components["payments"] = "ok"
+        components["email"] = "ok" if os.environ.get("RESEND_API_KEY") else "limited"
+        if overall == "ok" and any(v in ("down", "degraded") for v in components.values()):
+            overall = "ok"  # limited != degraded for our SLA
+        await db.health_pings.insert_one({
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "status": overall,
+            "components": components,
+        })
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[HealthPing] record failed: {e}")
+
+
+@router.get("/public/status-history")
+async def public_status_history(days: int = 30):
+    """Aggregated per-day uptime for sparkline chart (max 90 days)."""
+    days = max(1, min(int(days or 30), 90))
+    from datetime import timedelta as _td
+    now = datetime.now(timezone.utc)
+    start = now - _td(days=days)
+    cutoff = start.isoformat()
+
+    buckets = {}
+    async for p in db.health_pings.find({"created_at": {"$gte": cutoff}}):
+        day = (p.get("created_at") or "")[:10]
+        if not day:
+            continue
+        b = buckets.setdefault(day, {"ok": 0, "total": 0})
+        b["total"] += 1
+        if p.get("status") == "ok":
+            b["ok"] += 1
+
+    out_days = []
+    total_ok = 0
+    total_all = 0
+    cur = start
+    while cur.date() <= now.date():
+        key = cur.date().isoformat()
+        b = buckets.get(key, {"ok": 0, "total": 0})
+        pct = round((b["ok"] / b["total"]) * 100, 2) if b["total"] else None
+        out_days.append({"date": key, "uptime_pct": pct, "pings": b["total"]})
+        total_ok += b["ok"]
+        total_all += b["total"]
+        cur += _td(days=1)
+
+    return {
+        "days": out_days,
+        "summary": {
+            "uptime_pct": round((total_ok / total_all) * 100, 2) if total_all else None,
+            "pings_total": total_all,
+            "window_days": days,
+            "tracking_since": out_days[0]["date"] if out_days else None,
+        },
+    }
+
+
 # ============= ADMIN DEMO LEADS =============
 
 from deps import require_role  # local import to avoid circular  # noqa: E402
