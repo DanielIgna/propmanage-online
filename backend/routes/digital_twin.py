@@ -95,6 +95,13 @@ class ProjectCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=200)
     property_id: Optional[str] = None
     description: Optional[str] = Field(None, max_length=2000)
+    model_url: Optional[str] = Field(None, max_length=2000)  # Phase B: external .glb URL
+
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=200)
+    description: Optional[str] = Field(None, max_length=2000)
+    model_url: Optional[str] = Field(None, max_length=2000)
 
 
 @router.post("/projects")
@@ -107,6 +114,7 @@ async def create_project(payload: ProjectCreate, user: dict = Depends(get_curren
         "name": payload.name.strip(),
         "property_id": payload.property_id,
         "description": (payload.description or "").strip(),
+        "model_url": (payload.model_url or "").strip() or None,
         "owner_id": user["id"],
         "owner_name": user.get("name") or user.get("email"),
         "members": [],
@@ -184,6 +192,21 @@ async def remove_member(project_id: str, user_id: str, user: dict = Depends(get_
         {"$set": {"members": members, "updated_at": _now_iso()}},
     )
     return {"ok": True, "members": members}
+
+
+@router.patch("/projects/{project_id}")
+async def update_project(project_id: str, payload: ProjectUpdate, user: dict = Depends(get_current_user)):
+    await _ensure_dt_access(user)
+    p = await _ensure_project_access(project_id, user)
+    if user.get("role") not in ("admin", "operator") and p.get("owner_id") != user["id"]:
+        raise HTTPException(403, "Only owner can update.")
+    updates = {k: (v.strip() if isinstance(v, str) else v) for k, v in payload.model_dump(exclude_none=True).items()}
+    if not updates:
+        return _clean(p)
+    updates["updated_at"] = _now_iso()
+    await db.digital_twin_projects.update_one({"id": project_id}, {"$set": updates})
+    p = await db.digital_twin_projects.find_one({"id": project_id})
+    return _clean(p)
 
 
 @router.delete("/projects/{project_id}")

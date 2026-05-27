@@ -26,6 +26,7 @@ import { PrivacyNoticesPage } from "./pages/PrivacyNoticesPage";
 import { StatusPage } from "./pages/StatusPage";
 import { GDPRAuditBadge } from "./components/GDPRAuditBadge";
 import { TrustStrip } from "./components/TrustStrip";
+import DigitalTwinPage from "./pages/DigitalTwinPage";
 import "./App.css";
 
 // ============= NAV =============
@@ -1408,6 +1409,7 @@ function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/privacy/notices" element={<PrivacyNoticesPage />} />
+              <Route path="/digital-twin" element={<DigitalTwinPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/status" element={<StatusPage />} />
               <Route path="/login" element={<LoginPage />} />
