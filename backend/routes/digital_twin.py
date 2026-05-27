@@ -436,6 +436,7 @@ async def create_pin(project_id: str, payload: PinCreate, user: dict = Depends(g
         "author_name": user.get("name") or user.get("email"),
         "author_role": user.get("role"),
         "comment_count": 0,
+        "plan_anchors": [],
         "created_at": _now_iso(),
         "updated_at": _now_iso(),
     }
@@ -566,6 +567,75 @@ async def delete_pin(pin_id: str, user: dict = Depends(get_current_user)):
         {"$inc": {"pin_count": -1}, "$set": {"updated_at": _now_iso()}},
     )
     return {"ok": True}
+
+
+# ----------------- pin → plan anchors (Phase H: 3D ↔ 2D sync) -----------------
+
+class PlanAnchorIn(BaseModel):
+    plan_id: str
+    page: int = Field(1, ge=1, le=200)
+    x_pct: float = Field(..., ge=0.0, le=1.0)
+    y_pct: float = Field(..., ge=0.0, le=1.0)
+
+
+@router.post("/pins/{pin_id}/anchors")
+async def add_pin_anchor(pin_id: str, payload: PlanAnchorIn, user: dict = Depends(get_current_user)):
+    """Anchor a 3D pin to a (x_pct, y_pct) on a 2D plan PDF page."""
+    await _ensure_dt_access(user)
+    pin = await db.digital_twin_pins.find_one({"id": pin_id})
+    if not pin:
+        raise HTTPException(404, "Pin not found.")
+    await _ensure_project_access(pin["project_id"], user)
+    # Verify the plan belongs to the same project
+    plan = await db.digital_twin_plans.find_one({"id": payload.plan_id, "project_id": pin["project_id"]})
+    if not plan:
+        raise HTTPException(404, "Plan not found in this project.")
+    anchor = {
+        "id": _new_id(),
+        "plan_id": payload.plan_id,
+        "plan_title": plan.get("title"),
+        "page": payload.page,
+        "x_pct": payload.x_pct,
+        "y_pct": payload.y_pct,
+        "created_at": _now_iso(),
+        "created_by": user["id"],
+        "created_by_name": user.get("name") or user.get("email"),
+    }
+    # Replace any existing anchor on the same (plan_id, page) to keep one marker per page per pin
+    existing = [a for a in (pin.get("plan_anchors") or []) if not (a.get("plan_id") == payload.plan_id and int(a.get("page", 1)) == payload.page)]
+    existing.append(anchor)
+    await db.digital_twin_pins.update_one(
+        {"id": pin_id},
+        {"$set": {"plan_anchors": existing, "updated_at": _now_iso()}},
+    )
+    return {"ok": True, "anchor": anchor, "plan_anchors": existing}
+
+
+@router.delete("/pins/{pin_id}/anchors/{anchor_id}")
+async def remove_pin_anchor(pin_id: str, anchor_id: str, user: dict = Depends(get_current_user)):
+    await _ensure_dt_access(user)
+    pin = await db.digital_twin_pins.find_one({"id": pin_id})
+    if not pin:
+        raise HTTPException(404, "Pin not found.")
+    proj = await _ensure_project_access(pin["project_id"], user)
+    anchors = pin.get("plan_anchors") or []
+    target = next((a for a in anchors if a.get("id") == anchor_id), None)
+    if not target:
+        raise HTTPException(404, "Anchor not found.")
+    # Only the anchor author / pin author / project owner / admin can remove
+    if (
+        user.get("role") not in ("admin", "operator")
+        and target.get("created_by") != user["id"]
+        and pin.get("author_id") != user["id"]
+        and proj.get("owner_id") != user["id"]
+    ):
+        raise HTTPException(403, "Cannot remove this anchor.")
+    new_anchors = [a for a in anchors if a.get("id") != anchor_id]
+    await db.digital_twin_pins.update_one(
+        {"id": pin_id},
+        {"$set": {"plan_anchors": new_anchors, "updated_at": _now_iso()}},
+    )
+    return {"ok": True, "plan_anchors": new_anchors}
 
 
 # ----------------- comments (per pin thread) -----------------

@@ -1,0 +1,46 @@
+{
+  "summary": "Phase H (3D ↔ 2D Pin Sync) — backend 12/12 PASS, frontend ~90% PASS. Verified anchor CRUD, validation (x/y/page bounds, cross-project plan rejection), replacement semantics, permissions (admin/creator/owner/author can delete, member-but-not-creator → 403), DT Pro subscription gate (client → 403), and default empty plan_anchors[] on new pins. Frontend: PDF render-fix verified (canvas 714x1010, NOT stuck at 300x150), marker rendered at correct (x_pct*cw, y_pct*ch)=(214,390) for anchor (0.30, 0.40), defect category renders as red rgb(220,38,38), anchor-toggle button text flips Ancorează→Anulează, amber hint banner appears (bg-amber-500/20), canvas cursor=crosshair in anchor mode, AnchorPinPicker modal opens on canvas click and lists 2 pins, auto-switch to split mode on marker click. ONE concern: after picking a pin in AnchorPinPicker, the new anchor was NOT persisted (API confirmed plumbing pin still has 0 anchors after the pick) — likely a state/handler regression in the picker → POST flow.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "DigitalTwinPlans.jsx — AnchorPinPicker pick handler",
+        "issue": "Clicking [data-testid^=\"anchor-pick-\"] in the picker modal closes the modal but does NOT POST the anchor. Verified via API: GET /pins right after the pick shows the selected pin still has plan_anchors:[]. Repro: enter anchor mode → click PDF canvas (modal opens, 2 pins listed) → click second pin → modal closes but no marker appears and no anchor record is created. Likely cause: pendingCoords state may be cleared/stale by the time onPick handler runs, OR the POST call is wired only to first pin/wrong index. Backend POST /api/digital-twin/pins/{pin_id}/anchors works correctly (12/12 backend tests pass), so issue is purely client-side.",
+        "selector": "[data-testid^=\"anchor-pick-\"]",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Anchor pin via picker (toggle → canvas click → pick pin → expect new marker)",
+        "issue": "Picker click does not trigger POST /pins/{id}/anchors. No new marker rendered. Backend API works directly (curl POST succeeds, returns anchor).",
+        "affected_selectors": ["[data-testid=\"anchor-pin-picker\"]", "[data-testid^=\"anchor-pick-\"]", "[data-testid^=\"pdf-marker-\"]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_h_anchors.py",
+    "/app/test_reports/pytest/phase_h_results.xml"
+  ],
+  "action_items": [
+    "Investigate AnchorPinPicker → POST flow in DigitalTwinPlans.jsx. Likely: (a) pendingCoords (the {page, x_pct, y_pct} captured on PDF click) gets reset before pick handler reads it, or (b) the onPick prop is not awaiting the POST or the POST is failing silently. Add console.log around the picker's onSelect handler and verify pendingCoords is populated when fetch is called. Also verify the POST URL uses the picked pin's id, not a fallback.",
+    "After fix, re-run /app/backend/tests/test_phase_h_anchors.py for regression + re-test picker flow E2E."
+  ],
+  "critical_code_review_comments": [
+    "PlanAnchorIn currently only validates page<=200 but doesn't cross-check against the plan's actual page count (PDF metadata). User can anchor pin to page 50 of a 1-page PDF. Suggest fetching plan's page_count (already stored?) and rejecting if page > page_count, or document the intentional loose validation.",
+    "remove_pin_anchor permission check requires admin/operator OR (creator OR pin author OR project owner). Project members who didn't create the anchor cannot remove anchors created by other members — this may be intentional but consider if architects/specialists should be able to clean up each other's anchors on shared projects.",
+    "POST /pins/{pin_id}/anchors silently replaces an existing anchor on the same (plan_id, page). The API response includes the new anchor but does NOT tell the client that an old anchor was replaced. Consider returning {ok, anchor, replaced_anchor_id?} so the UI can update its local state cleanly.",
+    "AnchorPinPicker pick handler appears broken (see frontend_issues). High priority fix needed."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase_h_anchors.py"
+  ],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "~90% (8/9 testable flows; picker→POST broken)"},
+  "test_credentials": "admin@propmanage.io / Admin123! (auto DT Pro via role bypass); client@propmanage.io / Client123! (no DT Pro, used for 403 verification); specialist@propmanage.io / Spec123! (granted DT Pro via /api/admin/digital-twin/subscription/grant in test fixture).",
+  "seed_data_creation": "Created fresh project TEST_PhaseH_UI (id=a2f2d765ea4b4e509b4728944d0de13b) with 1 PDF plan (TEST H Plan) + 2 pins (UI Pin Defect=defect, UI Pin Plumbing=plumbing) + 1 anchor (defect pin at x_pct=0.30, y_pct=0.40, page=1). Backend test fixtures auto-cleanup; this UI seed remains for main agent's manual repro.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend Phase H is solid (12/12 pytest pass at /app/backend/tests/test_phase_h_anchors.py). Frontend rendering, marker positioning, and anchor-mode UI all work. The single failing flow is AnchorPinPicker → POST: confirmed via API that picking a pin from the modal does NOT create an anchor. After main agent fix, the simplest E2E verification is: login admin → open project TEST_PhaseH_UI → Deschide viewer → dt-open-plans → select 'TEST H Plan' → click plan-anchor-toggle → click anywhere on pdf-canvas → click any anchor-pick-{pin_id} in modal → expect a new pdf-marker-{pin_id} to appear. Cross-check with curl: GET /api/digital-twin/projects/{pid}/pins should show the picked pin with plan_anchors[length=1].",
+  "rca_of_the_issue": "AnchorPinPicker pick handler: when user clicks a pin in the picker, the expected sequence is (1) close modal, (2) POST /pins/{picked_id}/anchors with stored pendingCoords. Verified via API GET after E2E test that no anchor was created — backend POST never received. Two likely client-side causes to investigate in DigitalTwinPlans.jsx: (a) pendingCoords (captured on canvas click before modal opens) is being reset to null in the same render cycle that the modal opens, leaving handler with no coords; (b) the picker's onSelect prop is wired to a stale closure that doesn't actually call the POST. Recommend adding a useRef for pendingCoords or guarding the POST with explicit coord validation + a console.log + toast on success/error."
+}

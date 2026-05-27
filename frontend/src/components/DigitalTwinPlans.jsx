@@ -23,29 +23,26 @@ const PLAN_TYPES = [
 
 const TYPE_LABELS = Object.fromEntries(PLAN_TYPES.map((t) => [t.id, t.label]));
 
-// ============== PDF VIEWER (canvas) ==============
-const PdfCanvas = ({ url, page, scale, onLoaded }) => {
+// ============== PDF VIEWER (canvas with marker overlay for Phase H) ==============
+const PdfCanvas = ({ url, page, scale, onLoaded, markers = [], anchorMode = false, onAnchorClick, onMarkerClick, highlightPinId }) => {
   const canvasRef = useRef(null);
   const [err, setErr] = useState(null);
   const [rendering, setRendering] = useState(false);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [pdfDoc, setPdfDoc] = useState(null);
   const renderTaskRef = useRef(null);
-  const pdfDocRef = useRef(null);
 
   // Load PDF document (re-loads when url changes)
   useEffect(() => {
     let cancelled = false;
     setErr(null);
-    pdfDocRef.current = null;
-
+    setPdfDoc(null);
     const load = async () => {
       try {
-        const loadingTask = pdfjsLib.getDocument({
-          url,
-          withCredentials: true,
-        });
+        const loadingTask = pdfjsLib.getDocument({ url, withCredentials: true });
         const pdf = await loadingTask.promise;
         if (cancelled) return;
-        pdfDocRef.current = pdf;
+        setPdfDoc(pdf);
         onLoaded?.(pdf.numPages);
       } catch (e) {
         if (!cancelled) setErr(e.message || "Eroare la încărcarea PDF");
@@ -55,24 +52,24 @@ const PdfCanvas = ({ url, page, scale, onLoaded }) => {
     return () => { cancelled = true; };
   }, [url, onLoaded]);
 
-  // Render page (re-renders when page/scale changes)
+  // Render page (re-renders when pdf doc, page or scale changes)
   useEffect(() => {
     let cancelled = false;
     const render = async () => {
-      const pdf = pdfDocRef.current;
-      if (!pdf || !canvasRef.current) return;
+      if (!pdfDoc || !canvasRef.current) return;
       try {
         setRendering(true);
         if (renderTaskRef.current) {
           try { renderTaskRef.current.cancel(); } catch { /* ignore */ }
         }
-        const pageObj = await pdf.getPage(page);
+        const pageObj = await pdfDoc.getPage(page);
         if (cancelled) return;
         const viewport = pageObj.getViewport({ scale });
         const canvas = canvasRef.current;
         const ctx = canvas.getContext("2d");
         canvas.width = viewport.width;
         canvas.height = viewport.height;
+        setSize({ w: viewport.width, h: viewport.height });
         const task = pageObj.render({ canvasContext: ctx, viewport });
         renderTaskRef.current = task;
         await task.promise;
@@ -92,7 +89,17 @@ const PdfCanvas = ({ url, page, scale, onLoaded }) => {
         try { renderTaskRef.current.cancel(); } catch { /* ignore */ }
       }
     };
-  }, [page, scale]);
+  }, [pdfDoc, page, scale]);
+
+  // Click handler for anchor placement
+  const handleCanvasClick = (e) => {
+    if (!anchorMode || !onAnchorClick || !canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    if (x < 0 || x > 1 || y < 0 || y > 1) return;
+    onAnchorClick({ x_pct: x, y_pct: y });
+  };
 
   if (err) {
     return (
@@ -102,14 +109,57 @@ const PdfCanvas = ({ url, page, scale, onLoaded }) => {
     );
   }
 
+  // Category → marker color
+  const categoryColor = (cat) => ({
+    structural: "#ef4444", plumbing: "#06b6d4", electrical: "#facc15",
+    hvac: "#a78bfa", finish: "#f97316", defect: "#dc2626", general: "#10b981",
+  }[cat] || "#10b981");
+
   return (
     <div className="relative w-full h-full overflow-auto bg-stone-900/50 rounded-xl border border-white/5 p-4 flex items-start justify-center">
       {rendering && (
-        <div className="absolute top-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-stone-900/90 border border-white/10 text-xs text-stone-300" data-testid="pdf-loading">
+        <div className="absolute top-3 right-3 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-stone-900/90 border border-white/10 text-xs text-stone-300" data-testid="pdf-loading">
           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Se randează…
         </div>
       )}
-      <canvas ref={canvasRef} className="shadow-2xl bg-white" data-testid="pdf-canvas" />
+      {anchorMode && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-xs text-amber-200" data-testid="pdf-anchor-hint">
+          Click pe plan pentru a ancora pin-ul selectat
+        </div>
+      )}
+      <div className="relative" style={{ width: size.w || "auto", height: size.h || "auto" }}>
+        <canvas
+          ref={canvasRef}
+          className={`shadow-2xl bg-white ${anchorMode ? "cursor-crosshair" : ""}`}
+          data-testid="pdf-canvas"
+          onClick={handleCanvasClick}
+        />
+        {/* Marker overlay */}
+        {!rendering && size.w > 0 && markers.map((m) => {
+          const isHighlighted = highlightPinId && m.pin_id === highlightPinId;
+          const color = categoryColor(m.category);
+          return (
+            <button
+              key={m.anchor_id}
+              onClick={(e) => { e.stopPropagation(); onMarkerClick?.(m); }}
+              className="absolute -translate-x-1/2 -translate-y-full hover:scale-110 transition-transform z-10"
+              style={{ left: m.x_pct * size.w, top: m.y_pct * size.h }}
+              data-testid={`pdf-marker-${m.pin_id}`}
+              title={m.title}
+            >
+              <div
+                className={`flex items-center gap-1 px-2 py-1 rounded-full shadow-lg text-[10px] font-medium text-white ${isHighlighted ? "ring-2 ring-white ring-offset-1 ring-offset-stone-900 scale-110" : ""}`}
+                style={{ background: color }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                <span className="max-w-[120px] truncate">{m.title}</span>
+              </div>
+              {/* Pointer triangle */}
+              <div className="w-0 h-0 mx-auto" style={{ borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: `6px solid ${color}` }} />
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 };
@@ -277,6 +327,44 @@ const UploadPlanModal = ({ projectId, onClose, onUploaded }) => {
   );
 };
 
+// ============== ANCHOR PIN PICKER MODAL ==============
+const AnchorPinPicker = ({ pins, onPick, onClose }) => {
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-stone-900 border border-white/10 rounded-2xl p-5 w-full max-w-md" data-testid="anchor-pin-picker">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <h3 className="font-serif text-lg text-white">Alege pin-ul de ancorat</h3>
+            <p className="text-xs text-stone-400 mt-0.5">Selectează un pin 3D existent pentru a-l marca pe acest plan.</p>
+          </div>
+          <button onClick={onClose} className="text-stone-500 hover:text-white"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="space-y-1.5 max-h-[60vh] overflow-y-auto" data-testid="anchor-pin-list">
+          {pins.length === 0 ? (
+            <p className="text-xs text-stone-500 text-center py-6">Niciun pin 3D creat în acest proiect.</p>
+          ) : pins.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => onPick(p)}
+              className="w-full text-left p-2.5 rounded-lg border border-white/5 hover:bg-white/[0.04] transition-colors"
+              data-testid={`anchor-pick-${p.id}`}
+            >
+              <div className="text-xs font-medium text-white truncate">{p.title}</div>
+              <div className="text-[10px] text-stone-500 mt-0.5 flex items-center gap-1.5">
+                <span className="px-1.5 py-0.5 rounded bg-white/5">{p.category}</span>
+                <span>· {p.priority}</span>
+                <span>· {p.status}</span>
+                {(p.plan_anchors || []).length > 0 && <span className="text-emerald-400">· {p.plan_anchors.length} ancore</span>}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 // ============== MAIN PANEL ==============
 export default function DigitalTwinPlans({ projectId, projectName, projectModelUrl, onClose, embedded = false }) {
   const [plans, setPlans] = useState([]);
@@ -287,8 +375,12 @@ export default function DigitalTwinPlans({ projectId, projectName, projectModelU
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.2);
   const [showUpload, setShowUpload] = useState(false);
-  // View mode: "2d" (only PDF + sidebar), "3d" (only 3D viewer), "split" (both side-by-side)
   const [viewMode, setViewMode] = useState("2d");
+  // Phase H: pins + anchors
+  const [pins, setPins] = useState([]);
+  const [anchorMode, setAnchorMode] = useState(false);
+  const [pendingAnchor, setPendingAnchor] = useState(null); // { x_pct, y_pct }
+  const [highlightPinId, setHighlightPinId] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -304,7 +396,73 @@ export default function DigitalTwinPlans({ projectId, projectName, projectModelU
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [projectId]);
+  const loadPins = async () => {
+    try {
+      const { data } = await axios.get(`${API}/digital-twin/projects/${projectId}/pins`);
+      setPins(data.items || []);
+    } catch (e) {
+      console.error("pins load error", e);
+    }
+  };
+
+  useEffect(() => { load(); loadPins(); /* eslint-disable-next-line */ }, [projectId]);
+
+  // Phase H: compute markers for the currently displayed plan + page
+  const markers = !selected ? [] : pins.flatMap((pin) =>
+    (pin.plan_anchors || [])
+      .filter((a) => a.plan_id === selected.id && (a.page || 1) === page)
+      .map((a) => ({
+        anchor_id: a.id,
+        pin_id: pin.id,
+        title: pin.title,
+        category: pin.category,
+        x_pct: a.x_pct,
+        y_pct: a.y_pct,
+        anchor: a,
+        pin,
+      }))
+  );
+
+  const handleAnchorClick = async ({ x_pct, y_pct }) => {
+    // Open pin picker; remember the coordinates
+    setPendingAnchor({ x_pct, y_pct });
+  };
+
+  const handlePinPick = async (pin) => {
+    if (!pendingAnchor || !selected) return;
+    try {
+      const { data } = await axios.post(`${API}/digital-twin/pins/${pin.id}/anchors`, {
+        plan_id: selected.id,
+        page,
+        x_pct: pendingAnchor.x_pct,
+        y_pct: pendingAnchor.y_pct,
+      });
+      // Update local pin state with new anchors
+      setPins((arr) => arr.map((p) => p.id === pin.id ? { ...p, plan_anchors: data.plan_anchors } : p));
+      setHighlightPinId(pin.id);
+    } catch (e) {
+      alert(e?.response?.data?.detail || e.message);
+    } finally {
+      setPendingAnchor(null);
+      setAnchorMode(false);
+    }
+  };
+
+  const handleMarkerClick = (m) => {
+    setHighlightPinId(m.pin_id);
+    // Auto-switch to split mode to show both 2D and 3D
+    if (viewMode === "2d") setViewMode("split");
+  };
+
+  const handleRemoveAnchor = async (m) => {
+    if (!window.confirm(`Șterge ancora "${m.title}" de pe acest plan?`)) return;
+    try {
+      const { data } = await axios.delete(`${API}/digital-twin/pins/${m.pin_id}/anchors/${m.anchor_id}`);
+      setPins((arr) => arr.map((p) => p.id === m.pin_id ? { ...p, plan_anchors: data.plan_anchors } : p));
+    } catch (e) {
+      alert(e?.response?.data?.detail || e.message);
+    }
+  };
 
   const filtered = filter === "all" ? plans : plans.filter((p) => p.plan_type === filter);
 
@@ -486,6 +644,14 @@ export default function DigitalTwinPlans({ projectId, projectName, projectModelU
                       <ZoomIn className="w-3.5 h-3.5" />
                     </button>
                   </div>
+                  <button
+                    onClick={() => { setAnchorMode((v) => !v); setHighlightPinId(null); }}
+                    className={`px-2 py-1 text-[11px] rounded-full flex items-center gap-1 ${anchorMode ? "bg-amber-500/30 text-amber-200 ring-1 ring-amber-400/40" : "text-stone-400 hover:text-white bg-white/5"}`}
+                    title={anchorMode ? "Anulează ancorare" : "Ancorează pin 3D pe acest plan"}
+                    data-testid="plan-anchor-toggle"
+                  >
+                    <Layers className="w-3.5 h-3.5" /> {anchorMode ? "Anulează" : "Ancorează pin"}
+                  </button>
                   <a href={pdfUrl} target="_blank" rel="noreferrer" className="px-2 py-1 text-[11px] text-stone-400 hover:text-white" title="Descarcă" data-testid="plan-download">
                     <Download className="w-3.5 h-3.5" />
                   </a>
@@ -495,7 +661,17 @@ export default function DigitalTwinPlans({ projectId, projectName, projectModelU
                 </div>
                 {/* PDF canvas */}
                 <div className="flex-1 p-3 min-h-0" data-testid="plan-viewer-area">
-                  <PdfCanvas url={pdfUrl} page={page} scale={scale} onLoaded={(n) => setTotalPages(n)} />
+                  <PdfCanvas
+                    url={pdfUrl}
+                    page={page}
+                    scale={scale}
+                    onLoaded={(n) => setTotalPages(n)}
+                    markers={markers}
+                    anchorMode={anchorMode}
+                    onAnchorClick={handleAnchorClick}
+                    onMarkerClick={anchorMode ? handleRemoveAnchor : handleMarkerClick}
+                    highlightPinId={highlightPinId}
+                  />
                 </div>
               </>
             ) : (
@@ -519,10 +695,20 @@ export default function DigitalTwinPlans({ projectId, projectName, projectModelU
               projectName={projectName}
               embedded
               compactSidebar={viewMode === "split"}
+              highlightPinId={highlightPinId}
+              onPinSelect={(pinId) => setHighlightPinId(pinId)}
             />
           </main>
         )}
       </div>
+
+      {pendingAnchor && (
+        <AnchorPinPicker
+          pins={pins}
+          onPick={handlePinPick}
+          onClose={() => { setPendingAnchor(null); setAnchorMode(false); }}
+        />
+      )}
 
       {showUpload && (
         <UploadPlanModal

@@ -266,8 +266,8 @@ const MeasureMarkers = ({ points }) => {
   );
 };
 
-// --------- 3D Pin markers (Phase E) ---------
-const PinMarker = ({ pin, onOpen }) => {
+// --------- 3D Pin markers (Phase E + H highlight) ---------
+const PinMarker = ({ pin, onOpen, isHighlighted }) => {
   const color = CATEGORY_COLORS[pin.category] || "#60a5fa";
   return (
     <group position={[pin.position.x, pin.position.y, pin.position.z]}>
@@ -277,12 +277,18 @@ const PinMarker = ({ pin, onOpen }) => {
           onOpen(pin);
         }}
       >
-        <sphereGeometry args={[0.12, 20, 20]} />
+        <sphereGeometry args={[isHighlighted ? 0.2 : 0.12, 20, 20]} />
         <meshBasicMaterial color={color} />
       </mesh>
+      {isHighlighted && (
+        <mesh>
+          <ringGeometry args={[0.3, 0.4, 32]} />
+          <meshBasicMaterial color="#ffffff" side={THREE.DoubleSide} transparent opacity={0.85} />
+        </mesh>
+      )}
       <Html distanceFactor={10} position={[0, 0.25, 0]} center style={{ pointerEvents: "none" }}>
         <div
-          className="px-2 py-0.5 rounded-full text-[10px] text-white whitespace-nowrap shadow-lg font-medium"
+          className={`px-2 py-0.5 rounded-full text-[10px] text-white whitespace-nowrap shadow-lg font-medium ${isHighlighted ? "ring-2 ring-white scale-110" : ""}`}
           style={{ background: color }}
         >
           #{pin.title.slice(0, 16)}{pin.title.length > 16 ? "…" : ""}
@@ -303,7 +309,7 @@ const ResetCamera = ({ resetTrigger }) => {
   return null;
 };
 
-export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, onOpenPlans, embedded = false, compactSidebar = false }) => {
+export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, onOpenPlans, embedded = false, compactSidebar = false, highlightPinId = null, onPinSelect = null }) => {
   const [faceStyle, setFaceStyle] = useState("shaded");
   const [hiddenLayers, setHiddenLayers] = useState(new Set());
   const [layers, setLayers] = useState([]);
@@ -635,7 +641,12 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
             )}
             <MeasureMarkers points={measurePts} />
             {pins.map((p) => (
-              <PinMarker key={p.id} pin={p} onOpen={setPinOpen} />
+              <PinMarker
+                key={p.id}
+                pin={p}
+                onOpen={(pin) => { setPinOpen(pin); onPinSelect?.(pin.id); }}
+                isHighlighted={highlightPinId === p.id}
+              />
             ))}
           </Suspense>
           <gridHelper args={[40, 40, 0x333333, 0x1a1a1a]} position={[0, -0.1, 0]} />
