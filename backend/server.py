@@ -43,6 +43,8 @@ from routes.trust import router as trust_router
 from routes.root import router as root_router
 from routes.admin_console import router as admin_console_router, public_router as cms_public_router, run_due_preset_schedules, run_incident_spike_alert_check
 from routes.admin_ai import router as admin_ai_router, run_daily_ai_digest, send_daily_ai_digest_email
+from routes.security_guard import router as security_guard_router
+from routes.concierge import router as concierge_router, admin_router as concierge_admin_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -68,6 +70,7 @@ for r in (
     property_timeline_router, regions_router, matching_router,
     services_avail_router, projects_router, trust_router, root_router,
     admin_console_router, cms_public_router, admin_ai_router,
+    security_guard_router, concierge_router, concierge_admin_router,
 ):
     app.include_router(r)
 

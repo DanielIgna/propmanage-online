@@ -20,10 +20,34 @@ from bson.errors import InvalidId
 
 from db import db
 from deps import get_current_user, require_role
+from routes.security_guard import security_guard
 
 logger = logging.getLogger("propmanage.concierge")
 router = APIRouter(prefix="/api/concierge", tags=["concierge"])
 admin_router = APIRouter(prefix="/api/admin/concierge", tags=["admin-concierge"])
+
+# ============= PII REDACTION (assistant output safety net) =============
+
+EMAIL_REGEX = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+PHONE_REGEX = re.compile(r"(?<!\w)(\+?\d{1,3}[\s.-]?)?\(?\d{2,4}\)?[\s.-]?\d{2,4}[\s.-]?\d{2,4}(?!\w)")
+IBAN_REGEX = re.compile(r"\bRO\d{2}[A-Z]{4}\d{16}\b", re.IGNORECASE)
+CNP_REGEX = re.compile(r"\b[1-8]\d{12}\b")
+
+
+def _redact_pii(text: str) -> str:
+    if not text:
+        return text
+    text = EMAIL_REGEX.sub("[email redactat]", text)
+    text = IBAN_REGEX.sub("[IBAN redactat]", text)
+    text = CNP_REGEX.sub("[CNP redactat]", text)
+
+    def _phone_repl(m):
+        digits = re.sub(r"\D", "", m.group(0))
+        if len(digits) >= 9:  # only true phone-like sequences
+            return "[telefon redactat]"
+        return m.group(0)
+    text = PHONE_REGEX.sub(_phone_repl, text)
+    return text
 
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "").strip()
 DEFAULT_MODEL_PROVIDER = "anthropic"
@@ -238,7 +262,7 @@ async def _get_settings() -> dict:
 @router.post("/chat")
 async def concierge_chat(
     payload: dict = Body(...),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(security_guard),
 ):
     """Send a message to the role-appropriate concierge agent."""
     if not EMERGENT_LLM_KEY:
@@ -342,9 +366,15 @@ async def concierge_chat(
         logger.error(f"[Concierge] LLM error: {e}")
         response_text = "❌ Asistentul nu este disponibil momentan. Te rog încearcă din nou peste câteva secunde."
 
+    # PII redaction safety net on LLM output
+    redacted = _redact_pii(response_text)
+    pii_was_redacted = (redacted != response_text)
+    response_text = redacted
+
     await db.concierge_messages.insert_one({
         "session_id": session_id, "user_id": user["id"], "user_role": user_role,
         "role": "assistant", "content": response_text,
+        "pii_redacted": pii_was_redacted,
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
 

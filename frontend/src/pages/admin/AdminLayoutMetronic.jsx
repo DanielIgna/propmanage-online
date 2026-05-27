@@ -16,6 +16,7 @@ const NAV_SECTIONS = [
     items: [
       { id: "overview", label: "Dashboard", icon: LayoutDashboard },
       { id: "ai", label: "AI Investigator", icon: Bot, badge: "NEW" },
+      { id: "concierge", label: "Concierge & Security", icon: ShieldCheck, badge: "NEW" },
       { id: "activity", label: "Activitate Live", icon: Sparkles },
     ],
   },
