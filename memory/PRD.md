@@ -561,6 +561,14 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Validated AutoReminderSettingsModal frontend (iteration_28): 7/7 scenarios pass — enable toggle, thresholds CSV input, pause-until date, stop-forever switch, save & toast
 - Custom domain propmanage.ro stuck in "pending": deployment scan confirms codebase is deploy-ready (CORS=*, env vars clean, OAuth uses window.location.origin); user must delete existing A records at registrar then re-link via Entri (15-30 min DNS propagation expected)
 
+## Changelog — 2026-03-02 — Specialist Functional Audit (SPEC↔CLIENT + SPEC↔OPERATOR)
+- FIX P1 — added `import uuid` to `routes/specialist_docs.py` (POST /api/specialist/documents was returning 500 NameError — root cause: endpoint never exercised by tests). Discovered + fixed by testing agent.
+- FIX — `routes/operator.py` `POST /api/operator/flag-nonconformity` now ALSO notifies the assigned specialist (`type=nonconformity_specialist`) and the client (`type=nonconformity_client`) when target_type='request'. Previously only admins were notified — specialist + client were invisible to the flag.
+- FIX — `routes/operator_twins.py` `GET /api/properties/{prop_id}/twin` now allows the specialist of an assigned/historical request on the property to read the 2D twin (read-only). Previously specialists got 403 even on jobs they were actively working.
+- Validated (iteration_31): 15/16 backend audit tests pass (94%). Lifecycle accept→start→complete→confirm→review verified end-to-end; portfolio CRUD, dispute open, marketplace listing, timeline access, lead-fee 45 RON debit, operator/queue ACL.
+- Known non-issue: `POST /api/chat/{request_id}/messages` REST endpoint absent — chat is WebSocket-only via `/api/ws/chat/{request_id}?token=...`. Frontend ChatPanel.jsx uses WebSocket exclusively → no UX impact.
+- Backlog (P2): add `portfolio_count` to `/marketplace/specialists` payload; notify specialists with active requests when operator approves a twin.
+
 ## Changelog — 2026-03-01 — Operator Digital Twin Pro onboarding
 - New backend file: `routes/digital_twin.py` extended with `operator_router` (`/api/operator/digital-twin/*`):
   - `POST /grant-access` — operator (or admin) toggles `digital_twin_pro` flag on a client; audit-logged with `via=operator_panel`
