@@ -47,6 +47,7 @@ from routes.admin_ai import router as admin_ai_router, run_daily_ai_digest, send
 from routes.security_guard import router as security_guard_router
 from routes.concierge import router as concierge_router, admin_router as concierge_admin_router
 from routes.public import router as public_router
+from routes.demo_time_machine import router as demo_time_machine_router
 from demo_reset import reset_demo_accounts
 
 logging.basicConfig(level=logging.INFO)
@@ -86,6 +87,7 @@ for r in (
     admin_console_router, cms_public_router, admin_ai_router,
     security_guard_router, concierge_router, concierge_admin_router,
     public_router,
+    demo_time_machine_router,
 ):
     app.include_router(r)
 
