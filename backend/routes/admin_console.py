@@ -104,6 +104,12 @@ DEFAULT_SETTINGS = {
     "logo_text": "PropManage",
     "support_email": "support@propmanage.io",
     "maintenance_mode": False,
+    # Landing page section visibility flags
+    "landing_show_admin_trust": False,
+    "landing_show_business_model": False,
+    "landing_show_unit_economics": False,
+    "landing_show_value_proposition": True,
+    "landing_show_golden_path": True,
 }
 
 
@@ -141,6 +147,11 @@ class SettingsIn(BaseModel):
     logo_text: Optional[str] = None
     support_email: Optional[str] = None
     maintenance_mode: Optional[bool] = None
+    landing_show_admin_trust: Optional[bool] = None
+    landing_show_business_model: Optional[bool] = None
+    landing_show_unit_economics: Optional[bool] = None
+    landing_show_value_proposition: Optional[bool] = None
+    landing_show_golden_path: Optional[bool] = None
 
 
 class UserUpdateIn(BaseModel):
@@ -634,10 +645,21 @@ public_router = APIRouter(prefix="/api", tags=["cms_public"])
 
 @public_router.get("/cms/public")
 async def get_public_cms():
-    """Return merged defaults + overrides as flat dict (no auth)."""
+    """Return merged defaults + overrides as flat dict (no auth). Includes landing visibility flags."""
     docs = await db.cms_content.find({}).to_list(500)
     overrides = {d["key"]: d.get("value", "") for d in docs}
     merged = {**DEFAULT_CMS, **overrides}
+    # Append public settings (landing visibility flags only)
+    settings_doc = await db.platform_config.find_one({"key": "settings"})
+    base = dict(DEFAULT_SETTINGS)
+    if settings_doc:
+        base.update(settings_doc.get("value", {}))
+    for flag in [
+        "landing_show_admin_trust", "landing_show_business_model",
+        "landing_show_unit_economics", "landing_show_value_proposition",
+        "landing_show_golden_path"
+    ]:
+        merged[f"_settings.{flag}"] = bool(base.get(flag, False))
     return merged
 
 

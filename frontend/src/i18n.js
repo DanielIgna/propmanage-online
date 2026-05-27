@@ -179,10 +179,15 @@ export const I18nProvider = ({ children }) => {
     if (lang === "ro" && cms[key] !== undefined && cms[key] !== "") return cms[key];
     return translations[lang][key] || key;
   };
+  // Helper for landing visibility flags (defaults to true if missing — fail-open for new sections)
+  const showSection = (key, fallback = true) => {
+    const v = cms[`_settings.${key}`];
+    return v === undefined ? fallback : v === true || v === "true";
+  };
   const toggle = () => setLang(l => l === "ro" ? "en" : "ro");
 
   return (
-    <I18nContext.Provider value={{ lang, setLang, toggle, t, cms }}>
+    <I18nContext.Provider value={{ lang, setLang, toggle, t, cms, showSection }}>
       {children}
     </I18nContext.Provider>
   );

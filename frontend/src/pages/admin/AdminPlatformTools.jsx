@@ -143,8 +143,36 @@ export const AdminPlatformSettings = () => {
         </div>
       </AdminCard>
 
-      <AdminCard title="Branding & Contact" testid="settings-branding-card">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <AdminCard title="🎬 Vizibilitate secțiuni Landing" testid="settings-landing-vis-card">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          Activează / dezactivează secțiunile vizibile pe pagina publică. Secțiunile dezactivate sunt complet ascunse pentru clienți.
+        </p>
+        <div className="space-y-2">
+          {[
+            { key: "landing_show_admin_trust", label: "Admin · Control Center · Metrici Live", hint: "Statistici interne — recomandat OFF pentru clienți" },
+            { key: "landing_show_business_model", label: "Model de Business · Patru fluxuri de venit", hint: "Lead Fees / SaaS / Premium — pitch pentru investitori" },
+            { key: "landing_show_unit_economics", label: "Indicatori economici · ARPU / Take-rate / LTV", hint: "KPI financiari — dezactivat by default" },
+            { key: "landing_show_value_proposition", label: "Propunere de valoare · Client / Specialist / Platformă", hint: "Beneficii ecosistem" },
+            { key: "landing_show_golden_path", label: "Drumul ideal · Flux complet 7 pași", hint: "Demo vizual al jurnalei" },
+          ].map(it => (
+            <label key={it.key} className="flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-800">
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm">{it.label}</div>
+                <div className="text-xs text-slate-500">{it.hint}</div>
+              </div>
+              <input
+                type="checkbox"
+                checked={!!val(it.key)}
+                onChange={e => set(it.key, e.target.checked)}
+                className="w-5 h-5 accent-blue-600 shrink-0 ml-3"
+                data-testid={`settings-${it.key.replace(/_/g, "-")}`}
+              />
+            </label>
+          ))}
+        </div>
+      </AdminCard>
+
+      <AdminCard title="Branding & Contact" testid="settings-branding-card">        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Nume logo</label>
             <input value={val("logo_text") || ""} onChange={e => set("logo_text", e.target.value)} className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800" data-testid="settings-logo" />

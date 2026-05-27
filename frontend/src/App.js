@@ -1018,6 +1018,13 @@ const AdminTrust = () => {
 
 // ============= BUSINESS MODEL =============
 const BusinessModel = () => {
+  const { showSection } = useI18n();
+  return (
+    <BusinessModelInner showUnitEconomics={showSection("landing_show_unit_economics", false)} />
+  );
+};
+
+const BusinessModelInner = ({ showUnitEconomics }) => {
   const streams = [
     { icon: Coins, name: "Lead Fees", desc: "Specialiști plătesc 40-50 RON per lead acceptat.", n: "01" },
     { icon: TrendingUp, name: "Service Commissions", desc: "3% comision pe fiecare tranzacție escrow.", n: "02" },
@@ -1060,21 +1067,23 @@ const BusinessModel = () => {
         </div>
 
         {/* Projection */}
-        <div className="mt-16 glass-strong rounded-3xl p-10">
-          <h3 className="font-serif text-3xl mb-8">Indicatori economici</h3>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { l: "ARPU lunar (proprietar premium)", v: "~64€" },
-              { l: "Take-rate marketplace", v: "8-12%" },
-              { l: "LTV / CAC (target)", v: "4.2x" },
-            ].map((s, i) => (
-              <div key={i} className="border-l-2 border-[#d4ff3a]/30 pl-6">
-                <div className="text-xs uppercase tracking-wider text-stone-400 mb-2">{s.l}</div>
-                <div className="font-serif text-4xl">{s.v}</div>
-              </div>
-            ))}
+        {showUnitEconomics && (
+          <div className="mt-16 glass-strong rounded-3xl p-10">
+            <h3 className="font-serif text-3xl mb-8">Indicatori economici</h3>
+            <div className="grid md:grid-cols-3 gap-8">
+              {[
+                { l: "ARPU lunar (proprietar premium)", v: "~64€" },
+                { l: "Take-rate marketplace", v: "8-12%" },
+                { l: "LTV / CAC (target)", v: "4.2x" },
+              ].map((s, i) => (
+                <div key={i} className="border-l-2 border-[#d4ff3a]/30 pl-6">
+                  <div className="text-xs uppercase tracking-wider text-stone-400 mb-2">{s.l}</div>
+                  <div className="font-serif text-4xl">{s.v}</div>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </section>
   );
@@ -1313,7 +1322,7 @@ const PromoBanner = () => {
 
 // ============= LANDING PAGE =============
 const LandingPage = () => {
-  const { t } = useI18n();
+  const { t, showSection } = useI18n();
   const promoText = t("landing.promo_banner");
   const hasPromo = !!promoText && promoText !== "landing.promo_banner" && sessionStorage.getItem("pm_promo_dismissed") !== "1";
   return (
@@ -1327,10 +1336,10 @@ const LandingPage = () => {
       <SpecialistJourney />
       <WalletEcosystem />
       <DigitalTwin />
-      <AdminTrust />
-      <BusinessModel />
-      <ValueProp />
-      <GoldenPath />
+      {showSection("landing_show_admin_trust", false) && <AdminTrust />}
+      {showSection("landing_show_business_model", false) && <BusinessModel />}
+      {showSection("landing_show_value_proposition", true) && <ValueProp />}
+      {showSection("landing_show_golden_path", true) && <GoldenPath />}
       <CTA />
       <Footer />
     </div>
