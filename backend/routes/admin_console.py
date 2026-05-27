@@ -899,3 +899,118 @@ async def apply_landing_preset(preset_id: str, user: dict = Depends(require_role
         upsert=True,
     )
     return {"ok": True, "applied": preset.get("name"), "flags": preset.get("flags")}
+
+
+# ============= AUTO-SCHEDULE PRESETS =============
+class ScheduleIn(BaseModel):
+    preset_id: str
+    days: List[int] = Field(min_length=1, max_length=7)  # 0=Monday ... 6=Sunday
+    time: str = Field(pattern=r"^[0-2]\d:[0-5]\d$")  # HH:MM 24h
+    enabled: bool = True
+
+
+@router.get("/preset-schedules")
+async def list_schedules(user: dict = Depends(require_role("admin"))):
+    docs = await db.preset_schedules.find({}).sort("created_at", -1).to_list(100)
+    # Enrich with preset names
+    pids = [d.get("preset_id") for d in docs]
+    pmap = {}
+    if pids:
+        pid_oids = [ObjectId(p) for p in pids if p]
+        async for p in db.landing_presets.find({"_id": {"$in": pid_oids}}):
+            pmap[str(p["_id"])] = p
+    out = []
+    for d in docs:
+        preset = pmap.get(d.get("preset_id"))
+        out.append({
+            "id": str(d["_id"]),
+            "preset_id": d.get("preset_id"),
+            "preset_name": (preset or {}).get("name", "(șters)"),
+            "days": d.get("days", []),
+            "time": d.get("time"),
+            "enabled": bool(d.get("enabled", True)),
+            "last_run_at": d.get("last_run_at"),
+            "created_at": d.get("created_at"),
+        })
+    return out
+
+
+@router.post("/preset-schedules")
+async def create_schedule(data: ScheduleIn, user: dict = Depends(require_role("admin"))):
+    if any(d < 0 or d > 6 for d in data.days):
+        raise HTTPException(400, "Days must be 0-6 (Monday-Sunday)")
+    try:
+        ObjectId(data.preset_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid preset id")
+    preset = await db.landing_presets.find_one({"_id": ObjectId(data.preset_id)})
+    if not preset:
+        raise HTTPException(404, "Preset not found")
+    doc = {
+        "preset_id": data.preset_id,
+        "days": sorted(set(data.days)),
+        "time": data.time,
+        "enabled": data.enabled,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": user["id"],
+    }
+    res = await db.preset_schedules.insert_one(doc)
+    return {"ok": True, "id": str(res.inserted_id)}
+
+
+@router.patch("/preset-schedules/{schedule_id}")
+async def toggle_schedule(schedule_id: str, enabled: bool, user: dict = Depends(require_role("admin"))):
+    try:
+        oid = ObjectId(schedule_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid id")
+    await db.preset_schedules.update_one({"_id": oid}, {"$set": {"enabled": enabled}})
+    return {"ok": True}
+
+
+@router.delete("/preset-schedules/{schedule_id}")
+async def delete_schedule(schedule_id: str, user: dict = Depends(require_role("admin"))):
+    try:
+        oid = ObjectId(schedule_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid id")
+    await db.preset_schedules.delete_one({"_id": oid})
+    return {"ok": True}
+
+
+async def run_due_preset_schedules():
+    """Cron callable — runs every minute. Apply schedules whose (day, time) match now (Europe/Bucharest)."""
+    import pytz as _pytz
+    tz = _pytz.timezone("Europe/Bucharest")
+    now = datetime.now(tz)
+    weekday = now.weekday()  # 0=Monday
+    hhmm = now.strftime("%H:%M")
+
+    # Dedup window: same minute → skip if we already ran today's slot
+    today_key = now.strftime("%Y-%m-%d")
+    async for sched in db.preset_schedules.find({"enabled": True, "time": hhmm, "days": weekday}):
+        last = sched.get("last_run_at") or ""
+        if last.startswith(today_key) and last.endswith(hhmm):
+            continue  # already ran this minute today
+        # Apply preset
+        try:
+            preset = await db.landing_presets.find_one({"_id": ObjectId(sched["preset_id"])})
+            if not preset:
+                continue
+            settings_doc = await db.platform_config.find_one({"key": "settings"})
+            current = (settings_doc or {}).get("value", {})
+            merged = {**DEFAULT_SETTINGS, **current, **preset.get("flags", {})}
+            await db.platform_config.update_one(
+                {"key": "settings"},
+                {"$set": {"key": "settings", "value": merged,
+                          "updated_at": datetime.now(timezone.utc).isoformat(),
+                          "updated_by": "scheduler"}},
+                upsert=True,
+            )
+            await db.preset_schedules.update_one(
+                {"_id": sched["_id"]},
+                {"$set": {"last_run_at": f"{today_key}T{hhmm}"}}
+            )
+            logger.info(f"Scheduled preset applied: {preset.get('name')} at {hhmm}")
+        except Exception as exc:
+            logger.warning(f"Schedule run failed for {sched.get('_id')}: {exc}")

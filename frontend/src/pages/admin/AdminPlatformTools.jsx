@@ -563,7 +563,161 @@ const LandingPresetsCard = ({ currentFlags, onApply, onPersistedApply }) => {
       </div>
 
       {toast && <div className="mt-3 text-sm font-medium text-emerald-600 dark:text-emerald-400" data-testid="presets-toast">{toast}</div>}
+
+      <SchedulesSection presets={presets} />
     </AdminCard>
+  );
+};
+
+// ============= AUTO-SCHEDULE SECTION =============
+const DAY_LABELS = ["Lu", "Ma", "Mi", "Jo", "Vi", "Sâ", "Du"];
+
+const SchedulesSection = ({ presets }) => {
+  const [schedules, setSchedules] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ preset_id: "", days: [], time: "09:00" });
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState("");
+  const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 3000); };
+
+  const load = () => axios.get(`${API}/admin/preset-schedules`).then(r => setSchedules(r.data));
+  useEffect(() => { load(); }, []);
+
+  const toggleDay = (d) => setForm(f => ({
+    ...f,
+    days: f.days.includes(d) ? f.days.filter(x => x !== d) : [...f.days, d]
+  }));
+
+  const create = async (e) => {
+    e.preventDefault();
+    if (!form.preset_id || form.days.length === 0) {
+      flash("❌ Alege preset + cel puțin o zi");
+      return;
+    }
+    setBusy(true);
+    try {
+      await axios.post(`${API}/admin/preset-schedules`, form);
+      setShowForm(false);
+      setForm({ preset_id: "", days: [], time: "09:00" });
+      await load();
+      flash("✓ Programare creată");
+    } catch (e) { flash(`❌ ${e?.response?.data?.detail || "Eroare"}`); }
+    finally { setBusy(false); }
+  };
+
+  const toggle = async (s) => {
+    try {
+      await axios.patch(`${API}/admin/preset-schedules/${s.id}?enabled=${!s.enabled}`);
+      await load();
+    } catch {}
+  };
+
+  const remove = async (s) => {
+    if (!window.confirm(`Șterge programarea pentru "${s.preset_name}"?`)) return;
+    await axios.delete(`${API}/admin/preset-schedules/${s.id}`);
+    await load();
+    flash("✓ Programare ștearsă");
+  };
+
+  return (
+    <div className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-800" data-testid="schedules-section">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+        <div>
+          <h4 className="font-semibold flex items-center gap-2">⏰ Auto-Schedule Presets</h4>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Aplică automat preset-uri la ore specifice (Europe/Bucharest). Verificare la fiecare minut.
+          </p>
+        </div>
+        <AdminBtn variant="secondary" onClick={() => setShowForm(s => !s)} data-testid="schedule-new-btn">
+          {showForm ? "Anulează" : "+ Adaugă programare"}
+        </AdminBtn>
+      </div>
+
+      {showForm && (
+        <form onSubmit={create} className="mb-3 p-3 rounded-lg border border-purple-200 dark:border-purple-500/30 bg-purple-50 dark:bg-purple-500/5" data-testid="schedule-form">
+          <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Preset</label>
+          <select
+            value={form.preset_id}
+            onChange={e => setForm(f => ({ ...f, preset_id: e.target.value }))}
+            className="w-full mt-1 mb-3 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+            data-testid="schedule-preset-select"
+            required
+          >
+            <option value="">— Alege preset —</option>
+            {presets.map(p => <option key={p.id} value={p.id}>{p.system ? "🔒 " : ""}{p.name}</option>)}
+          </select>
+
+          <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Zile (Luni → Duminică)</label>
+          <div className="flex gap-1.5 mt-1 mb-3 flex-wrap">
+            {DAY_LABELS.map((lbl, idx) => (
+              <button
+                type="button"
+                key={idx}
+                onClick={() => toggleDay(idx)}
+                className={`w-10 h-10 rounded-full font-medium text-sm transition-colors ${form.days.includes(idx) ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200"}`}
+                data-testid={`schedule-day-${idx}`}
+              >
+                {lbl}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setForm(f => ({ ...f, days: [0,1,2,3,4] }))}
+              className="text-xs px-3 rounded-full bg-white dark:bg-slate-800 hover:bg-slate-50 border border-slate-200 dark:border-slate-700"
+              data-testid="schedule-workdays"
+            >L-V</button>
+            <button
+              type="button"
+              onClick={() => setForm(f => ({ ...f, days: [5,6] }))}
+              className="text-xs px-3 rounded-full bg-white dark:bg-slate-800 hover:bg-slate-50 border border-slate-200 dark:border-slate-700"
+              data-testid="schedule-weekend"
+            >S-D</button>
+          </div>
+
+          <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Ora (Europe/Bucharest)</label>
+          <input
+            type="time"
+            value={form.time}
+            onChange={e => setForm(f => ({ ...f, time: e.target.value }))}
+            className="w-full mt-1 mb-3 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+            data-testid="schedule-time-input"
+            required
+          />
+
+          <AdminBtn type="submit" disabled={busy} data-testid="schedule-submit">{busy ? "..." : "Creează programare"}</AdminBtn>
+        </form>
+      )}
+
+      <div className="space-y-2">
+        {schedules.map(s => (
+          <div key={s.id} className={`p-3 rounded-lg border ${s.enabled ? "border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-500/5" : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30 opacity-60"}`} data-testid={`schedule-${s.id}`}>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm">{s.preset_name}</div>
+                <div className="text-xs text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
+                  <span className="flex gap-1">
+                    {DAY_LABELS.map((lbl, i) => (
+                      <span key={i} className={`inline-block w-6 text-center text-[10px] py-0.5 rounded ${s.days.includes(i) ? "bg-blue-600 text-white font-semibold" : "bg-slate-200 dark:bg-slate-700 text-slate-400"}`}>{lbl}</span>
+                    ))}
+                  </span>
+                  <span className="text-base font-mono font-semibold text-slate-700 dark:text-slate-200">{s.time}</span>
+                  {s.last_run_at && <span className="text-[10px] text-slate-400">· Ultima rulare: {s.last_run_at}</span>}
+                </div>
+              </div>
+              <div className="flex gap-1.5 items-center">
+                <label className="flex items-center cursor-pointer" title={s.enabled ? "Dezactivează" : "Activează"}>
+                  <input type="checkbox" checked={s.enabled} onChange={() => toggle(s)} className="w-4 h-4 accent-emerald-600" data-testid={`schedule-toggle-${s.id}`} />
+                </label>
+                <AdminBtn variant="ghost" onClick={() => remove(s)} title="Șterge programare" data-testid={`schedule-delete-${s.id}`}>🗑️</AdminBtn>
+              </div>
+            </div>
+          </div>
+        ))}
+        {schedules.length === 0 && <div className="text-center py-4 text-sm text-slate-500">Nicio programare activă. Adaugă una pentru rotație automată a preset-urilor.</div>}
+      </div>
+
+      {toast && <div className="mt-2 text-sm font-medium text-emerald-600 dark:text-emerald-400" data-testid="schedules-toast">{toast}</div>}
+    </div>
   );
 };
 

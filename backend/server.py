@@ -41,7 +41,7 @@ from routes.services_avail import router as services_avail_router
 from routes.projects import router as projects_router
 from routes.trust import router as trust_router
 from routes.root import router as root_router
-from routes.admin_console import router as admin_console_router, public_router as cms_public_router
+from routes.admin_console import router as admin_console_router, public_router as cms_public_router, run_due_preset_schedules
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -92,9 +92,17 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=7200,
         )
+        scheduler.add_job(
+            run_due_preset_schedules,
+            CronTrigger(minute="*", timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="preset_schedules",
+            replace_existing=True,
+            misfire_grace_time=60,
+        )
         scheduler.start()
         logger.info("Daily digest scheduler started (19:00 Europe/Bucharest).")
         logger.info("Warranty auto-release scheduler started (06:00 Europe/Bucharest).")
+        logger.info("Preset schedules scheduler started (every minute, Europe/Bucharest).")
 
 
 @app.on_event("shutdown")
