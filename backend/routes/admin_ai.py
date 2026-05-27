@@ -1186,3 +1186,223 @@ async def send_daily_ai_digest_email():
         logger.info(f"[AI-Digest] email sent to {len(admin_emails)} admin(s) via {result.get('provider')}")
     except Exception as e:  # noqa: BLE001
         logger.error(f"[AI-Digest] error: {e}")
+
+
+# ============= REPAIR EFFECTIVENESS LOW ALERT (Phase 47D) =============
+# Cron-driven email alert when rolling AI effectiveness drops below a threshold.
+# Reuses the same window logic as /repair-suggestions/trend.
+
+DEFAULT_ALERT_CONFIG = {
+    "enabled": False,
+    "threshold_pct": 50,           # alert if rolling effectiveness < this
+    "window_days": 7,              # rolling window
+    "min_decided": 3,              # require at least this many decided suggestions
+    "recipients": [],              # email list; falls back to admin users when empty
+    "last_sent_at": None,
+    "last_state": None,            # {effectiveness_pct, applied, decided, alert_triggered, ...}
+    "last_check_at": None,
+}
+
+
+async def _get_alert_config() -> dict:
+    doc = await db.admin_ai_alert_config.find_one({"_id": "global"})
+    if not doc:
+        return dict(DEFAULT_ALERT_CONFIG)
+    merged = dict(DEFAULT_ALERT_CONFIG)
+    merged.update({k: v for k, v in doc.items() if k != "_id"})
+    return merged
+
+
+async def _save_alert_config(updates: dict, actor_id: str):
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    updates["updated_by"] = actor_id
+    await db.admin_ai_alert_config.update_one({"_id": "global"}, {"$set": updates}, upsert=True)
+
+
+async def _compute_rolling_effectiveness(days: int) -> dict:
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    pipeline = [
+        {"$match": {"created_at": {"$gte": cutoff}}},
+        {"$group": {
+            "_id": None,
+            "applied": {"$sum": {"$cond": [{"$eq": ["$status", "applied"]}, 1, 0]}},
+            "approved": {"$sum": {"$cond": [{"$eq": ["$status", "approved"]}, 1, 0]}},
+            "rejected": {"$sum": {"$cond": [{"$eq": ["$status", "rejected"]}, 1, 0]}},
+            "total": {"$sum": 1},
+        }},
+    ]
+    res = None
+    async for r in db.admin_ai_repair_suggestions.aggregate(pipeline):
+        res = r
+    if not res:
+        return {"applied": 0, "approved": 0, "rejected": 0, "total": 0, "decided": 0, "effectiveness_pct": None}
+    decided = res["applied"] + res["approved"] + res["rejected"]
+    eff = round((res["applied"] / decided) * 100, 1) if decided else None
+    return {
+        "applied": res["applied"], "approved": res["approved"], "rejected": res["rejected"],
+        "total": res["total"], "decided": decided, "effectiveness_pct": eff,
+    }
+
+
+async def _resolve_alert_recipients(cfg: dict) -> list:
+    recipients = list(cfg.get("recipients") or [])
+    if recipients:
+        return recipients
+    # Fallback: admin users
+    async for u in db.users.find({"role": "admin"}, {"email": 1}):
+        if u.get("email"):
+            recipients.append(u["email"])
+    if not recipients:
+        recipients = [os.environ.get("ADMIN_EMAIL", "admin@propmanage.io")]
+    return recipients
+
+
+def _build_alert_email_html(state: dict, cfg: dict) -> str:
+    eff = state.get("effectiveness_pct")
+    eff_str = f"{eff}%" if eff is not None else "—"
+    color = "#dc2626" if (eff is not None and eff < cfg["threshold_pct"]) else "#fbbf24"
+    body_html = f"""
+      <p>Bună,</p>
+      <p>Sistemul AI Repair Suggester are <strong>eficacitate scăzută</strong> în ultimele {cfg['window_days']} zile.</p>
+      <table border="0" cellpadding="0" cellspacing="0" style="width:100%; background:#1a1a1f; border-radius:14px; margin:18px 0;">
+        <tr>
+          <td style="padding:18px 22px;">
+            <div style="color:#888893; font-size:11px; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:6px;">Eficacitate rolling ({cfg['window_days']}z)</div>
+            <div style="color:{color}; font-size:42px; font-weight:bold; line-height:1;">{eff_str}</div>
+            <div style="color:#a8a8b0; font-size:12px; margin-top:6px;">Prag configurat: <b>{cfg['threshold_pct']}%</b></div>
+          </td>
+          <td style="padding:18px 22px; border-left:1px solid #2a2a30;">
+            <div style="color:#888893; font-size:11px; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:6px;">Detalii sugestii</div>
+            <div style="color:#fff; font-size:13px; line-height:1.8;">
+              Total: <b>{state.get('total', 0)}</b><br>
+              Aplicate: <b style="color:#60a5fa;">{state.get('applied', 0)}</b><br>
+              Aprobate: <b style="color:#34d399;">{state.get('approved', 0)}</b><br>
+              Respinse: <b style="color:#f87171;">{state.get('rejected', 0)}</b>
+            </div>
+          </td>
+        </tr>
+      </table>
+      <p style="color:#a8a8b0; font-size:13px;">Recomandări:</p>
+      <ul style="color:#a8a8b0; font-size:13px;">
+        <li>Verifică în Repair Audit Log care pattern-uri au eficacitate < 30% și ajustează prompt-ul.</li>
+        <li>Marchează manual sugestiile vechi care nu au fost aplicate (cleanup).</li>
+        <li>Regenerează sugestiile pentru finding-urile critice cu risc mare.</li>
+      </ul>
+      <p><a href="{os.environ.get('APP_PUBLIC_URL', 'https://propmanage.io')}/admin" style="display:inline-block; padding:12px 24px; background:#d4ff3a; color:#000; text-decoration:none; border-radius:8px; font-weight:bold;">Deschide AI Console</a></p>
+    """
+    return body_html
+
+
+async def _send_effectiveness_alert_email(state: dict, cfg: dict, dry_run: bool = False) -> dict:
+    from email_service import _layout, send_email as _send_email  # type: ignore
+    recipients = await _resolve_alert_recipients(cfg)
+    eff = state.get("effectiveness_pct")
+    subject = f"[PropManage AI] Eficacitate AI scăzută: {eff}% (prag {cfg['threshold_pct']}%)"
+    html = _layout(
+        title="⚠️ Eficacitate AI sub prag",
+        preheader=f"Eficacitate {eff}% în ultimele {cfg['window_days']}z (prag {cfg['threshold_pct']}%)",
+        body_html=_build_alert_email_html(state, cfg),
+    )
+    if dry_run:
+        return {"dry_run": True, "recipients": recipients, "subject": subject, "preview_chars": len(html)}
+    result = await _send_email(recipients, subject, html)
+    return {"dry_run": False, "recipients": recipients, "subject": subject, "provider": result.get("provider")}
+
+
+async def run_ai_effectiveness_alert_check(force: bool = False, dry_run: bool = False) -> dict:
+    cfg = await _get_alert_config()
+    if not cfg.get("enabled") and not force:
+        return {"skipped": True, "reason": "disabled"}
+    state = await _compute_rolling_effectiveness(cfg["window_days"])
+    state["alert_triggered"] = False
+    state["checked_at"] = datetime.now(timezone.utc).isoformat()
+    decided = state.get("decided", 0)
+    eff = state.get("effectiveness_pct")
+    if decided < cfg["min_decided"]:
+        state["skip_reason"] = f"only {decided} decisions (need ≥{cfg['min_decided']})"
+        await _save_alert_config({"last_state": state, "last_check_at": state["checked_at"]}, actor_id="system_cron")
+        return {"skipped": True, **state}
+    if eff is None or eff >= cfg["threshold_pct"]:
+        state["skip_reason"] = "above threshold"
+        await _save_alert_config({"last_state": state, "last_check_at": state["checked_at"]}, actor_id="system_cron")
+        return {"skipped": True, **state}
+
+    # Dedupe per ISO week unless force=true
+    iso_week = datetime.now(timezone.utc).strftime("%G-W%V")
+    if not force and cfg.get("last_sent_week") == iso_week:
+        state["skip_reason"] = f"already sent this week ({iso_week})"
+        await _save_alert_config({"last_state": state, "last_check_at": state["checked_at"]}, actor_id="system_cron")
+        return {"skipped": True, **state}
+
+    send_result = await _send_effectiveness_alert_email(state, cfg, dry_run=dry_run)
+    state["alert_triggered"] = True
+    state["last_sent_at"] = datetime.now(timezone.utc).isoformat() if not dry_run else None
+    state["last_sent_to"] = send_result.get("recipients")
+    updates = {
+        "last_state": state,
+        "last_check_at": state["checked_at"],
+    }
+    if not dry_run:
+        updates["last_sent_at"] = state["last_sent_at"]
+        updates["last_sent_week"] = iso_week
+        # Append to history
+        await db.admin_ai_alert_history.insert_one({
+            "sent_at": state["last_sent_at"],
+            "state": state,
+            "cfg_snapshot": {k: cfg.get(k) for k in ("threshold_pct", "window_days", "min_decided", "recipients")},
+            "iso_week": iso_week,
+        })
+    await _save_alert_config(updates, actor_id="system_cron")
+    return {"sent": not dry_run, **state, "send_result": send_result}
+
+
+# ----- REST endpoints -----
+
+@router.get("/effectiveness-alert/config")
+async def get_alert_cfg(user: dict = Depends(require_role("admin"))):
+    return await _get_alert_config()
+
+
+@router.put("/effectiveness-alert/config")
+async def put_alert_cfg(payload: dict = Body(...), user: dict = Depends(require_role("admin"))):
+    allowed = {"enabled", "threshold_pct", "window_days", "min_decided", "recipients"}
+    updates = {k: v for k, v in payload.items() if k in allowed}
+    # Validate
+    if "threshold_pct" in updates:
+        try: updates["threshold_pct"] = max(0, min(100, int(updates["threshold_pct"])))
+        except (TypeError, ValueError): raise HTTPException(400, "threshold_pct must be int 0..100")
+    if "window_days" in updates:
+        try: updates["window_days"] = max(1, min(60, int(updates["window_days"])))
+        except (TypeError, ValueError): raise HTTPException(400, "window_days must be int 1..60")
+    if "min_decided" in updates:
+        try: updates["min_decided"] = max(1, int(updates["min_decided"]))
+        except (TypeError, ValueError): raise HTTPException(400, "min_decided must be positive int")
+    if "recipients" in updates:
+        if not isinstance(updates["recipients"], list):
+            raise HTTPException(400, "recipients must be a list")
+        emails = []
+        for e in updates["recipients"]:
+            s = str(e or "").strip().lower()
+            if s and "@" in s and "." in s:
+                emails.append(s)
+        updates["recipients"] = emails[:25]
+    await _save_alert_config(updates, user["id"])
+    return await _get_alert_config()
+
+
+@router.post("/effectiveness-alert/test")
+async def test_alert(payload: dict = Body(default={}), user: dict = Depends(require_role("admin"))):
+    """Body: {dry_run: bool=true, force: bool=true}"""
+    dry_run = payload.get("dry_run", True)
+    force = payload.get("force", True)
+    return await run_ai_effectiveness_alert_check(force=force, dry_run=dry_run)
+
+
+@router.get("/effectiveness-alert/history")
+async def alert_history(limit: int = Query(20, le=100), user: dict = Depends(require_role("admin"))):
+    cursor = db.admin_ai_alert_history.find({}).sort("sent_at", -1).limit(limit)
+    items = []
+    async for d in cursor:
+        d["_id"] = str(d["_id"])
+        items.append(d)
+    return {"items": items}
