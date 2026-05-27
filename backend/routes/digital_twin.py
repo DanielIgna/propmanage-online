@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 
 from db import db
 from deps import get_current_user, require_role
+from email_service import send_template, tpl_dt_pin_created, tpl_dt_comment_added
 
 router = APIRouter(prefix="/api/digital-twin", tags=["digital-twin"])
 
@@ -81,6 +82,28 @@ async def _ensure_project_access(project_id: str, user: dict) -> dict:
     if any(m.get("user_id") == user["id"] for m in members):
         return p
     raise HTTPException(403, "No access to this project.")
+
+
+async def _project_stakeholders(project: dict, exclude_user_id: str | None = None) -> list:
+    """All people who should be notified about a project event: owner + members.
+    Excludes the actor and any without email. Returns list of {id, name, email}."""
+    ids = [project.get("owner_id")]
+    for m in (project.get("members") or []):
+        if m.get("user_id"):
+            ids.append(m["user_id"])
+    ids = [i for i in ids if i and i != exclude_user_id]
+    if not ids:
+        return []
+    out = []
+    seen = set()
+    for uid in ids:
+        if uid in seen:
+            continue
+        seen.add(uid)
+        u = await db.users.find_one(_user_filter(uid), {"_id": 1, "email": 1, "name": 1})
+        if u and u.get("email"):
+            out.append({"id": str(u["_id"]), "name": u.get("name") or u["email"], "email": u["email"]})
+    return out
 
 
 def _clean(d: dict) -> dict:
@@ -363,7 +386,7 @@ class PinCreate(BaseModel):
 @router.post("/projects/{project_id}/pins")
 async def create_pin(project_id: str, payload: PinCreate, user: dict = Depends(get_current_user)):
     await _ensure_dt_access(user)
-    await _ensure_project_access(project_id, user)
+    project = await _ensure_project_access(project_id, user)
     pid = _new_id()
     doc = {
         "id": pid,
@@ -388,6 +411,15 @@ async def create_pin(project_id: str, payload: PinCreate, user: dict = Depends(g
         {"id": project_id},
         {"$set": {"updated_at": _now_iso()}, "$inc": {"pin_count": 1}},
     )
+    # Notify stakeholders (fire-and-forget)
+    stakeholders = await _project_stakeholders(project, exclude_user_id=user["id"])
+    actor_name = user.get("name") or user.get("email") or "Utilizator"
+    for s in stakeholders:
+        await send_template(
+            tpl_dt_pin_created,
+            s["name"], project.get("name", "Proiect"), doc["title"], doc["category"], doc["priority"], actor_name,
+            to=s["email"],
+        )
     return _clean(doc)
 
 

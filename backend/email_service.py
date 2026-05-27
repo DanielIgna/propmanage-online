@@ -259,6 +259,34 @@ def tpl_escrow_funded(specialist_name: str, request_title: str, amount: float, c
     return {"subject": f"💰 Escrow alimentat: {amount:.0f} RON", "html": _layout("Plată în escrow primită", "Începe lucrarea în siguranță.", body, f"{APP_URL}/specialist", "Vezi lucrările")}
 
 
+def tpl_dt_pin_created(recipient_name: str, project_name: str, pin_title: str, category: str, priority: str, author_name: str) -> dict:
+    body = f"""
+      <p>Bună {recipient_name},</p>
+      <p><strong style="color:#10b981;">{author_name}</strong> a creat un pin nou în proiectul Digital Twin <em>"{project_name}"</em>.</p>
+      <div style="background:#10b98115; border-left:3px solid #10b981; padding:14px 18px; border-radius:12px; margin:18px 0;">
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#10b981; margin-bottom:6px;">Pin · {category} · {priority}</div>
+        <div style="color:#e5e5e5; font-weight:600; font-size:15px;">{pin_title}</div>
+      </div>
+      <p>Deschide modelul 3D pentru a vedea poziția exactă și a comenta.</p>
+    """
+    return {"subject": f"📌 Pin nou pe Digital Twin: {pin_title}", "html": _layout("Pin colaborativ nou", f"Notă pe {project_name}", body, f"{APP_URL}/digital-twin", "Deschide proiectul")}
+
+
+def tpl_dt_comment_added(recipient_name: str, project_name: str, pin_title: str, author_name: str, author_role: str, message: str) -> dict:
+    short = (message[:200] + "…") if len(message) > 200 else message
+    role_label = {"client": "Proprietar", "specialist": "Specialist", "admin": "Administrator", "operator": "Operator", "architect": "Arhitect"}.get(author_role, author_role or "Utilizator")
+    body = f"""
+      <p>Bună {recipient_name},</p>
+      <p><strong style="color:#10b981;">{author_name}</strong> ({role_label}) a comentat pe pin-ul <em>"{pin_title}"</em> din proiectul <strong>{project_name}</strong>.</p>
+      <div style="background:#0f172a; border-left:3px solid #60a5fa; padding:14px 18px; border-radius:12px; margin:18px 0;">
+        <div style="color:#e5e5e5; font-style:italic; line-height:1.6;">"{short}"</div>
+      </div>
+    """
+    return {"subject": f"💬 Comentariu nou: {pin_title}", "html": _layout("Comentariu Digital Twin", f"Pin: {pin_title}", body, f"{APP_URL}/digital-twin", "Deschide threadul")}
+
+
+
+
 # ===================== High-level helper that's fire-and-forget =====================
 
 async def send_template(template_fn, *args, to: Optional[str] = None, fire_and_forget: bool = True, **kwargs) -> Optional[dict]:
