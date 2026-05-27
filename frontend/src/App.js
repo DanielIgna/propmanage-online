@@ -28,6 +28,7 @@ import { GDPRAuditBadge } from "./components/GDPRAuditBadge";
 import { TrustStrip } from "./components/TrustStrip";
 import DigitalTwinPage from "./pages/DigitalTwinPage";
 import ReportApprovalPage from "./pages/ReportApprovalPage";
+import { ImpersonationBanner } from "./components/ImpersonationBanner";
 import "./App.css";
 
 // ============= NAV =============
@@ -1443,6 +1444,7 @@ function App() {
       <I18nProvider>
         <AuthProvider>
           <BrowserRouter>
+            <ImpersonationBanner />
             <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />

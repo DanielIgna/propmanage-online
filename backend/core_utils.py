@@ -28,6 +28,24 @@ def create_access_token(user_id: str, email: str, role: str) -> str:
     }, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
+def create_impersonation_token(target_user_id: str, target_email: str, target_role: str,
+                               admin_id: str, admin_email: str, log_id: str,
+                               ttl_seconds: int = 7200) -> str:
+    """Special access token signed for a target user, but tagged with the impersonating admin.
+    TTL defaults to 2h (user choice 4.c). Cannot be refreshed."""
+    return jwt.encode({
+        "sub": target_user_id, "email": target_email, "role": target_role,
+        "exp": datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds),
+        "type": "access",
+        "impersonation": {
+            "admin_id": admin_id,
+            "admin_email": admin_email,
+            "log_id": log_id,
+            "started_at": datetime.now(timezone.utc).isoformat(),
+        }
+    }, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
 def create_refresh_token(user_id: str) -> str:
     return jwt.encode({
         "sub": user_id,

@@ -22,11 +22,22 @@ async def get_current_user(request: Request) -> dict:
         user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
         if not user:
             raise HTTPException(401, "User not found")
-        return serialize_doc(user)
+        u = serialize_doc(user)
+        # Attach impersonation context (if the token was minted by /admin/impersonate)
+        if payload.get("impersonation"):
+            u["impersonation"] = payload["impersonation"]
+        return u
     except jwt.ExpiredSignatureError:
         raise HTTPException(401, "Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(401, "Invalid token")
+
+
+def block_in_impersonation(user: dict, action: str = "această acțiune"):
+    """Raise 403 if the current request is an admin acting on behalf of a target user.
+    Used to protect destructive/credential-modifying endpoints (password, 2FA, delete account)."""
+    if user.get("impersonation"):
+        raise HTTPException(403, f"Nu poți efectua {action} în modul impersonare. Ieși din impersonare mai întâi.")
 
 
 def require_role(*allowed):

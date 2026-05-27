@@ -51,6 +51,7 @@ from routes.public import router as public_router, admin_router as public_admin_
 from routes.demo_time_machine import router as demo_time_machine_router
 from routes.gdpr import router as gdpr_router, admin_router as gdpr_admin_router
 from routes.digital_twin import router as digital_twin_router, admin_router as digital_twin_admin_router
+from routes.impersonation import router as impersonation_router
 from demo_reset import reset_demo_accounts
 
 logging.basicConfig(level=logging.INFO)
@@ -94,6 +95,7 @@ for r in (
     demo_time_machine_router,
     gdpr_router, gdpr_admin_router,
     digital_twin_router, digital_twin_admin_router,
+    impersonation_router,
 ):
     app.include_router(r)
 

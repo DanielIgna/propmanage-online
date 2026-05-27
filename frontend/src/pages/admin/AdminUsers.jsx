@@ -1,9 +1,11 @@
 // Unified user management: list, filter, edit, ban
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { Search, Download, Edit2, Ban, CheckCircle2, X } from "lucide-react";
+import { Search, Download, Edit2, Ban, CheckCircle2, X, UserCheck } from "lucide-react";
 import { AdminCard, AdminBtn } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
+import { ImpersonateModal } from "./ImpersonateModal";
+import { useAuth } from "../../auth";
 
 const EditUserModal = ({ user, onClose, onSaved }) => {
   const [form, setForm] = useState({
@@ -78,11 +80,13 @@ const EditUserModal = ({ user, onClose, onSaved }) => {
 };
 
 export const AdminUsers = () => {
+  const { user: me } = useAuth();
   const [data, setData] = useState({ items: [], total: 0 });
   const [q, setQ] = useState("");
   const [role, setRole] = useState("");
   const [skip, setSkip] = useState(0);
   const [editing, setEditing] = useState(null);
+  const [impersonating, setImpersonating] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const load = () => {
@@ -174,6 +178,16 @@ export const AdminUsers = () => {
                     <button onClick={() => setEditing(u)} className="text-blue-600 hover:text-blue-700 dark:text-blue-400 mr-2" title="Editare" data-testid={`edit-user-${u.id}`}>
                       <Edit2 className="w-4 h-4 inline" />
                     </button>
+                    {u.role !== "admin" && u.id !== me?.id && !u.banned && (
+                      <button
+                        onClick={() => setImpersonating(u)}
+                        className="text-red-600 hover:text-red-700 dark:text-red-400 mr-2"
+                        title="Intră în contul lui (jurnalizat GDPR)"
+                        data-testid={`impersonate-user-${u.id}`}
+                      >
+                        <UserCheck className="w-4 h-4 inline" />
+                      </button>
+                    )}
                     <button onClick={() => ban(u.id, u.banned)} className={u.banned ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"} title={u.banned ? "Unban" : "Ban"} data-testid={`ban-user-${u.id}`}>
                       <Ban className="w-4 h-4 inline" />
                     </button>
@@ -197,6 +211,7 @@ export const AdminUsers = () => {
       </AdminCard>
 
       {editing && <EditUserModal user={editing} onClose={() => setEditing(null)} onSaved={load} />}
+      {impersonating && <ImpersonateModal user={impersonating} onClose={() => setImpersonating(null)} />}
     </div>
   );
 };

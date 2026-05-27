@@ -480,11 +480,16 @@ const PrivacyModal = ({ onClose }) => {
   const [consents, setConsents] = useState({});
   const [consentsLoaded, setConsentsLoaded] = useState(false);
 
+  const [accessHistory, setAccessHistory] = useState(null);
+
   useEffect(() => {
     axios.get(`${API}/gdpr/me/consents`)
       .then(r => setConsents(r.data.consents || {}))
       .catch(() => {})
       .finally(() => setConsentsLoaded(true));
+    axios.get(`${API}/me/access-history`)
+      .then(r => setAccessHistory(r.data.items || []))
+      .catch(() => setAccessHistory([]));
   }, []);
 
   const toggleConsent = async (key, current) => {
@@ -564,6 +569,42 @@ const PrivacyModal = ({ onClose }) => {
           <button onClick={exportData} disabled={exporting} className="btn-accent px-4 py-2 rounded-full text-xs font-medium" data-testid="export-data-btn">
             {exporting ? "Se generează..." : "Descarcă JSON"}
           </button>
+        </div>
+
+        {/* Access History — GDPR Art. 15 transparency: who at PropManage accessed your account */}
+        <div className="bg-white/5 rounded-xl p-4" data-testid="access-history-section">
+          <div className="flex items-center gap-2 mb-2">
+            <Eye className="w-4 h-4 text-[#d4ff3a]" />
+            <div className="font-medium">Cine a accesat contul tău</div>
+          </div>
+          <p className="text-xs text-stone-400 mb-3 leading-relaxed">
+            Lista sesiunilor în care un administrator PropManage a accesat contul tău (pentru suport sau investigare). Fiecare sesiune este jurnalizată cu motiv și durată.
+          </p>
+          {accessHistory === null ? (
+            <div className="text-xs text-stone-500">Se încarcă...</div>
+          ) : accessHistory.length === 0 ? (
+            <div className="text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3" data-testid="access-history-empty">
+              ✓ Niciun administrator nu a accesat contul tău până acum.
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1" data-testid="access-history-list">
+              {accessHistory.map(it => (
+                <div key={it.id} className="bg-white/[0.03] border border-white/5 rounded-lg p-3 text-xs" data-testid={`access-history-${it.id}`}>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <div className="font-medium text-stone-200 truncate">{it.admin_name || it.admin_email}</div>
+                    <div className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${it.ended_at ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}`}>
+                      {it.ended_at ? "încheiată" : "activă"}
+                    </div>
+                  </div>
+                  <div className="text-stone-400 mb-1 italic">"{it.reason}"</div>
+                  <div className="text-[10px] text-stone-500 flex items-center gap-2 flex-wrap">
+                    <span><Clock className="w-3 h-3 inline -mt-0.5 mr-0.5" />{new Date(it.started_at).toLocaleString("ro-RO", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                    {it.duration_seconds != null && <span>· durată: {Math.floor(it.duration_seconds / 60)}m {it.duration_seconds % 60}s</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Granular consents */}

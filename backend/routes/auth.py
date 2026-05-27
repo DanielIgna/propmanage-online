@@ -20,7 +20,7 @@ from core_utils import (
     hash_password, verify_password, create_access_token, create_refresh_token,
     serialize_doc, set_auth_cookies,
 )
-from deps import get_current_user, require_role
+from deps import get_current_user, require_role, block_in_impersonation
 from services import send_email, VAPID_PUBLIC_KEY
 from models import (
     RegisterIn, LoginIn, TotpVerifyIn, ALLOWED_SPECIALTIES,
@@ -160,6 +160,8 @@ async def login(data: LoginIn, request: Request, response: Response):
 async def logout(response: Response):
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/")
+    # Also clear any stashed admin token (impersonation safety)
+    response.delete_cookie("admin_access_token", path="/")
     return {"ok": True}
 
 
@@ -174,6 +176,7 @@ async def me(user: dict = Depends(get_current_user)):
         fresh = {"_id": doc["_id"], "email": doc.get("email"), "role": doc.get("role")}
         await _enforce_admin_role(fresh)
         user["role"] = fresh["role"]
+    # `impersonation` field is already injected by get_current_user when applicable.
     return user
 
 
@@ -271,6 +274,7 @@ class ChangePasswordIn(BaseModel):
 
 @router.post("/auth/change-password")
 async def change_password(data: ChangePasswordIn, user: dict = Depends(get_current_user)):
+    block_in_impersonation(user, "schimbarea parolei")
     db_user = await db.users.find_one({"_id": ObjectId(user["id"])})
     if not db_user or not verify_password(data.current_password, db_user.get("password_hash", "")):
         raise HTTPException(401, "Parola curentă este incorectă.")
@@ -311,6 +315,7 @@ class AccountDeleteIn(BaseModel):
 
 @router.post("/auth/account-delete")
 async def account_delete(data: AccountDeleteIn, response: Response, user: dict = Depends(get_current_user)):
+    block_in_impersonation(user, "ștergerea contului")
     if data.confirmation != "STERGE":
         raise HTTPException(400, "Confirmarea trebuie să fie exact 'STERGE'.")
     db_user = await db.users.find_one({"_id": ObjectId(user["id"])})
@@ -424,6 +429,7 @@ async def push_unsubscribe(data: PushSubscriptionIn, user: dict = Depends(get_cu
 # ============= 2FA (TOTP) =============
 @router.post("/auth/2fa/setup")
 async def setup_2fa(user: dict = Depends(get_current_user)):
+    block_in_impersonation(user, "configurarea 2FA")
     secret = pyotp.random_base32()
     await db.users.update_one(
         {"_id": ObjectId(user["id"])},
@@ -440,6 +446,7 @@ async def setup_2fa(user: dict = Depends(get_current_user)):
 
 @router.post("/auth/2fa/verify")
 async def verify_2fa(data: TotpVerifyIn, user: dict = Depends(get_current_user)):
+    block_in_impersonation(user, "activarea 2FA")
     full_user = await db.users.find_one({"_id": ObjectId(user["id"])})
     secret = full_user.get("totp_pending_secret")
     if not secret:
@@ -456,6 +463,7 @@ async def verify_2fa(data: TotpVerifyIn, user: dict = Depends(get_current_user))
 
 @router.post("/auth/2fa/disable")
 async def disable_2fa(data: TotpVerifyIn, user: dict = Depends(get_current_user)):
+    block_in_impersonation(user, "dezactivarea 2FA")
     full_user = await db.users.find_one({"_id": ObjectId(user["id"])})
     if not full_user.get("totp_enabled"):
         raise HTTPException(400, "2FA not enabled")
