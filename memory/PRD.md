@@ -561,6 +561,14 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Validated AutoReminderSettingsModal frontend (iteration_28): 7/7 scenarios pass — enable toggle, thresholds CSV input, pause-until date, stop-forever switch, save & toast
 - Custom domain propmanage.ro stuck in "pending": deployment scan confirms codebase is deploy-ready (CORS=*, env vars clean, OAuth uses window.location.origin); user must delete existing A records at registrar then re-link via Entri (15-30 min DNS propagation expected)
 
+## Changelog — 2026-03-03 — Client + Operator Audit + Health Score Specialist
+- NEW FEATURE: **Health Score Specialist** — `GET /api/marketplace/specialists` și `GET /api/specialists/{id}/profile` returnează `health: {score 0-100, tier (excellent|good|developing), color, label, components}`. Formula: rating×6 + reviews_bonus(0-15) + verified(15) + completion_rate×25 (sau +12 neutral pentru <3 joburi) + dispute_bonus(0-15). Cap 100. Praguri: ≥80 excellent (verde), 50-79 good (amber), <50 developing (roșu).
+- NEW UI: `/app/frontend/src/components/HealthScoreBadge.jsx` (data-testid=health-badge-{tier}) cu modal de detalii (data-testid=health-detail-modal) afișat la click. Integrat în Marketplace cards și SpecialistProfile pagina publică. Format `BADGE · scor` (separator visual).
+- P2 FIX: `routes/operator_twins.py` `POST /operator/twins/{id}/validate` — notificare automată specialiștilor cu cereri active (assigned/in_progress/completed) pe acea proprietate când operatorul aprobă/respinge twin-ul (`type=twin_specialist_update`); response include `specialists_notified` count.
+- FIX P1: `GET /api/operator/twins` făcea 500 când exista un doc cu `property_id="None"` (string literal) din legacy. Adăugat parsing defensiv + cleanup DB (1 doc corupt șters).
+- Validated (iteration_32): Client audit 100% (property CRUD, request lifecycle, escrow, confirm, review, dispute, twin request, marketplace, profile). Operator audit 95% (twin build/approve/reject, queue, flag-nonconformity regression, DT Pro queue, role guard). Health Score backend+frontend.
+- Known minor inconsistencies (P3): ReviewIn schema requires job_id redundant cu URL, RequestCreateIn.priority enum nu acceptă 'medium'/'low'/'high'.
+
 ## Changelog — 2026-03-02 — Specialist Functional Audit (SPEC↔CLIENT + SPEC↔OPERATOR)
 - FIX P1 — added `import uuid` to `routes/specialist_docs.py` (POST /api/specialist/documents was returning 500 NameError — root cause: endpoint never exercised by tests). Discovered + fixed by testing agent.
 - FIX — `routes/operator.py` `POST /api/operator/flag-nonconformity` now ALSO notifies the assigned specialist (`type=nonconformity_specialist`) and the client (`type=nonconformity_client`) when target_type='request'. Previously only admins were notified — specialist + client were invisible to the flag.

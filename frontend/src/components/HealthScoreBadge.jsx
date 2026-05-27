@@ -20,12 +20,13 @@ export const HealthScoreBadge = ({ health, size = "md", showLabel = true, withDe
       <button
         onClick={(e) => { if (withDetails) { e.preventDefault(); e.stopPropagation(); setOpen(true); } }}
         type="button"
-        className={`inline-flex items-center gap-1 ${isSm ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]"} rounded-full ${s.bg} ${s.text} ring-1 ${s.ring} uppercase tracking-wider font-bold ${withDetails ? "hover:brightness-125" : ""}`}
+        className={`inline-flex items-center gap-1.5 ${isSm ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]"} rounded-full ${s.bg} ${s.text} ring-1 ${s.ring} uppercase tracking-wider font-bold ${withDetails ? "hover:brightness-125" : ""}`}
         data-testid={`health-badge-${health.tier}`}
         title={`Health Score: ${health.score}/100`}
       >
         <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
         {showLabel && <span>{health.label}</span>}
+        <span className="opacity-50">·</span>
         <span className="tabular-nums">{health.score}</span>
       </button>
 

@@ -108,7 +108,16 @@ async def get_my_property_twin(prop_id: str, user: dict = Depends(get_current_us
 async def operator_list_twins(user: dict = Depends(require_role("operator", "admin"))):
     """List all twins (pending + approved) with batched enrichment"""
     docs = await db.twins.find({}).sort("requested_at", -1).to_list(100)
-    prop_ids = [ObjectId(d["property_id"]) for d in docs if d.get("property_id")]
+    # Defensive: filter out docs with missing / corrupt property_id (e.g. legacy 'None' string)
+    prop_ids = []
+    for d in docs:
+        pid = d.get("property_id")
+        if not pid or not isinstance(pid, str) or len(pid) != 24:
+            continue
+        try:
+            prop_ids.append(ObjectId(pid))
+        except Exception:
+            continue
     props_map = {}
     owner_ids = set()
     if prop_ids:
