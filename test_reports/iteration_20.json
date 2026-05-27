@@ -1,0 +1,28 @@
+{
+  "summary": "Phase F (2D Plans / PDF) — both backend and frontend tested end-to-end. Backend pytest 15/15 PASS (upload, list+filter, serve auth/unauth/traversal/404, patch, delete, permissions client+specialist 403, admin stats plans key). Frontend E2E PASS: admin login → /digital-twin → Layers icon opens dt-plans-panel → upload modal accepts PDF, drop-zone + title + type select + submit work → new plan-item appears + pdf-canvas renders with '1 / 1' page info → zoom in/out cycles 120%→140%→100% bounded correctly → filter pills filter list (Section pill shows 1 item) → plans-close returns to project list → dt-open-plans button inside 3D viewer correctly jumps to Plans panel of the same project. No critical issues found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_f_plans.py",
+    "/app/test_reports/pytest/phase_f_plans_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "DigitalTwinPlans.jsx uses window.confirm for delete — inconsistent with rest of app's custom modal styling (low priority).",
+    "Plan upload metadata (title/description/plan_type) is passed as query params (not multipart form fields) — works but feels mixed; Pydantic PlanCreateMeta model is declared but unused. Consider switching to Form fields for cleaner OpenAPI schema. Non-blocking.",
+    "_ensure_project_access denies non-member specialist before _ensure_dt_access is checked, so the 'specialist no DT pro' case actually returns 403 due to DT gate first — both paths lead to 403 so behavior is correct, but error message will differ depending on flag state.",
+    "TYPE_LABELS map only displays human label for known types; if backend ever returns unexpected plan_type the UI falls back to raw key (handled gracefully)."
+  ],
+  "updated_files": ["/app/backend/tests/test_phase_f_plans.py"],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "100% on all Phase F flows"},
+  "test_credentials": "admin@propmanage.io / Admin123! (DT Pro bypass), client@propmanage.io / Client123! (no DT Pro, 403 verified), specialist@propmanage.io / Spec123! (no DT Pro / non-member, 403 verified).",
+  "seed_data_creation": "Created 1 temporary project 'TEST_PhaseF_Plans' and several test plans via pytest, all cleaned up via fixtures. One persistent 'e2e_test' plan + pre-existing 'Test Floor Plan' remain in DE Demo Test project from frontend E2E (idempotent for re-runs).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Phase F backend + frontend fully validated. Re-usable pytest file at /app/backend/tests/test_phase_f_plans.py (uses module-scoped admin/client/specialist sessions + auto-cleanup of TEST_ prefixed project). Minimal PDF byte-pattern (~300 bytes) embedded in test file works correctly with pdfjs-dist; it renders as 1 blank page. PDFjs worker served from /pdf.worker.min.mjs. Admin has DT Pro via role bypass; client + specialist do NOT have digital_twin_pro flag and correctly hit 403 on all DT plan endpoints. dt-open-plans button from inside 3D viewer (DigitalTwinViewer.jsx) successfully transitions to plans panel. handleDelete uses window.confirm — flagged for future UX improvement, not a bug.",
+  "rca_of_the_issue": "N/A — no bugs found."
+}

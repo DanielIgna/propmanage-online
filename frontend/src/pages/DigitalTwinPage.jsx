@@ -2,11 +2,12 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
-import { Box, Plus, Lock, Eye, Trash2, ArrowLeft, Sparkles, ExternalLink, Upload, FileBox, X } from "lucide-react";
+import { Box, Plus, Lock, Eye, Trash2, ArrowLeft, Sparkles, ExternalLink, Upload, FileBox, X, Layers } from "lucide-react";
 import { API } from "./DashShared";
 import DigitalTwinViewer from "../components/DigitalTwinViewer";
+import DigitalTwinPlans from "../components/DigitalTwinPlans";
 
-const ProjectCard = ({ p, onOpen, onDelete, onUpload }) => (
+const ProjectCard = ({ p, onOpen, onDelete, onUpload, onPlans }) => (
   <div className="group relative rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] p-5 transition-colors" data-testid={`dt-project-${p.id}`}>
     <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-t-2xl opacity-50 group-hover:opacity-100 transition-opacity" />
     <div className="flex items-start gap-3 mb-3">
@@ -19,9 +20,10 @@ const ProjectCard = ({ p, onOpen, onDelete, onUpload }) => (
       </div>
     </div>
     {p.description && <p className="text-xs text-stone-400 line-clamp-2 mb-3">{p.description}</p>}
-    <div className="flex gap-3 text-[11px] text-stone-500 mb-4">
+    <div className="flex gap-3 text-[11px] text-stone-500 mb-4 flex-wrap">
       <span>📌 {p.pin_count || 0} pin-uri</span>
       <span>📁 {p.model_count || 0} modele</span>
+      <span>📐 {p.plan_count || 0} planuri 2D</span>
       {p.model_url ? <span className="text-emerald-400">● Model încărcat</span> : <span className="text-amber-400">● Demo procedural</span>}
     </div>
     <div className="flex gap-2">
@@ -31,6 +33,14 @@ const ProjectCard = ({ p, onOpen, onDelete, onUpload }) => (
         data-testid={`dt-open-${p.id}`}
       >
         <Eye className="w-3.5 h-3.5" /> Deschide viewer
+      </button>
+      <button
+        onClick={() => onPlans(p)}
+        className="px-3 py-2 text-xs rounded-full border border-white/10 text-stone-300 hover:bg-white/5"
+        title="Planuri 2D (PDF)"
+        data-testid={`dt-plans-${p.id}`}
+      >
+        <Layers className="w-3.5 h-3.5" />
       </button>
       <button
         onClick={() => onUpload(p)}
@@ -340,6 +350,7 @@ export default function DigitalTwinPage() {
   const [openCreate, setOpenCreate] = useState(false);
   const [viewing, setViewing] = useState(null);
   const [uploadingTo, setUploadingTo] = useState(null);
+  const [plansFor, setPlansFor] = useState(null);
 
   const loadAll = async () => {
     setLoading(true);
@@ -376,6 +387,16 @@ export default function DigitalTwinPage() {
   }
   if (!sub?.active) return <LockedScreen onRequest={requestAccess} />;
 
+  if (plansFor) {
+    return (
+      <DigitalTwinPlans
+        projectId={plansFor.id}
+        projectName={plansFor.name}
+        onClose={() => setPlansFor(null)}
+      />
+    );
+  }
+
   if (viewing) {
     return (
       <DigitalTwinViewer
@@ -383,6 +404,7 @@ export default function DigitalTwinPage() {
         modelUrl={viewing.model_url}
         projectName={viewing.name}
         onClose={() => setViewing(null)}
+        onOpenPlans={() => { setPlansFor(viewing); setViewing(null); }}
       />
     );
   }
@@ -424,7 +446,7 @@ export default function DigitalTwinPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="dt-projects-grid">
             {projects.map((p) => (
-              <ProjectCard key={p.id} p={p} onOpen={setViewing} onDelete={handleDelete} onUpload={setUploadingTo} />
+              <ProjectCard key={p.id} p={p} onOpen={setViewing} onDelete={handleDelete} onUpload={setUploadingTo} onPlans={setPlansFor} />
             ))}
           </div>
         )}

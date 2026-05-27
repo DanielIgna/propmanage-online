@@ -35,7 +35,11 @@ UPLOAD_ROOT = Path(os.environ.get("DT_UPLOAD_DIR") or "/app/backend/uploads/digi
 UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_EXTS = {".glb", ".gltf"}
+ALLOWED_PLAN_EXTS = {".pdf"}
 MAX_UPLOAD_BYTES = 200 * 1024 * 1024  # 200 MB hard cap
+MAX_PLAN_BYTES = 50 * 1024 * 1024  # 50 MB cap for PDFs
+
+PLAN_TYPES = {"floorplan", "section", "elevation", "detail", "site", "other"}
 
 
 # ----------------- helpers -----------------
@@ -155,6 +159,7 @@ async def create_project(payload: ProjectCreate, user: dict = Depends(get_curren
         "owner_name": user.get("name") or user.get("email"),
         "members": [],
         "model_count": 0,
+        "plan_count": 0,
         "pin_count": 0,
         "created_at": now,
         "updated_at": now,
@@ -184,6 +189,7 @@ async def get_project(project_id: str, user: dict = Depends(get_current_user)):
     # Attach lightweight counts.
     p["pin_count"] = await db.digital_twin_pins.count_documents({"project_id": project_id})
     p["model_count"] = await db.digital_twin_models.count_documents({"project_id": project_id})
+    p["plan_count"] = await db.digital_twin_plans.count_documents({"project_id": project_id})
     return _clean(p)
 
 
@@ -253,6 +259,7 @@ async def delete_project(project_id: str, user: dict = Depends(get_current_user)
         raise HTTPException(403, "Only owner can delete.")
     await db.digital_twin_projects.delete_one({"id": project_id})
     await db.digital_twin_models.delete_many({"project_id": project_id})
+    await db.digital_twin_plans.delete_many({"project_id": project_id})
     pins = await db.digital_twin_pins.find({"project_id": project_id}, {"id": 1}).to_list(length=10000)
     pin_ids = [pin["id"] for pin in pins]
     if pin_ids:
@@ -535,6 +542,175 @@ async def list_comments(pin_id: str, user: dict = Depends(get_current_user)):
     return {"items": items, "count": len(items)}
 
 
+# ----------------- 2D Plans (PDF) — Phase F -----------------
+
+class PlanCreateMeta(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = Field(None, max_length=2000)
+    plan_type: str = Field("floorplan")
+
+
+@router.post("/projects/{project_id}/plans")
+async def upload_plan(
+    project_id: str,
+    file: UploadFile = File(...),
+    title: str = Query(..., min_length=1, max_length=200),
+    description: Optional[str] = Query(None, max_length=2000),
+    plan_type: str = Query("floorplan"),
+    user: dict = Depends(get_current_user),
+):
+    """Upload a 2D architectural PDF (floor plan, section, elevation, detail)."""
+    await _ensure_dt_access(user)
+    p = await _ensure_project_access(project_id, user)
+    if user.get("role") not in ("admin", "operator") and p.get("owner_id") != user["id"]:
+        # Project members can also upload plans (architects, specialists need to share schedules)
+        is_member = any(m.get("user_id") == user["id"] for m in (p.get("members") or []))
+        if not is_member:
+            raise HTTPException(403, "Doar proprietarul sau membrii proiectului pot încărca planuri.")
+
+    plan_type_clean = plan_type if plan_type in PLAN_TYPES else "other"
+
+    raw_name = file.filename or "plan.pdf"
+    ext = Path(raw_name).suffix.lower()
+    if ext not in ALLOWED_PLAN_EXTS:
+        raise HTTPException(400, "Format permis: .pdf")
+
+    plans_dir = UPLOAD_ROOT / project_id / "plans"
+    plans_dir.mkdir(parents=True, exist_ok=True)
+    safe_stem = uuid.uuid4().hex[:12]
+    safe_name = f"{safe_stem}{ext}"
+    dest = plans_dir / safe_name
+
+    total = 0
+    try:
+        with dest.open("wb") as out:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > MAX_PLAN_BYTES:
+                    out.close()
+                    dest.unlink(missing_ok=True)
+                    raise HTTPException(413, f"Fișier prea mare (max {MAX_PLAN_BYTES // (1024*1024)} MB pentru PDF).")
+                out.write(chunk)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        dest.unlink(missing_ok=True)
+        raise HTTPException(500, f"Upload failed: {e}") from e
+
+    public_path = f"/api/digital-twin/plans/{project_id}/{safe_name}"
+    doc = {
+        "id": _new_id(),
+        "project_id": project_id,
+        "filename": raw_name,
+        "stored_as": safe_name,
+        "size_bytes": total,
+        "url": public_path,
+        "title": title.strip(),
+        "description": (description or "").strip(),
+        "plan_type": plan_type_clean,
+        "uploaded_by": user["id"],
+        "uploaded_by_name": user.get("name") or user.get("email"),
+        "uploaded_at": _now_iso(),
+    }
+    await db.digital_twin_plans.insert_one(doc)
+    await db.digital_twin_projects.update_one(
+        {"id": project_id},
+        {"$set": {"updated_at": _now_iso()}, "$inc": {"plan_count": 1}},
+    )
+    return _clean(doc)
+
+
+@router.get("/projects/{project_id}/plans")
+async def list_plans(
+    project_id: str,
+    plan_type: Optional[str] = Query(None),
+    user: dict = Depends(get_current_user),
+):
+    await _ensure_dt_access(user)
+    await _ensure_project_access(project_id, user)
+    q = {"project_id": project_id}
+    if plan_type and plan_type in PLAN_TYPES:
+        q["plan_type"] = plan_type
+    items = []
+    async for pl in db.digital_twin_plans.find(q).sort("uploaded_at", -1):
+        items.append(_clean(pl))
+    return {"items": items, "count": len(items)}
+
+
+@router.get("/plans/{project_id}/{filename}")
+async def serve_plan_file(project_id: str, filename: str, user: dict = Depends(get_current_user)):
+    """Serve uploaded PDF plan. Permission-checked."""
+    await _ensure_dt_access(user)
+    await _ensure_project_access(project_id, user)
+    if "/" in filename or "\\" in filename or filename.startswith(".."):
+        raise HTTPException(400, "Invalid filename.")
+    file_path = UPLOAD_ROOT / project_id / "plans" / filename
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(404, "Plan file not found.")
+    return FileResponse(
+        file_path,
+        media_type="application/pdf",
+        filename=filename,
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
+class PlanUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = Field(None, max_length=2000)
+    plan_type: Optional[str] = None
+
+
+@router.patch("/plans/{plan_id}")
+async def update_plan(plan_id: str, payload: PlanUpdate, user: dict = Depends(get_current_user)):
+    await _ensure_dt_access(user)
+    plan = await db.digital_twin_plans.find_one({"id": plan_id})
+    if not plan:
+        raise HTTPException(404, "Plan not found.")
+    proj = await _ensure_project_access(plan["project_id"], user)
+    if (
+        user.get("role") not in ("admin", "operator")
+        and plan.get("uploaded_by") != user["id"]
+        and proj.get("owner_id") != user["id"]
+    ):
+        raise HTTPException(403, "Cannot edit this plan.")
+    updates = {k: (v.strip() if isinstance(v, str) else v) for k, v in payload.model_dump(exclude_none=True).items()}
+    if "plan_type" in updates and updates["plan_type"] not in PLAN_TYPES:
+        updates["plan_type"] = "other"
+    if not updates:
+        return _clean(plan)
+    await db.digital_twin_plans.update_one({"id": plan_id}, {"$set": updates})
+    plan = await db.digital_twin_plans.find_one({"id": plan_id})
+    return _clean(plan)
+
+
+@router.delete("/plans/{plan_id}")
+async def delete_plan(plan_id: str, user: dict = Depends(get_current_user)):
+    await _ensure_dt_access(user)
+    plan = await db.digital_twin_plans.find_one({"id": plan_id})
+    if not plan:
+        raise HTTPException(404, "Plan not found.")
+    proj = await _ensure_project_access(plan["project_id"], user)
+    if (
+        user.get("role") not in ("admin", "operator")
+        and plan.get("uploaded_by") != user["id"]
+        and proj.get("owner_id") != user["id"]
+    ):
+        raise HTTPException(403, "Cannot delete this plan.")
+    # Remove the physical file
+    file_path = UPLOAD_ROOT / plan["project_id"] / "plans" / plan["stored_as"]
+    file_path.unlink(missing_ok=True)
+    await db.digital_twin_plans.delete_one({"id": plan_id})
+    await db.digital_twin_projects.update_one(
+        {"id": plan["project_id"]},
+        {"$inc": {"plan_count": -1}, "$set": {"updated_at": _now_iso()}},
+    )
+    return {"ok": True}
+
+
 # ----------------- admin: subscription grant -----------------
 
 admin_router = APIRouter(prefix="/api/admin/digital-twin", tags=["digital-twin-admin"])
@@ -568,6 +744,7 @@ async def admin_stats(user: dict = Depends(require_role("admin"))):  # noqa: ARG
     return {
         "projects": await db.digital_twin_projects.count_documents({}),
         "models": await db.digital_twin_models.count_documents({}),
+        "plans": await db.digital_twin_plans.count_documents({}),
         "pins": await db.digital_twin_pins.count_documents({}),
         "comments": await db.digital_twin_comments.count_documents({}),
         "pro_users": await db.users.count_documents({"digital_twin_pro": True}),

@@ -303,7 +303,7 @@ const ResetCamera = ({ resetTrigger }) => {
   return null;
 };
 
-export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose }) => {
+export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, onOpenPlans }) => {
   const [faceStyle, setFaceStyle] = useState("shaded");
   const [hiddenLayers, setHiddenLayers] = useState(new Set());
   const [layers, setLayers] = useState([]);
@@ -568,7 +568,7 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose })
           )}
         </div>
 
-        <div className="px-4 py-3 border-t border-white/10 flex gap-2">
+        <div className="px-4 py-3 border-t border-white/10 flex gap-2 flex-wrap">
           <button
             onClick={() => setResetTick((t) => t + 1)}
             className="flex-1 px-3 py-2 text-xs rounded-lg bg-white/5 hover:bg-white/10 text-stone-300 flex items-center justify-center gap-1.5"
@@ -576,6 +576,16 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose })
           >
             <RotateCcw className="w-3.5 h-3.5" /> Reset cameră
           </button>
+          {onOpenPlans && (
+            <button
+              onClick={onOpenPlans}
+              className="px-3 py-2 text-xs rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-200 flex items-center justify-center gap-1.5"
+              data-testid="dt-open-plans"
+              title="Planuri 2D (PDF)"
+            >
+              <Layers className="w-3.5 h-3.5" /> Plane 2D
+            </button>
+          )}
           {onClose && (
             <button
               onClick={onClose}
