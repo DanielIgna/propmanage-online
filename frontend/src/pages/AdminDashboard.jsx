@@ -71,7 +71,7 @@ export const AdminDashboard = () => {
           {/* Live Activity Stream */}
           <div className="glass-strong rounded-3xl p-6 mt-6" data-testid="activity-stream">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-serif text-xl flex items-center gap-2"><Activity className="w-4 h-4 text-[#d4ff3a]" />Activity Stream</h3>
+              <h3 className="font-serif text-xl flex items-center gap-2"><Activity className="w-4 h-4 text-[#d4ff3a]" />Flux Activitate</h3>
               <span className="text-[10px] uppercase tracking-wider text-stone-500">Live · ultimele 30 evenimente</span>
             </div>
             {activity.length === 0 ? (

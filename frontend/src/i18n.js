@@ -49,7 +49,7 @@ const translations = {
     // Landing - Hero
     "hero.badge": "PROPERTY OPERATING SYSTEM • V4.2",
     "hero.title1": "Proprietatea ta,", "hero.title2": "perfecționată", "hero.title3": "digital.",
-    "hero.subtitle": "PropManage creează un Digital Twin high-fidelity al locuinței tale, monitorizând starea structurală și performanța financiară în timp real. Liniștea structurată pentru proprietarul modern.",
+    "hero.subtitle": "PropManage creează un Digital Twin de înaltă fidelitate al locuinței tale, monitorizând starea structurală și performanța financiară în timp real. Liniștea structurată pentru proprietarul modern.",
     "hero.cta1": "Explorează Demo", "hero.cta2": "Vezi Flux Complet",
     "hero.stat1": "Utilizatori activi", "hero.stat2": "Joburi în execuție",
     "hero.stat3": "Specialiști verificați", "hero.stat4": "Sănătate portofoliu",
@@ -75,11 +75,11 @@ const translations = {
     "sol.p3.t": "Escrow Securizat", "sol.p3.d": "Plățile sunt protejate până când lucrarea este confirmată ca finalizată.",
     "sol.p4.t": "Istoric Digital", "sol.p4.d": "Fiecare intervenție, fiecare reparație, fiecare cost — salvat permanent.",
     // CTA
-    "cta.badge": "READY TO BUILD",
+    "cta.badge": "GATA DE LANSARE",
     "cta.title1": "Gata să digitalizezi", "cta.title2": "tot ecosistemul?",
     "cta.intro": "Alătură-te celor 12,842 de utilizatori care au transformat proprietățile lor în active digitale gestionabile, valoroase și liniștitoare.",
-    "cta.btn1": "Creează cont gratuit", "cta.btn2": "Talk to specialist",
-    "cta.footer": "No credit card required · Cancel anytime · 14-day trial",
+    "cta.btn1": "Creează cont gratuit", "cta.btn2": "Vorbește cu un specialist",
+    "cta.footer": "Fără card de credit · Anulezi oricând · Probă 14 zile",
   },
   en: {
     // Nav

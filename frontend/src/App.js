@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./auth";
 import { I18nProvider, useI18n } from "./i18n";
+import { useABTest } from "./ab";
 import { LoginPage, RegisterPage } from "./pages/Auth";
 import { ThemeToggle } from "./pages/DashShared";
 import { ClientDashboard, SpecialistDashboard, AdminDashboard, OperatorDashboard } from "./pages/Dashboards";
@@ -802,7 +803,7 @@ const DigitalTwin = () => {
     <section id="twin" className="py-32 px-6 relative">
       <div className="absolute inset-0 dotted-bg opacity-20" />
       <div className="max-w-7xl mx-auto relative">
-        <SectionTag num="06" label="Digital Twin · Core Differentiator" />
+        <SectionTag num="06" label="Digital Twin · Element diferențiator" />
         <h2 className="font-serif text-5xl md:text-7xl tracking-tight mb-6 max-w-4xl" data-testid="twin-title">
           Casa ta, în <span className="italic">3D real-time</span>.
         </h2>
@@ -817,7 +818,7 @@ const DigitalTwin = () => {
             <div className="relative">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <div className="text-xs text-stone-400 uppercase tracking-wider mb-1">Live Preview</div>
+                  <div className="text-xs text-stone-400 uppercase tracking-wider mb-1">Previzualizare Live</div>
                   <h3 className="font-serif text-2xl">Vila Horizon · TW-09 Alpha</h3>
                 </div>
                 <div className="inline-flex items-center gap-2 bg-emerald-500/10 px-3 py-1.5 rounded-full">
@@ -948,13 +949,13 @@ const AdminTrust = () => {
     { icon: FileCheck, t: "Verificare specialiști", d: "Asigurări, certificări, documente legale — totul scanat și validat manual." },
     { icon: Gavel, t: "Mediere dispute", d: "Sistem de arbitraj imparțial. Refund, release sau request more info." },
     { icon: Award, t: "Quality control", d: "Audit lunar al lucrărilor, validare 3D model, rating real timp." },
-    { icon: Shield, t: "Sage Certified Audit", d: "Standard de audit verificat extern pentru fiecare proprietate premium." },
+    { icon: Shield, t: "Audit certificat extern", d: "Standard de audit verificat extern pentru fiecare proprietate premium." },
   ];
 
   return (
     <section className="py-32 px-6 relative">
       <div className="max-w-7xl mx-auto">
-        <SectionTag num="07" label="Admin & Trust" />
+        <SectionTag num="07" label="Administrare & Încredere" />
         <div className="grid lg:grid-cols-2 gap-16 mb-16">
           <h2 className="font-serif text-5xl md:text-7xl tracking-tight" data-testid="admin-title">
             Trust este <span className="italic">infrastructură</span>.
@@ -991,7 +992,7 @@ const AdminTrust = () => {
           <div className="flex items-center justify-between mb-8">
             <div>
               <div className="text-xs text-stone-400 uppercase tracking-wider mb-1">PropAdmin · Control Center</div>
-              <h3 className="font-serif text-2xl">Live metrics</h3>
+              <h3 className="font-serif text-2xl">Metrici Live</h3>
             </div>
             <div className="text-xs text-stone-400">real-time · last 24h</div>
           </div>
@@ -1020,14 +1021,14 @@ const BusinessModel = () => {
   const streams = [
     { icon: Coins, name: "Lead Fees", desc: "Specialiști plătesc 40-50 RON per lead acceptat.", n: "01" },
     { icon: TrendingUp, name: "Service Commissions", desc: "3% comision pe fiecare tranzacție escrow.", n: "02" },
-    { icon: Sparkles, name: "Wallet Activation", desc: "750€ licență pe viață pentru premium users.", n: "03" },
-    { icon: Activity, name: "Subscription (future)", desc: "59€/lună pentru maintenance plans complete.", n: "04" },
+    { icon: Sparkles, name: "Activare Wallet", desc: "750€ licență pe viață pentru utilizatorii premium.", n: "03" },
+    { icon: Activity, name: "Abonament (în pregătire)", desc: "59€/lună pentru planuri complete de mentenanță.", n: "04" },
   ];
 
   return (
     <section id="business" className="py-32 px-6 relative">
       <div className="max-w-7xl mx-auto">
-        <SectionTag num="08" label="Business Model" />
+        <SectionTag num="08" label="Model de business" />
         <h2 className="font-serif text-5xl md:text-7xl tracking-tight mb-6 max-w-4xl" data-testid="business-title">
           Patru fluxuri de <span className="italic">venit</span>.
         </h2>
@@ -1060,7 +1061,7 @@ const BusinessModel = () => {
 
         {/* Projection */}
         <div className="mt-16 glass-strong rounded-3xl p-10">
-          <h3 className="font-serif text-3xl mb-8">Unit economics</h3>
+          <h3 className="font-serif text-3xl mb-8">Indicatori economici</h3>
           <div className="grid md:grid-cols-3 gap-8">
             {[
               { l: "ARPU lunar (proprietar premium)", v: "~64€" },
@@ -1108,8 +1109,8 @@ const ValueProp = () => {
       color: "cyan",
       benefits: [
         { t: "Ecosistem scalabil", d: "Network effects: mai mulți clienți → mai mulți specialiști." },
-        { t: "Recurring revenue", d: "Subscriptions + commissions + premium licenses." },
-        { t: "Data moat", d: "Cel mai mare dataset de mentenanță rezidențială din regiune." },
+        { t: "Venituri recurente", d: "Abonamente + comisioane + licențe premium." },
+        { t: "Avantaj de date", d: "Cel mai mare dataset de mentenanță rezidențială din regiune." },
       ]
     },
   ];
@@ -1117,7 +1118,7 @@ const ValueProp = () => {
   return (
     <section className="py-32 px-6 relative">
       <div className="max-w-7xl mx-auto">
-        <SectionTag num="09" label="Value Proposition" />
+        <SectionTag num="09" label="Propunere de valoare" />
         <h2 className="font-serif text-5xl md:text-7xl tracking-tight mb-6 max-w-4xl" data-testid="value-title">
           Toată lumea <span className="italic">câștigă</span>.
         </h2>
@@ -1164,22 +1165,22 @@ const ValueProp = () => {
 // ============= GOLDEN PATH =============
 const GoldenPath = () => {
   const path = [
-    { i: Users, t: "User", c: "Andrei creează cont" },
-    { i: AlertTriangle, t: "Request", c: "Alertă: scurgere baie" },
+    { i: Users, t: "Cont", c: "Andrei creează cont" },
+    { i: AlertTriangle, t: "Solicitare", c: "Alertă: scurgere baie" },
     { i: Wrench, t: "Specialist", c: "Match cu Mihai 4.9★" },
-    { i: Camera, t: "Job", c: "Lucrare 1h 45min" },
-    { i: Lock, t: "Payment", c: "Escrow 450 RON" },
-    { i: FileCheck, t: "History", c: "Update jurnal digital" },
-    { i: TrendingUp, t: "Twin Update", c: "+5% sănătate" },
+    { i: Camera, t: "Lucrare", c: "Lucrare 1h 45min" },
+    { i: Lock, t: "Plată", c: "Escrow 450 RON" },
+    { i: FileCheck, t: "Istoric", c: "Actualizare jurnal digital" },
+    { i: TrendingUp, t: "Twin actualizat", c: "+5% sănătate" },
   ];
 
   return (
     <section className="py-32 px-6 relative">
       <div className="absolute inset-0 dotted-bg opacity-30" />
       <div className="max-w-7xl mx-auto relative">
-        <SectionTag num="10" label="Golden Path" />
+        <SectionTag num="10" label="Drumul ideal" />
         <h2 className="font-serif text-5xl md:text-7xl tracking-tight mb-6 max-w-4xl" data-testid="golden-title">
-          De la <span className="italic">click</span> la <span className="italic">closure</span>.
+          De la <span className="italic">click</span> la <span className="italic">finalizare</span>.
         </h2>
         <p className="text-lg text-stone-400 max-w-2xl mb-16">
           Un singur flux. Șapte pași. Sub 24 de ore de la problemă la rezolvare documentată.
@@ -1221,7 +1222,7 @@ const GoldenPath = () => {
           {[
             { v: "23h", l: "Average resolution time", before: "Înainte: 7-14 zile" },
             { v: "100%", l: "Documented interventions", before: "Înainte: 0%" },
-            { v: "+15%", l: "Property value increase", before: "După 12 luni utilizare" },
+            { v: "+15%", l: "Creștere valoare proprietate", before: "După 12 luni utilizare" },
           ].map((s, i) => (
             <div key={i} className="glass-strong rounded-3xl p-8">
               <div className="font-serif text-6xl mb-2 text-[#d4ff3a]">{s.v}</div>
@@ -1285,7 +1286,7 @@ const Footer = () => (
       </div>
       <div className="flex gap-6 text-xs text-stone-500">
         <a href="#" className="hover:text-white transition-colors">Termeni</a>
-        <a href="#" className="hover:text-white transition-colors">Privacy</a>
+        <a href="#" className="hover:text-white transition-colors">Confidențialitate</a>
         <a href="#" className="hover:text-white transition-colors">Contact</a>
       </div>
     </div>

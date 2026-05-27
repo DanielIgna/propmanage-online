@@ -371,7 +371,7 @@ export const RegisterPage = () => {
             </button>
           </form>
           <div className="mt-6 text-center text-xs text-stone-500">
-            {t("register.hasAccount")} <Link to="/login" className="text-[#d4ff3a] hover:underline">Sign in</Link>
+            {t("register.hasAccount")} <Link to="/login" className="text-[#d4ff3a] hover:underline">Conectare</Link>
           </div>
         </div>
       </motion.div>

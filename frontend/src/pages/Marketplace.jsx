@@ -35,7 +35,7 @@ export const PublicMarketplace = () => {
             </div>
             <span className="font-serif text-lg font-semibold">PropManage</span>
           </Link>
-          <Link to="/login" className="text-xs text-stone-400 hover:text-white">Login</Link>
+          <Link to="/login" className="text-xs text-stone-400 hover:text-white">Conectare</Link>
         </div>
       </header>
 

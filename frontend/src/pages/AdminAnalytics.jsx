@@ -60,7 +60,7 @@ export const AdminAnalytics = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h3 className="font-serif text-2xl">Analytics Live</h3>
+              <h3 className="font-serif text-2xl">Analize Live</h3>
           <p className="text-xs text-stone-400">Date actualizate în timp real</p>
         </div>
         <div className="flex items-center gap-2">

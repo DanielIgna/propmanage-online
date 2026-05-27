@@ -303,9 +303,9 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setP
       <div className="space-y-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Stat icon={Activity} label="Sănătate" value="—" sub="Niciun imobil" tid="stat-health" />
-          <Stat icon={Wallet} label={t("client.wallet")} value={`${user?.wallet_balance?.toFixed(0) || 0} RON`} sub="Sold" color="emerald" tid="stat-wallet" />
-          <Stat icon={Sparkles} label={t("client.tokens")} value={user?.tokens || 0} sub="Earned" color="amber" tid="stat-tokens" />
-          <Stat icon={Briefcase} label={t("client.requests")} value={requests.length} sub="Total" color="cyan" tid="stat-requests" />
+          <Stat icon={Wallet} label={t("client.wallet")} value={`${user?.wallet_balance?.toFixed(0) || 0} RON`} sub="Portofel" color="emerald" tid="stat-wallet" />
+          <Stat icon={Sparkles} label={t("client.tokens")} value={user?.tokens || 0} sub="Tokeni" color="amber" tid="stat-tokens" />
+          <Stat icon={Briefcase} label={t("client.requests")} value={requests.length} sub="Solicitări" color="cyan" tid="stat-requests" />
         </div>
 
         <div className="glass-strong rounded-3xl p-8 sm:p-12 text-center relative overflow-hidden" data-testid="onboarding-empty">
@@ -338,10 +338,10 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setP
   return (
     <>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-        <Stat icon={Activity} label={t("client.health")} value={`${prop?.health_score || 0}/100`} sub="Property" tid="stat-health" />
-        <Stat icon={Wallet} label={t("client.wallet")} value={`${user?.wallet_balance?.toFixed(0) || 0} RON`} sub="Sold" color="emerald" tid="stat-wallet" />
-        <Stat icon={Sparkles} label={t("client.tokens")} value={user?.tokens || 0} sub="Earned" color="amber" tid="stat-tokens" />
-        <Stat icon={Briefcase} label={t("client.requests")} value={requests.length} sub="Total" color="cyan" tid="stat-requests" />
+        <Stat icon={Activity} label={t("client.health")} value={`${prop?.health_score || 0}/100`} sub="Proprietate" tid="stat-health" />
+        <Stat icon={Wallet} label={t("client.wallet")} value={`${user?.wallet_balance?.toFixed(0) || 0} RON`} sub="Portofel" color="emerald" tid="stat-wallet" />
+        <Stat icon={Sparkles} label={t("client.tokens")} value={user?.tokens || 0} sub="Tokeni" color="amber" tid="stat-tokens" />
+        <Stat icon={Briefcase} label={t("client.requests")} value={requests.length} sub="Solicitări" color="cyan" tid="stat-requests" />
       </div>
 
       <WalletTopupBar onSuccess={refreshUser} />
