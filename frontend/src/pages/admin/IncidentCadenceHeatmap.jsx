@@ -52,15 +52,21 @@ export const IncidentCadenceHeatmap = () => {
     }
   };
 
-  const testAlert = async (dryRun = false) => {
+  const updateTier = (tierName, changes) => {
+    if (!alertConfig?.tiers) return;
+    const newTiers = alertConfig.tiers.map(t => t.name === tierName ? { ...t, ...changes } : t);
+    updateAlertConfig({ tiers: newTiers });
+  };
+
+  const testAlert = async (dryRun = false, forceTier = null) => {
     try {
-      const r = await axios.post(`${API}/admin/incident-spike-alert/test`, { dry_run: dryRun });
+      const r = await axios.post(`${API}/admin/incident-spike-alert/test`, { dry_run: dryRun, force_tier: forceTier });
       if (!r.data.ok && r.data.reason) {
         window.alert(`ℹ️ ${r.data.reason}\n\nDelta: ${r.data.delta_pct}% (current=${r.data.current}, previous=${r.data.previous})`);
       } else if (r.data.dry_run) {
-        window.alert(`✓ Preview generat:\n\nSubject: ${r.data.subject}\nDestinatari: ${r.data.recipients_count}\n\n(dry-run — nu s-a trimis nimic)`);
+        window.alert(`✓ Preview generat:\n\nTier: ${r.data.matched_tier}\nSubject: ${r.data.subject}\nDestinatari: ${r.data.recipients_count}\n\n(dry-run — nu s-a trimis nimic)`);
       } else {
-        window.alert(`✓ Test trimis!\n\nProvider: ${r.data.provider}${r.data.demo ? " (console — RESEND_API_KEY lipsește)" : ""}\nSubject: ${r.data.subject}\nDestinatari: ${r.data.recipients_count}`);
+        window.alert(`✓ Test trimis!\n\nTier: ${r.data.matched_tier}\nProvider: ${r.data.provider}${r.data.demo ? " (console — RESEND_API_KEY lipsește)" : ""}\nSubject: ${r.data.subject}\nDestinatari: ${r.data.recipients_count}`);
       }
     } catch (e) {
       window.alert(`❌ ${e?.response?.data?.detail || "Eroare la trimitere"}`);
@@ -141,16 +147,18 @@ export const IncidentCadenceHeatmap = () => {
             className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
             data-testid="auto-alert-toggle"
           >
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold">🔔 Alertă automată email</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-semibold">🔔 Alertă automată email · Multi-tier</span>
               {alertConfig.enabled ? (
                 <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">Activă</span>
               ) : (
                 <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">Inactivă</span>
               )}
-              {alertConfig.preset && (
-                <span className="text-xs text-slate-500">→ {alertConfig.preset.name} ({alertConfig.preset.emails.length} destinatari)</span>
-              )}
+              {(alertConfig.tiers || []).filter(t => t.preset_id).map(t => (
+                <span key={t.name} className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: t.color + "22", color: t.color }}>
+                  {t.name} ≥{t.threshold_pct}%
+                </span>
+              ))}
             </div>
             <span className={`text-slate-400 transition-transform ${showAlertSettings ? "rotate-180" : ""}`}>▼</span>
           </button>
@@ -158,48 +166,70 @@ export const IncidentCadenceHeatmap = () => {
           {showAlertSettings && (
             <div className="px-4 pb-4 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
               <p className="text-xs text-slate-500">
-                Sistemul verifică automat în fiecare <b>Luni la 08:00 (Europa/București)</b> dacă numărul de trimiteri pentru săptămâna anterioară depășește pragul față de săptămâna dinainte. Dacă da, trimite automat un raport cu snapshot heatmap către presetul ales (max o alertă pe săptămână).
+                Sistemul verifică în fiecare <b>Luni la 08:00 (Europa/București)</b> dacă spike-ul depășește cel puțin un tier configurat. Trimite alerta către presetul tier-ului <b>maxim depășit</b> (max 1 alertă/săptămână per tier). Tier-urile fără preset sunt ignorate.
               </p>
 
-              <div className="grid md:grid-cols-3 gap-3">
-                <label className="flex items-center gap-2 p-3 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                  <input
-                    type="checkbox"
-                    checked={alertConfig.enabled}
-                    onChange={(ev) => updateAlertConfig({ enabled: ev.target.checked })}
-                    className="w-4 h-4 accent-emerald-500"
-                    data-testid="auto-alert-enabled"
-                  />
-                  <span className="text-sm font-medium">Activează alertă</span>
-                </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={alertConfig.enabled}
+                  onChange={(ev) => updateAlertConfig({ enabled: ev.target.checked })}
+                  className="w-4 h-4 accent-emerald-500"
+                  data-testid="auto-alert-enabled"
+                />
+                <span className="text-sm font-medium">Activează verificarea automată săptămânală</span>
+              </label>
 
-                <label className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 block">
-                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold block mb-1">Preset destinatari</span>
-                  <select
-                    value={alertConfig.preset_id || ""}
-                    onChange={(ev) => updateAlertConfig({ preset_id: ev.target.value || null })}
-                    className="w-full px-2 py-1 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded"
-                    data-testid="auto-alert-preset"
+              <div className="space-y-2">
+                {(alertConfig.tiers || []).map(t => (
+                  <div
+                    key={t.name}
+                    className="p-3 rounded-lg border-l-4 border-r border-y bg-white dark:bg-slate-900/40 border-r-slate-200 dark:border-r-slate-700 border-y-slate-200 dark:border-y-slate-700"
+                    style={{ borderLeftColor: t.color }}
+                    data-testid={`tier-row-${t.name}`}
                   >
-                    <option value="">— Niciun preset —</option>
-                    {presets.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.emails.length} dest.)</option>
-                    ))}
-                  </select>
-                </label>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-2 min-w-[120px]">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />
+                        <span className="text-sm font-bold uppercase tracking-wider" style={{ color: t.color }}>{t.label}</span>
+                      </div>
 
-                <label className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 block">
-                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold block mb-1">Prag % (10-500)</span>
-                  <input
-                    type="number"
-                    min={10}
-                    max={500}
-                    value={alertConfig.threshold_pct}
-                    onChange={(ev) => updateAlertConfig({ threshold_pct: parseInt(ev.target.value, 10) || 100 })}
-                    className="w-full px-2 py-1 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded"
-                    data-testid="auto-alert-threshold"
-                  />
-                </label>
+                      <label className="flex items-center gap-1.5">
+                        <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">≥</span>
+                        <input
+                          type="number"
+                          min={10}
+                          max={1000}
+                          value={t.threshold_pct}
+                          onChange={(ev) => updateTier(t.name, { threshold_pct: parseInt(ev.target.value, 10) || 50 })}
+                          className="w-20 px-2 py-1 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-center"
+                          data-testid={`tier-threshold-${t.name}`}
+                        />
+                        <span className="text-xs text-slate-500">%</span>
+                      </label>
+
+                      <select
+                        value={t.preset_id || ""}
+                        onChange={(ev) => updateTier(t.name, { preset_id: ev.target.value || null })}
+                        className="flex-1 min-w-[180px] px-2 py-1 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded"
+                        data-testid={`tier-preset-${t.name}`}
+                      >
+                        <option value="">— Niciun preset (tier dezactivat) —</option>
+                        {presets.map(p => (
+                          <option key={p.id} value={p.id}>{p.name} ({p.emails.length} dest.)</option>
+                        ))}
+                      </select>
+
+                      <button
+                        onClick={() => testAlert(false, t.name)}
+                        disabled={!t.preset_id}
+                        className="text-xs font-semibold px-2 py-1 rounded border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                        data-testid={`tier-test-${t.name}`}
+                        title={`Trimite test pentru tier ${t.label}`}
+                      >📨 Test</button>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {alertConfig.last_result && (
@@ -207,30 +237,13 @@ export const IncidentCadenceHeatmap = () => {
                   <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">Ultima trimitere</div>
                   <div className="text-slate-700 dark:text-slate-300">
                     {new Date(alertConfig.last_result.sent_at).toLocaleString("ro-RO")} ·
+                    tier: <b className="uppercase">{alertConfig.last_result.tier || "—"}</b> ·
                     delta: <b>{alertConfig.last_result.delta_pct ?? "∞"}%</b> ·
                     {alertConfig.last_result.recipients_count} destinatari ·
                     {alertConfig.last_result.ok ? <span className="text-emerald-600"> ✓ ok</span> : <span className="text-red-600"> ✗ eșec</span>}
                   </div>
-                  {alertConfig.last_sent_week && (
-                    <div className="text-slate-500 mt-0.5">Pentru săptămâna: {alertConfig.last_sent_week}</div>
-                  )}
                 </div>
               )}
-
-              <div className="flex gap-2 pt-1">
-                <button
-                  onClick={() => testAlert(true)}
-                  disabled={!alertConfig.preset_id}
-                  className="text-xs font-semibold px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  data-testid="auto-alert-test-dry"
-                >👁 Preview (dry-run)</button>
-                <button
-                  onClick={() => testAlert(false)}
-                  disabled={!alertConfig.preset_id}
-                  className="text-xs font-semibold px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  data-testid="auto-alert-test-real"
-                >📨 Trimite test acum</button>
-              </div>
             </div>
           )}
         </div>

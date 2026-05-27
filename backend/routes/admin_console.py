@@ -140,6 +140,7 @@ DEFAULT_SETTINGS = {
 class CMSEntryIn(BaseModel):
     key: str
     value: str
+    expires_at: Optional[str] = None  # ISO datetime; only used for landing.promo_banner today
 
 
 class EmailTemplateIn(BaseModel):
@@ -205,6 +206,7 @@ async def list_cms(user: dict = Depends(require_role("admin"))):
             "is_overridden": k in overrides,
             "updated_at": meta.get("updated_at") if meta else None,
             "updated_by": meta.get("updated_by") if meta else None,
+            "expires_at": meta.get("expires_at") if meta else None,
         })
     # Custom keys created by admin not in defaults
     for k, v in overrides.items():
@@ -219,6 +221,7 @@ async def list_cms(user: dict = Depends(require_role("admin"))):
             "is_custom": True,
             "updated_at": meta.get("updated_at") if meta else None,
             "updated_by": meta.get("updated_by") if meta else None,
+            "expires_at": meta.get("expires_at") if meta else None,
         })
     out.sort(key=lambda x: x["key"])
     return out
@@ -228,21 +231,24 @@ async def list_cms(user: dict = Depends(require_role("admin"))):
 async def upsert_cms(data: CMSEntryIn, user: dict = Depends(require_role("admin"))):
     now = datetime.now(timezone.utc).isoformat()
     existing = await db.cms_content.find_one({"key": data.key})
+    update_doc = {
+        "key": data.key,
+        "value": data.value,
+        "updated_at": now,
+        "updated_by": user["id"],
+    }
+    if data.expires_at is not None:
+        update_doc["expires_at"] = data.expires_at or None  # empty string → None (clears)
     await db.cms_content.update_one(
         {"key": data.key},
-        {"$set": {
-            "key": data.key,
-            "value": data.value,
-            "updated_at": now,
-            "updated_by": user["id"],
-        }},
+        {"$set": update_doc},
         upsert=True,
     )
     await audit("cms.update", user,
                 target={"type": "cms_key", "id": data.key, "label": data.key},
-                before={"value": (existing or {}).get("value")} if existing else None,
-                after={"value": data.value})
-    return {"ok": True, "key": data.key}
+                before={"value": (existing or {}).get("value"), "expires_at": (existing or {}).get("expires_at")} if existing else None,
+                after={"value": data.value, "expires_at": data.expires_at})
+    return {"ok": True, "key": data.key, "expires_at": update_doc.get("expires_at")}
 
 
 @router.delete("/cms/{key}")
@@ -708,7 +714,14 @@ public_router = APIRouter(prefix="/api", tags=["cms_public"])
 async def get_public_cms():
     """Return merged defaults + overrides as flat dict (no auth). Includes landing visibility flags."""
     docs = await db.cms_content.find({}).to_list(500)
-    overrides = {d["key"]: d.get("value", "") for d in docs}
+    now_iso = datetime.now(timezone.utc).isoformat()
+    overrides = {}
+    for d in docs:
+        # Skip expired overrides → reveal defaults (or empty for custom keys)
+        exp = d.get("expires_at")
+        if exp and exp <= now_iso:
+            continue
+        overrides[d["key"]] = d.get("value", "")
     merged = {**DEFAULT_CMS, **overrides}
     # Append public settings (landing visibility flags only)
     settings_doc = await db.platform_config.find_one({"key": "settings"})
@@ -2247,19 +2260,40 @@ async def incident_cadence_weekly_compare(
     return await _compute_weekly_compare(alert_threshold_pct)
 
 
-# ============= INCIDENT SPIKE AUTO-ALERT =============
+# ============= INCIDENT SPIKE AUTO-ALERT (multi-tier severity) =============
+# Default tiers for fresh installs. Admin can override via UI.
+DEFAULT_ALERT_TIERS = [
+    {"name": "warning", "label": "Warning", "color": "#fbbf24", "threshold_pct": 50, "preset_id": None},
+    {"name": "high", "label": "High", "color": "#f97316", "threshold_pct": 150, "preset_id": None},
+    {"name": "critical", "label": "Critical", "color": "#dc2626", "threshold_pct": 300, "preset_id": None},
+]
+
+
 async def _get_spike_alert_settings() -> dict:
-    """Load auto-alert settings from platform_settings (with defaults)."""
+    """Load auto-alert settings. Migrates old single-preset shape → tiered shape automatically."""
     doc = await db.platform_settings.find_one({"_id": "incident_spike_alert"})
     if not doc:
         return {
-            "enabled": False, "preset_id": None, "threshold_pct": 100,
-            "last_sent_week": None, "last_result": None,
+            "enabled": False,
+            "tiers": DEFAULT_ALERT_TIERS,
+            "last_sent_week": None,
+            "last_result": None,
         }
+    tiers = doc.get("tiers")
+    if not tiers:
+        # Backward-compat: migrate old single-preset config to a single-tier list
+        legacy_preset = doc.get("preset_id")
+        legacy_thresh = int(doc.get("threshold_pct", 100))
+        if legacy_preset:
+            tiers = [
+                {"name": "warning", "label": "Warning", "color": "#fbbf24",
+                 "threshold_pct": legacy_thresh, "preset_id": legacy_preset},
+            ] + [t for t in DEFAULT_ALERT_TIERS if t["name"] != "warning"]
+        else:
+            tiers = DEFAULT_ALERT_TIERS
     return {
         "enabled": bool(doc.get("enabled", False)),
-        "preset_id": doc.get("preset_id"),
-        "threshold_pct": int(doc.get("threshold_pct", 100)),
+        "tiers": tiers,
         "last_sent_week": doc.get("last_sent_week"),
         "last_result": doc.get("last_result"),
     }
@@ -2273,20 +2307,46 @@ async def _save_spike_alert_settings(updates: dict):
     )
 
 
+def _classify_tier(delta_pct, tiers: list) -> Optional[dict]:
+    """Return the highest-severity tier whose threshold is met, else None.
+    Tiers list is ordered low→high. Iterate reversed → return first match.
+    """
+    if delta_pct is None:
+        # Infinite increase: hit highest configured tier (with a preset)
+        for t in reversed(tiers):
+            if t.get("preset_id"):
+                return t
+        return None
+    for t in reversed(tiers):
+        thresh = int(t.get("threshold_pct", 0) or 0)
+        if delta_pct >= thresh and t.get("preset_id"):
+            return t
+    return None
+
+
+async def _enrich_tiers_with_presets(tiers: list) -> list:
+    """Attach preset object to each tier for the UI."""
+    out = []
+    for t in tiers:
+        item = dict(t)
+        pid = item.get("preset_id")
+        if pid:
+            try:
+                pdoc = await db.incident_recipient_presets.find_one({"_id": ObjectId(pid)})
+                item["preset"] = _serialize_preset(pdoc) if pdoc else None
+            except (InvalidId, Exception):  # noqa: BLE001
+                item["preset"] = None
+        else:
+            item["preset"] = None
+        out.append(item)
+    return out
+
+
 @router.get("/incident-spike-alert/config")
 async def get_spike_alert_config(user: dict = Depends(require_role("admin"))):
-    """Read auto-alert configuration for incident spikes."""
+    """Read auto-alert configuration for incident spikes (multi-tier)."""
     settings = await _get_spike_alert_settings()
-    # Enrich with preset info if configured
-    preset = None
-    if settings.get("preset_id"):
-        try:
-            pdoc = await db.incident_recipient_presets.find_one({"_id": ObjectId(settings["preset_id"])})
-            if pdoc:
-                preset = _serialize_preset(pdoc)
-        except (InvalidId, Exception):  # noqa: BLE001
-            pass
-    return {**settings, "preset": preset}
+    return {**settings, "tiers": await _enrich_tiers_with_presets(settings["tiers"])}
 
 
 @router.put("/incident-spike-alert/config")
@@ -2294,42 +2354,62 @@ async def update_spike_alert_config(
     payload: dict = Body(...),
     user: dict = Depends(require_role("admin")),
 ):
-    """Update auto-alert config. Body: { enabled, preset_id, threshold_pct }"""
+    """Update auto-alert config. Body: { enabled, tiers: [{name, threshold_pct, preset_id, label, color}] }"""
     updates = {}
     if "enabled" in payload:
         updates["enabled"] = bool(payload["enabled"])
-    if "preset_id" in payload:
-        pid = payload.get("preset_id")
-        if pid:
+
+    if "tiers" in payload:
+        new_tiers = payload.get("tiers") or []
+        if not isinstance(new_tiers, list) or len(new_tiers) == 0:
+            raise HTTPException(400, "Tiers trebuie să fie o listă cu cel puțin un element.")
+        clean = []
+        seen_names = set()
+        for raw in new_tiers:
+            if not isinstance(raw, dict):
+                continue
+            name = (raw.get("name") or "").strip().lower()[:24]
+            if not name or name in seen_names:
+                raise HTTPException(400, "Fiecare tier trebuie să aibă un `name` unic.")
+            seen_names.add(name)
             try:
-                pdoc = await db.incident_recipient_presets.find_one({"_id": ObjectId(pid)})
-                if not pdoc:
-                    raise HTTPException(404, "Preset inexistent.")
-            except InvalidId:
-                raise HTTPException(400, "preset_id invalid.")
-        updates["preset_id"] = pid
-    if "threshold_pct" in payload:
-        try:
-            tp = int(payload["threshold_pct"])
-            if not (10 <= tp <= 500):
-                raise ValueError()
-            updates["threshold_pct"] = tp
-        except (TypeError, ValueError):
-            raise HTTPException(400, "threshold_pct trebuie să fie un întreg între 10 și 500.")
+                tp = int(raw.get("threshold_pct", 100))
+                if not (10 <= tp <= 1000):
+                    raise ValueError()
+            except (TypeError, ValueError):
+                raise HTTPException(400, f"threshold_pct invalid pentru tier '{name}' (10-1000).")
+            pid = raw.get("preset_id") or None
+            if pid:
+                try:
+                    pdoc = await db.incident_recipient_presets.find_one({"_id": ObjectId(pid)})
+                    if not pdoc:
+                        raise HTTPException(404, f"Presetul tier-ului '{name}' nu există.")
+                except InvalidId:
+                    raise HTTPException(400, f"preset_id invalid pentru tier '{name}'.")
+            clean.append({
+                "name": name,
+                "label": (raw.get("label") or name.title())[:40],
+                "color": (raw.get("color") or "#fbbf24")[:16],
+                "threshold_pct": tp,
+                "preset_id": pid,
+            })
+        # Sort tiers ascending by threshold so classification works
+        clean.sort(key=lambda x: x["threshold_pct"])
+        updates["tiers"] = clean
 
     if updates:
         old = await _get_spike_alert_settings()
         await _save_spike_alert_settings(updates)
         await audit("incident_spike_alert.config_update", user,
-                    target={"type": "platform_setting", "id": "incident_spike_alert", "label": "Auto-alert Incident Spike"},
+                    target={"type": "platform_setting", "id": "incident_spike_alert", "label": "Auto-alert Incident Spike (multi-tier)"},
                     before={k: old.get(k) for k in updates},
                     after=updates)
 
     return await get_spike_alert_config(user)
 
 
-async def _send_spike_alert_email(wc: dict, preset: dict, dry_run: bool = False) -> dict:
-    """Send the spike-alert email to all recipients in the preset.
+async def _send_spike_alert_email(wc: dict, tier: dict, preset: dict, dry_run: bool = False) -> dict:
+    """Send the spike-alert email for a specific severity tier.
     Returns dict with status. If dry_run=True, only generates content, doesn't send.
     """
     delta = wc.get("delta_pct")
@@ -2338,24 +2418,24 @@ async def _send_spike_alert_email(wc: dict, preset: dict, dry_run: bool = False)
     prev_total = wc["previous"]["total_sends"]
     week_label = f"{wc['current']['monday']} → {wc['current']['sunday']}"
 
-    subject = f"[INCIDENT SPIKE] {delta_label} această săptămână ({curr_total} vs {prev_total})"
+    tier_emoji = {"warning": "🟡", "high": "🟠", "critical": "🔴"}.get(tier["name"], "⚠️")
+    tier_label = (tier.get("label") or tier["name"]).upper()
+    accent = tier.get("color") or "#fbbf24"
+
+    subject = f"[INCIDENT SPIKE · {tier_label}] {delta_label} această săptămână ({curr_total} vs {prev_total})"
 
     # Build mini heatmap as HTML grid
-    def _cells_html(cells, accent_color):
+    def _cells_html(cells, base):
         out = []
         for c in cells:
             cnt = c["count"]
             bg = ("#1a1a1f" if c["is_future"]
                   else "#1f2937" if cnt == 0
-                  else accent_color if cnt < 3 else "#dc2626")
+                  else base)
             out.append(
                 f'<td style="width:32px;height:32px;background:{bg};border:1px solid #2a2a30;text-align:center;color:#fff;font-size:11px;font-weight:600;">{cnt or ""}</td>'
             )
         return "".join(out)
-
-    accent = "#0f9d58" if delta is not None and delta < 0 else "#fbbf24"
-    if delta is not None and delta >= wc["alert_threshold_pct"]:
-        accent = "#dc2626"
 
     weeks_html = f"""
       <table border="0" cellpadding="0" cellspacing="0" style="background:#1a1a1f; border-radius:14px; padding:18px; margin:18px 0; width:100%;">
@@ -2382,16 +2462,16 @@ async def _send_spike_alert_email(wc: dict, preset: dict, dry_run: bool = False)
 
     body_html = f"""
       <p>Bună,</p>
-      <p>Sistemul automat de monitoring a detectat un <strong>spike de activitate</strong> de incident response:</p>
+      <p>Sistemul automat de monitoring a detectat un <strong>spike de activitate</strong> de incident response la nivel <strong>{tier_emoji} {tier_label}</strong>:</p>
       <div style="background:{accent}15; border-left:3px solid {accent}; padding:16px 18px; border-radius:12px; margin:18px 0;">
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:{accent}; margin-bottom:6px;">Variație vs săptămâna trecută</div>
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:{accent}; margin-bottom:6px;">Variație vs săptămâna trecută · Severitate {tier_label}</div>
         <div style="font-size:32px; font-weight:bold; color:{accent};">{delta_label}</div>
-        <div style="color:#a8a8b0; font-size:13px; margin-top:6px;">Prag configurat: +{wc['alert_threshold_pct']}%</div>
+        <div style="color:#a8a8b0; font-size:13px; margin-top:6px;">Prag tier {tier_label}: +{tier['threshold_pct']}%</div>
       </div>
       {weeks_html}
-      <p style="color:#a8a8b0; font-size:13px;">Acțiuni recomandate:</p>
+      <p style="color:#a8a8b0; font-size:13px;">Acțiuni recomandate pentru {tier_label}:</p>
       <ul style="color:#c8c8cc; font-size:13px;">
-        <li>Verifică deploy-urile și modificările recente de pe platformă.</li>
+        <li>Verifică deploy-urile și modificările recente.</li>
         <li>Consultă audit log-ul pentru anomalii: <a style="color:#d4ff3a;" href="https://propmanage.io/admin">consola admin</a></li>
         <li>Distribuie raportul către echipa relevantă dacă e necesar.</li>
       </ul>
@@ -2399,7 +2479,7 @@ async def _send_spike_alert_email(wc: dict, preset: dict, dry_run: bool = False)
 
     from email_service import _layout, send_email as _send_email  # type: ignore
     html = _layout(
-        title="🚨 Spike Activity Detected",
+        title=f"{tier_emoji} Spike Activity Detected — {tier_label}",
         preheader=f"{delta_label} vs săpt. trecută",
         body_html=body_html,
     )
@@ -2409,7 +2489,7 @@ async def _send_spike_alert_email(wc: dict, preset: dict, dry_run: bool = False)
         return {"ok": False, "error": "Preset gol — niciun destinatar."}
 
     if dry_run:
-        return {"ok": True, "dry_run": True, "subject": subject, "recipients_count": len(recipients)}
+        return {"ok": True, "dry_run": True, "subject": subject, "recipients_count": len(recipients), "tier": tier["name"]}
 
     result = await _send_email(recipients, subject, html)
     return {
@@ -2418,41 +2498,47 @@ async def _send_spike_alert_email(wc: dict, preset: dict, dry_run: bool = False)
         "demo": result.get("demo", False),
         "subject": subject,
         "recipients_count": len(recipients),
+        "tier": tier["name"],
         "error": result.get("error"),
     }
 
 
 async def run_incident_spike_alert_check():
-    """Cron job: runs every Monday 08:00 Europe/Bucharest. Sends auto-alert if spike detected.
-    Deduplicates by `last_sent_week` (one alert per week max).
+    """Cron job: runs every Monday 08:00 Europe/Bucharest. Picks the highest-severity tier matched.
+    Deduplicates by `last_sent_week + tier` (one alert per week per tier max).
     """
     try:
         settings = await _get_spike_alert_settings()
         if not settings.get("enabled"):
             return
-        if not settings.get("preset_id"):
-            logger.info("[SpikeAlert] enabled but no preset configured — skipping")
+
+        tiers = settings.get("tiers", [])
+        configured = [t for t in tiers if t.get("preset_id")]
+        if not configured:
+            logger.info("[SpikeAlert] enabled but no tier has preset configured — skipping")
             return
 
-        wc = await _compute_weekly_compare(settings.get("threshold_pct", 100))
-        if not wc.get("alert"):
-            logger.info(f"[SpikeAlert] no spike detected (delta={wc.get('delta_pct')}%)")
+        wc = await _compute_weekly_compare(min(int(t.get("threshold_pct", 100)) for t in configured))
+        matched = _classify_tier(wc.get("delta_pct"), tiers)
+        if not matched:
+            logger.info(f"[SpikeAlert] no tier matched (delta={wc.get('delta_pct')}%)")
             return
 
-        # Dedupe: don't send twice for the same week
+        # Dedupe: don't send same tier twice for same week
         week_key = wc["current"]["monday"]
-        if settings.get("last_sent_week") == week_key:
-            logger.info(f"[SpikeAlert] already sent for week {week_key} — skipping")
+        last_week = settings.get("last_sent_week")
+        last_tier = (settings.get("last_result") or {}).get("tier")
+        if last_week == week_key and last_tier == matched["name"]:
+            logger.info(f"[SpikeAlert] already sent tier '{matched['name']}' for week {week_key} — skipping")
             return
 
-        # Fetch preset
-        preset_doc = await db.incident_recipient_presets.find_one({"_id": ObjectId(settings["preset_id"])})
+        preset_doc = await db.incident_recipient_presets.find_one({"_id": ObjectId(matched["preset_id"])})
         if not preset_doc:
-            logger.warning("[SpikeAlert] configured preset not found — skipping")
+            logger.warning(f"[SpikeAlert] tier '{matched['name']}' preset not found — skipping")
             return
         preset = _serialize_preset(preset_doc)
 
-        result = await _send_spike_alert_email(wc, preset)
+        result = await _send_spike_alert_email(wc, matched, preset)
         await _save_spike_alert_settings({
             "last_sent_week": week_key,
             "last_result": {
@@ -2460,10 +2546,10 @@ async def run_incident_spike_alert_check():
                 "ok": result.get("ok"),
                 "delta_pct": wc.get("delta_pct"),
                 "recipients_count": result.get("recipients_count"),
+                "tier": matched["name"],
                 "error": result.get("error"),
             },
         })
-        # Audit log
         await db.admin_audit_log.insert_one({
             "action": "incident_spike_alert.sent",
             "actor_id": "system",
@@ -2471,13 +2557,18 @@ async def run_incident_spike_alert_check():
             "actor_email": "system@propmanage.io",
             "target_type": "platform_setting",
             "target_id": "incident_spike_alert",
-            "target_label": f"Spike Alert {week_key}",
+            "target_label": f"Spike Alert {week_key} · {matched['name']}",
             "before": None,
-            "after": {"delta_pct": wc.get("delta_pct"), "current_total": wc["current"]["total_sends"], "previous_total": wc["previous"]["total_sends"]},
-            "note": f"Email trimis către {result.get('recipients_count', 0)} destinatari prin {result.get('provider')}",
+            "after": {
+                "delta_pct": wc.get("delta_pct"),
+                "tier": matched["name"],
+                "current_total": wc["current"]["total_sends"],
+                "previous_total": wc["previous"]["total_sends"],
+            },
+            "note": f"Tier {matched['name']} — email către {result.get('recipients_count', 0)} destinatari prin {result.get('provider')}",
             "created_at": datetime.now(timezone.utc).isoformat(),
         })
-        logger.info(f"[SpikeAlert] sent for week {week_key}: delta={wc.get('delta_pct')}% to {result.get('recipients_count')} recipients via {result.get('provider')}")
+        logger.info(f"[SpikeAlert] sent tier '{matched['name']}' for week {week_key}: delta={wc.get('delta_pct')}% → {result.get('recipients_count')} recipients via {result.get('provider')}")
     except Exception as e:  # noqa: BLE001
         logger.error(f"[SpikeAlert] error: {e}")
 
@@ -2488,33 +2579,47 @@ async def test_spike_alert(
     user: dict = Depends(require_role("admin")),
 ):
     """Manually trigger the spike-alert check (for testing).
-    Body: { dry_run: bool (default false), force: bool (default false — bypasses 'alert detected' check) }
+    Body: { dry_run: bool, force_tier: str (optional — bypasses classification, sends specific tier) }
     """
     settings = await _get_spike_alert_settings()
-    if not settings.get("preset_id"):
-        raise HTTPException(400, "Niciun preset configurat pentru alertă. Setează unul din UI mai întâi.")
+    tiers = settings.get("tiers", [])
+    configured = [t for t in tiers if t.get("preset_id")]
+    if not configured:
+        raise HTTPException(400, "Niciun tier are preset configurat. Setează unul din UI mai întâi.")
 
-    preset_doc = await db.incident_recipient_presets.find_one({"_id": ObjectId(settings["preset_id"])})
+    force_tier_name = payload.get("force_tier")
+    wc = await _compute_weekly_compare(min(int(t.get("threshold_pct", 100)) for t in configured))
+
+    if force_tier_name:
+        matched = next((t for t in tiers if t["name"] == force_tier_name and t.get("preset_id")), None)
+        if not matched:
+            raise HTTPException(400, f"Tier '{force_tier_name}' nu există sau nu are preset.")
+    else:
+        matched = _classify_tier(wc.get("delta_pct"), tiers)
+        if not matched:
+            return {
+                "ok": False,
+                "reason": "Niciun tier nu a fost depășit în acest moment",
+                "delta_pct": wc.get("delta_pct"),
+                "current": wc["current"]["total_sends"],
+                "previous": wc["previous"]["total_sends"],
+            }
+
+    preset_doc = await db.incident_recipient_presets.find_one({"_id": ObjectId(matched["preset_id"])})
     if not preset_doc:
-        raise HTTPException(404, "Preset configurat nu a fost găsit (a fost șters?). Actualizează configurarea.")
+        raise HTTPException(404, f"Presetul tier-ului '{matched['name']}' nu a fost găsit.")
     preset = _serialize_preset(preset_doc)
 
-    wc = await _compute_weekly_compare(settings.get("threshold_pct", 100))
-    force = bool(payload.get("force"))
-    if not wc.get("alert") and not force:
-        return {"ok": False, "reason": "Niciun spike detectat în acest moment", "delta_pct": wc.get("delta_pct"), "current": wc["current"]["total_sends"], "previous": wc["previous"]["total_sends"]}
-
     dry_run = bool(payload.get("dry_run"))
-    result = await _send_spike_alert_email(wc, preset, dry_run=dry_run)
+    result = await _send_spike_alert_email(wc, matched, preset, dry_run=dry_run)
 
     if not dry_run and result.get("ok"):
-        # Log manual test in audit
         await audit("incident_spike_alert.manual_test", user,
-                    target={"type": "platform_setting", "id": "incident_spike_alert", "label": "Spike Alert (manual test)"},
-                    after={"delta_pct": wc.get("delta_pct"), "recipients_count": result.get("recipients_count")},
-                    note=f"Test manual de către {user.get('name') or user.get('email')}")
+                    target={"type": "platform_setting", "id": "incident_spike_alert", "label": f"Spike Alert (manual test · {matched['name']})"},
+                    after={"delta_pct": wc.get("delta_pct"), "tier": matched["name"], "recipients_count": result.get("recipients_count")},
+                    note=f"Test manual tier '{matched['name']}' de către {user.get('name') or user.get('email')}")
 
-    return {"ok": result.get("ok"), "delta_pct": wc.get("delta_pct"), **result}
+    return {"ok": result.get("ok"), "delta_pct": wc.get("delta_pct"), "matched_tier": matched["name"], **result}
 
 
 @router.post("/audit-log/{entry_id}/rollback")

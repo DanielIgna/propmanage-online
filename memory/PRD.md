@@ -237,6 +237,33 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Auto-deschide modalul când pagina e accesată cu `?compare=` (fetch fallback prin `GET /api/admin/audit-log/{id}`)
 - Banner roșu "⚠️ Link invalid" dacă intrările au fost șterse; URL curățat la close
 
+### Phase 45 — Multi-tier Severity + Banner Expiry + i18n EN + Pytest Fixes (Feb 2026)
+**Multi-tier Severity:**
+- Refactor `_get_spike_alert_settings()` cu shape nou: `tiers: [{name, label, color, threshold_pct, preset_id}]`
+- Migrare automată din vechiul `preset_id + threshold_pct` la noul array de tier-uri (backward-compat)
+- Helper `_classify_tier()` returnează **highest-severity tier matched** (only the highest with configured preset)
+- Defaults: warning (≥50%, amber), high (≥150%, orange), critical (≥300%, red)
+- Endpoint test extins cu `force_tier` pentru a testa orice tier individual
+- Dedupe per `(last_sent_week + tier)` în cron — aceeași săptămână + același tier = skip
+- Frontend: 3 rânduri color-coded cu border-left per tier severity, fiecare cu propriul preset selector, threshold input, buton "📨 Test"
+
+**Banner Promo cu Expirare Automată:**
+- `CMSEntryIn` extins cu `expires_at` (ISO datetime opțional)
+- Public CMS endpoint filtrează override-uri expirate → revealează default-ul (sau gol pentru custom keys)
+- Frontend AdminCMS: date picker `datetime-local` doar pentru `landing.promo_banner`, badge "Programat"/"Expirat"
+
+**CMS i18n EN bilingv:**
+- i18n.js extins: `cms[key]` = RO override, `cms[\`${key}:en\`]` = EN override
+- Fallback chain: EN override → translations.en → translations.ro → key
+- Frontend AdminCMS: toggle "🌍 Bilingv" → afișează textarea EN sub fiecare cheie RO, salvare independentă pe `:en` suffix
+- Auto-skip listare a cheilor `:en` în main list (sunt editing companions)
+
+**Pytest Fixes:**
+- Fix `NameError: uuid` în `/app/backend/routes/payments.py` (lipsea `import uuid`)
+- Fix `NameError: uuid` în `/app/backend/routes/design.py` (lipsea `import uuid`)
+- Fix `test_twins_enriched_fields`: enrich fields always set (None fallback) chiar dacă property nu mai există
+- Phase 8 + 9 → toate 29 teste pass
+
 ### Phase 44 — Spike Alert Auto-Email (Feb 2026)
 - Backend helper `_compute_weekly_compare()` refactored din endpoint pentru reutilizare cron
 - Endpoint `GET/PUT /api/admin/incident-spike-alert/config` — citește/actualizează `{enabled, preset_id, threshold_pct, last_sent_week, last_result}`

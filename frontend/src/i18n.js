@@ -174,10 +174,19 @@ export const I18nProvider = ({ children }) => {
       .catch(() => setCms({}));
   }, []);
 
-  // CMS overrides take priority for RO; EN falls back to translations as before.
+  // CMS overrides take priority. Storage convention:
+  //   `key` → RO override
+  //   `key:en` → EN override (optional)
+  // Both fall back to bundled translations[lang] when missing.
   const t = (key) => {
-    if (lang === "ro" && cms[key] !== undefined && cms[key] !== "") return cms[key];
-    return translations[lang][key] || key;
+    if (lang === "en") {
+      const enOverride = cms[`${key}:en`];
+      if (enOverride !== undefined && enOverride !== "") return enOverride;
+      return translations.en[key] || translations.ro[key] || key;
+    }
+    // RO
+    if (cms[key] !== undefined && cms[key] !== "") return cms[key];
+    return translations.ro[key] || key;
   };
   // Helper for landing visibility flags (defaults to true if missing — fail-open for new sections)
   // Honor ?preview=1&landing_show_X=true/false URL params (admin preview mode)

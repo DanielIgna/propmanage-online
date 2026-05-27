@@ -10,19 +10,31 @@ export const AdminCMS = () => {
   const [items, setItems] = useState([]);
   const [q, setQ] = useState("");
   const [edits, setEdits] = useState({}); // key -> new value
+  const [expiryEdits, setExpiryEdits] = useState({}); // key -> new expires_at
   const [saving, setSaving] = useState({});
   const [loaded, setLoaded] = useState(false);
+  const [showEn, setShowEn] = useState(false); // bilingual edit mode
 
   const load = () => axios.get(`${API}/admin/cms`).then(r => { setItems(r.data); setLoaded(true); });
   useEffect(() => { load(); }, []);
 
   const save = async (key) => {
     const value = edits[key];
-    if (value === undefined) return;
+    const expiresEdit = expiryEdits[key];
+    const valueChanged = value !== undefined;
+    const expiryChanged = expiresEdit !== undefined;
+    if (!valueChanged && !expiryChanged) return;
     setSaving(s => ({ ...s, [key]: true }));
     try {
-      await axios.put(`${API}/admin/cms`, { key, value });
+      const it = items.find(i => i.key === key);
+      const body = { key, value: valueChanged ? value : (it?.value || "") };
+      if (expiryChanged) {
+        // Convert "datetime-local" format → ISO with offset → backend uses UTC; we send local interpreted as UTC for simplicity
+        body.expires_at = expiresEdit ? new Date(expiresEdit).toISOString() : "";
+      }
+      await axios.put(`${API}/admin/cms`, body);
       setEdits(e => { const n = { ...e }; delete n[key]; return n; });
+      setExpiryEdits(e => { const n = { ...e }; delete n[key]; return n; });
       await load();
     } finally {
       setSaving(s => { const n = { ...s }; delete n[key]; return n; });
@@ -37,10 +49,14 @@ export const AdminCMS = () => {
   };
 
   const filtered = items.filter(it =>
-    !q ||
-    it.key.toLowerCase().includes(q.toLowerCase()) ||
-    (it.value || "").toLowerCase().includes(q.toLowerCase())
+    !it.key.endsWith(":en") && (
+      !q ||
+      it.key.toLowerCase().includes(q.toLowerCase()) ||
+      (it.value || "").toLowerCase().includes(q.toLowerCase())
+    )
   );
+
+  const itemsByKey = items.reduce((acc, it) => { acc[it.key] = it; return acc; }, {});
 
   const grouped = filtered.reduce((acc, it) => {
     const ns = it.key.split(".")[0];
@@ -62,7 +78,19 @@ export const AdminCMS = () => {
               data-testid="cms-search"
             />
           </div>
-          <span className="text-xs text-slate-500">{filtered.length} / {items.length} texte</span>
+          <button
+            onClick={() => setShowEn(!showEn)}
+            className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+              showEn
+                ? "border-blue-400 bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:border-blue-500/50 dark:text-blue-300"
+                : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+            }`}
+            data-testid="cms-toggle-en"
+            title="Editează în paralel versiunea EN (engleză)"
+          >
+            🌍 {showEn ? "Bilingv ✓" : "Editor EN"}
+          </button>
+          <span className="text-xs text-slate-500">{filtered.length} / {items.filter(i => !i.key.endsWith(":en")).length} texte</span>
         </div>
       </AdminCard>
 
@@ -74,21 +102,82 @@ export const AdminCMS = () => {
             {list.map(it => {
               const current = edits[it.key] !== undefined ? edits[it.key] : it.value;
               const dirty = edits[it.key] !== undefined && edits[it.key] !== it.value;
+              const supportsExpiry = it.key === "landing.promo_banner";
+              const expiryCurrent = expiryEdits[it.key] !== undefined ? expiryEdits[it.key] :
+                (it.expires_at ? it.expires_at.slice(0, 16) : "");
+              const expiryDirty = expiryEdits[it.key] !== undefined;
+              const isExpired = it.expires_at && it.expires_at <= new Date().toISOString();
+              const fullDirty = dirty || expiryDirty;
               return (
                 <div key={it.key} className="grid grid-cols-1 md:grid-cols-[280px_1fr_auto] gap-3 items-start" data-testid={`cms-row-${it.key}`}>
                   <div>
                     <div className="font-mono text-xs text-slate-600 dark:text-slate-300 break-all">{it.key}</div>
                     {it.is_overridden && <span className="text-[9px] uppercase tracking-wider text-amber-600 dark:text-amber-400">Modificat</span>}
+                    {isExpired && <span className="text-[9px] uppercase tracking-wider text-red-600 dark:text-red-400 ml-1">Expirat</span>}
+                    {it.expires_at && !isExpired && <span className="text-[9px] uppercase tracking-wider text-blue-600 dark:text-blue-400 ml-1">Programat</span>}
                   </div>
-                  <textarea
-                    value={current}
-                    onChange={e => setEdits(s => ({ ...s, [it.key]: e.target.value }))}
-                    rows={Math.min(6, Math.max(1, Math.ceil((current || "").length / 80)))}
-                    className={`w-full px-3 py-2 rounded-lg border text-sm font-medium bg-white dark:bg-slate-800 ${dirty ? "border-amber-400 dark:border-amber-600" : "border-slate-200 dark:border-slate-700"}`}
-                    data-testid={`cms-input-${it.key}`}
-                  />
+                  <div className="space-y-2">
+                    <textarea
+                      value={current}
+                      onChange={e => setEdits(s => ({ ...s, [it.key]: e.target.value }))}
+                      rows={Math.min(6, Math.max(1, Math.ceil((current || "").length / 80)))}
+                      className={`w-full px-3 py-2 rounded-lg border text-sm font-medium bg-white dark:bg-slate-800 ${dirty ? "border-amber-400 dark:border-amber-600" : "border-slate-200 dark:border-slate-700"}`}
+                      data-testid={`cms-input-${it.key}`}
+                    />
+                    {showEn && (() => {
+                      const enKey = `${it.key}:en`;
+                      const enItem = itemsByKey[enKey];
+                      const enValue = edits[enKey] !== undefined ? edits[enKey] : (enItem?.value || "");
+                      const enDirty = edits[enKey] !== undefined && edits[enKey] !== (enItem?.value || "");
+                      return (
+                        <div className="flex gap-2 items-start">
+                          <div className="text-[10px] uppercase tracking-wider font-bold text-blue-600 dark:text-blue-400 mt-2 shrink-0 w-8">EN</div>
+                          <textarea
+                            value={enValue}
+                            onChange={e => setEdits(s => ({ ...s, [enKey]: e.target.value }))}
+                            rows={Math.min(6, Math.max(1, Math.ceil((enValue || "").length / 80)))}
+                            className={`flex-1 px-3 py-2 rounded-lg border text-sm bg-blue-50/30 dark:bg-blue-500/5 ${enDirty ? "border-amber-400 dark:border-amber-600" : "border-blue-200 dark:border-blue-500/30"}`}
+                            data-testid={`cms-input-${enKey}`}
+                            placeholder={`English translation (fallback: RO value)`}
+                          />
+                          {enDirty && (
+                            <AdminBtn variant="primary" onClick={() => save(enKey)} disabled={saving[enKey]} data-testid={`cms-save-${enKey}`}>
+                              <Save className="w-3.5 h-3.5" />
+                            </AdminBtn>
+                          )}
+                          {enItem?.is_overridden && !enDirty && (
+                            <AdminBtn variant="ghost" onClick={() => reset(enKey)} title="Reset EN" data-testid={`cms-reset-${enKey}`}>
+                              <RotateCcw className="w-3.5 h-3.5" />
+                            </AdminBtn>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    {supportsExpiry && (
+                      <div className="flex items-center gap-2 flex-wrap text-xs">
+                        <label className="flex items-center gap-2">
+                          <span className="text-slate-500">⏰ Expiră la:</span>
+                          <input
+                            type="datetime-local"
+                            value={expiryCurrent}
+                            onChange={e => setExpiryEdits(s => ({ ...s, [it.key]: e.target.value }))}
+                            className={`px-2 py-1 rounded-md border text-xs bg-white dark:bg-slate-800 ${expiryDirty ? "border-amber-400" : "border-slate-200 dark:border-slate-700"}`}
+                            data-testid={`cms-expiry-${it.key}`}
+                          />
+                        </label>
+                        {expiryCurrent && (
+                          <button
+                            onClick={() => setExpiryEdits(s => ({ ...s, [it.key]: "" }))}
+                            className="text-xs text-slate-500 hover:text-red-500 underline"
+                            data-testid={`cms-expiry-clear-${it.key}`}
+                          >Elimină dată</button>
+                        )}
+                        <span className="text-[10px] text-slate-400">După această dată, banner-ul dispare automat pentru public.</span>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex gap-1 shrink-0">
-                    <AdminBtn variant={dirty ? "primary" : "secondary"} onClick={() => save(it.key)} disabled={!dirty || saving[it.key]} data-testid={`cms-save-${it.key}`}>
+                    <AdminBtn variant={fullDirty ? "primary" : "secondary"} onClick={() => save(it.key)} disabled={!fullDirty || saving[it.key]} data-testid={`cms-save-${it.key}`}>
                       <Save className="w-3.5 h-3.5" />
                     </AdminBtn>
                     {it.is_overridden && (

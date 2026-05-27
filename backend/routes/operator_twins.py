@@ -111,15 +111,15 @@ async def operator_list_twins(user: dict = Depends(require_role("operator", "adm
     for d in docs:
         d = serialize_doc(d)
         prop = props_map.get(d.get("property_id"))
-        if prop:
-            d["property_name"] = prop.get("name")
-            d["property_address"] = prop.get("address")
-            d["property_type"] = prop.get("type")
-            d["property_surface"] = prop.get("surface")
-            d["property_rooms"] = prop.get("rooms")
-            owner = owners_map.get(prop.get("owner_id"))
-            d["owner_name"] = owner.get("name") if owner else None
-            d["owner_email"] = owner.get("email") if owner else None
+        # Always set enriched fields (None if not found) so consumers can rely on keys existing
+        d["property_name"] = prop.get("name") if prop else None
+        d["property_address"] = prop.get("address") if prop else None
+        d["property_type"] = prop.get("type") if prop else None
+        d["property_surface"] = prop.get("surface") if prop else None
+        d["property_rooms"] = prop.get("rooms") if prop else None
+        owner = owners_map.get(prop.get("owner_id")) if prop else None
+        d["owner_name"] = owner.get("name") if owner else None
+        d["owner_email"] = owner.get("email") if owner else None
         out.append(d)
     return out
 
