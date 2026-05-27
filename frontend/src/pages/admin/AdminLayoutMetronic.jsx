@@ -5,7 +5,8 @@ import axios from "axios";
 import {
   LayoutDashboard, Users, ShieldCheck, Scale, Wallet, FolderKanban,
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
-  LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, Sparkles, Bot, Zap, Inbox
+  LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, Sparkles, Bot, Zap, Inbox,
+  UserCheck, Home, Wrench, Briefcase
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { API } from "../DashShared";
@@ -185,6 +186,113 @@ const LiveActivityRail = ({ theme }) => {
   );
 };
 
+const ROLE_PROFILES = [
+  { role: "client", label: "Client", icon: Home, color: "blue", demoEmail: "client@propmanage.io" },
+  { role: "specialist", label: "Specialist", icon: Wrench, color: "emerald", demoEmail: "specialist@propmanage.io" },
+  { role: "operator", label: "Operator", icon: Briefcase, color: "amber", demoEmail: "operator@propmanage.io" },
+];
+
+const QuickProfileSwitch = ({ dark }) => {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(null);
+
+  const enterRole = async (profile) => {
+    setBusy(profile.role);
+    try {
+      // Try demo account first (fast path, predictable)
+      let target = null;
+      try {
+        const { data } = await axios.get(`${API}/admin/users`, { params: { q: profile.demoEmail, limit: 1 } });
+        if (data.items && data.items[0]?.role === profile.role) target = data.items[0];
+      } catch (_) { /* fall through */ }
+
+      // Fallback: first user of that role
+      if (!target) {
+        const { data } = await axios.get(`${API}/admin/users`, { params: { role: profile.role, limit: 1 } });
+        target = data.items?.[0];
+      }
+      if (!target) {
+        alert(`Nu am găsit niciun utilizator cu rolul ${profile.label}.`);
+        return;
+      }
+
+      const { data } = await axios.post(`${API}/admin/impersonate`, {
+        user_id: target.id,
+        reason: `QA admin — verificare funcționalități rol ${profile.label} (${target.email})`,
+      });
+      window.location.href = data?.redirect_to || `/${profile.role}`;
+    } catch (e) {
+      alert(e?.response?.data?.detail || e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+          dark
+            ? "bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/25"
+            : "bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
+        }`}
+        data-testid="quick-profile-switch"
+        title="Intră rapid într-un profil (jurnalizat GDPR · 2h)"
+      >
+        <UserCheck className="w-3.5 h-3.5" />
+        Schimbă profilul
+        <ChevronDown className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div
+            className={`absolute right-0 top-full mt-2 w-64 rounded-xl border shadow-2xl z-40 overflow-hidden ${
+              dark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+            }`}
+            data-testid="quick-profile-menu"
+          >
+            <div className={`px-3 py-2.5 border-b ${dark ? "border-slate-700" : "border-slate-200"}`}>
+              <div className={`text-[10px] uppercase tracking-wider font-bold ${dark ? "text-slate-400" : "text-slate-500"}`}>
+                Intră rapid ca
+              </div>
+              <div className={`text-[10px] mt-0.5 ${dark ? "text-slate-500" : "text-slate-400"}`}>
+                Sesiune impersonare jurnalizată GDPR · 2h
+              </div>
+            </div>
+            {ROLE_PROFILES.map(p => (
+              <button
+                key={p.role}
+                onClick={() => { setOpen(false); enterRole(p); }}
+                disabled={busy === p.role}
+                className={`w-full text-left px-3 py-2.5 flex items-center gap-3 text-sm transition-colors ${
+                  dark ? "hover:bg-slate-800 text-slate-200" : "hover:bg-slate-50 text-slate-700"
+                } disabled:opacity-60`}
+                data-testid={`quick-profile-${p.role}`}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-${p.color}-500/15`}>
+                  <p.icon className={`w-4 h-4 text-${p.color}-500`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium">{p.label}</div>
+                  <div className={`text-[11px] truncate ${dark ? "text-slate-500" : "text-slate-400"}`}>
+                    {busy === p.role ? "Se inițializează..." : p.demoEmail}
+                  </div>
+                </div>
+              </button>
+            ))}
+            <div className={`px-3 py-2 border-t text-[10px] ${dark ? "border-slate-800 text-slate-500" : "border-slate-100 text-slate-400"}`}>
+              Pentru utilizatori reali → tab <strong>Toți userii</strong>.
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitle }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -271,6 +379,7 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
           </button>
           <GlobalSearch theme={theme} />
           <HealthScoreBadge dark={dark} />
+          <QuickProfileSwitch dark={dark} />
           <ReplayAIAdminTourButton />
           <button onClick={toggleTheme} className={`p-2 rounded-lg ${dark ? "hover:bg-slate-800 text-slate-300" : "hover:bg-slate-100 text-slate-600"}`} data-testid="admin-theme-toggle">
             {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}

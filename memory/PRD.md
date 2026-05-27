@@ -574,6 +574,8 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - AdminUsers: red `UserCheck` icon per non-admin/non-self/non-banned row → opens `ImpersonateModal` (10-char reason required)
 - AdminConsole: new "Impersonări" sidebar tab under COMPLIANCE → `AdminImpersonationLogs` audit table
 - SettingsPanel → Privacy modal: new "Cine a accesat contul tău" section listing past sessions
-- Validated end-to-end (iteration_29): backend 17/17 pytest, frontend 100% on FRONTEND-A..F + regression suite
+- **QuickProfileSwitch** dropdown în admin header (`data-testid=quick-profile-switch`): 3 butoane (Client / Specialist / Operator) → impersonifică instant contul demo corespunzător cu reason auto-fill „QA admin — verificare funcționalități rol X". Fallback la primul user de rolul respectiv dacă demo nu există.
+- Validated end-to-end (iteration_29 + smoke screenshot iter): backend 17/17 pytest + status codes corecți (409 nested, 403 destructiv), frontend 100% pe FRONTEND-A..F + regression
+
 
 
