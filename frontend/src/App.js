@@ -1353,12 +1353,20 @@ const LandingPage = () => {
     <div className={`grain min-h-screen bg-[#0a0a0b] text-stone-100 ${(hasPromo || isPreview || !demoModeDismissed) ? "pt-9 sm:pt-10" : ""}`}>
       {isPreview && <PreviewBanner />}
       {!isPreview && !demoModeDismissed && (
-        <div className="fixed top-0 left-0 right-0 z-[58] bg-stone-900/95 backdrop-blur border-b border-amber-500/30 text-amber-200 text-center text-[11px] sm:text-xs py-1.5 px-10 flex items-center justify-center gap-2" data-testid="demo-mode-banner">
-          <span className="opacity-80">🧪 Demo Mode · Plățile Stripe sunt în mod test, fără bani reali</span>
-          <button onClick={() => setDemoOpen(true)} className="underline hover:no-underline font-medium opacity-100 text-[#d4ff3a]" data-testid="demo-mode-cta">Programează demo</button>
-          <button onClick={() => { sessionStorage.setItem("pm_demo_mode_dismissed", "1"); setDemoModeDismissed(true); }} className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 hover:bg-white/10 rounded text-stone-400" aria-label="Închide" data-testid="demo-mode-dismiss">
-            <Minus className="w-3.5 h-3.5 rotate-45" />
-          </button>
+        <div className="fixed top-0 left-0 right-0 z-[58] bg-stone-900/95 backdrop-blur border-b border-amber-500/30 text-amber-200" data-testid="demo-mode-banner">
+          <div className="flex items-center gap-2 px-3 sm:px-10 py-1.5 text-[11px] sm:text-xs">
+            <span className="opacity-80 truncate flex-1 sm:flex-none sm:text-center">
+              <span className="hidden sm:inline">🧪 Demo Mode · Plățile Stripe sunt în mod test, fără bani reali</span>
+              <span className="sm:hidden">🧪 Demo · Stripe test mode</span>
+            </span>
+            <button onClick={() => setDemoOpen(true)} className="underline hover:no-underline font-medium text-[#d4ff3a] shrink-0" data-testid="demo-mode-cta">
+              <span className="hidden sm:inline">Programează demo</span>
+              <span className="sm:hidden">Demo</span>
+            </button>
+            <button onClick={() => { sessionStorage.setItem("pm_demo_mode_dismissed", "1"); setDemoModeDismissed(true); }} className="shrink-0 w-7 h-7 -mr-1 flex items-center justify-center hover:bg-white/10 active:bg-white/15 rounded-full text-stone-300" aria-label="Închide banner demo" data-testid="demo-mode-dismiss">
+              <Minus className="w-4 h-4 rotate-45" />
+            </button>
+          </div>
         </div>
       )}
       {!isPreview && demoModeDismissed && <PromoBanner />}
