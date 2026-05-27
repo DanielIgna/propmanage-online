@@ -379,6 +379,7 @@ export default function DigitalTwinPage() {
   if (viewing) {
     return (
       <DigitalTwinViewer
+        projectId={viewing.id}
         modelUrl={viewing.model_url}
         projectName={viewing.name}
         onClose={() => setViewing(null)}
