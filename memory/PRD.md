@@ -454,14 +454,24 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
   - Public endpoints: `GET /api/gdpr/documents/{ropa|sub-processors|cookies|dpia|breach-plan|company}` + PDF exports (`/pdf/ropa`, `/pdf/dpia`, `/pdf/notice/{role}`).
   - Admin endpoints (Parts B-E ready for activation when needed): DSAR queue, breach drills audit, ROPA/Cookies/Subs CRUD, gdpr_audit collection.
   - Defaults seeded: 10 ROPA activities, 5 sub-processors, 5 cookies, DPIA doc, 5-step breach plan.
-- **Frontend** `pages/admin/AdminGDPR.jsx` — 5-tab DPO-ready panel inside Admin Console:
-  - 📋 ROPA — expandable cards (10 procesări) with legal basis, retention, transfers, security.
-  - 🤖 DPIA AI Layer — risk factors vs mitigations grid + residual risk callout + PDF download.
-  - 🌐 Sub-procesatori — table with status pills (active/ready_to_activate), DPA links, SCC mechanism.
-  - 🍪 Cookies & Storage — first-party inventory + tracking-pixel-free disclaimer.
-  - 🚨 Breach Plan 72h — vertical timeline 5 steps with bullet actions per phase.
-- Sidebar nav: new **COMPLIANCE** section → "GDPR Pack" item (NEW badge) wired in `AdminLayoutMetronic.jsx` + `AdminConsole.jsx`.
-- Fixed pre-existing syntax error in `gdpr.py` (smart-quote string termination, line 766).
+- **Frontend** `pages/admin/AdminGDPR.jsx` — 5-tab DPO-ready panel inside Admin Console.
+
+### Phase 49 — GDPR Compliance Pack (Parts B, C, D, E) — Feb 2026
+- **Part B (Privacy Notices public page)** — New `pages/PrivacyNoticesPage.jsx` at route `/privacy/notices`:
+  - 5 role cards (Client, Specialist, Operator, Visitor, B2B DPA) with summary + highlights + PDF download + read inline.
+  - Bottom section linking to ROPA / Sub-processors JSON / Cookies / DPIA PDF.
+  - Linked from `LegalPages.jsx` (PrivacyPage) via callout box.
+- **Part C (DSAR self-service)** — Extended `PrivacyModal` in `SettingsPanel.jsx`:
+  - JSON export now uses `/api/gdpr/me/export` (Art. 15 + Art. 20 with rights summary).
+  - New "Consimțăminte granulare" section — toggles for `marketing_email`, `product_updates`, `research_participation` via `/api/gdpr/me/consents` GET/POST.
+  - New "Cerere oficială ștergere via DPO (Art. 17)" — submits to admin queue with 30-day SLA via `/api/gdpr/me/erasure-request`. Idempotent + visible SLA confirmation.
+  - Direct delete (legacy `/auth/account-delete`) preserved as fast path.
+- **Part D (Admin GDPR Control Center)** — Extended `AdminGDPR.jsx` with 2 new tabs:
+  - `DSAR Queue`: status filter pills (toate/noi/în analiză/finalizate/respinse) + table with SLA pills (overdue/<7d/normal) + modal to update status & admin notes (auto-audit-log).
+  - `Drills & Audit`: form to log breach drill (scenario, 5 step toggles, duration, notes), history list, and read-only `gdpr_audit` log table.
+- **Part E (DPO Bundle ZIP)** — New backend endpoint `GET /api/gdpr/pdf/bundle` (admin only) — packages ROPA PDF + DPIA PDF + 5 privacy notice PDFs + sub-processors/cookies/breach JSON + README into a single ZIP; logs each download to `gdpr_audit`. Wired as prominent button in AdminGDPR header.
+- **Bug fix**: Syntax error in `gdpr.py` (smart-quote string termination line 766).
+- **Test results**: All endpoints validated end-to-end (client login → erasure submit → admin sees request with SLA 30z; bundle ZIP returns 23KB application/zip; granular consents persisted). Notices page renders 5 cards. All 7 GDPR tabs render in admin.
 
 
 

@@ -66,6 +66,11 @@ export const PrivacyPage = () => (
     </ul>
     <p>Pentru orice cerere DSAR, scrie la <a href="mailto:admin@propmanage.io">admin@propmanage.io</a> — răspundem în maximum 30 zile.</p>
 
+    <p className="mt-4 p-4 rounded-xl bg-white/5 border border-white/10">
+      <strong className="text-[#d4ff3a]">📑 Notificări de confidențialitate per rol:</strong>{" "}
+      Vezi notificările detaliate pentru <Link to="/privacy/notices" className="text-[#d4ff3a] underline">Client, Specialist, Operator, Vizitator + DPA (B2B)</Link> — toate descărcabile ca PDF.
+    </p>
+
     <h2>5. Cookies</h2>
     <p>Folosim cookies <strong>strict necesare</strong> (autentificare, preferințe UI) și NU folosim cookies de tracking publicitar. Nu este necesar consent banner pentru cookies necesare.</p>
 

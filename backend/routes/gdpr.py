@@ -822,6 +822,85 @@ async def pdf_notice(role: str):
     return StreamingResponse(buf, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=propmanage_notice_{role}.pdf"})
 
 
+@router.get("/pdf/bundle")
+async def pdf_bundle(user: dict = Depends(require_role("admin"))):
+    """Package E — ZIP bundle with all DPO PDFs (ROPA + DPIA + 5 notices)."""
+    import zipfile
+    zbuf = io.BytesIO()
+    with zipfile.ZipFile(zbuf, "w", zipfile.ZIP_DEFLATED) as z:
+        # ROPA
+        ropa_buf = await _build_ropa_pdf()
+        z.writestr("01_ROPA_Art30.pdf", ropa_buf.getvalue())
+        # DPIA
+        dpia_buf = await _build_dpia_pdf_buffer()
+        z.writestr("02_DPIA_AI_Layer.pdf", dpia_buf.getvalue())
+        # Notices
+        for role in ("client", "specialist", "operator", "visitor", "dpa"):
+            buf = await _build_privacy_notice_pdf(role)
+            z.writestr(f"03_Notice_{role}.pdf", buf.getvalue())
+        # Sub-processors JSON (no PDF dedicated yet; ship JSON for transparency)
+        subs = await _get_doc("gdpr_sub_processors", DEFAULT_SUB_PROCESSORS)
+        cookies = await _get_doc("gdpr_cookies", DEFAULT_COOKIES)
+        z.writestr("04_sub_processors.json", json.dumps(subs, ensure_ascii=False, indent=2))
+        z.writestr("05_cookies_inventory.json", json.dumps(cookies, ensure_ascii=False, indent=2))
+        z.writestr("06_breach_plan.json", json.dumps(BREACH_CHECKLIST, ensure_ascii=False, indent=2))
+        readme = (
+            f"PropManage — DPO Compliance Bundle\n"
+            f"Generated: {datetime.now(timezone.utc).isoformat()}\n"
+            f"Operator: {COMPANY_NAME}\n"
+            f"DPO: {DPO_EMAIL}\n\n"
+            f"Contents:\n"
+            f"  01_ROPA_Art30.pdf      — Registru Activități Prelucrare (Art. 30)\n"
+            f"  02_DPIA_AI_Layer.pdf   — Data Protection Impact Assessment (AI)\n"
+            f"  03_Notice_client.pdf   — Privacy Notice pentru Client\n"
+            f"  03_Notice_specialist.pdf\n"
+            f"  03_Notice_operator.pdf\n"
+            f"  03_Notice_visitor.pdf\n"
+            f"  03_Notice_dpa.pdf      — Data Processing Agreement (B2B)\n"
+            f"  04_sub_processors.json — Lista sub-procesatori (JSON)\n"
+            f"  05_cookies_inventory.json\n"
+            f"  06_breach_plan.json    — Checklist 72h\n"
+        )
+        z.writestr("README.txt", readme)
+    zbuf.seek(0)
+    # Audit log
+    await db.gdpr_audit.insert_one({
+        "kind": "bundle_export", "actor": user["id"], "actor_name": user.get("name"),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return StreamingResponse(zbuf, media_type="application/zip", headers={"Content-Disposition": "attachment; filename=propmanage_gdpr_bundle.zip"})
+
+
+async def _build_dpia_pdf_buffer() -> io.BytesIO:
+    """Extracted helper so bundle can reuse without HTTP layer."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    styles, BASE, BOLD = _build_pdf_styles()
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=1.8*cm, rightMargin=1.8*cm, topMargin=1.8*cm, bottomMargin=1.8*cm, title="DPIA — PropManage AI")
+    story = [
+        Paragraph(DPIA_DOC["title"], styles["h1"]),
+        Paragraph(f"Versiune {DPIA_DOC['version']} · Operator: {COMPANY_NAME} · DPO: {DPO_EMAIL}", styles["small"]),
+        Spacer(1, 0.4*cm),
+        Paragraph("1. Scop", styles["h2"]),
+        Paragraph(DPIA_DOC["scope"], styles["body"]),
+        Paragraph("2. Factori de risc ridicat", styles["h2"]),
+    ]
+    for f in DPIA_DOC["high_risk_factors"]:
+        story.append(Paragraph(f"• {f}", styles["body"]))
+    story.append(Paragraph("3. Măsuri de atenuare", styles["h2"]))
+    for m in DPIA_DOC["mitigations"]:
+        story.append(Paragraph(f"• {m}", styles["body"]))
+    story.append(Paragraph("4. Risc rezidual", styles["h2"]))
+    story.append(Paragraph(DPIA_DOC["residual_risk"], styles["body"]))
+    story.append(Paragraph("5. Frecvență de revizuire", styles["h2"]))
+    story.append(Paragraph(DPIA_DOC["review_frequency"], styles["body"]))
+    doc.build(story)
+    buf.seek(0)
+    return buf
+
+
 @router.get("/pdf/dpia")
 async def pdf_dpia():
     from reportlab.lib.pagesizes import A4

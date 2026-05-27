@@ -473,11 +473,37 @@ const PrivacyModal = ({ onClose }) => {
   const [deleting, setDeleting] = useState(false);
   const [delForm, setDelForm] = useState({ password: "", confirmation: "" });
   const [showDelete, setShowDelete] = useState(false);
+  // Phase 49 Part C — formal DSAR via DPO queue + granular consents
+  const [erasureReason, setErasureReason] = useState("");
+  const [erasureLoading, setErasureLoading] = useState(false);
+  const [erasureOk, setErasureOk] = useState(null);
+  const [consents, setConsents] = useState({});
+  const [consentsLoaded, setConsentsLoaded] = useState(false);
+
+  useEffect(() => {
+    axios.get(`${API}/gdpr/me/consents`)
+      .then(r => setConsents(r.data.consents || {}))
+      .catch(() => {})
+      .finally(() => setConsentsLoaded(true));
+  }, []);
+
+  const toggleConsent = async (key, current) => {
+    const nextVal = !current;
+    setConsents(c => ({ ...c, [key]: { value: nextVal, updated_at: new Date().toISOString() } }));
+    try {
+      await axios.post(`${API}/gdpr/me/consents`, { key, value: nextVal });
+    } catch (err) {
+      // revert
+      setConsents(c => ({ ...c, [key]: { value: current, updated_at: new Date().toISOString() } }));
+      alert(formatApiError(err));
+    }
+  };
 
   const exportData = async () => {
     setExporting(true);
     try {
-      const { data } = await axios.post(`${API}/auth/account-export`);
+      // Use new GDPR-aligned export (Art. 15) — adds rights summary and comprehensive scope
+      const { data } = await axios.get(`${API}/gdpr/me/export`);
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -489,6 +515,22 @@ const PrivacyModal = ({ onClose }) => {
       alert(formatApiError(err));
     } finally {
       setExporting(false);
+    }
+  };
+
+  const submitErasureRequest = async () => {
+    if (!window.confirm("Trimiți o cerere oficială de ștergere către DPO. Vei primi răspuns în maxim 30 zile. Continuăm?")) return;
+    setErasureLoading(true);
+    try {
+      const { data } = await axios.post(`${API}/gdpr/me/erasure-request`, {
+        reason: erasureReason,
+        confirm: true,
+      });
+      setErasureOk(data);
+    } catch (err) {
+      alert(formatApiError(err));
+    } finally {
+      setErasureLoading(false);
     }
   };
 
@@ -510,26 +552,99 @@ const PrivacyModal = ({ onClose }) => {
   return (
     <ModalShell title="Date și confidențialitate" onClose={onClose} tid="privacy-modal">
       <div className="space-y-4 text-sm">
+        {/* Art. 15 — Export */}
         <div className="bg-white/5 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <Download className="w-4 h-4 text-[#d4ff3a]" />
-            <div className="font-medium">Exportă datele tale</div>
+            <div className="font-medium">Exportă datele tale (Art. 15 + Art. 20)</div>
           </div>
           <p className="text-xs text-stone-400 mb-3 leading-relaxed">
-            Conform GDPR (Art. 20 — portabilitatea datelor), poți descărca toate datele tale: profil, proprietăți, cereri, notificări, tranzacții.
+            Descarcă toate datele tale într-un format JSON structurat: profil, cereri, proiecte, plăți, notificări, contoare AI Concierge. Include și un rezumat al drepturilor tale GDPR.
           </p>
           <button onClick={exportData} disabled={exporting} className="btn-accent px-4 py-2 rounded-full text-xs font-medium" data-testid="export-data-btn">
             {exporting ? "Se generează..." : "Descarcă JSON"}
           </button>
         </div>
 
+        {/* Granular consents */}
+        <div className="bg-white/5 rounded-xl p-4" data-testid="consents-section">
+          <div className="flex items-center gap-2 mb-2">
+            <Shield className="w-4 h-4 text-[#d4ff3a]" />
+            <div className="font-medium">Consimțăminte granulare</div>
+          </div>
+          <p className="text-xs text-stone-400 mb-3 leading-relaxed">
+            Controlează ce comunicări non-tranzacționale ne dai voie să-ți trimitem.
+          </p>
+          {!consentsLoaded ? (
+            <div className="text-xs text-stone-500">Se încarcă...</div>
+          ) : (
+            <div className="space-y-2">
+              {[
+                { key: "marketing_email", label: "Marketing prin email (newsletter, oferte)" },
+                { key: "product_updates", label: "Update-uri de produs (feature noi, schimbări)" },
+                { key: "research_participation", label: "Cercetare UX (sondaje opționale)" },
+              ].map(c => {
+                const cur = !!consents[c.key]?.value;
+                return (
+                  <label key={c.key} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/[0.03] cursor-pointer" data-testid={`consent-${c.key}`}>
+                    <span className="text-xs text-stone-300">{c.label}</span>
+                    <input
+                      type="checkbox"
+                      checked={cur}
+                      onChange={() => toggleConsent(c.key, cur)}
+                      className="w-4 h-4 accent-[#d4ff3a]"
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Art. 17 formal erasure via DPO queue */}
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4" data-testid="dsar-erasure-section">
+          <div className="flex items-center gap-2 mb-2">
+            <Shield className="w-4 h-4 text-amber-400" />
+            <div className="font-medium text-amber-300">Cerere oficială ștergere via DPO (Art. 17)</div>
+          </div>
+          <p className="text-xs text-stone-400 mb-3 leading-relaxed">
+            Pentru o cerere formală cu audit trail. Răspuns garantat în 30 zile prin DPO. Recomandat dacă ai întrebări complexe sau cont B2B.
+          </p>
+          {erasureOk ? (
+            <div className="text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3" data-testid="erasure-ok">
+              ✅ Cerere {erasureOk.deduped ? "deja existentă" : "înregistrată"} (ID: {erasureOk.id?.slice(-8)}). SLA: {new Date(erasureOk.sla_due_at).toLocaleDateString("ro-RO")}.
+            </div>
+          ) : (
+            <>
+              <textarea
+                rows={2}
+                value={erasureReason}
+                onChange={(e) => setErasureReason(e.target.value)}
+                placeholder="Motiv (opțional, max 500 caractere)"
+                maxLength={500}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs mb-2"
+                data-testid="erasure-reason"
+              />
+              <button
+                onClick={submitErasureRequest}
+                disabled={erasureLoading}
+                className="px-4 py-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded-full text-xs font-medium"
+                data-testid="erasure-submit-btn"
+              >
+                {erasureLoading ? "Se trimite..." : "Trimite cerere către DPO"}
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Direct delete (fast path) */}
         <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="w-4 h-4 text-red-400" />
-            <div className="font-medium text-red-400">Șterge contul</div>
+            <div className="font-medium text-red-400">Șterge contul imediat</div>
           </div>
           <p className="text-xs text-stone-400 mb-3 leading-relaxed">
-            Conform GDPR (Art. 17 — dreptul de a fi uitat). Datele tale personale vor fi anonimizate ireversibil. Istoricul tranzacțiilor și disputele se păstrează pentru conformitate fiscală.
+            Pentru clienții individuali care vor o ștergere rapidă. Datele personale sunt anonimizate ireversibil. Istoricul tranzacțiilor și disputele rămân pentru conformitate fiscală (10 ani).
           </p>
           {!showDelete ? (
             <button onClick={() => setShowDelete(true)} className="px-4 py-2 bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 rounded-full text-xs font-medium" data-testid="show-delete-btn">

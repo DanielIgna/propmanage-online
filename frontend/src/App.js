@@ -22,6 +22,7 @@ import { TutorialOverlay } from "./pages/TutorialOverlay";
 import { AIConciergeBubble } from "./components/AIConciergeBubble";
 import { BookDemoModal } from "./pages/BookDemoModal";
 import { PrivacyPage, TermsPage } from "./pages/LegalPages";
+import { PrivacyNoticesPage } from "./pages/PrivacyNoticesPage";
 import { StatusPage } from "./pages/StatusPage";
 import "./App.css";
 
@@ -1400,6 +1401,7 @@ function App() {
             <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/privacy/notices" element={<PrivacyNoticesPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/status" element={<StatusPage />} />
               <Route path="/login" element={<LoginPage />} />
