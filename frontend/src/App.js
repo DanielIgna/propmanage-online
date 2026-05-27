@@ -24,6 +24,7 @@ import { BookDemoModal } from "./pages/BookDemoModal";
 import { PrivacyPage, TermsPage } from "./pages/LegalPages";
 import { PrivacyNoticesPage } from "./pages/PrivacyNoticesPage";
 import { StatusPage } from "./pages/StatusPage";
+import { GDPRAuditBadge } from "./components/GDPRAuditBadge";
 import "./App.css";
 
 // ============= NAV =============
@@ -96,9 +97,12 @@ const Hero = () => {
     
     <div className="max-w-7xl mx-auto w-full relative">
       <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-        <div className="inline-flex items-center gap-2 px-4 py-2 glass rounded-full mb-8" data-testid="hero-badge">
-          <div className="w-2 h-2 rounded-full bg-[#d4ff3a] pulse-dot" />
-          <span className="text-xs tracking-wide text-stone-300">{t("hero.badge")}</span>
+        <div className="flex flex-wrap items-center gap-3 mb-8">
+          <div className="inline-flex items-center gap-2 px-4 py-2 glass rounded-full" data-testid="hero-badge">
+            <div className="w-2 h-2 rounded-full bg-[#d4ff3a] pulse-dot" />
+            <span className="text-xs tracking-wide text-stone-300">{t("hero.badge")}</span>
+          </div>
+          <GDPRAuditBadge variant="hero" />
         </div>
         
         <h1 className="font-serif text-6xl md:text-8xl lg:text-9xl leading-[0.95] tracking-tight mb-8 max-w-5xl" data-testid="hero-title">
@@ -1298,12 +1302,13 @@ const Footer = () => (
         <span className="font-serif text-lg">PropManage</span>
         <span className="text-xs text-stone-500 ml-2">© 2026 · Property Operating System</span>
       </div>
-      <div className="flex gap-6 text-xs text-stone-500">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-stone-500">
         <Link to="/terms" className="hover:text-white transition-colors" data-testid="footer-terms">Termeni</Link>
         <Link to="/privacy" className="hover:text-white transition-colors" data-testid="footer-privacy">Confidențialitate</Link>
         <Link to="/status" className="hover:text-white transition-colors inline-flex items-center gap-1" data-testid="footer-status">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Status
         </Link>
+        <GDPRAuditBadge variant="footer" />
         <a href="mailto:admin@propmanage.io" className="hover:text-white transition-colors">Contact</a>
       </div>
     </div>
