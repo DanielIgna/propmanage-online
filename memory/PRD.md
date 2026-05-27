@@ -228,6 +228,17 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - **Stripe Checkout** — emergentintegrations integrated. DEMO mode active while `STRIPE_API_KEY=sk_test_emergent` placeholder. Swap to real `sk_test_*` or `sk_live_*` to enable real Stripe + webhook signature verification.
 - **SendGrid** — emails print to console. Needs `SENDGRID_API_KEY` for production dispatch.
 
+### Phase 36 — Audit Diff Compare (Feb 2026)
+- Checkbox-uri pe rândurile din Audit Log (max 2 selectate simultan, FIFO drop)
+- Buton "🔬 Compară selectate (2)" în toolbar care deschide modal Diff Compare
+- Modal afișează cronologic Mai vechi (stânga) / Mai nou (dreapta) cu header (acțiune, actor, timestamp)
+- **2 moduri vizualizare** (toggle):
+  1. **Tabel câmpuri** — key-by-key comparison pentru obiecte, marker amber `●` pe câmpuri schimbate
+  2. **Diff linie cu linie** — GitHub-style side-by-side cu numere de linie, LCS algorithm, fundal roșu/verde, prefixe `−`/`+`, statistici `+N −N linii modificate`
+- Smart state pick: `cms.reset` → folosește `before`, alte acțiuni → `after`
+- Avertisment vizibil dacă țintele sunt diferite (compararea poate fi mai puțin relevantă)
+- Toate testate vizual cu screenshot pe Setări Platform changes
+
 ## Roadmap
 ### P1 (Next)
 - `server.py` routers split: auth.py, admin.py, operator.py, payments.py, requests.py, marketplace.py, design.py, portfolio.py (monolith ~2870 lines, refactor postponed multiple times)

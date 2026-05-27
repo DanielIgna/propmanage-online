@@ -262,8 +262,96 @@ export const AdminAuditLog = () => {
   );
 };
 
+// ============= LINE-BY-LINE DIFF (LCS) =============
+// GitHub-style side-by-side diff. Returns array of rows: { type, leftNo, left, rightNo, right }
+const computeLineDiff = (a, b) => {
+  const linesA = String(a ?? "").split("\n");
+  const linesB = String(b ?? "").split("\n");
+  const m = linesA.length, n = linesB.length;
+  // Build LCS DP table
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = m - 1; i >= 0; i--) {
+    for (let j = n - 1; j >= 0; j--) {
+      dp[i][j] = linesA[i] === linesB[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const rows = [];
+  let i = 0, j = 0, li = 1, lj = 1;
+  while (i < m && j < n) {
+    if (linesA[i] === linesB[j]) {
+      rows.push({ type: "eq", leftNo: li++, left: linesA[i], rightNo: lj++, right: linesB[j] });
+      i++; j++;
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      rows.push({ type: "del", leftNo: li++, left: linesA[i], rightNo: null, right: null });
+      i++;
+    } else {
+      rows.push({ type: "add", leftNo: null, left: null, rightNo: lj++, right: linesB[j] });
+      j++;
+    }
+  }
+  while (i < m) rows.push({ type: "del", leftNo: li++, left: linesA[i++], rightNo: null, right: null });
+  while (j < n) rows.push({ type: "add", leftNo: null, left: null, rightNo: lj++, right: linesB[j++] });
+  return rows;
+};
+
+const LineDiffView = ({ left, right }) => {
+  // Normalize: if object → JSON pretty
+  const normalize = (v) => {
+    if (v === null || v === undefined) return "";
+    if (typeof v === "object") { try { return JSON.stringify(v, null, 2); } catch { return String(v); } }
+    return String(v);
+  };
+  const rows = computeLineDiff(normalize(left), normalize(right));
+  const stats = rows.reduce((acc, r) => {
+    if (r.type === "add") acc.add++;
+    else if (r.type === "del") acc.del++;
+    return acc;
+  }, { add: 0, del: 0 });
+
+  return (
+    <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden" data-testid="line-diff-view">
+      <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 text-[11px] flex items-center gap-3">
+        <span className="text-emerald-600 dark:text-emerald-400 font-bold">+{stats.add}</span>
+        <span className="text-red-600 dark:text-red-400 font-bold">−{stats.del}</span>
+        <span className="text-slate-500">linii modificate</span>
+      </div>
+      <div className="overflow-auto max-h-[55vh]">
+        <table className="w-full text-xs font-mono">
+          <tbody>
+            {rows.map((r, idx) => {
+              const bg = r.type === "add" ? "bg-emerald-50 dark:bg-emerald-500/10"
+                : r.type === "del" ? "bg-red-50 dark:bg-red-500/10"
+                : "";
+              const leftBg = r.type === "del" ? "bg-red-100/60 dark:bg-red-500/15" : r.type === "add" ? "" : "";
+              const rightBg = r.type === "add" ? "bg-emerald-100/60 dark:bg-emerald-500/15" : r.type === "del" ? "" : "";
+              return (
+                <tr key={idx} className={bg}>
+                  <td className="w-10 px-2 py-0.5 text-right text-slate-400 select-none border-r border-slate-100 dark:border-slate-800 align-top">{r.leftNo ?? ""}</td>
+                  <td className={`px-2 py-0.5 whitespace-pre-wrap break-all border-r border-slate-100 dark:border-slate-800 align-top ${leftBg}`}>
+                    {r.type === "del" && <span className="text-red-600 dark:text-red-400 mr-1">−</span>}
+                    {r.left ?? <span className="text-slate-300"> </span>}
+                  </td>
+                  <td className="w-10 px-2 py-0.5 text-right text-slate-400 select-none border-r border-slate-100 dark:border-slate-800 align-top">{r.rightNo ?? ""}</td>
+                  <td className={`px-2 py-0.5 whitespace-pre-wrap break-all align-top ${rightBg}`}>
+                    {r.type === "add" && <span className="text-emerald-600 dark:text-emerald-400 mr-1">+</span>}
+                    {r.right ?? <span className="text-slate-300"> </span>}
+                  </td>
+                </tr>
+              );
+            })}
+            {rows.length === 0 && (
+              <tr><td colSpan={4} className="text-center py-6 text-slate-400 italic">Conținut identic — nicio diferență detectată.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 // ============= COMPARE DIFF MODAL =============
 const CompareDiffModal = ({ entryA, entryB, onClose, onClear }) => {
+  const [view, setView] = useState("auto"); // auto | lines | keys
   if (!entryA || !entryB) return null;
   // Order chronologically: older = A, newer = B
   const [older, newer] = (new Date(entryA.created_at) <= new Date(entryB.created_at))
@@ -282,9 +370,13 @@ const CompareDiffModal = ({ entryA, entryB, onClose, onClear }) => {
   // Compute key-level diff if both are objects
   const isObjA = olderState && typeof olderState === "object";
   const isObjB = newerState && typeof newerState === "object";
-  const keys = isObjA && isObjB
+  const bothObjects = isObjA && isObjB;
+  const keys = bothObjects
     ? Array.from(new Set([...Object.keys(olderState), ...Object.keys(newerState)]))
     : null;
+
+  // Decide which view to render
+  const effectiveView = view === "auto" ? (bothObjects ? "keys" : "lines") : view;
 
   const sameTarget = entryA.target_id === entryB.target_id && entryA.target_type === entryB.target_type;
 
@@ -313,7 +405,23 @@ const CompareDiffModal = ({ entryA, entryB, onClose, onClear }) => {
           <ColumnHeader entry={newer} role="Mai nou" tone="emerald" />
         </div>
 
-        {keys ? (
+        {/* View toggle */}
+        <div className="flex items-center gap-1 mb-3 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit" data-testid="compare-view-toggle">
+          {bothObjects && (
+            <button
+              onClick={() => setView("keys")}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${effectiveView === "keys" ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-600 dark:text-slate-400"}`}
+              data-testid="view-keys"
+            >📋 Tabel câmpuri</button>
+          )}
+          <button
+            onClick={() => setView("lines")}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${effectiveView === "lines" ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-600 dark:text-slate-400"}`}
+            data-testid="view-lines"
+          >📄 Diff linie cu linie</button>
+        </div>
+
+        {effectiveView === "keys" && keys ? (
           <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden" data-testid="compare-table">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 dark:bg-slate-800/50">
@@ -331,8 +439,8 @@ const CompareDiffModal = ({ entryA, entryB, onClose, onClear }) => {
                   return (
                     <tr key={k} className={`border-t border-slate-100 dark:border-slate-800/50 ${changed ? "bg-amber-50/40 dark:bg-amber-500/5" : ""}`}>
                       <td className="py-2 px-3 font-mono text-xs">{k}{changed && <span className="ml-1 text-[9px] text-amber-600 dark:text-amber-400">●</span>}</td>
-                      <td className="py-2 px-3 font-mono text-xs text-slate-700 dark:text-slate-300">{v1 === undefined ? <em className="text-slate-400">— absent —</em> : typeof v1 === "object" ? JSON.stringify(v1) : String(v1)}</td>
-                      <td className="py-2 px-3 font-mono text-xs text-slate-700 dark:text-slate-300">{v2 === undefined ? <em className="text-slate-400">— absent —</em> : typeof v2 === "object" ? JSON.stringify(v2) : String(v2)}</td>
+                      <td className="py-2 px-3 font-mono text-xs text-slate-700 dark:text-slate-300 break-all">{v1 === undefined ? <em className="text-slate-400">— absent —</em> : typeof v1 === "object" ? JSON.stringify(v1) : String(v1)}</td>
+                      <td className="py-2 px-3 font-mono text-xs text-slate-700 dark:text-slate-300 break-all">{v2 === undefined ? <em className="text-slate-400">— absent —</em> : typeof v2 === "object" ? JSON.stringify(v2) : String(v2)}</td>
                     </tr>
                   );
                 })}
@@ -343,16 +451,7 @@ const CompareDiffModal = ({ entryA, entryB, onClose, onClear }) => {
             </div>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 gap-3">
-            <div>
-              <div className="text-[10px] uppercase tracking-wider text-red-600 font-bold mb-1">Mai vechi</div>
-              <pre className="bg-red-50 dark:bg-red-500/5 border border-red-100 dark:border-red-500/20 rounded-lg p-3 text-xs font-mono overflow-x-auto max-h-64">{olderState === null || olderState === undefined ? "— gol —" : String(olderState)}</pre>
-            </div>
-            <div>
-              <div className="text-[10px] uppercase tracking-wider text-emerald-600 font-bold mb-1">Mai nou</div>
-              <pre className="bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/20 rounded-lg p-3 text-xs font-mono overflow-x-auto max-h-64">{newerState === null || newerState === undefined ? "— gol —" : String(newerState)}</pre>
-            </div>
-          </div>
+          <LineDiffView left={olderState} right={newerState} />
         )}
 
         <div className="flex justify-end gap-2 mt-5">
