@@ -76,6 +76,30 @@ async def operator_flag_nonconformity(data: NonConformityIn, user: dict = Depend
             type_="nonconformity",
             link="/admin"
         )
+    # Notify the assigned specialist (and client, if any) when the flag targets a request
+    if related_request_id:
+        try:
+            req = await db.requests.find_one({"_id": ObjectId(related_request_id)})
+        except Exception:
+            req = None
+        if req:
+            sev_label = {"low": "minoră", "medium": "medie", "high": "majoră", "critical": "critică"}.get(data.severity, data.severity)
+            if req.get("specialist_id"):
+                await notify(
+                    req["specialist_id"],
+                    f"⚠ Sesizare pe lucrarea ta ({sev_label})",
+                    f"Operatorul {user['name']} a raportat o neconformitate pe '{req.get('title', 'cererea')}'. Motiv: {data.reason[:140]}",
+                    type_="nonconformity_specialist",
+                    link="/specialist",
+                )
+            if req.get("client_id"):
+                await notify(
+                    req["client_id"],
+                    f"ℹ Sesizare pe lucrarea ta ({sev_label})",
+                    f"Operatorul {user['name']} a raportat o problemă pe lucrarea ta. Admin-ul verifică situația.",
+                    type_="nonconformity_client",
+                    link="/client",
+                )
     return {"ok": True, "id": flag_id}
 
 @router.get("/admin/nonconformities")

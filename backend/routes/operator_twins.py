@@ -73,11 +73,23 @@ async def request_twin_validation(prop_id: str, user: dict = Depends(get_current
 
 @router.get("/properties/{prop_id}/twin")
 async def get_my_property_twin(prop_id: str, user: dict = Depends(get_current_user)):
-    """Read-only twin view for the property OWNER (client). Returns rooms + assets if approved."""
+    """Read-only twin view for the property OWNER (client), the assigned specialist
+    of an active/historical request on this property, admin and operator."""
     prop = await db.properties.find_one({"_id": ObjectId(prop_id)})
     if not prop:
         raise HTTPException(404, "Property not found")
-    if prop.get("owner_id") != user["id"] and user.get("role") not in ("admin", "operator"):
+    is_authorized = (
+        prop.get("owner_id") == user["id"]
+        or user.get("role") in ("admin", "operator")
+    )
+    if not is_authorized and user.get("role") == "specialist":
+        # Allow specialists currently or previously assigned to any request on this property
+        spec_request = await db.requests.find_one({
+            "property_id": prop_id,
+            "specialist_id": user["id"],
+        })
+        is_authorized = bool(spec_request)
+    if not is_authorized:
         raise HTTPException(403, "Not allowed")
     twin = await db.twins.find_one({"property_id": prop_id})
     if not twin:

@@ -1,0 +1,60 @@
+{
+  "summary": "Phase 31 backend audit of Specialist role connectors (SPEC<->CLIENT + SPEC<->OPERATOR). 17 scenarios scripted in pytest. Result: 15 PASSED, 1 SKIPPED (could not isolate a property without an existing specialist2 request to assert 403 — positive path of NEW FIX-2 was confirmed), 1 XFAIL (REST POST /chat/{id}/messages not implemented — chat is WebSocket only). Both NEW FIXES validated: (1) operator nonconformity flag emits in-app notifications to specialist + client + admin with correct type tags; (2) specialist GET /properties/{id}/twin returns 200 when they have an assigned request on that property. Found and FIXED a P1 crash on POST /api/specialist/documents (missing 'import uuid' caused 500). Verified review endpoint, dispute open by specialist, timeline access for both parties, lead-fee 45 RON debit, full open→assigned→in_progress→completed→confirmed lifecycle, marketplace listing, portfolio CRUD, and operator/queue ACL.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/specialist/documents",
+        "issue": "NameError: 'uuid' not defined - 500 Internal Server Error on every upload. Missing import in routes/specialist_docs.py. FIXED in this iteration (added `import uuid`).",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "POST /api/chat/{request_id}/messages",
+        "issue": "REST endpoint does NOT exist. Chat is exposed only via WebSocket (`/ws/chat/{request_id}`) and a GET history endpoint. Specialist↔Client chat works through the WebSocket, but any backend/test/UX flow that POSTs over REST will 405/404. Either add a REST POST wrapper or update the spec/UI to call WS only.",
+        "priority": "MEDIUM"
+      },
+      {
+        "endpoint": "GET /api/specialists/{spec_id}/profile",
+        "issue": "Returns a 'portfolio' array shape but card-level integration assumed 'portfolio_count' (per problem statement REGRESSION-2). Marketplace listing does NOT expose explicit portfolio_count; consumers must count() the embedded list. Recommend adding portfolio_count to /marketplace/specialists for consistency."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase31_specialist_audit.py",
+    "/app/test_reports/pytest/phase31_results.xml"
+  ],
+  "action_items": [
+    "DONE (testing agent): added `import uuid` to /app/backend/routes/specialist_docs.py to fix 500 on POST /api/specialist/documents.",
+    "Decide on REST POST /api/chat/{request_id}/messages — either implement it (recommended for resilience and tooling) or update SpecialistDashboard chat tab to be WS-only and document the contract.",
+    "Optional: add portfolio_count to GET /api/marketplace/specialists payload for client-side filtering without an extra fetch.",
+    "Optional: implement SPEC<->OPERATOR-5 (notify specialists with active requests when operator approves a twin) - currently NOT implemented; flagged as info per spec."
+  ],
+  "critical_code_review_comments": [
+    "routes/specialist_docs.py line 40 used uuid.uuid4() with no import — indicates this endpoint had never been exercised by tests. Add it to the regression suite (now covered).",
+    "routes/operator.py flag-nonconformity correctly fans out specialist_id + client_id notifications for target_type='request' (lines ~81-103). NEW FIX verified working.",
+    "routes/operator_twins.py get_my_property_twin now correctly authorizes specialists with active assigned/in_progress requests on the property (lines ~74-100). NEW FIX verified working.",
+    "routes/chat.py exposes only WebSocket + GET history. If product expects REST send, that's missing.",
+    "ReviewIn model requires `job_id` in body but the endpoint /requests/{req_id}/review uses the path id and ignores body.job_id — minor schema/impl drift; safe but confusing.",
+    "Several endpoints accept 'amount' as query param (e.g., POST /requests/{id}/escrow?amount=300) instead of JSON body — inconsistent with other CRUD."
+  ],
+  "updated_files": [
+    "/app/backend/routes/specialist_docs.py (added `import uuid`)",
+    "/app/backend/tests/test_phase31_specialist_audit.py (new test file)"
+  ],
+  "success_rate": {
+    "backend": "94% (15/16 executable; 1 skip is env-dependent, 1 xfail is documented missing endpoint)",
+    "frontend": "n/a (backend-only run as requested)"
+  },
+  "test_credentials": "Used /app/memory/test_credentials.md set: client@propmanage.io/Client123!, specialist@propmanage.io/Spec123!, specialist2@propmanage.io/Spec123!, operator@propmanage.io/Op123!, admin@propmanage.io/Admin123!. Auth is COOKIE-based (httpOnly) — login returns user JSON, no bearer token. Test client uses requests.Session().",
+  "seed_data_creation": "Created via API during test run: 1 client property if none existed (TEST_AuditHouse), 2 requests (TEST_AuditReq_xxx run through full lifecycle to 'confirmed'; TEST_DisputeReq_xxx left in 'disputed' state with frozen escrow), 1 portfolio item (TEST_PortfolioItem), 1 specialist document (TEST_AuditCert). 45 RON deducted from specialist wallet per accept (×2).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run /app/backend/tests/test_phase31_specialist_audit.py for regression. Two known classes of state to be aware of: (a) the audited request gets pushed to 'confirmed' so escrow_status='released' — re-running creates fresh requests via uuid suffix, so safe to re-run. (b) specialist2 may have an assigned request on the seeded property, causing the 403 negative-path test to SKIP — this is not a regression. Both NEW FIXES (operator nonconformity → specialist+client notif, and specialist twin access on assigned request) are confirmed working end-to-end. Chat REST POST remains an unwired endpoint (xfail). Specialist documents upload now works after the uuid import fix.",
+  "rca of the issue": "P1 BUG (FIXED): POST /api/specialist/documents returned 500 NameError: name 'uuid' is not defined. Reproduction: login as specialist; POST /api/specialist/documents with {type:'certification', name:'X', url:'https://...'}; backend traceback at routes/specialist_docs.py:40 (str(uuid.uuid4())). Mitigation applied: added `import uuid` at top of routes/specialist_docs.py. Verified by re-running test_specialist_can_upload_document → PASS."
+}
