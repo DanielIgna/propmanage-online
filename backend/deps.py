@@ -40,6 +40,16 @@ def block_in_impersonation(user: dict, action: str = "această acțiune"):
         raise HTTPException(403, f"Nu poți efectua {action} în modul impersonare. Ieși din impersonare mai întâi.")
 
 
+def block_impersonation_dep(action: str):
+    """Dependency factory: rejects the request with 403 BEFORE body validation if the caller
+    is in impersonation mode. Use this for endpoints whose body could fail Pydantic validation
+    (otherwise the 422 would mask the 403)."""
+    async def _dep(user: dict = Depends(get_current_user)):
+        block_in_impersonation(user, action)
+        return user
+    return _dep
+
+
 def require_role(*allowed):
     async def dep(user: dict = Depends(get_current_user)):
         if user.get("role") in allowed:

@@ -54,12 +54,16 @@ async def start_impersonation(
     data: ImpersonateIn,
     request: Request,
     response: Response,
-    admin: dict = Depends(require_role("admin")),
+    current: dict = Depends(get_current_user),
 ):
     """Start an impersonation session. Admin only."""
-    # Cannot impersonate while already impersonating (avoid token mess)
-    if admin.get("impersonation"):
+    # GDPR: refuse nested impersonation BEFORE role gating so the 409 surfaces
+    # (under nested-impersonation the current session role == target's role, not 'admin').
+    if current.get("impersonation"):
         raise HTTPException(409, "Ești deja în modul impersonare. Ieși mai întâi.")
+    if current.get("role") != "admin":
+        raise HTTPException(403, "Insufficient permissions")
+    admin = current
 
     target = await db.users.find_one({"_id": ObjectId(data.user_id)})
     if not target:

@@ -561,3 +561,19 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Validated AutoReminderSettingsModal frontend (iteration_28): 7/7 scenarios pass — enable toggle, thresholds CSV input, pause-until date, stop-forever switch, save & toast
 - Custom domain propmanage.ro stuck in "pending": deployment scan confirms codebase is deploy-ready (CORS=*, env vars clean, OAuth uses window.location.origin); user must delete existing A records at registrar then re-link via Entri (15-30 min DNS propagation expected)
 
+## Changelog — 2026-02-28 — Admin Impersonation (GDPR)
+- New backend route `/app/backend/routes/impersonation.py` with endpoints:
+  - `POST /api/admin/impersonate` (reason ≥10ch, returns 2h JWT)
+  - `POST /api/admin/stop-impersonation` (restores admin cookie, marks log ended_at)
+  - `GET /api/admin/impersonation-logs` (admin audit view: skip/limit, target/admin filters)
+  - `GET /api/me/access-history` (GDPR data-subject view — IP/UA stripped)
+- New collection `db.impersonation_logs` (admin_id, target_user_id, reason, IP, UA, started_at, ended_at, duration_seconds)
+- Hardened auth: change_password / 2FA setup+verify+disable / account_delete all use `block_impersonation_dep` (Depends factory) so 403 surfaces BEFORE Pydantic 422 even on malformed bodies
+- Cannot impersonate other admins → 403; cannot nest → 409 (now surfaces before role gating)
+- Frontend: `<ImpersonationBanner />` sticky red banner with live 2h countdown + Stop button (mounted globally inside BrowserRouter)
+- AdminUsers: red `UserCheck` icon per non-admin/non-self/non-banned row → opens `ImpersonateModal` (10-char reason required)
+- AdminConsole: new "Impersonări" sidebar tab under COMPLIANCE → `AdminImpersonationLogs` audit table
+- SettingsPanel → Privacy modal: new "Cine a accesat contul tău" section listing past sessions
+- Validated end-to-end (iteration_29): backend 17/17 pytest, frontend 100% on FRONTEND-A..F + regression suite
+
+
