@@ -117,14 +117,21 @@ def _layout(title: str, preheader: str, body_html: str, cta_url: Optional[str] =
 
 # ===================== Send function =====================
 
-async def send_email(to: str | List[str], subject: str, html: str, plain: Optional[str] = None) -> dict:
-    """Sends an email via active provider. Returns dict {ok, provider, id|error}."""
+async def send_email(to: str | List[str], subject: str, html: str, plain: Optional[str] = None, attachments: Optional[List[dict]] = None) -> dict:
+    """Sends an email via active provider. Returns dict {ok, provider, id|error}.
+
+    attachments: optional list of dicts. Resend format: [{filename, content (base64 str)}].
+    For SendGrid we convert to its expected schema (filename, content, type, disposition).
+    Console provider just logs that attachments would be sent.
+    """
     recipients = [to] if isinstance(to, str) else to
     plain_text = plain or "View this email in HTML"
 
     if PROVIDER == "resend":
         try:
             params = {"from": SENDER_EMAIL, "to": recipients, "subject": subject, "html": html, "text": plain_text}
+            if attachments:
+                params["attachments"] = attachments
             result = await asyncio.to_thread(resend.Emails.send, params)
             return {"ok": True, "provider": "resend", "id": result.get("id")}
         except Exception as e:
@@ -134,6 +141,16 @@ async def send_email(to: str | List[str], subject: str, html: str, plain: Option
     if PROVIDER == "sendgrid":
         try:
             msg = Mail(from_email=SENDER_EMAIL, to_emails=recipients, subject=subject, html_content=html, plain_text_content=plain_text)
+            if attachments:
+                from sendgrid.helpers.mail import Attachment, FileContent, FileName, FileType, Disposition
+                for a in attachments:
+                    att = Attachment(
+                        FileContent(a.get("content")),
+                        FileName(a.get("filename", "attachment.pdf")),
+                        FileType(a.get("type", "application/pdf")),
+                        Disposition("attachment"),
+                    )
+                    msg.add_attachment(att)
             result = await asyncio.to_thread(_sg_client.send, msg)
             return {"ok": True, "provider": "sendgrid", "status_code": result.status_code}
         except Exception as e:
@@ -141,7 +158,8 @@ async def send_email(to: str | List[str], subject: str, html: str, plain: Option
             return {"ok": False, "provider": "sendgrid", "error": str(e)}
 
     # console fallback - print to logs for dev visibility
-    logger.info(f"[EMAIL/CONSOLE] To: {recipients} | Subject: {subject}")
+    att_info = f" | Attachments: {len(attachments)} ({', '.join(a.get('filename', '?') for a in attachments)})" if attachments else ""
+    logger.info(f"[EMAIL/CONSOLE] To: {recipients} | Subject: {subject}{att_info}")
     logger.info(f"[EMAIL/CONSOLE] HTML preview (first 200 chars): {html[:200]}")
     return {"ok": True, "provider": "console", "demo": True}
 

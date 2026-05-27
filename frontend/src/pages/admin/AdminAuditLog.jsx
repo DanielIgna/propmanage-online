@@ -59,6 +59,42 @@ export const AdminAuditLog = () => {
   const [missingCompare, setMissingCompare] = useState(false); // shareable link entries not found
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [pinning, setPinning] = useState(null); // entry id being pinned/unpinned
+  const [emailModal, setEmailModal] = useState(null); // { entry } when open
+  const [emailRecipients, setEmailRecipients] = useState("");
+  const [emailNote, setEmailNote] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+
+  const sendEmailReport = async () => {
+    if (!emailModal) return;
+    const recipients = emailRecipients.split(",").map(s => s.trim()).filter(Boolean);
+    if (recipients.length === 0) {
+      flash("❌ Adaugă cel puțin un destinatar");
+      return;
+    }
+    setEmailSending(true);
+    try {
+      const r = await axios.post(`${API}/admin/audit-log/${emailModal.entry.id}/email-report`, {
+        recipients,
+        note: emailNote,
+        base_url: window.location.origin,
+      });
+      const provider = r.data.provider;
+      const invalid = r.data.invalid_recipients || [];
+      let msg = r.data.demo
+        ? `✓ Email simulat (provider: console — configurează RESEND_API_KEY pentru trimitere reală). Destinatari: ${r.data.recipients.length}`
+        : `✓ Email trimis via ${provider} către ${r.data.recipients.length} destinatar(i)`;
+      if (invalid.length) msg += ` · ${invalid.length} adresă(e) invalidă(e) ignorată(e)`;
+      flash(msg);
+      setEmailModal(null);
+      setEmailRecipients("");
+      setEmailNote("");
+      load();
+    } catch (e) {
+      flash(`❌ ${e?.response?.data?.detail || "Eroare la trimiterea emailului"}`);
+    } finally {
+      setEmailSending(false);
+    }
+  };
 
   const togglePin = async (entry) => {
     let note = entry.pinned_note;
@@ -344,6 +380,19 @@ export const AdminAuditLog = () => {
                         >
                           📄 Raport PDF
                         </button>
+                        <button
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            setEmailModal({ entry: e });
+                            setEmailRecipients("");
+                            setEmailNote("");
+                          }}
+                          className="shrink-0 text-[11px] font-semibold px-2.5 py-1.5 rounded-md bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white transition-colors flex items-center gap-1"
+                          data-testid={`audit-email-${e.id}`}
+                          title="Trimite raportul PDF prin email către legal, compliance sau echipa de incident response. One-click compliance forwarding."
+                        >
+                          📧 Email raport
+                        </button>
                       </div>
                     )}
                     <div className="grid md:grid-cols-2 gap-3">
@@ -420,6 +469,76 @@ export const AdminAuditLog = () => {
           }}
           onCopiedLink={() => flash("✓ Link copiat în clipboard — îl poți trimite oricui are acces admin.")}
         />
+      )}
+      {emailModal && (
+        <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !emailSending && setEmailModal(null)}>
+          <div
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6"
+            onClick={ev => ev.stopPropagation()}
+            data-testid="email-report-modal"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold flex items-center gap-2">📧 Email raport incident</h3>
+                <p className="text-xs text-slate-500 mt-1">Trimite PDF-ul cu raportul către legal, compliance sau orice destinatar relevant.</p>
+              </div>
+              <button onClick={() => !emailSending && setEmailModal(null)} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">×</button>
+            </div>
+
+            <div className="mb-3 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-xs">
+              <div className="font-semibold text-slate-700 dark:text-slate-300 mb-0.5">Intrare:</div>
+              <div className="text-slate-600 dark:text-slate-400">
+                <span className="font-mono">{emailModal.entry.action}</span> · {emailModal.entry.target_label || emailModal.entry.target_type}
+              </div>
+              {emailModal.entry.pinned_note && (
+                <div className="text-amber-700 dark:text-amber-300 italic mt-1">📌 "{emailModal.entry.pinned_note}"</div>
+              )}
+            </div>
+
+            <label className="block mb-3">
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block">
+                Destinatari <span className="text-slate-500 font-normal">(separate prin virgulă, max 10)</span>
+              </span>
+              <input
+                type="text"
+                value={emailRecipients}
+                onChange={ev => setEmailRecipients(ev.target.value)}
+                placeholder="legal@firma.ro, compliance@firma.ro"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-mono"
+                data-testid="email-recipients-input"
+                disabled={emailSending}
+              />
+            </label>
+
+            <label className="block mb-4">
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block">
+                Notă admin <span className="text-slate-500 font-normal">(opțional — va apărea în corpul emailului)</span>
+              </span>
+              <textarea
+                value={emailNote}
+                onChange={ev => setEmailNote(ev.target.value)}
+                placeholder="Ex: Pentru review urgent — modificarea a fost discutată în meetingul de azi."
+                rows={3}
+                maxLength={500}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm resize-none"
+                data-testid="email-note-input"
+                disabled={emailSending}
+              />
+            </label>
+
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-4 p-2 rounded-md bg-blue-50/50 dark:bg-blue-500/5 border border-blue-100 dark:border-blue-500/20">
+              ℹ️ Email-ul va include PDF-ul complet ca atașament, plus diff before/after, nota incident și QR code spre intrare live.
+              <br/>Dacă <code className="font-mono">RESEND_API_KEY</code> nu e configurat, emailul va fi simulat (logat în consolă).
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <AdminBtn variant="secondary" onClick={() => setEmailModal(null)} disabled={emailSending} data-testid="email-cancel">Anulează</AdminBtn>
+              <AdminBtn variant="primary" onClick={sendEmailReport} disabled={emailSending || !emailRecipients.trim()} data-testid="email-send">
+                {emailSending ? "Se trimite..." : "📨 Trimite email"}
+              </AdminBtn>
+            </div>
+          </div>
+        </div>
       )}
       {missingCompare && (
         <div className="fixed bottom-4 right-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 text-sm px-4 py-2 rounded-lg shadow-lg" data-testid="compare-missing-banner">

@@ -1487,26 +1487,8 @@ async def toggle_pin_audit_entry(
     return {"ok": True, "pinned": new_pinned, "pinned_note": note if new_pinned else None}
 
 
-@router.get("/audit-log/{entry_id}/incident-report.pdf")
-async def export_incident_report_pdf(
-    entry_id: str,
-    base_url: Optional[str] = None,
-    user: dict = Depends(require_role("admin")),
-):
-    """Generate a PDF incident report for an audit entry. Designed for pinned anomalies,
-    legal documentation, board meetings, post-mortems, and ISO/SOC2 compliance attachments.
-
-    Includes: title, actor, timestamp, target, before/after diff, pin note, pin author,
-    and QR code linking to shareable diff URL.
-    """
-    try:
-        oid = ObjectId(entry_id)
-    except InvalidId:
-        raise HTTPException(400, "Invalid entry id")
-    entry = await db.admin_audit_log.find_one({"_id": oid})
-    if not entry:
-        raise HTTPException(404, "Audit entry not found")
-
+async def _build_incident_pdf_bytes(entry: dict, base_url: Optional[str], requested_by_label: str) -> bytes:
+    """Generate the incident report PDF as bytes. Shared by the download endpoint and the email-report endpoint."""
     # Imports kept local — heavy modules
     import json as _json
     import os as _os
@@ -1586,12 +1568,10 @@ async def export_incident_report_pdf(
             return str(iso)
 
     story = []
-    # Header
     story.append(Paragraph("PropManage — Incident Report", h1))
     story.append(Paragraph(f"Audit Entry · {entry.get('action', '—')}", h2))
     story.append(Spacer(1, 6))
 
-    # Metadata table
     pinned = bool(entry.get("pinned"))
     meta_rows = [
         [Paragraph("ACȚIUNE", label), Paragraph(entry.get("action", "—"), val)],
@@ -1614,7 +1594,6 @@ async def export_incident_report_pdf(
     story.append(t)
     story.append(Spacer(1, 14))
 
-    # Pin note (highlighted)
     if pinned:
         pn = entry.get("pinned_note") or "(fără notă)"
         by = entry.get("pinned_by_name") or "—"
@@ -1625,7 +1604,6 @@ async def export_incident_report_pdf(
         ))
         story.append(Spacer(1, 12))
 
-    # Before / After diff
     before_txt = fmt_value(entry.get("before"))
     after_txt = fmt_value(entry.get("after"))
     diff_data = [
@@ -1656,11 +1634,8 @@ async def export_incident_report_pdf(
     story.append(diff_tbl)
     story.append(Spacer(1, 14))
 
-    # QR code linking to shareable URL
     if base_url:
-        share_url = f"{base_url.rstrip('/')}/admin?compare={entry_id},{entry_id}"
-        # Actually for single entry, use a deep link to audit log with this entry expanded
-        share_url = f"{base_url.rstrip('/')}/admin?audit_focus={entry_id}"
+        share_url = f"{base_url.rstrip('/')}/admin?audit_focus={str(entry['_id'])}"
         qr_img = qrcode.make(share_url)
         qr_buf = BytesIO()
         qr_img.save(qr_buf, format="PNG")
@@ -1683,24 +1658,171 @@ async def export_incident_report_pdf(
         story.append(KeepTogether([qr_table]))
         story.append(Spacer(1, 12))
 
-    # Footer
     now_str = datetime.now(timezone.utc).strftime("%d %b %Y, %H:%M UTC")
     story.append(Paragraph(
         f"<font size='8' color='#94a3b8'>Document generat de <b>PropManage Audit System</b> la {now_str} "
-        f"· Solicitat de {user.get('name') or user.get('email')} "
+        f"· Solicitat de {requested_by_label} "
         f"· Pentru audituri ISO/SOC2, post-mortems, rapoarte legale</font>",
         val,
     ))
 
     doc.build(story)
     buf.seek(0)
+    return buf.getvalue()
 
+
+@router.get("/audit-log/{entry_id}/incident-report.pdf")
+async def export_incident_report_pdf(
+    entry_id: str,
+    base_url: Optional[str] = None,
+    user: dict = Depends(require_role("admin")),
+):
+    """Generate a PDF incident report for an audit entry. Designed for pinned anomalies,
+    legal documentation, board meetings, post-mortems, and ISO/SOC2 compliance attachments.
+    """
+    try:
+        oid = ObjectId(entry_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid entry id")
+    entry = await db.admin_audit_log.find_one({"_id": oid})
+    if not entry:
+        raise HTTPException(404, "Audit entry not found")
+
+    from io import BytesIO
+    pdf_bytes = await _build_incident_pdf_bytes(
+        entry, base_url, user.get("name") or user.get("email") or "Admin",
+    )
     filename = f"incident-report-{entry_id}.pdf"
     return StreamingResponse(
-        buf,
+        BytesIO(pdf_bytes),
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post("/audit-log/{entry_id}/email-report")
+async def email_incident_report(
+    entry_id: str,
+    payload: dict = Body(...),
+    user: dict = Depends(require_role("admin")),
+):
+    """Email an incident-report PDF to one or more recipients.
+    Body: { recipients: [str, ...] (required, max 10), note: str (optional admin context),
+            base_url: str (optional, for QR/deep link) }
+    Uses Resend if RESEND_API_KEY is configured, otherwise prints to logs (console fallback).
+    """
+    import base64
+    import re
+
+    try:
+        oid = ObjectId(entry_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid entry id")
+    entry = await db.admin_audit_log.find_one({"_id": oid})
+    if not entry:
+        raise HTTPException(404, "Audit entry not found")
+
+    recipients_raw = payload.get("recipients") or []
+    if isinstance(recipients_raw, str):
+        # allow comma-separated
+        recipients_raw = [r.strip() for r in recipients_raw.split(",") if r.strip()]
+    email_re = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+    recipients = [r for r in recipients_raw if email_re.match(r)]
+    invalid = [r for r in recipients_raw if r not in recipients]
+    if not recipients:
+        raise HTTPException(400, "Niciun destinatar valid. Verifică adresele de email.")
+    if len(recipients) > 10:
+        raise HTTPException(400, "Maxim 10 destinatari per email.")
+
+    admin_note = (payload.get("note") or "").strip()[:500] or None
+    base_url = payload.get("base_url") or None
+
+    # Generate PDF (reuse helper)
+    pdf_bytes = await _build_incident_pdf_bytes(
+        entry, base_url, user.get("name") or user.get("email") or "Admin",
+    )
+    pdf_b64 = base64.b64encode(pdf_bytes).decode("ascii")
+    pdf_filename = f"incident-report-{entry_id}.pdf"
+
+    # Format action label + datetime for subject
+    action = entry.get("action", "audit")
+    target_label = entry.get("target_label") or entry.get("target_type") or "—"
+    try:
+        evt_dt = datetime.fromisoformat(str(entry.get("created_at")).replace("Z", "+00:00")).strftime("%d %b %Y")
+    except Exception:
+        evt_dt = ""
+    pin_note = entry.get("pinned_note") or ""
+    subject_tail = f" — {pin_note[:60]}" if pin_note else ""
+    subject = f"[INCIDENT] {action} — {target_label} — {evt_dt}{subject_tail}"
+
+    # Build minimalist HTML body (uses email_service layout)
+    from email_service import _layout, send_email as _send_email  # type: ignore
+
+    pinned_html = ""
+    if entry.get("pinned"):
+        pinned_html = f"""
+          <div style="background:#fbbf2415; border-left:3px solid #fbbf24; padding:14px 18px; border-radius:12px; margin:18px 0;">
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#fbbf24; margin-bottom:6px;">Notă incident</div>
+            <div style="color:#e5e5e5; font-style:italic;">"{pin_note or '(fără notă)'}"</div>
+            <div style="color:#888893; font-size:11px; margin-top:6px;">
+              Marcat de {entry.get('pinned_by_name') or '—'}
+            </div>
+          </div>
+        """
+    admin_note_html = ""
+    if admin_note:
+        admin_note_html = f"""
+          <div style="background:#1a1a1f; border-left:3px solid #d4ff3a; padding:14px 18px; border-radius:12px; margin:18px 0;">
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#d4ff3a; margin-bottom:6px;">Notă administrator</div>
+            <div style="color:#e5e5e5;">{admin_note}</div>
+          </div>
+        """
+
+    body_html = f"""
+      <p>Salut,</p>
+      <p>Adminul <strong>{user.get('name') or user.get('email')}</strong> a transmis acest raport de incident generat de PropManage Audit System.</p>
+      <table border="0" cellpadding="0" cellspacing="0" style="width:100%; background:#1a1a1f; border-radius:14px; padding:18px; margin:18px 0;">
+        <tr><td style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#888893; padding-bottom:6px;">Acțiune</td><td style="font-size:14px; color:#ffffff; padding-bottom:6px;">{action}</td></tr>
+        <tr><td style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#888893; padding-bottom:6px;">Țintă</td><td style="font-size:14px; color:#ffffff; padding-bottom:6px;">{target_label}</td></tr>
+        <tr><td style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#888893; padding-bottom:6px;">Actor</td><td style="font-size:13px; color:#c8c8cc; padding-bottom:6px;">{entry.get('actor_name') or '—'} &lt;{entry.get('actor_email') or '—'}&gt;</td></tr>
+        <tr><td style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#888893;">Data</td><td style="font-size:13px; color:#c8c8cc;">{evt_dt or '—'}</td></tr>
+      </table>
+      {pinned_html}
+      {admin_note_html}
+      <p style="color:#a8a8b0; font-size:13px;">Atașat în acest email găsești PDF-ul cu raportul complet — include diff before/after, codul QR pentru acces live și header de audit ISO/SOC2.</p>
+    """
+    html = _layout(
+        title="Raport de incident",
+        preheader=f"Audit entry · {action} · {target_label}",
+        body_html=body_html,
+    )
+
+    # Build attachment payload (Resend format)
+    attachments = [{"filename": pdf_filename, "content": pdf_b64}]
+
+    # Use extended send_email (passes attachments if supported)
+    try:
+        result = await _send_email(recipients, subject, html, attachments=attachments)
+    except TypeError:
+        # send_email doesn't support attachments yet — fallback without
+        result = await _send_email(recipients, subject, html)
+        result["warning"] = "Atașamentul PDF nu a putut fi trimis (provider nu suportă attachments)."
+
+    # Audit log this email send
+    await audit("incident.email_sent", user,
+                target={"type": "audit_entry", "id": entry_id, "label": f"{action} → {target_label}"},
+                note=f"Email trimis către {len(recipients)} destinatar(i) via {result.get('provider', '—')}")
+
+    return {
+        "ok": result.get("ok", False),
+        "provider": result.get("provider"),
+        "recipients": recipients,
+        "invalid_recipients": invalid,
+        "demo": result.get("demo", False),
+        "error": result.get("error"),
+        "warning": result.get("warning"),
+        "id": result.get("id"),
+    }
 
 
 @router.post("/audit-log/{entry_id}/rollback")

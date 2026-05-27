@@ -237,6 +237,17 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Auto-deschide modalul când pagina e accesată cu `?compare=` (fetch fallback prin `GET /api/admin/audit-log/{id}`)
 - Banner roșu "⚠️ Link invalid" dacă intrările au fost șterse; URL curățat la close
 
+### Phase 39 — Email Incident Report (Feb 2026)
+- Endpoint `POST /api/admin/audit-log/{id}/email-report` cu body `{recipients, note, base_url}`
+- Reutilizează `_build_incident_pdf_bytes` helper (refactor din Phase 38) pentru attachment
+- `send_email()` în `email_service.py` extins cu parametru `attachments` (suport Resend + SendGrid)
+- Validare destinatari prin regex, max 10, separator virgulă, returnează `invalid_recipients` list
+- Subject auto-format: `[INCIDENT] {action} — {target} — {date} — {pin_note[:60]}`
+- Body HTML brand-styled cu tabel metadată, casetă pinned-note, casetă admin-note
+- Auto-audit: fiecare email creează o intrare `incident.email_sent` în audit log (traceability)
+- Frontend: buton "📧 Email raport" lângă "📄 Raport PDF" în detail-view pinned + modal cu prompt destinatari + textarea notă admin
+- Console fallback graceful când `RESEND_API_KEY` lipsește: UI informează `"Email simulat (provider: console)"`
+
 ### Phase 38 — Incident Report PDF Export (Feb 2026)
 - Endpoint `GET /api/admin/audit-log/{id}/incident-report.pdf?base_url=...` (admin only)
 - PDF generat cu **ReportLab** + font **DejaVu Sans** (Unicode complet, diacritice românești Ț/Ș/Ă/Î/Â)
