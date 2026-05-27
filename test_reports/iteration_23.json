@@ -1,0 +1,38 @@
+{
+  "summary": "Refactor validation (concierge.py split + DigitalTwinViewer.jsx split) — ZERO regressions detected. Backend concierge endpoints: 13/13 PASS (user chat, history, public settings; admin settings/conversations/stats/block-unblock; safety filters for prompt injection + sensitive request; escalation on 'refund'; PII redaction of email + phone). Frontend Digital Twin viewer (refactored orchestrator + viewer/constants.js + ViewerScene + MeasureSection + PinSystem): all data-testids render correctly — dt-viewer mounts, dt-tool-orbit/measure/section/pin (4/4), dt-face-shaded/white/xray/wireframe/monochrome (5/5), dt-reset-camera, dt-close-viewer, dt-measure-hint on measure click, dt-section-controls + dt-section-axis-x/y/z on section click, dt-pin-draft-modal with title/desc/category/priority/submit fields after clicking on canvas in pin mode. The pin draft modal opens correctly with a fresh world-position (e.g., x=2.679 y=3.582 z=3.125) — confirms ViewerScene/ModelWithEvents callback wiring through the refactored orchestrator is intact. Admin-level user-bypass UA was needed (security_guard blocks default python-requests).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_concierge_refactor.py",
+    "/app/test_reports/pytest/concierge_refactor_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "concierge.py re-exports admin_router via `from routes.concierge_admin import admin_router  # noqa: F401`. Backward compatibility for `from routes.concierge import router, admin_router` (server.py:48) verified — both routers register and respond.",
+    "concierge_core.py keeps EMERGENT_LLM_KEY/model constants alongside helpers. Consider moving the constants into a tiny config module if more provider tuning surfaces grow, but acceptable for current scope.",
+    "viewer/constants.js correctly exports FACE_STYLES (5), TOOLS (4), SECTION_AXES (3), CATEGORY_COLORS, STATUS_LABEL — all confirmed live by the DOM data-testids matching exactly.",
+    "PinSystem.jsx (PinDraftModal + PinThreadModal) uses fixed inset-0 z-50 for its own overlay — independent of the viewer's embedded/fullscreen mode, so it renders correctly regardless of split-mode wrapping. Good encapsulation.",
+    "Note: dt-section-slider is conditionally rendered only when an axis is selected (line 214 of DigitalTwinViewer.jsx) — this is by design, not a refactor regression. Review request mentioned the slider but verified that the gating axis state still drives it post-refactor.",
+    "security_guard dependency on /api/concierge/chat blocks the default python-requests User-Agent (UA classifier flags 'python-requests' as a bot). Tests had to spoof a browser UA. This is pre-existing behavior, not a refactor issue, but worth being aware of for future automated testing."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_concierge_refactor.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (13/13 fast tests; 1 slow rate-limit test deselected to keep run fast)",
+    "frontend": "100% on the post-refactor viewer surface (viewer mount, tools, face styles, reset/close, measure hint, section controls, pin draft modal full field set)"
+  },
+  "test_credentials": "admin@propmanage.io / Admin123! (admin); client@propmanage.io / Client123! (client). All endpoints exercised via REST against https://phased-document.preview.emergentagent.com.",
+  "seed_data_creation": "No new seed data created. Reused TEST_PhaseH_UI project from iteration_22 to open the viewer; pin draft modal capture verified at world position (2.679, 3.582, 3.125) but draft was cancelled — no DB pollution. Admin block-user test uses TEST_user_* synthetic id and self-cleans (block then unblock).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Refactor is solid. Concierge split (user/admin/core) preserves all behavior. DigitalTwinViewer split (orchestrator + viewer/ submodules) keeps every data-testid + Three.js click→spawn-pin wiring intact. If future iterations touch concierge or viewer again, /app/backend/tests/test_concierge_refactor.py is the regression net — run with `-m 'not slow'` for ~9s, or remove the marker filter to also exercise the 30-msg rate-limit path (~30-90s). For UI viewer regression, the iteration_23 playwright recipe (login admin → /digital-twin → dt-open-* first project → assert dt-viewer + tool/face/section testids → switch to pin tool → mouse click canvas center → assert dt-pin-draft-modal + its 5 field testids) covers the critical path in <30s.",
+  "rca_of_the_issue": "N/A — no issues found post-refactor."
+}

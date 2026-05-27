@@ -1,161 +1,40 @@
-"""PropManage — AI Concierge (Bubble Widget) + Content Filter + Per-Role Security
+"""PropManage — AI Concierge (Bubble Widget) user-facing endpoints + role prompts.
 
 Provides:
 - Role-aware AI assistant (Client / Specialist / Operator) via Claude Sonnet 4.5
 - Anti-prompt-injection + sensitive request filtering
 - Rate limiting per user
 - Auto-escalation to human support for trigger phrases
-- Audit logging integrated with admin_ai_findings (concierge_abuse_blocked)
+
+Admin endpoints live in `concierge_admin.py`. Shared helpers in `concierge_core.py`.
 """
-import os
-import re
 import uuid
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Body, Query, Request
-from bson import ObjectId
-from bson.errors import InvalidId
+from fastapi import APIRouter, Depends, HTTPException, Body
 
 from db import db
-from deps import get_current_user, require_role
+from deps import get_current_user
 from routes.security_guard import security_guard
+from routes.concierge_core import (
+    EMERGENT_LLM_KEY,
+    DEFAULT_MODEL_PROVIDER,
+    DEFAULT_MODEL_NAME,
+    _check_escalation,
+    _check_prompt_injection,
+    _check_sensitive_request,
+    _get_settings,
+    _rate_limit_check,
+    _record_block,
+    _redact_pii,
+)
+# Re-export admin_router for backward compatibility (server.py imports both from this module)
+from routes.concierge_admin import admin_router  # noqa: F401
 
 logger = logging.getLogger("propmanage.concierge")
 router = APIRouter(prefix="/api/concierge", tags=["concierge"])
-admin_router = APIRouter(prefix="/api/admin/concierge", tags=["admin-concierge"])
-
-# ============= PII REDACTION (assistant output safety net) =============
-
-EMAIL_REGEX = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
-PHONE_REGEX = re.compile(r"(?<!\w)(\+?\d{1,3}[\s.-]?)?\(?\d{2,4}\)?[\s.-]?\d{2,4}[\s.-]?\d{2,4}(?!\w)")
-IBAN_REGEX = re.compile(r"\bRO\d{2}[A-Z]{4}\d{16}\b", re.IGNORECASE)
-CNP_REGEX = re.compile(r"\b[1-8]\d{12}\b")
-
-
-def _redact_pii(text: str) -> str:
-    if not text:
-        return text
-    text = EMAIL_REGEX.sub("[email redactat]", text)
-    text = IBAN_REGEX.sub("[IBAN redactat]", text)
-    text = CNP_REGEX.sub("[CNP redactat]", text)
-
-    def _phone_repl(m):
-        digits = re.sub(r"\D", "", m.group(0))
-        if len(digits) >= 9:  # only true phone-like sequences
-            return "[telefon redactat]"
-        return m.group(0)
-    text = PHONE_REGEX.sub(_phone_repl, text)
-    return text
-
-EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "").strip()
-DEFAULT_MODEL_PROVIDER = "anthropic"
-DEFAULT_MODEL_NAME = "claude-sonnet-4-6"
-
-# ============= SAFETY FILTERS =============
-
-PROMPT_INJECTION_PATTERNS = [
-    r"ignore\s+(all\s+)?(previous|prior)\s+(instructions|prompts|messages)",
-    r"you\s+are\s+now\s+(a|an)\s+\w+(?!\s+(assistant|agent))",
-    r"system\s*:\s*",
-    r"</?\s*(system|admin|root|sudo)\s*>",
-    r"reveal\s+(your\s+|the\s+)?(prompt|instructions|system\s+message|guidelines)",
-    r"act\s+as\s+(a\s+)?(different|another)\s+\w+",
-    r"pretend\s+(you\s+are|to\s+be)",
-    r"roleplay\s+as",
-    r"\bDAN\b|\bjailbreak\b",
-    r"developer\s+mode",
-    r"\\n\\nHuman:|\\n\\nAssistant:",  # Anthropic-style injection
-    r"<\|im_(start|end)\|>",  # OpenAI chat template injection
-]
-
-SENSITIVE_REQUEST_PATTERNS = [
-    r"(d[aă][- ]?mi|arat[aă][- ]?mi|spune[- ]?mi)\s+(parola|password|token|api[ _-]?key|cheia)",
-    r"(arat[aă]|listeaz[aă]|toți|toate)\s+(useri|utilizatori|clienți|specialiști|operatori)",
-    r"care\s+(este|sunt)\s+(comisionul|marja|profitul|venitul)",
-    r"(structur[aă]|schema)\s+(baz[aă]\s+date|database|db)",
-    r"select\s+\*\s+from",
-    r"drop\s+(table|database)",
-    r"\bunion\s+select\b",
-    r"<script[^>]*>",
-    r"javascript:\s*",
-    r"on(click|error|load)\s*=",
-]
-
-DEFAULT_ESCALATION_TRIGGERS = [
-    "plângere", "reclamație", "reclamatie",
-    "refund", "bani înapoi", "bani inapoi",
-    "problemă legală", "problema legala", "instanță", "avocat", "tribunal",
-    "ștergere cont", "stergere cont", "gdpr", "ștergeți contul",
-    "hack", "spart cont", "fraudă", "frauda", "furat",
-    "discriminare", "abuz", "hărțuire", "hartuire",
-    "bug critic", "platforma nu funcționează", "platforma nu functioneaza",
-]
-
-
-def _check_prompt_injection(text: str) -> Optional[str]:
-    low = text.lower()
-    for p in PROMPT_INJECTION_PATTERNS:
-        if re.search(p, low, re.IGNORECASE):
-            return p
-    return None
-
-
-def _check_sensitive_request(text: str) -> Optional[str]:
-    low = text.lower()
-    for p in SENSITIVE_REQUEST_PATTERNS:
-        if re.search(p, low, re.IGNORECASE):
-            return p
-    return None
-
-
-def _check_escalation(text: str, triggers: list) -> Optional[str]:
-    low = text.lower()
-    for t in triggers:
-        if t.lower() in low:
-            return t
-    return None
-
-
-async def _rate_limit_check(user_id: str, window_minutes: int = 5, max_messages: int = 30) -> bool:
-    """Returns True if user is within limits, False if exceeded."""
-    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=window_minutes)).isoformat()
-    count = await db.concierge_messages.count_documents({
-        "user_id": user_id,
-        "role": "user",
-        "created_at": {"$gte": cutoff},
-    })
-    return count < max_messages
-
-
-async def _record_block(user_id: str, user_role: str, message: str, reason: str, severity: str = "warning"):
-    """Record a concierge block in admin_ai_findings for visibility."""
-    composite_key = f"concierge_abuse::{user_id}::{reason[:50]}"
-    existing = await db.admin_ai_findings.find_one({"composite_key": composite_key})
-    now_iso = datetime.now(timezone.utc).isoformat()
-    if existing:
-        await db.admin_ai_findings.update_one(
-            {"_id": existing["_id"]},
-            {"$set": {"last_seen_at": now_iso, "context.last_message": message[:200]},
-             "$inc": {"occurrences": 1}},
-        )
-    else:
-        await db.admin_ai_findings.insert_one({
-            "composite_key": composite_key,
-            "pattern": "concierge_abuse_blocked",
-            "label": f"Mesaj blocat concierge — {reason}",
-            "severity": severity,
-            "description": "Userul a încercat un mesaj suspect/prompt injection în chat",
-            "entity_type": "user",
-            "entity_id": user_id,
-            "entity_label": f"{user_role} · {user_id[:8]}",
-            "context": {"reason": reason, "last_message": message[:200], "user_role": user_role},
-            "status": "open",
-            "first_seen_at": now_iso,
-            "last_seen_at": now_iso,
-            "occurrences": 1,
-        })
 
 
 # ============= ROLE-BASED SYSTEM PROMPTS =============
@@ -238,23 +117,6 @@ ROLE_PROMPTS = {
     "specialist": SPECIALIST_PROMPT,
     "operator": OPERATOR_PROMPT,
 }
-
-
-async def _get_settings() -> dict:
-    doc = await db.concierge_settings.find_one({"_id": "global"})
-    if not doc:
-        return {
-            "enabled_roles": ["client", "specialist", "operator"],
-            "escalation_triggers": DEFAULT_ESCALATION_TRIGGERS,
-            "support_email": os.environ.get("ADMIN_EMAIL", "support@propmanage.io"),
-            "blocked_users": [],
-        }
-    return {
-        "enabled_roles": doc.get("enabled_roles", ["client", "specialist", "operator"]),
-        "escalation_triggers": doc.get("escalation_triggers", DEFAULT_ESCALATION_TRIGGERS),
-        "support_email": doc.get("support_email", os.environ.get("ADMIN_EMAIL", "support@propmanage.io")),
-        "blocked_users": doc.get("blocked_users", []),
-    }
 
 
 # ============= USER-FACING ENDPOINTS =============
@@ -419,144 +281,3 @@ async def concierge_public_settings(user: dict = Depends(get_current_user)):
         "is_blocked": user["id"] in s.get("blocked_users", []),
         "user_role": user_role,
     }
-
-
-# ============= ADMIN ENDPOINTS =============
-
-@admin_router.get("/settings")
-async def get_concierge_settings(user: dict = Depends(require_role("admin"))):
-    return await _get_settings()
-
-
-@admin_router.put("/settings")
-async def update_concierge_settings(
-    payload: dict = Body(...),
-    user: dict = Depends(require_role("admin")),
-):
-    update = {}
-    if "enabled_roles" in payload:
-        roles = [r for r in payload["enabled_roles"] if r in ["client", "specialist", "operator"]]
-        update["enabled_roles"] = roles
-    if "escalation_triggers" in payload:
-        update["escalation_triggers"] = [t.strip() for t in payload["escalation_triggers"] if t.strip()][:50]
-    if "support_email" in payload:
-        update["support_email"] = payload["support_email"].strip()
-    if "blocked_users" in payload:
-        update["blocked_users"] = [u for u in payload["blocked_users"] if isinstance(u, str)]
-    await db.concierge_settings.update_one({"_id": "global"}, {"$set": update}, upsert=True)
-    return await _get_settings()
-
-
-@admin_router.get("/conversations")
-async def list_concierge_conversations(
-    limit: int = Query(50, le=200),
-    filter: Optional[str] = None,  # "escalated" | "blocked" | None
-    user: dict = Depends(require_role("admin")),
-):
-    pipeline = []
-    match = {}
-    if filter == "escalated":
-        match["escalated"] = True
-    elif filter == "blocked":
-        match["blocked"] = True
-    if match:
-        pipeline.append({"$match": match})
-    pipeline += [
-        {"$sort": {"created_at": -1}},
-        {"$group": {
-            "_id": "$session_id",
-            "user_id": {"$first": "$user_id"},
-            "user_role": {"$first": "$user_role"},
-            "last_message_at": {"$first": "$created_at"},
-            "message_count": {"$sum": 1},
-            "escalated": {"$max": "$escalated"},
-            "blocked": {"$max": "$blocked"},
-            "first_message": {"$last": "$content"},
-        }},
-        {"$sort": {"last_message_at": -1}},
-        {"$limit": limit},
-    ]
-    items = []
-    async for d in db.concierge_messages.aggregate(pipeline):
-        items.append({
-            "session_id": d["_id"],
-            "user_id": d.get("user_id"),
-            "user_role": d.get("user_role"),
-            "last_message_at": d.get("last_message_at"),
-            "message_count": d.get("message_count"),
-            "escalated": bool(d.get("escalated")),
-            "blocked": bool(d.get("blocked")),
-            "first_message": (d.get("first_message") or "")[:120],
-        })
-    return {"items": items}
-
-
-@admin_router.get("/conversations/{session_id}")
-async def get_conversation_messages(session_id: str, user: dict = Depends(require_role("admin"))):
-    cursor = db.concierge_messages.find({"session_id": session_id}).sort("created_at", 1)
-    msgs = []
-    async for m in cursor:
-        msgs.append({
-            "role": m.get("role"),
-            "content": m.get("content"),
-            "blocked": m.get("blocked", False),
-            "escalated": m.get("escalated", False),
-            "block_reason": m.get("block_reason"),
-            "escalation_trigger": m.get("escalation_trigger"),
-            "created_at": m.get("created_at"),
-        })
-    return {"session_id": session_id, "messages": msgs}
-
-
-@admin_router.get("/stats")
-async def concierge_stats(user: dict = Depends(require_role("admin"))):
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
-    total = await db.concierge_messages.count_documents({"created_at": {"$gte": cutoff}})
-    escalated = await db.concierge_messages.count_documents({"created_at": {"$gte": cutoff}, "escalated": True})
-    blocked = await db.concierge_messages.count_documents({"created_at": {"$gte": cutoff}, "blocked": True})
-    # Unique sessions per role
-    by_role = {}
-    pipeline = [
-        {"$match": {"created_at": {"$gte": cutoff}, "role": "user"}},
-        {"$group": {"_id": "$user_role", "count": {"$sum": 1}, "sessions": {"$addToSet": "$session_id"}}},
-    ]
-    async for d in db.concierge_messages.aggregate(pipeline):
-        by_role[d["_id"]] = {"messages": d["count"], "sessions": len(d.get("sessions", []))}
-    # Top abusers
-    pipeline = [
-        {"$match": {"created_at": {"$gte": cutoff}, "blocked": True}},
-        {"$group": {"_id": "$user_id", "count": {"$sum": 1}, "role": {"$first": "$user_role"}}},
-        {"$sort": {"count": -1}},
-        {"$limit": 10},
-    ]
-    top_abusers = []
-    async for d in db.concierge_messages.aggregate(pipeline):
-        top_abusers.append({"user_id": d["_id"], "user_role": d.get("role"), "blocks": d["count"]})
-    return {
-        "window_days": 30,
-        "total_messages": total,
-        "escalated_count": escalated,
-        "blocked_count": blocked,
-        "escalation_rate_pct": round((escalated / total * 100), 1) if total else 0,
-        "block_rate_pct": round((blocked / total * 100), 1) if total else 0,
-        "by_role": by_role,
-        "top_abusers": top_abusers,
-    }
-
-
-@admin_router.post("/block-user/{user_id}")
-async def block_user(user_id: str, user: dict = Depends(require_role("admin"))):
-    settings = await _get_settings()
-    blocked = list(settings.get("blocked_users", []))
-    if user_id not in blocked:
-        blocked.append(user_id)
-    await db.concierge_settings.update_one({"_id": "global"}, {"$set": {"blocked_users": blocked}}, upsert=True)
-    return {"ok": True, "blocked_users": blocked}
-
-
-@admin_router.delete("/block-user/{user_id}")
-async def unblock_user(user_id: str, user: dict = Depends(require_role("admin"))):
-    settings = await _get_settings()
-    blocked = [u for u in settings.get("blocked_users", []) if u != user_id]
-    await db.concierge_settings.update_one({"_id": "global"}, {"$set": {"blocked_users": blocked}}, upsert=True)
-    return {"ok": True, "blocked_users": blocked}
