@@ -515,6 +515,18 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 
 
 
+### Phase 55 — Digital Twin Phase I+: Digital Report Approval (token-based, no login) — Feb 2026
+- **Backend**: When an issue report is sent, a signed JWT (type=`dt_report_approval`, exp=30 days, payload: pin_id+report_id+recipient_email) is generated via `_make_report_approval_token()` using the platform's main JWT_SECRET. The token is embedded in `approval_url` = `{APP_URL}/report-respond/{token}` and added to `pin.report_history[].approval_url`. Email template `tpl_dt_issue_report` now renders 2 inline CTA buttons ("✅ Confirmat" + "📝 Necesită modificări") with prefilled `?decision=...` for one-click decisions.
+- **2 new public endpoints** (no auth, token-validated):
+  - `GET /api/digital-twin/reports/approve/info?token=X` — resolves token, returns pin/project/report context.
+  - `POST /api/digital-twin/reports/approve/decide` — body `{token, decision: confirmed|needs_changes, comment?}`. Single-use (second POST → 409). MongoDB `array_filters` atomically updates the right history entry. Triggers sender notification (in-app `notify()` + email via `_layout` helper).
+  - Token validation: invalid → 400, expired → 410, wrong type → 400, tampered signature → 400.
+- **Frontend**: new public page `ReportApprovalPage.jsx` at route `/report-respond/:token` (255 lines, self-contained). Lifecycle: info fetch → form picker (data-testid=`decision-confirmed`/`decision-needs-changes`) → optional comment → submit → `report-decision-success`. On reload, locked into `report-already-decided`. Invalid token → `report-approval-error`. Supports URL preset `?decision=confirmed` to pre-select.
+- **Polish**: `auth.js` now skips the `/auth/me` probe on `/report-respond/*` paths to avoid noisy 401s on a deliberately-public route.
+- **Test results**: iteration_25.json — 14/14 backend pytest (`test_phase_i_approval.py`: issuance, JWT structure, info endpoint 200/400/410/wrong-type/tampered, decide 200/409/422, sender notification) + 6/6 Playwright UI flows (form, picker rings, submit, reload-locked, invalid token, URL preset). 100% pass, zero bugs.
+
+
+
 ## Roadmap
 ### P1 (Next)
 - `server.py` routers split: auth.py, admin.py, operator.py, payments.py, requests.py, marketplace.py, design.py, portfolio.py (monolith ~2870 lines, refactor postponed multiple times)

@@ -16,6 +16,12 @@ export const AuthProvider = ({ children }) => {
     if (window.location.hash?.includes("session_id=")) {
       return;
     }
+    // Skip auth probe on intentionally-public routes (avoids noisy 401s).
+    const path = window.location.pathname;
+    if (path.startsWith("/report-respond/")) {
+      setUser(false);
+      return;
+    }
     axios.get(`${API}/auth/me`)
       .then(r => setUser(r.data))
       .catch(() => setUser(false));
