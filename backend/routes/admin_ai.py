@@ -426,6 +426,309 @@ async def list_scans(limit: int = Query(20, le=100), user: dict = Depends(requir
     return {"items": items}
 
 
+# ============= AI REPAIR SUGGESTER (Faza B) =============
+# LLM proposes a concrete fix per finding → admin reviews & approves/rejects.
+# IMPORTANT: "approved" only marks the suggestion as acceptable. NO automatic
+# write actions are taken. Admin marks "applied" manually after running the fix.
+
+REPAIR_SYSTEM_PROMPT = """Ești "Repair Suggester", un asistent AI care propune pași concreți pentru
+remedierea anomaliilor detectate de scannerul PropManage.
+
+REGULI STRICTE:
+- NU executi nimic — doar propui.
+- Răspunzi STRUCTURAT, în română, în JSON valid cu schema:
+  {
+    "summary": "1 frază — ce e problema",
+    "risk_level": "low|medium|high",
+    "steps": ["pas 1 concret", "pas 2 concret", ...],
+    "rollback": "cum se anulează schimbarea dacă e nevoie",
+    "verification": "cum verifică adminul că s-a rezolvat",
+    "estimated_minutes": <număr întreg>,
+    "requires_db_write": true|false,
+    "requires_user_communication": true|false
+  }
+- Pașii trebuie să fie ACȚIUNI specifice pe care adminul le poate face în UI/DB.
+- Dacă finding-ul nu e clar sau nu poți propune nimic util, returnează steps: ["Nu pot propune un fix automatizabil. Recomand investigare manuală."]
+- NICIODATĂ nu inventa endpoint-uri sau funcții. Folosește limbaj operațional.
+- Răspunde DOAR cu JSON-ul, fără cod-fence, fără text suplimentar.
+"""
+
+
+@router.post("/findings/{finding_id}/suggest-repair")
+async def suggest_repair(
+    finding_id: str,
+    payload: dict = Body(default={}),
+    user: dict = Depends(require_role("admin")),
+):
+    """Generate a repair suggestion for a finding using Claude Sonnet 4.5.
+    Body (optional): { regenerate: bool } — if true, overwrite existing.
+    """
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(503, "EMERGENT_LLM_KEY nu este configurat.")
+    try:
+        oid = ObjectId(finding_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid finding id")
+
+    finding = await db.admin_ai_findings.find_one({"_id": oid})
+    if not finding:
+        raise HTTPException(404, "Finding not found")
+
+    regenerate = bool(payload.get("regenerate"))
+    existing = await db.admin_ai_repair_suggestions.find_one({"finding_id": str(oid)})
+    if existing and not regenerate:
+        return {
+            "finding_id": str(oid),
+            "suggestion": _serialize_repair(existing),
+            "cached": True,
+        }
+
+    # Build prompt context
+    finding_brief = {
+        "pattern": finding.get("pattern"),
+        "label": finding.get("label"),
+        "severity": finding.get("severity"),
+        "description": finding.get("description"),
+        "entity_type": finding.get("entity_type"),
+        "entity_id": finding.get("entity_id"),
+        "entity_label": finding.get("entity_label"),
+        "occurrences": finding.get("occurrences", 1),
+        "context": finding.get("context"),
+        "first_seen_at": finding.get("first_seen_at"),
+    }
+    import json as _json
+    user_msg = (
+        "Iată finding-ul. Propune un plan de fix conform schemei JSON din instrucțiuni.\n\n"
+        + _json.dumps(finding_brief, ensure_ascii=False, indent=2)
+    )
+
+    proposal_json = None
+    raw_text = ""
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage  # type: ignore
+        chat_inst = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"repair_{oid}_{uuid.uuid4().hex[:6]}",
+            system_message=REPAIR_SYSTEM_PROMPT,
+        ).with_model(DEFAULT_MODEL_PROVIDER, DEFAULT_MODEL_NAME)
+        raw_text = await chat_inst.send_message(UserMessage(text=user_msg))
+        # Try to extract a JSON object — be tolerant if LLM wraps in markdown despite instructions.
+        cleaned = raw_text.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("```", 2)[1]
+            if cleaned.startswith("json"):
+                cleaned = cleaned[4:]
+            cleaned = cleaned.strip("` \n")
+        # Locate first { ... last }
+        first = cleaned.find("{")
+        last = cleaned.rfind("}")
+        if first != -1 and last != -1 and last > first:
+            proposal_json = _json.loads(cleaned[first:last + 1])
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[Repair-Suggester] LLM error: {e}")
+        raise HTTPException(502, f"Nu am putut genera sugestia: {str(e)[:160]}")
+
+    if not isinstance(proposal_json, dict):
+        # Fallback: store raw text so admin still sees something
+        proposal_json = {
+            "summary": "Răspuns LLM neformatabil — verifică textul brut.",
+            "risk_level": "medium",
+            "steps": [raw_text[:500] or "Niciun pas extras."],
+            "rollback": "—",
+            "verification": "—",
+            "estimated_minutes": 0,
+            "requires_db_write": False,
+            "requires_user_communication": False,
+        }
+
+    # Sanitize / clamp fields
+    risk = (proposal_json.get("risk_level") or "medium").lower()
+    if risk not in {"low", "medium", "high"}:
+        risk = "medium"
+    steps = proposal_json.get("steps") or []
+    if not isinstance(steps, list):
+        steps = [str(steps)]
+    steps = [str(s)[:500] for s in steps][:12]
+
+    try:
+        est_minutes = max(0, int(proposal_json.get("estimated_minutes") or 0))
+    except (TypeError, ValueError):
+        est_minutes = 0
+
+    doc = {
+        "finding_id": str(oid),
+        "finding_pattern": finding.get("pattern"),
+        "finding_label": finding.get("label"),
+        "summary": str(proposal_json.get("summary") or "")[:500],
+        "risk_level": risk,
+        "steps": steps,
+        "rollback": str(proposal_json.get("rollback") or "")[:600],
+        "verification": str(proposal_json.get("verification") or "")[:600],
+        "estimated_minutes": est_minutes,
+        "requires_db_write": bool(proposal_json.get("requires_db_write")),
+        "requires_user_communication": bool(proposal_json.get("requires_user_communication")),
+        "raw_response": raw_text[:4000],
+        "status": "proposed",  # proposed | approved | rejected | applied
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": user["id"],
+        "created_by_name": user.get("name") or user.get("email"),
+        "decided_at": None,
+        "decided_by": None,
+        "decision_note": None,
+        "applied_at": None,
+        "applied_by": None,
+    }
+    if existing:
+        await db.admin_ai_repair_suggestions.update_one(
+            {"_id": existing["_id"]},
+            {"$set": doc, "$inc": {"regeneration_count": 1}},
+        )
+        doc["_id"] = existing["_id"]
+    else:
+        doc["regeneration_count"] = 0
+        res = await db.admin_ai_repair_suggestions.insert_one(doc)
+        doc["_id"] = res.inserted_id
+
+    return {"finding_id": str(oid), "suggestion": _serialize_repair(doc), "cached": False}
+
+
+def _serialize_repair(d: dict) -> dict:
+    return {
+        "id": str(d["_id"]),
+        "finding_id": d.get("finding_id"),
+        "summary": d.get("summary"),
+        "risk_level": d.get("risk_level"),
+        "steps": d.get("steps") or [],
+        "rollback": d.get("rollback"),
+        "verification": d.get("verification"),
+        "estimated_minutes": d.get("estimated_minutes", 0),
+        "requires_db_write": d.get("requires_db_write", False),
+        "requires_user_communication": d.get("requires_user_communication", False),
+        "status": d.get("status"),
+        "created_at": d.get("created_at"),
+        "created_by_name": d.get("created_by_name"),
+        "decided_at": d.get("decided_at"),
+        "decision_note": d.get("decision_note"),
+        "applied_at": d.get("applied_at"),
+        "regeneration_count": d.get("regeneration_count", 0),
+    }
+
+
+@router.get("/findings/{finding_id}/suggest-repair")
+async def get_repair_suggestion(
+    finding_id: str,
+    user: dict = Depends(require_role("admin")),
+):
+    try:
+        oid = ObjectId(finding_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid finding id")
+    s = await db.admin_ai_repair_suggestions.find_one({"finding_id": str(oid)})
+    if not s:
+        return {"finding_id": str(oid), "suggestion": None}
+    return {"finding_id": str(oid), "suggestion": _serialize_repair(s)}
+
+
+@router.post("/repair-suggestions/{suggestion_id}/decide")
+async def decide_repair(
+    suggestion_id: str,
+    payload: dict = Body(...),
+    user: dict = Depends(require_role("admin")),
+):
+    """Admin approves or rejects a repair suggestion. NOT applied automatically.
+    Body: { decision: "approve" | "reject", note?: str }
+    """
+    try:
+        oid = ObjectId(suggestion_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid suggestion id")
+    decision = (payload.get("decision") or "").lower()
+    if decision not in {"approve", "reject"}:
+        raise HTTPException(400, "decision must be 'approve' or 'reject'")
+    note = (payload.get("note") or "").strip()[:400] or None
+    new_status = "approved" if decision == "approve" else "rejected"
+    res = await db.admin_ai_repair_suggestions.update_one(
+        {"_id": oid},
+        {"$set": {
+            "status": new_status,
+            "decided_at": datetime.now(timezone.utc).isoformat(),
+            "decided_by": user["id"],
+            "decision_note": note,
+        }},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "Suggestion not found")
+    return {"ok": True, "status": new_status}
+
+
+@router.post("/repair-suggestions/{suggestion_id}/mark-applied")
+async def mark_applied(
+    suggestion_id: str,
+    payload: dict = Body(default={}),
+    user: dict = Depends(require_role("admin")),
+):
+    """Admin manually marks a previously-approved suggestion as applied (after they ran it).
+    Optionally auto-resolves the linked finding.
+    """
+    try:
+        oid = ObjectId(suggestion_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid suggestion id")
+    sug = await db.admin_ai_repair_suggestions.find_one({"_id": oid})
+    if not sug:
+        raise HTTPException(404, "Suggestion not found")
+    if sug.get("status") != "approved":
+        raise HTTPException(400, "Doar sugestiile aprobate pot fi marcate ca aplicate.")
+    note = (payload.get("note") or "").strip()[:400] or None
+    auto_resolve = bool(payload.get("resolve_finding", True))
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.admin_ai_repair_suggestions.update_one(
+        {"_id": oid},
+        {"$set": {
+            "status": "applied",
+            "applied_at": now_iso,
+            "applied_by": user["id"],
+            "apply_note": note,
+        }},
+    )
+    if auto_resolve and sug.get("finding_id"):
+        try:
+            fobj = ObjectId(sug["finding_id"])
+            await db.admin_ai_findings.update_one(
+                {"_id": fobj, "status": "open"},
+                {"$set": {
+                    "status": "resolved",
+                    "resolved_at": now_iso,
+                    "resolved_by": user["id"],
+                    "resolved_by_name": user.get("name") or user.get("email"),
+                    "resolution_note": f"Auto-rezolvat după aplicare repair: {note or '—'}",
+                }},
+            )
+        except InvalidId:
+            pass
+    return {"ok": True}
+
+
+@router.get("/repair-suggestions")
+async def list_repair_suggestions(
+    status: Optional[str] = None,
+    limit: int = Query(50, le=200),
+    user: dict = Depends(require_role("admin")),
+):
+    filt = {}
+    if status and status != "all":
+        filt["status"] = status
+    cursor = db.admin_ai_repair_suggestions.find(filt).sort("created_at", -1).limit(limit)
+    items = [_serialize_repair(d) async for d in cursor]
+    counts = {
+        "proposed": await db.admin_ai_repair_suggestions.count_documents({"status": "proposed"}),
+        "approved": await db.admin_ai_repair_suggestions.count_documents({"status": "approved"}),
+        "rejected": await db.admin_ai_repair_suggestions.count_documents({"status": "rejected"}),
+        "applied": await db.admin_ai_repair_suggestions.count_documents({"status": "applied"}),
+    }
+    return {"items": items, "counts": counts}
+
+
 # ============= CHAT WITH AI INVESTIGATOR =============
 
 def _build_system_prompt() -> str:

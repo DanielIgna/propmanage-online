@@ -1,0 +1,46 @@
+{
+  "summary": "Phase 47B AI Repair Suggester end-to-end testing. Backend: 18/19 pytest assertions pass (1 real bug found in regenerate response). CORS lockdown verified (wildcard + no credentials). Email provider console fallback verified. Frontend: AdminAIConsole AI Investigator tab loads, 33 OPEN findings list, Wrench icon opens repair-modal, Generează triggers Claude call and renders full suggestion content (summary/steps/rollback/verification/risk_level badge/requires_db_write badge/est_minutes). Action bar (Regenerează/Respinge/Aprobă) shows correctly. One frontend UX issue: after Aprobă click, the mark-applied button did not appear after a 2s wait (state may need explicit refresh or longer poll).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/admin/ai/findings/{id}/suggest-repair?regenerate=true",
+        "issue": "Response returns suggestion.regeneration_count=0 even though DB is correctly incremented (GET returns 1). Bug in admin_ai.py: after `update_one({$set: doc, $inc: {regeneration_count: 1}})`, the local `doc` dict is passed to _serialize_repair without reading back the incremented counter. Fix: either re-fetch the doc with find_one before serializing, or manually compute `doc['regeneration_count'] = (existing.get('regeneration_count', 0) + 1)` before serialize. Persistence is correct; only the immediate POST response is stale."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "RepairSuggester modal (AdminAIConsole.jsx)",
+        "issue": "After clicking Aprobă (repair-approve), the mark-applied button (data-testid=repair-mark-applied) did not appear within 2s. Possibly the local state set after decideRepair() does not switch the status to 'approved' synchronously, OR the action-bar conditional renders mark-applied only when suggestion.status==='approved' but the API response payload's status field isn't being merged. Worth verifying setRepairModal({...prev, suggestion: {...prev.suggestion, status:'approved'}}) is being called after decide.",
+        "selector": "[data-testid=repair-mark-applied]",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase47b.py",
+    "/app/test_reports/pytest/phase47b_results.xml"
+  ],
+  "action_items": [
+    "Fix regeneration_count stale value in POST suggest-repair response (one-line: re-read updated doc OR compute new count locally before _serialize_repair).",
+    "Verify/repair the UI state update after Aprobă in AdminAIConsole.jsx — ensure suggestion.status is updated to 'approved' so the action-bar swaps to 'Am aplicat fix-ul' button. Likely a setState issue in decideRepair handler."
+  ],
+  "critical_code_review_comments": [
+    "admin_ai.py suggest_repair regenerate path: local `doc` not synced with $inc result before serialization — leads to incorrect API response (DB-truth diverges from response-truth).",
+    "Frontend decideRepair handler likely doesn't propagate the new 'approved' status back into local state used by the action-bar conditional render. Recommend pattern: after axios.post for decide, do `setRepairModal(prev => ({...prev, suggestion: {...prev.suggestion, status: decision==='approve' ? 'approved' : 'rejected'}}))`."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase47b.py (NEW — 19 tests covering all lifecycle, authz, bad-input, CORS, email-provider)"
+  ],
+  "success_rate": {"backend": "94.7% (18/19)", "frontend": "85% (core flow works, one state-refresh issue post-approve)"},
+  "test_credentials": "admin@propmanage.io / Admin123! (admin) and client@propmanage.io / Client123! (403 negative tests). Both confirmed working.",
+  "seed_data_creation": "No new seed needed — used existing 33 open findings from previous Phase 47 scan.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Phase 47B backend: 19-test pytest file at /app/backend/tests/test_phase47b.py — only test_04_regenerate_increments_count fails (response field is stale; DB is correct — verified via GET in subsequent test). All 18 other tests pass including CORS wildcard+no-credentials check, email console fallback, full lifecycle (generate→cache→regenerate→approve/reject→mark-applied→auto-resolve finding), and 5 non-admin 403 cases. For frontend: demo-admin button at /login auto-fills credentials and clicking login-submit completes login. AI Investigator sidebar item navigates to AdminAIConsole. Generate triggers Claude call ~3-8s and renders content correctly. After Aprobă, UI does NOT swap to 'Am aplicat fix-ul' button within 2s — needs main agent to fix decideRepair state update. The mark-applied lifecycle is verified end-to-end at backend level so the only gap is the UI state refresh.",
+  "rca_of_the_issue": "1) regeneration_count bug RCA: in admin_ai.py suggest_repair endpoint, the update_one() call uses $set:doc and $inc:{regeneration_count:1}. Mongo correctly increments the persisted value, but the local `doc` dict in Python memory still has the old/missing field. _serialize_repair(doc) reads doc.get('regeneration_count', 0)=0 and returns it. Repro: POST suggest-repair (returns rc=0), POST suggest-repair regenerate=true (response shows rc=0 BUT GET shows rc=1). Mitigation: after update_one, either await db.admin_ai_repair_suggestions.find_one({_id: existing[_id]}) and serialize that, or set doc['regeneration_count']=existing.get('regeneration_count',0)+1 before serialize. 2) UI approve→mark-applied not appearing RCA: likely the decideRepair() async handler in AdminAIConsole.jsx does not update local suggestion.status on success; either page-level refetch is required or local state mutation is missing. The action bar conditional ({suggestion.status==='approved' && <mark-applied/>}) never fires."
+}

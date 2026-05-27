@@ -4,6 +4,7 @@ After Phase B refactor, all endpoints live in routes/*.py modules.
 This file only wires the app: CORS, lifecycle hooks, scheduler, router includes.
 """
 import logging
+import os
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 import pytz
@@ -47,17 +48,28 @@ from routes.security_guard import router as security_guard_router
 from routes.concierge import router as concierge_router, admin_router as concierge_admin_router
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 app = FastAPI(title="PropManage API")
 
+# CORS: read from env, support "*" wildcard for dev OR comma-separated origins for prod.
+_raw_origins = os.environ.get("CORS_ORIGINS", "*").strip()
+if _raw_origins == "*" or not _raw_origins:
+    _origins = ["*"]
+    _allow_credentials = False  # Browsers reject credentials with "*"
+else:
+    _origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+    _allow_credentials = True
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_origins,
+    allow_origin_regex=os.environ.get("CORS_ORIGIN_REGEX") or None,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+logger = logging.getLogger(__name__)
+logger.info(f"CORS configured: origins={_origins} credentials={_allow_credentials}")
 
 # Register all routers
 for r in (
