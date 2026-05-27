@@ -889,15 +889,30 @@ async def apply_landing_preset(preset_id: str, user: dict = Depends(require_role
     settings_doc = await db.platform_config.find_one({"key": "settings"})
     current = (settings_doc or {}).get("value", {})
     merged = {**DEFAULT_SETTINGS, **current, **preset.get("flags", {})}
+    now_iso = datetime.now(timezone.utc).isoformat()
     await db.platform_config.update_one(
         {"key": "settings"},
         {"$set": {
             "key": "settings", "value": merged,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": now_iso,
             "updated_by": user["id"],
         }},
         upsert=True,
     )
+    # Log manual apply to history for full audit trail
+    await db.preset_schedule_runs.insert_one({
+        "schedule_id": None,
+        "preset_id": preset_id,
+        "preset_name": preset.get("name"),
+        "flags": preset.get("flags", {}),
+        "day_of_week": None,
+        "time": None,
+        "run_at": now_iso,
+        "status": "applied",
+        "trigger": "manual",
+        "actor_id": user["id"],
+        "actor_name": user.get("name"),
+    })
     return {"ok": True, "applied": preset.get("name"), "flags": preset.get("flags")}
 
 
@@ -1000,10 +1015,11 @@ async def run_due_preset_schedules():
             settings_doc = await db.platform_config.find_one({"key": "settings"})
             current = (settings_doc or {}).get("value", {})
             merged = {**DEFAULT_SETTINGS, **current, **preset.get("flags", {})}
+            run_at_iso = datetime.now(timezone.utc).isoformat()
             await db.platform_config.update_one(
                 {"key": "settings"},
                 {"$set": {"key": "settings", "value": merged,
-                          "updated_at": datetime.now(timezone.utc).isoformat(),
+                          "updated_at": run_at_iso,
                           "updated_by": "scheduler"}},
                 upsert=True,
             )
@@ -1011,6 +1027,56 @@ async def run_due_preset_schedules():
                 {"_id": sched["_id"]},
                 {"$set": {"last_run_at": f"{today_key}T{hhmm}"}}
             )
+            # Log run to history
+            await db.preset_schedule_runs.insert_one({
+                "schedule_id": str(sched["_id"]),
+                "preset_id": sched["preset_id"],
+                "preset_name": preset.get("name"),
+                "flags": preset.get("flags", {}),
+                "day_of_week": weekday,
+                "time": hhmm,
+                "run_at": run_at_iso,
+                "status": "applied",
+                "trigger": "auto-scheduler",
+            })
             logger.info(f"Scheduled preset applied: {preset.get('name')} at {hhmm}")
         except Exception as exc:
+            await db.preset_schedule_runs.insert_one({
+                "schedule_id": str(sched.get("_id")),
+                "preset_id": sched.get("preset_id"),
+                "preset_name": "(eroare)",
+                "day_of_week": weekday,
+                "time": hhmm,
+                "run_at": datetime.now(timezone.utc).isoformat(),
+                "status": "error",
+                "trigger": "auto-scheduler",
+                "error": str(exc)[:300],
+            })
             logger.warning(f"Schedule run failed for {sched.get('_id')}: {exc}")
+
+
+@router.get("/schedule-history")
+async def schedule_history(
+    user: dict = Depends(require_role("admin")),
+    preset_id: Optional[str] = None,
+    limit: int = Query(50, le=200),
+):
+    filt = {}
+    if preset_id:
+        filt["preset_id"] = preset_id
+    cursor = db.preset_schedule_runs.find(filt).sort("run_at", -1).limit(limit)
+    out = []
+    async for d in cursor:
+        out.append({
+            "id": str(d["_id"]),
+            "schedule_id": d.get("schedule_id"),
+            "preset_id": d.get("preset_id"),
+            "preset_name": d.get("preset_name"),
+            "day_of_week": d.get("day_of_week"),
+            "time": d.get("time"),
+            "run_at": d.get("run_at"),
+            "status": d.get("status"),
+            "trigger": d.get("trigger"),
+            "error": d.get("error"),
+        })
+    return out

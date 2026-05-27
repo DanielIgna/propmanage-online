@@ -717,6 +717,126 @@ const SchedulesSection = ({ presets }) => {
       </div>
 
       {toast && <div className="mt-2 text-sm font-medium text-emerald-600 dark:text-emerald-400" data-testid="schedules-toast">{toast}</div>}
+
+      <ScheduleHistorySection presets={presets} />
+    </div>
+  );
+};
+
+// ============= SCHEDULE HISTORY =============
+const DAY_LABELS_SHORT = ["Lu", "Ma", "Mi", "Jo", "Vi", "Sâ", "Du"];
+
+const ScheduleHistorySection = ({ presets }) => {
+  const [history, setHistory] = useState([]);
+  const [filterPreset, setFilterPreset] = useState("");
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const load = () => {
+    setLoading(true);
+    const params = { limit: 50 };
+    if (filterPreset) params.preset_id = filterPreset;
+    axios.get(`${API}/admin/schedule-history`, { params })
+      .then(r => setHistory(r.data))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { if (open) load(); }, [open, filterPreset]);
+
+  const fmtTime = (iso) => {
+    if (!iso) return "—";
+    try { return new Date(iso).toLocaleString("ro-RO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }); }
+    catch { return iso; }
+  };
+
+  return (
+    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800" data-testid="schedule-history-section">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
+        data-testid="schedule-history-toggle"
+      >
+        <span className="flex items-center gap-2">📊 Istoric Aplicări {history.length > 0 && open && <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">{history.length}</span>}</span>
+        <span className="text-xs text-slate-400">{open ? "▼" : "▶"}</span>
+      </button>
+
+      {open && (
+        <div className="mt-3" data-testid="schedule-history-panel">
+          <div className="flex gap-2 mb-3 items-center flex-wrap">
+            <label className="text-xs text-slate-500">Filtru:</label>
+            <select
+              value={filterPreset}
+              onChange={e => setFilterPreset(e.target.value)}
+              className="px-2 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+              data-testid="history-filter-preset"
+            >
+              <option value="">Toate preset-urile</option>
+              {presets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <AdminBtn variant="ghost" onClick={load} data-testid="history-refresh">↻ Refresh</AdminBtn>
+            <span className="text-xs text-slate-400 ml-auto">Ultimele 50 aplicări</span>
+          </div>
+
+          {loading && <div className="text-center py-4 text-sm text-slate-500">Se încarcă...</div>}
+          {!loading && history.length === 0 && (
+            <div className="text-center py-6 text-sm text-slate-500">
+              Niciun istoric încă. Aplicările manuale (Aplică + Salvează) și cele automate vor apărea aici.
+            </div>
+          )}
+
+          {!loading && history.length > 0 && (
+            <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
+              {history.map(h => (
+                <div
+                  key={h.id}
+                  className={`flex items-center gap-3 p-2.5 rounded-lg border ${
+                    h.status === "error"
+                      ? "border-red-200 dark:border-red-500/30 bg-red-50/30 dark:bg-red-500/5"
+                      : h.trigger === "auto-scheduler"
+                        ? "border-blue-200 dark:border-blue-500/30 bg-blue-50/30 dark:bg-blue-500/5"
+                        : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+                  }`}
+                  data-testid={`history-row-${h.id}`}
+                >
+                  <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                    h.status === "error"
+                      ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
+                      : h.trigger === "auto-scheduler"
+                        ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400"
+                        : "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400"
+                  }`}>
+                    {h.status === "error" ? "❌ EROARE" : h.trigger === "auto-scheduler" ? "⏰ AUTO" : "✋ MANUAL"}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm truncate">{h.preset_name}</div>
+                    <div className="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap">
+                      <span>{fmtTime(h.run_at)}</span>
+                      {h.day_of_week !== null && h.day_of_week !== undefined && (
+                        <>
+                          <span>·</span>
+                          <span className="font-medium">{DAY_LABELS_SHORT[h.day_of_week]} {h.time}</span>
+                        </>
+                      )}
+                      {h.actor_name && (
+                        <>
+                          <span>·</span>
+                          <span>de {h.actor_name}</span>
+                        </>
+                      )}
+                      {h.error && (
+                        <>
+                          <span>·</span>
+                          <span className="text-red-600 dark:text-red-400 italic truncate">{h.error}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
