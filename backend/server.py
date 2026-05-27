@@ -42,6 +42,7 @@ from routes.projects import router as projects_router
 from routes.trust import router as trust_router
 from routes.root import router as root_router
 from routes.admin_console import router as admin_console_router, public_router as cms_public_router, run_due_preset_schedules, run_incident_spike_alert_check
+from routes.admin_ai import router as admin_ai_router, run_daily_ai_digest, send_daily_ai_digest_email
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -66,7 +67,7 @@ for r in (
     notifications_router, ai_router, marketplace_router,
     property_timeline_router, regions_router, matching_router,
     services_avail_router, projects_router, trust_router, root_router,
-    admin_console_router, cms_public_router,
+    admin_console_router, cms_public_router, admin_ai_router,
 ):
     app.include_router(r)
 
@@ -106,11 +107,27 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=86400,
         )
+        scheduler.add_job(
+            run_daily_ai_digest,
+            CronTrigger(hour=3, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="ai_daily_scan",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        scheduler.add_job(
+            send_daily_ai_digest_email,
+            CronTrigger(hour=8, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="ai_daily_digest_email",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
         scheduler.start()
         logger.info("Daily digest scheduler started (19:00 Europe/Bucharest).")
         logger.info("Warranty auto-release scheduler started (06:00 Europe/Bucharest).")
         logger.info("Preset schedules scheduler started (every minute, Europe/Bucharest).")
         logger.info("Incident spike alert scheduler started (Monday 08:00 Europe/Bucharest).")
+        logger.info("AI daily auto-scan scheduler started (03:00 Europe/Bucharest).")
+        logger.info("AI daily digest email scheduler started (08:00 Europe/Bucharest).")
 
 
 @app.on_event("shutdown")

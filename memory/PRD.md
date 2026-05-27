@@ -237,6 +237,37 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Auto-deschide modalul când pagina e accesată cu `?compare=` (fetch fallback prin `GET /api/admin/audit-log/{id}`)
 - Banner roșu "⚠️ Link invalid" dacă intrările au fost șterse; URL curățat la close
 
+### Phase 46 — AI Admin Investigator (Faza A MVP) (Feb 2026)
+**Backend (`/app/backend/routes/admin_ai.py`):**
+- 8 scannere deterministe Python (NO LLM credits) pentru pattern-uri: `stale_project`, `specialist_low_rating`, `client_repeated_rejections`, `operator_unvalidated_twins`, `escrow_stuck`, `audit_spike`, `orphan_twins`, `duplicate_users`
+- Colecție `admin_ai_findings` cu lifecycle (open/dismissed/resolved), occurrence tracking, composite key dedup
+- Colecție `admin_ai_scans` cu istoric run-uri
+- Endpoint `POST /api/admin/ai/scan/run` — trigger manual full-scan
+- Endpoints `GET/POST` findings cu filter status/severity/pattern + KPIs
+- Endpoints `dismiss/resolve` cu notă rezolvare
+- **Chat AI**: `POST /chat/send` cu Claude Sonnet 4.5 via Emergent LLM Key (model `claude-sonnet-4-6`)
+- System prompt branded "Investigator" în română cu constrângeri stricte: NU execută, NU inventează, doar sugerează
+- Live context injection: findings snapshot inclus în system prompt la fiecare turn
+- Colecții `admin_ai_sessions` + `admin_ai_messages` pentru memorie persistentă
+- Endpoints CRUD pentru sesiuni (list / get messages / delete)
+
+**Cron jobs (`server.py`):**
+- `ai_daily_scan` — Zilnic 03:00 Europe/Bucharest (auto-scan)
+- `ai_daily_digest_email` — Zilnic 08:00 Europe/Bucharest (email digest cu top 20 findings către admini)
+
+**Frontend (`/app/frontend/src/pages/admin/AdminAIConsole.jsx`):**
+- Card Findings cu severity color-coding (high/warning/low), filter pills, butoane ✓ rezolvă + × ignoră
+- Card Chat cu sidebar sesiuni (titlu, count mesaje, delete), bubble UI conversațional, indicator "gândește..."
+- Sugestii de întrebări în empty state
+- Badge "Claude Sonnet 4.5"
+- Banner explicit: read-only / 100% control admin
+
+**Navigation:**
+- Nou meniu "AI Investigator" în secțiunea OVERVIEW cu badge gradient "NEW"
+- Tab `ai` în AdminConsole router
+
+**Test live**: scanner-ul a detectat **31 orphan twins reale** în DB; Claude Sonnet 4.5 răspunde fluent în română cu structură pe priorități și sugestii grupate pe severitate.
+
 ### Phase 45 — Multi-tier Severity + Banner Expiry + i18n EN + Pytest Fixes (Feb 2026)
 **Multi-tier Severity:**
 - Refactor `_get_spike_alert_settings()` cu shape nou: `tiers: [{name, label, color, threshold_pct, preset_id}]`

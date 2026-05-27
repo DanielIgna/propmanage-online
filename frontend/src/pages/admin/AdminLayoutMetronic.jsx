@@ -5,7 +5,7 @@ import axios from "axios";
 import {
   LayoutDashboard, Users, ShieldCheck, Scale, Wallet, FolderKanban,
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
-  LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, Sparkles
+  LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, Sparkles, Bot
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { API } from "../DashShared";
@@ -15,6 +15,7 @@ const NAV_SECTIONS = [
     title: "OVERVIEW",
     items: [
       { id: "overview", label: "Dashboard", icon: LayoutDashboard },
+      { id: "ai", label: "AI Investigator", icon: Bot, badge: "NEW" },
       { id: "activity", label: "Activitate Live", icon: Sparkles },
     ],
   },
@@ -221,6 +222,9 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
                   >
                     <ActiveIcon className="w-4 h-4 shrink-0" />
                     <span className="truncate">{it.label}</span>
+                    {it.badge && (
+                      <span className="ml-auto text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white">{it.badge}</span>
+                    )}
                   </button>
                 );
               })}

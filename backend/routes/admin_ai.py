@@ -1,0 +1,682 @@
+"""PropManage — AI Admin Console (Investigator agent)
+
+MVP Faza A:
+- Deterministic anomaly scanner (Python, no LLM credits spent on detection)
+- Claude Sonnet 4.5 for natural language interpretation + admin chat
+- Persistent findings in MongoDB with lifecycle (open/dismissed/resolved)
+- Daily auto-scan via APScheduler + email digest
+
+Design goals:
+- Admin has 100% control (read-only DB access from LLM, NO write operations)
+- All actions logged to admin_audit_log
+- Memory persists across sessions and admin restarts
+"""
+import os
+import uuid
+import logging
+from datetime import datetime, timezone, timedelta
+from typing import Optional, List
+
+from fastapi import APIRouter, Depends, HTTPException, Body, Query
+from bson import ObjectId
+from bson.errors import InvalidId
+
+from db import db
+from deps import require_role
+
+logger = logging.getLogger("propmanage.admin_ai")
+router = APIRouter(prefix="/api/admin/ai", tags=["admin-ai"])
+
+EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "").strip()
+DEFAULT_MODEL_PROVIDER = "anthropic"
+DEFAULT_MODEL_NAME = "claude-sonnet-4-6"  # Latest available per playbook
+
+# ============= ANOMALY SCANNER (deterministic Python — NO LLM) =============
+
+ANOMALY_PATTERNS = {
+    "stale_project": {
+        "label": "Proiect blocat fără activitate",
+        "severity": "warning",
+        "description": "Proiect cu status 'active' fără modificări de peste 30 zile",
+    },
+    "specialist_low_rating": {
+        "label": "Specialist cu rating scăzut activ",
+        "severity": "high",
+        "description": "Specialist cu rating <3.0 dar still active pe platformă",
+    },
+    "client_repeated_rejections": {
+        "label": "Client cu cereri respinse repetat",
+        "severity": "warning",
+        "description": "Client cu ≥3 cereri respinse de același specialist în 7 zile",
+    },
+    "operator_unvalidated_twins": {
+        "label": "Operator cu twins nevalidate",
+        "severity": "warning",
+        "description": "Operator cu proprietăți twin nevalidate de peste 7 zile",
+    },
+    "escrow_stuck": {
+        "label": "Plată escrow blocată",
+        "severity": "high",
+        "description": "Milestone cu fonduri reținute >14 zile fără update",
+    },
+    "audit_spike": {
+        "label": "Spike audit log activity",
+        "severity": "warning",
+        "description": "≥30 acțiuni admin în <60 minute (posibil bot sau test în prod)",
+    },
+    "orphan_twins": {
+        "label": "Twins orfane",
+        "severity": "low",
+        "description": "Twin care referă property_id inexistent în DB",
+    },
+    "duplicate_users": {
+        "label": "Useri duplicați",
+        "severity": "low",
+        "description": "Useri cu aceeași adresă de email (case-insensitive) — posibil duplicate",
+    },
+}
+
+
+async def _scan_stale_projects() -> list:
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    findings = []
+    async for p in db.projects.find({"status": "active", "updated_at": {"$lt": cutoff}}).limit(50):
+        findings.append({
+            "pattern": "stale_project",
+            "entity_type": "project",
+            "entity_id": str(p["_id"]),
+            "entity_label": p.get("title") or p.get("name") or str(p["_id"]),
+            "context": {
+                "last_update": p.get("updated_at"),
+                "owner_id": p.get("owner_id"),
+                "specialist_id": p.get("specialist_id"),
+            },
+        })
+    return findings
+
+
+async def _scan_specialist_low_rating() -> list:
+    findings = []
+    async for u in db.users.find({"role": "specialist", "trust_score": {"$lt": 3.0, "$ne": None}}).limit(50):
+        findings.append({
+            "pattern": "specialist_low_rating",
+            "entity_type": "user",
+            "entity_id": str(u["_id"]),
+            "entity_label": u.get("name") or u.get("email"),
+            "context": {"email": u.get("email"), "trust_score": u.get("trust_score")},
+        })
+    return findings
+
+
+async def _scan_client_repeated_rejections() -> list:
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    pipeline = [
+        {"$match": {"status": "rejected", "created_at": {"$gte": cutoff}}},
+        {"$group": {
+            "_id": {"client_id": "$client_id", "specialist_id": "$specialist_id"},
+            "count": {"$sum": 1},
+            "request_ids": {"$push": "$_id"},
+        }},
+        {"$match": {"count": {"$gte": 3}}},
+        {"$limit": 50},
+    ]
+    findings = []
+    async for g in db.requests.aggregate(pipeline):
+        findings.append({
+            "pattern": "client_repeated_rejections",
+            "entity_type": "user_pair",
+            "entity_id": f"{g['_id'].get('client_id')}__{g['_id'].get('specialist_id')}",
+            "entity_label": f"Client → Specialist ({g['count']} respingeri)",
+            "context": {**g["_id"], "count": g["count"]},
+        })
+    return findings
+
+
+async def _scan_operator_unvalidated_twins() -> list:
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    findings = []
+    async for t in db.twins.find({"validated": False, "created_at": {"$lt": cutoff}}).limit(50):
+        findings.append({
+            "pattern": "operator_unvalidated_twins",
+            "entity_type": "twin",
+            "entity_id": str(t["_id"]),
+            "entity_label": f"Twin {t.get('property_id', '?')}",
+            "context": {"property_id": t.get("property_id"), "created_at": t.get("created_at")},
+        })
+    return findings
+
+
+async def _scan_escrow_stuck() -> list:
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=14)).isoformat()
+    findings = []
+    async for p in db.projects.find({"milestones": {"$exists": True}}).limit(200):
+        for m in p.get("milestones", []):
+            if m.get("escrow_held") and m.get("updated_at", p.get("updated_at", "")) < cutoff:
+                findings.append({
+                    "pattern": "escrow_stuck",
+                    "entity_type": "milestone",
+                    "entity_id": f"{p['_id']}::{m.get('id')}",
+                    "entity_label": f"{p.get('title', '?')} → {m.get('title', '?')}",
+                    "context": {"amount": m.get("amount"), "held_since": m.get("escrow_held_at")},
+                })
+    return findings
+
+
+async def _scan_audit_spike() -> list:
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    count = await db.admin_audit_log.count_documents({"created_at": {"$gte": cutoff}})
+    if count >= 30:
+        return [{
+            "pattern": "audit_spike",
+            "entity_type": "audit_log",
+            "entity_id": f"window_{cutoff[:13]}",
+            "entity_label": f"{count} acțiuni în ultima oră",
+            "context": {"count": count, "window_start": cutoff},
+        }]
+    return []
+
+
+async def _scan_orphan_twins() -> list:
+    findings = []
+    twin_props = set()
+    async for t in db.twins.find({}, {"property_id": 1}).limit(500):
+        if t.get("property_id"):
+            twin_props.add(t["property_id"])
+    if not twin_props:
+        return findings
+    existing = set()
+    async for p in db.properties.find({"_id": {"$in": [pid for pid in twin_props if isinstance(pid, str)]}}, {"_id": 1}):
+        existing.add(str(p["_id"]))
+    orphans = twin_props - existing
+    for pid in list(orphans)[:50]:
+        t = await db.twins.find_one({"property_id": pid})
+        if t:
+            findings.append({
+                "pattern": "orphan_twins",
+                "entity_type": "twin",
+                "entity_id": str(t["_id"]),
+                "entity_label": f"Twin pt property_id={pid} (inexistent)",
+                "context": {"property_id": pid},
+            })
+    return findings
+
+
+async def _scan_duplicate_users() -> list:
+    pipeline = [
+        {"$group": {"_id": {"$toLower": "$email"}, "count": {"$sum": 1}, "ids": {"$push": "$_id"}}},
+        {"$match": {"count": {"$gt": 1}}},
+        {"$limit": 30},
+    ]
+    findings = []
+    async for g in db.users.aggregate(pipeline):
+        findings.append({
+            "pattern": "duplicate_users",
+            "entity_type": "user_group",
+            "entity_id": g["_id"],
+            "entity_label": f"{g['count']} useri cu email '{g['_id']}'",
+            "context": {"email": g["_id"], "count": g["count"], "user_ids": [str(uid) for uid in g["ids"]]},
+        })
+    return findings
+
+
+SCANNERS = [
+    _scan_stale_projects,
+    _scan_specialist_low_rating,
+    _scan_client_repeated_rejections,
+    _scan_operator_unvalidated_twins,
+    _scan_escrow_stuck,
+    _scan_audit_spike,
+    _scan_orphan_twins,
+    _scan_duplicate_users,
+]
+
+
+async def run_full_scan(actor_id: str = "system") -> dict:
+    """Execute all anomaly scanners and persist new findings. Updates existing ones if pattern+entity matches."""
+    started = datetime.now(timezone.utc)
+    all_raw = []
+    errors = []
+    for scanner in SCANNERS:
+        try:
+            res = await scanner()
+            all_raw.extend(res)
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"[AI-Scan] {scanner.__name__} failed: {e}")
+            errors.append({"scanner": scanner.__name__, "error": str(e)})
+
+    new_count = 0
+    updated_count = 0
+    seen_count = 0
+    for f in all_raw:
+        meta = ANOMALY_PATTERNS.get(f["pattern"], {})
+        composite_key = f"{f['pattern']}::{f['entity_id']}"
+        existing = await db.admin_ai_findings.find_one({"composite_key": composite_key})
+        now_iso = datetime.now(timezone.utc).isoformat()
+        if existing:
+            if existing.get("status") == "open":
+                await db.admin_ai_findings.update_one(
+                    {"_id": existing["_id"]},
+                    {"$set": {"last_seen_at": now_iso, "context": f["context"], "entity_label": f["entity_label"]},
+                     "$inc": {"occurrences": 1}},
+                )
+                updated_count += 1
+            else:
+                seen_count += 1
+        else:
+            await db.admin_ai_findings.insert_one({
+                "composite_key": composite_key,
+                "pattern": f["pattern"],
+                "label": meta.get("label", f["pattern"]),
+                "severity": meta.get("severity", "warning"),
+                "description": meta.get("description", ""),
+                "entity_type": f["entity_type"],
+                "entity_id": f["entity_id"],
+                "entity_label": f["entity_label"],
+                "context": f["context"],
+                "status": "open",
+                "first_seen_at": now_iso,
+                "last_seen_at": now_iso,
+                "occurrences": 1,
+                "resolved_at": None,
+                "resolved_by": None,
+                "resolution_note": None,
+                "scan_id": started.isoformat(),
+            })
+            new_count += 1
+
+    # Record scan history
+    summary = {
+        "scan_id": started.isoformat(),
+        "started_at": started.isoformat(),
+        "finished_at": datetime.now(timezone.utc).isoformat(),
+        "actor_id": actor_id,
+        "new_findings": new_count,
+        "updated_findings": updated_count,
+        "ignored_findings": seen_count,
+        "total_raw": len(all_raw),
+        "errors": errors,
+    }
+    res = await db.admin_ai_scans.insert_one(dict(summary))
+    summary["id"] = str(res.inserted_id)
+    logger.info(f"[AI-Scan] complete: new={new_count} updated={updated_count} ignored={seen_count}")
+    return summary
+
+
+# ============= REST ENDPOINTS =============
+
+def _serialize_finding(d: dict) -> dict:
+    return {
+        "id": str(d["_id"]),
+        "pattern": d.get("pattern"),
+        "label": d.get("label"),
+        "severity": d.get("severity"),
+        "description": d.get("description"),
+        "entity_type": d.get("entity_type"),
+        "entity_id": d.get("entity_id"),
+        "entity_label": d.get("entity_label"),
+        "context": d.get("context"),
+        "status": d.get("status"),
+        "first_seen_at": d.get("first_seen_at"),
+        "last_seen_at": d.get("last_seen_at"),
+        "occurrences": d.get("occurrences", 1),
+        "resolved_at": d.get("resolved_at"),
+        "resolved_by_name": d.get("resolved_by_name"),
+        "resolution_note": d.get("resolution_note"),
+    }
+
+
+@router.post("/scan/run")
+async def trigger_scan(user: dict = Depends(require_role("admin"))):
+    """Manually trigger a full anomaly scan."""
+    summary = await run_full_scan(actor_id=user["id"])
+    return summary
+
+
+@router.get("/findings")
+async def list_findings(
+    status: Optional[str] = Query("open"),
+    severity: Optional[str] = None,
+    pattern: Optional[str] = None,
+    limit: int = Query(100, le=500),
+    user: dict = Depends(require_role("admin")),
+):
+    """List findings with optional filters."""
+    filt = {}
+    if status and status != "all":
+        filt["status"] = status
+    if severity:
+        filt["severity"] = severity
+    if pattern:
+        filt["pattern"] = pattern
+    total = await db.admin_ai_findings.count_documents(filt)
+    cursor = db.admin_ai_findings.find(filt).sort([
+        ("severity", -1),  # high before low (text sort works for our 3-level labels)
+        ("last_seen_at", -1),
+    ]).limit(limit)
+    items = [_serialize_finding(d) async for d in cursor]
+    # KPI counts
+    counts = {
+        "open": await db.admin_ai_findings.count_documents({"status": "open"}),
+        "dismissed": await db.admin_ai_findings.count_documents({"status": "dismissed"}),
+        "resolved": await db.admin_ai_findings.count_documents({"status": "resolved"}),
+    }
+    by_severity = {
+        "high": await db.admin_ai_findings.count_documents({"status": "open", "severity": "high"}),
+        "warning": await db.admin_ai_findings.count_documents({"status": "open", "severity": "warning"}),
+        "low": await db.admin_ai_findings.count_documents({"status": "open", "severity": "low"}),
+    }
+    return {"items": items, "total": total, "counts": counts, "by_severity": by_severity}
+
+
+@router.post("/findings/{finding_id}/dismiss")
+async def dismiss_finding(
+    finding_id: str,
+    payload: dict = Body(default={}),
+    user: dict = Depends(require_role("admin")),
+):
+    try:
+        oid = ObjectId(finding_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid finding id")
+    note = (payload.get("note") or "").strip()[:300] or None
+    await db.admin_ai_findings.update_one(
+        {"_id": oid},
+        {"$set": {
+            "status": "dismissed",
+            "resolved_at": datetime.now(timezone.utc).isoformat(),
+            "resolved_by": user["id"],
+            "resolved_by_name": user.get("name") or user.get("email"),
+            "resolution_note": note,
+        }},
+    )
+    return {"ok": True}
+
+
+@router.post("/findings/{finding_id}/resolve")
+async def resolve_finding(
+    finding_id: str,
+    payload: dict = Body(default={}),
+    user: dict = Depends(require_role("admin")),
+):
+    try:
+        oid = ObjectId(finding_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid finding id")
+    note = (payload.get("note") or "").strip()[:300] or None
+    await db.admin_ai_findings.update_one(
+        {"_id": oid},
+        {"$set": {
+            "status": "resolved",
+            "resolved_at": datetime.now(timezone.utc).isoformat(),
+            "resolved_by": user["id"],
+            "resolved_by_name": user.get("name") or user.get("email"),
+            "resolution_note": note,
+        }},
+    )
+    return {"ok": True}
+
+
+@router.get("/scans")
+async def list_scans(limit: int = Query(20, le=100), user: dict = Depends(require_role("admin"))):
+    cursor = db.admin_ai_scans.find({}).sort("started_at", -1).limit(limit)
+    items = []
+    async for d in cursor:
+        d["_id"] = str(d["_id"])
+        items.append(d)
+    return {"items": items}
+
+
+# ============= CHAT WITH AI INVESTIGATOR =============
+
+def _build_system_prompt() -> str:
+    return """Ești "Investigator", un agent AI specializat în consilierea administratorilor platformei PropManage (o platformă de property management cu 4 roluri: Client, Specialist, Operator, Admin).
+
+ROLUL TĂU:
+- Răspunzi în română (utilizatorul preferă RO)
+- Analizezi findings/anomalii detectate de scannerul determinist
+- Răspunzi la întrebări despre starea platformei
+- Sugerezi acțiuni — DAR NU EXECUȚI nimic. Adminul are control 100%.
+- Ești concis, factual, fără floricele. Folosește bullet points și tabele când e util.
+
+CONSTRÂNGERI CRITICE:
+- NU inventa date. Dacă nu știi, spune "nu am această informație în contextul curent".
+- NU promite acțiuni autonome — orice schimbare necesită aprobarea adminului.
+- Pentru întrebări care necesită query în DB, sugerează ce filtru să folosească adminul în UI sau cere clarificări.
+
+FORMAT RĂSPUNS:
+- Începe cu un rezumat de 1 frază
+- Apoi detalii structurate (bullets/numbered)
+- Termină cu "Acțiuni sugerate:" doar dacă e relevant — fiecare prefixată cu severitate (🔴 urgent, 🟠 important, 🟡 monitorizare)"""
+
+
+async def _get_findings_summary_for_context(limit: int = 30) -> str:
+    """Build a compact text snapshot of current open findings to inject into LLM context."""
+    cursor = db.admin_ai_findings.find({"status": "open"}).sort([
+        ("severity", -1), ("occurrences", -1), ("last_seen_at", -1),
+    ]).limit(limit)
+    lines = []
+    async for f in cursor:
+        sev_icon = {"high": "🔴", "warning": "🟠", "low": "🟡"}.get(f.get("severity"), "·")
+        lines.append(f"- {sev_icon} [{f.get('pattern')}] {f.get('entity_label')} (occurrences: {f.get('occurrences', 1)}, first seen: {f.get('first_seen_at', '?')[:10]})")
+    if not lines:
+        return "Niciun finding deschis în acest moment."
+    return "FINDINGS DESCHISE CURENTE:\n" + "\n".join(lines)
+
+
+@router.post("/chat/send")
+async def chat_send(
+    payload: dict = Body(...),
+    user: dict = Depends(require_role("admin")),
+):
+    """Send a chat message to the Investigator agent.
+    Body: { session_id: str (optional, creates new if missing), message: str }
+    """
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(503, "EMERGENT_LLM_KEY nu este configurat în /app/backend/.env")
+
+    session_id = payload.get("session_id") or f"admin_ai_{user['id']}_{uuid.uuid4().hex[:8]}"
+    user_message = (payload.get("message") or "").strip()
+    if not user_message:
+        raise HTTPException(400, "Mesajul este gol.")
+
+    # Load or create session
+    sess = await db.admin_ai_sessions.find_one({"session_id": session_id})
+    now_iso = datetime.now(timezone.utc).isoformat()
+    if not sess:
+        await db.admin_ai_sessions.insert_one({
+            "session_id": session_id,
+            "admin_id": user["id"],
+            "admin_name": user.get("name") or user.get("email"),
+            "created_at": now_iso,
+            "last_message_at": now_iso,
+            "message_count": 0,
+            "title": user_message[:60],
+        })
+
+    # Save user message
+    await db.admin_ai_messages.insert_one({
+        "session_id": session_id,
+        "role": "user",
+        "content": user_message,
+        "created_at": now_iso,
+    })
+
+    # Build context: findings snapshot + recent message history
+    findings_snapshot = await _get_findings_summary_for_context()
+    history_cursor = db.admin_ai_messages.find({"session_id": session_id}).sort("created_at", 1).limit(20)
+    history = []
+    async for m in history_cursor:
+        history.append({"role": m["role"], "content": m["content"]})
+
+    # Compose system message with live context
+    system_msg = _build_system_prompt() + f"\n\n--- CONTEXT LIVE (snapshot la {now_iso}) ---\n{findings_snapshot}"
+
+    # Call LLM
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage  # type: ignore
+
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=session_id,
+            system_message=system_msg,
+        ).with_model(DEFAULT_MODEL_PROVIDER, DEFAULT_MODEL_NAME)
+
+        # Replay history except the latest user message (which we'll send fresh)
+        # NOTE: emergentintegrations LlmChat keeps internal history per session_id.
+        # We don't want to double up. So we just send the latest user message.
+        response_text = await chat.send_message(UserMessage(text=user_message))
+        provider_used = DEFAULT_MODEL_PROVIDER
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[AI-Chat] LLM call failed: {e}")
+        response_text = f"❌ Nu am putut contacta modelul AI. Eroare: {str(e)[:200]}\n\nPoți încerca din nou peste câteva secunde sau verifică EMERGENT_LLM_KEY în logs."
+        provider_used = "error"
+
+    # Save assistant message
+    await db.admin_ai_messages.insert_one({
+        "session_id": session_id,
+        "role": "assistant",
+        "content": response_text,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "provider": provider_used,
+    })
+    await db.admin_ai_sessions.update_one(
+        {"session_id": session_id},
+        {"$set": {"last_message_at": datetime.now(timezone.utc).isoformat()},
+         "$inc": {"message_count": 2}},
+    )
+
+    return {
+        "session_id": session_id,
+        "message": response_text,
+        "history": history + [{"role": "assistant", "content": response_text}],
+    }
+
+
+@router.get("/chat/sessions")
+async def list_chat_sessions(user: dict = Depends(require_role("admin"))):
+    cursor = db.admin_ai_sessions.find({"admin_id": user["id"]}).sort("last_message_at", -1).limit(30)
+    items = []
+    async for s in cursor:
+        items.append({
+            "session_id": s["session_id"],
+            "title": s.get("title"),
+            "created_at": s.get("created_at"),
+            "last_message_at": s.get("last_message_at"),
+            "message_count": s.get("message_count", 0),
+        })
+    return {"items": items}
+
+
+@router.get("/chat/sessions/{session_id}/messages")
+async def get_chat_messages(
+    session_id: str,
+    user: dict = Depends(require_role("admin")),
+):
+    sess = await db.admin_ai_sessions.find_one({"session_id": session_id})
+    if not sess or sess.get("admin_id") != user["id"]:
+        raise HTTPException(404, "Session not found")
+    cursor = db.admin_ai_messages.find({"session_id": session_id}).sort("created_at", 1)
+    msgs = []
+    async for m in cursor:
+        msgs.append({
+            "role": m["role"],
+            "content": m["content"],
+            "created_at": m.get("created_at"),
+        })
+    return {"session_id": session_id, "messages": msgs, "title": sess.get("title")}
+
+
+@router.delete("/chat/sessions/{session_id}")
+async def delete_chat_session(
+    session_id: str,
+    user: dict = Depends(require_role("admin")),
+):
+    sess = await db.admin_ai_sessions.find_one({"session_id": session_id})
+    if not sess or sess.get("admin_id") != user["id"]:
+        raise HTTPException(404, "Session not found")
+    await db.admin_ai_sessions.delete_one({"session_id": session_id})
+    await db.admin_ai_messages.delete_many({"session_id": session_id})
+    return {"ok": True}
+
+
+# ============= DAILY AUTO-SCAN + EMAIL DIGEST =============
+
+async def run_daily_ai_digest():
+    """Cron job: runs daily at 03:00 Europe/Bucharest. Auto-scans + emails digest to admin at 08:00.
+    Split into 2 cron jobs in server.py: scan at 03:00, digest at 08:00.
+    """
+    try:
+        summary = await run_full_scan(actor_id="system_cron")
+        logger.info(f"[AI-DailyDigest] scan complete: {summary['new_findings']} new")
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[AI-DailyDigest] scan error: {e}")
+
+
+async def send_daily_ai_digest_email():
+    """Send digest email summarizing open findings to all admins (or ADMIN_EMAIL if no admin users)."""
+    try:
+        # Pick top 20 open findings ordered by severity then occurrences
+        cursor = db.admin_ai_findings.find({"status": "open"}).sort([
+            ("severity", -1), ("occurrences", -1), ("last_seen_at", -1),
+        ]).limit(20)
+        items = []
+        async for f in cursor:
+            items.append(f)
+        if not items:
+            logger.info("[AI-Digest] no open findings — skipping email")
+            return
+
+        # Get admin emails
+        admin_emails = []
+        async for u in db.users.find({"role": "admin"}, {"email": 1}):
+            if u.get("email"):
+                admin_emails.append(u["email"])
+        if not admin_emails:
+            admin_emails = [os.environ.get("ADMIN_EMAIL", "admin@propmanage.io")]
+
+        # Build HTML body
+        rows_html = ""
+        for f in items:
+            sev = f.get("severity")
+            color = {"high": "#dc2626", "warning": "#fbbf24", "low": "#94a3b8"}.get(sev, "#94a3b8")
+            sev_label = {"high": "URGENT", "warning": "ATENȚIE", "low": "INFO"}.get(sev, sev)
+            rows_html += f"""
+              <tr>
+                <td style="padding:8px 12px; border-bottom:1px solid #2a2a30; vertical-align:top;">
+                  <span style="display:inline-block; padding:2px 8px; border-radius:999px; background:{color}22; color:{color}; font-size:10px; font-weight:bold;">{sev_label}</span>
+                </td>
+                <td style="padding:8px 12px; border-bottom:1px solid #2a2a30; vertical-align:top;">
+                  <div style="color:#fff; font-size:13px;">{f.get('label')}</div>
+                  <div style="color:#a8a8b0; font-size:12px; margin-top:2px;">{f.get('entity_label')}</div>
+                </td>
+                <td style="padding:8px 12px; border-bottom:1px solid #2a2a30; text-align:right; vertical-align:top; color:#888893; font-size:11px;">
+                  {f.get('occurrences', 1)}x
+                </td>
+              </tr>
+            """
+
+        from email_service import _layout, send_email as _send_email  # type: ignore
+        body_html = f"""
+          <p>Bună,</p>
+          <p>Investigatorul AI a scanat platforma și a detectat <strong>{len(items)} anomalii deschise</strong>. Sumar:</p>
+          <table border="0" cellpadding="0" cellspacing="0" style="width:100%; background:#1a1a1f; border-radius:14px; margin:18px 0;">
+            <tr style="background:#0f0f12;">
+              <th style="padding:10px 12px; text-align:left; font-size:11px; color:#888893; letter-spacing:0.5px;">SEVERITATE</th>
+              <th style="padding:10px 12px; text-align:left; font-size:11px; color:#888893; letter-spacing:0.5px;">FINDING</th>
+              <th style="padding:10px 12px; text-align:right; font-size:11px; color:#888893; letter-spacing:0.5px;">OCURENȚE</th>
+            </tr>
+            {rows_html}
+          </table>
+          <p style="color:#a8a8b0; font-size:13px;">Deschide consola admin pentru a vedea detalii complete, a aproba acțiuni sau a marca finding-uri ca rezolvate:</p>
+          <p><a href="https://propmanage.io/admin" style="display:inline-block; padding:12px 24px; background:#d4ff3a; color:#000; text-decoration:none; border-radius:8px; font-weight:bold;">Deschide AI Console</a></p>
+        """
+        html = _layout(
+            title="🤖 Daily AI Investigator Digest",
+            preheader=f"{len(items)} anomalii deschise pe platformă",
+            body_html=body_html,
+        )
+        subject = f"[PropManage AI] {len(items)} anomalii deschise · digest zilnic"
+        result = await _send_email(admin_emails, subject, html)
+        logger.info(f"[AI-Digest] email sent to {len(admin_emails)} admin(s) via {result.get('provider')}")
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[AI-Digest] error: {e}")
