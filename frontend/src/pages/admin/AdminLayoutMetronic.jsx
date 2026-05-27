@@ -46,6 +46,7 @@ const NAV_SECTIONS = [
     items: [
       { id: "abtests", label: "A/B Tests", icon: Sparkles },
       { id: "trust", label: "Trust Score Weights", icon: Award },
+      { id: "audit", label: "Audit Log", icon: FileText },
       { id: "settings", label: "Setări Platformă", icon: Settings },
     ],
   },

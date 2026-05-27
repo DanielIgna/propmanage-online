@@ -11,6 +11,7 @@ import {
   AdminTrustWeights, AdminPlatformSettings, AdminFinance, AdminProjects, AdminActivityFull
 } from "./AdminPlatformTools";
 import { AdminABTests } from "./AdminABTests";
+import { AdminAuditLog } from "./AdminAuditLog";
 
 const TITLES = {
   overview: { title: "Dashboard", subtitle: "Privire de ansamblu asupra platformei" },
@@ -25,6 +26,7 @@ const TITLES = {
   zones: { title: "Zone Acoperire", subtitle: "Adaugă orașe / cartiere sau dezactivează cele existente" },
   abtests: { title: "Experimente A/B", subtitle: "Testează variante și măsoară CTR în timp real" },
   trust: { title: "Trust Score Weights", subtitle: "Ajustează ponderea fiecărui factor (suma = 100%)" },
+  audit: { title: "Audit Log", subtitle: "Istoric complet al acțiunilor admin · GDPR compliance" },
   settings: { title: "Setări Platformă", subtitle: "Feature flags, comisioane, branding" },
 };
 
@@ -52,6 +54,7 @@ export const AdminDashboard = () => {
       {active === "zones" && <AdminZones />}
       {active === "trust" && <AdminTrustWeights />}
       {active === "abtests" && <AdminABTests />}
+      {active === "audit" && <AdminAuditLog />}
       {active === "settings" && <AdminPlatformSettings />}
     </AdminLayoutMetronic>
   );

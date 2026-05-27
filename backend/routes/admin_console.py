@@ -31,6 +31,27 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["admin_console"])
 
 
+# ============= AUDIT LOG HELPER =============
+async def audit(action: str, actor: dict, target: Optional[dict] = None, before: Optional[dict] = None, after: Optional[dict] = None, note: Optional[str] = None):
+    """Persist an admin action to the audit_log collection. Fire-and-forget (won't break request)."""
+    try:
+        await db.admin_audit_log.insert_one({
+            "action": action,
+            "actor_id": actor.get("id"),
+            "actor_name": actor.get("name"),
+            "actor_email": actor.get("email"),
+            "target_type": (target or {}).get("type"),
+            "target_id": (target or {}).get("id"),
+            "target_label": (target or {}).get("label"),
+            "before": before,
+            "after": after,
+            "note": note,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as exc:
+        logger.warning(f"Audit log write failed for {action}: {exc}")
+
+
 # ============= DEFAULTS =============
 DEFAULT_CMS = {
     "landing.promo_banner": "",
@@ -94,7 +115,6 @@ DEFAULT_TRUST_WEIGHTS = {
     "complaints_penalty": 0.15,
     "verification_bonus": 0.10,
 }
-
 DEFAULT_SETTINGS = {
     "stripe_live": False,
     "resend_live": False,
@@ -204,6 +224,7 @@ async def list_cms(user: dict = Depends(require_role("admin"))):
 @router.put("/cms")
 async def upsert_cms(data: CMSEntryIn, user: dict = Depends(require_role("admin"))):
     now = datetime.now(timezone.utc).isoformat()
+    existing = await db.cms_content.find_one({"key": data.key})
     await db.cms_content.update_one(
         {"key": data.key},
         {"$set": {
@@ -214,12 +235,21 @@ async def upsert_cms(data: CMSEntryIn, user: dict = Depends(require_role("admin"
         }},
         upsert=True,
     )
+    await audit("cms.update", user,
+                target={"type": "cms_key", "id": data.key, "label": data.key},
+                before={"value": (existing or {}).get("value")} if existing else None,
+                after={"value": data.value})
     return {"ok": True, "key": data.key}
 
 
 @router.delete("/cms/{key}")
 async def reset_cms(key: str, user: dict = Depends(require_role("admin"))):
+    existing = await db.cms_content.find_one({"key": key})
     await db.cms_content.delete_one({"key": key})
+    if existing:
+        await audit("cms.reset", user,
+                    target={"type": "cms_key", "id": key, "label": key},
+                    before={"value": existing.get("value")})
     return {"ok": True, "reset": key}
 
 
@@ -401,6 +431,10 @@ async def update_settings(data: SettingsIn, user: dict = Depends(require_role("a
         }},
         upsert=True,
     )
+    await audit("settings.update", user,
+                target={"type": "platform_settings", "id": "settings", "label": "Platform Settings"},
+                before={k: current.get(k) for k in updates},
+                after=updates)
     return {"ok": True, **merged}
 
 
@@ -435,32 +469,55 @@ async def list_users(
 
 @router.patch("/users/{user_id}")
 async def update_user(user_id: str, data: UserUpdateIn, user: dict = Depends(require_role("admin"))):
+    try:
+        oid = ObjectId(user_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid user id")
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     if not updates:
         raise HTTPException(400, "Nothing to update")
+    target_user = await db.users.find_one({"_id": oid}, {"name": 1, "email": 1, **{k: 1 for k in updates}})
+    if not target_user:
+        raise HTTPException(404, "User not found")
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
     updates["updated_by"] = user["id"]
-    res = await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": updates})
-    if res.matched_count == 0:
-        raise HTTPException(404, "User not found")
+    await db.users.update_one({"_id": oid}, {"$set": updates})
+    await audit("user.update", user,
+                target={"type": "user", "id": user_id, "label": target_user.get("email")},
+                before={k: target_user.get(k) for k in updates if k not in ("updated_at", "updated_by")},
+                after={k: v for k, v in updates.items() if k not in ("updated_at", "updated_by")})
     return {"ok": True}
 
 
 @router.post("/users/{user_id}/ban")
 async def ban_user(user_id: str, user: dict = Depends(require_role("admin"))):
+    try:
+        oid = ObjectId(user_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid user id")
+    target_user = await db.users.find_one({"_id": oid}, {"email": 1})
     await db.users.update_one(
-        {"_id": ObjectId(user_id)},
+        {"_id": oid},
         {"$set": {"banned": True, "banned_at": datetime.now(timezone.utc).isoformat(), "banned_by": user["id"]}},
     )
+    await audit("user.ban", user,
+                target={"type": "user", "id": user_id, "label": (target_user or {}).get("email")})
     return {"ok": True}
 
 
 @router.post("/users/{user_id}/unban")
 async def unban_user(user_id: str, user: dict = Depends(require_role("admin"))):
+    try:
+        oid = ObjectId(user_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid user id")
+    target_user = await db.users.find_one({"_id": oid}, {"email": 1})
     await db.users.update_one(
-        {"_id": ObjectId(user_id)},
+        {"_id": oid},
         {"$unset": {"banned": "", "banned_at": "", "banned_by": ""}},
     )
+    await audit("user.unban", user,
+                target={"type": "user", "id": user_id, "label": (target_user or {}).get("email")})
     return {"ok": True}
 
 
@@ -643,6 +700,7 @@ async def activity_feed_live(limit: int = Query(20, le=100), user: dict = Depend
 public_router = APIRouter(prefix="/api", tags=["cms_public"])
 
 
+
 @public_router.get("/cms/public")
 async def get_public_cms():
     """Return merged defaults + overrides as flat dict (no auth). Includes landing visibility flags."""
@@ -773,7 +831,6 @@ LANDING_FLAG_KEYS = [
     "landing_show_value_proposition",
     "landing_show_golden_path",
 ]
-
 DEFAULT_PRESETS = [
     {
         "name": "Public Client",
@@ -858,6 +915,9 @@ async def create_landing_preset(data: PresetIn, user: dict = Depends(require_rol
         "created_by": user["id"],
     }
     res = await db.landing_presets.insert_one(doc)
+    await audit("preset.create", user,
+                target={"type": "preset", "id": str(res.inserted_id), "label": data.name},
+                after={"flags": flags})
     return {"ok": True, "id": str(res.inserted_id)}
 
 
@@ -873,6 +933,9 @@ async def delete_landing_preset(preset_id: str, user: dict = Depends(require_rol
     if doc.get("system"):
         raise HTTPException(400, "Preset-urile sistem nu pot fi șterse.")
     await db.landing_presets.delete_one({"_id": oid})
+    await audit("preset.delete", user,
+                target={"type": "preset", "id": preset_id, "label": doc.get("name")},
+                before={"flags": doc.get("flags")})
     return {"ok": True}
 
 
@@ -1056,8 +1119,7 @@ async def run_due_preset_schedules():
 
 
 @router.get("/schedule-history")
-async def schedule_history(
-    user: dict = Depends(require_role("admin")),
+async def schedule_history(    user: dict = Depends(require_role("admin")),
     preset_id: Optional[str] = None,
     limit: int = Query(50, le=200),
 ):
@@ -1080,3 +1142,78 @@ async def schedule_history(
             "error": d.get("error"),
         })
     return out
+
+
+# ============= AUDIT LOG ENDPOINTS =============
+@router.get("/audit-log")
+async def list_audit_log(
+    user: dict = Depends(require_role("admin")),
+    action: Optional[str] = None,
+    actor_id: Optional[str] = None,
+    target_type: Optional[str] = None,
+    q: Optional[str] = None,
+    limit: int = Query(100, le=500),
+    skip: int = 0,
+):
+    filt = {}
+    if action:
+        filt["action"] = action
+    if actor_id:
+        filt["actor_id"] = actor_id
+    if target_type:
+        filt["target_type"] = target_type
+    if q:
+        filt["$or"] = [
+            {"actor_name": {"$regex": q, "$options": "i"}},
+            {"actor_email": {"$regex": q, "$options": "i"}},
+            {"target_label": {"$regex": q, "$options": "i"}},
+            {"note": {"$regex": q, "$options": "i"}},
+        ]
+    total = await db.admin_audit_log.count_documents(filt)
+    cursor = db.admin_audit_log.find(filt).sort("created_at", -1).skip(skip).limit(limit)
+    items = []
+    async for d in cursor:
+        items.append({
+            "id": str(d["_id"]),
+            "action": d.get("action"),
+            "actor_id": d.get("actor_id"),
+            "actor_name": d.get("actor_name"),
+            "actor_email": d.get("actor_email"),
+            "target_type": d.get("target_type"),
+            "target_id": d.get("target_id"),
+            "target_label": d.get("target_label"),
+            "before": d.get("before"),
+            "after": d.get("after"),
+            "note": d.get("note"),
+            "created_at": d.get("created_at"),
+        })
+    return {"items": items, "total": total, "skip": skip, "limit": limit}
+
+
+@router.get("/audit-log/actions")
+async def audit_log_actions(user: dict = Depends(require_role("admin"))):
+    """Return distinct action types + counts for filter dropdown."""
+    pipeline = [
+        {"$group": {"_id": "$action", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+    rows = await db.admin_audit_log.aggregate(pipeline).to_list(50)
+    return [{"action": r["_id"], "count": r["count"]} for r in rows if r["_id"]]
+
+
+@router.get("/audit-log/export.csv")
+async def export_audit_log_csv(user: dict = Depends(require_role("admin"))):
+    rows = []
+    async for d in db.admin_audit_log.find({}).sort("created_at", -1).limit(5000):
+        rows.append({
+            "created_at": d.get("created_at", ""),
+            "action": d.get("action", ""),
+            "actor": d.get("actor_email", ""),
+            "actor_name": d.get("actor_name", ""),
+            "target_type": d.get("target_type", ""),
+            "target_label": d.get("target_label", ""),
+            "before": str(d.get("before") or "")[:200],
+            "after": str(d.get("after") or "")[:200],
+        })
+    return _csv_response(rows, "audit_log.csv")
+
