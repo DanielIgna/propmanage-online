@@ -208,7 +208,33 @@ async def operator_validate_twin(prop_id: str, data: TwinValidateIn, user: dict 
             await notify(prop["owner_id"], "Digital Twin aprobat", f"Twin-ul proprietății '{prop.get('name','')}' a fost validat și activat.", type_="twin", link="/client")
         else:
             await notify(prop["owner_id"], "Twin necesită revizie", f"Twin-ul proprietății '{prop.get('name','')}' necesită ajustări. {data.notes or ''}", type_="twin", link="/client")
+    # Notify specialists with active (assigned/in_progress/completed) requests on this property
+    notified_specialists = set()
+    async for req in db.requests.find({
+        "property_id": prop_id,
+        "status": {"$in": ["assigned", "in_progress", "completed"]},
+        "specialist_id": {"$ne": None},
+    }, {"specialist_id": 1, "title": 1}):
+        sid = req.get("specialist_id")
+        if sid and sid not in notified_specialists:
+            notified_specialists.add(sid)
+            if data.action == "approve":
+                await notify(
+                    sid,
+                    "🏠 Twin actualizat pe proprietatea ta de lucru",
+                    f"Operatorul a validat 2D twin-ul proprietatii pe care lucrezi ('{prop.get('name', '')}'). Acum poti vedea camerele si asset-urile in profilul cererii.",
+                    type_="twin_specialist_update",
+                    link="/specialist",
+                )
+            else:
+                await notify(
+                    sid,
+                    "⚠ Twin necesită revizie",
+                    f"2D twin-ul proprietatii '{prop.get('name', '')}' (unde ai lucrare activa) a fost respins. Operatorul a notat: {(data.notes or '—')[:140]}",
+                    type_="twin_specialist_update",
+                    link="/specialist",
+                )
     await log_event(None, "twin.validated", actor=user, property_id=prop_id,
-                    payload={"action": data.action, "new_status": new_status, "notes": (data.notes or "")[:200]})
-    return {"ok": True, "status": new_status}
+                    payload={"action": data.action, "new_status": new_status, "notes": (data.notes or "")[:200], "specialists_notified": len(notified_specialists)})
+    return {"ok": True, "status": new_status, "specialists_notified": len(notified_specialists)}
 

@@ -5,6 +5,7 @@ import axios from "axios";
 import { motion } from "framer-motion";
 import { Star, CheckCircle2, Award, Briefcase, Calendar, ArrowLeft, Building2, Image as ImageIcon, Shield, Clock, Camera, AlertOctagon } from "lucide-react";
 import { PortfolioGallery } from "./Portfolio";
+import { HealthScoreBadge } from "../components/HealthScoreBadge";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -150,6 +151,7 @@ export const SpecialistProfile = () => {
                     <Award className="w-4 h-4" />{data.tier}
                   </div>
                 )}
+                {data.health && <HealthScoreBadge health={data.health} />}
               </div>
             </div>
           </div>

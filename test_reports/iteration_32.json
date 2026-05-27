@@ -1,0 +1,67 @@
+{
+  "summary": "Phase 32 audit (Client + Operator) and Health Score Specialist verified. Backend: 19/20 active tests PASS (1 skipped: no pending maintenance logs to validate), 1 FAIL caused by a real backend bug in /api/operator/twins listing (500 due to undefendable ObjectId on twin doc with property_id='None'). Health Score feature fully working backend + frontend (badges render, detail modal opens, profile page shows progress bars).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/operator/twins",
+        "issue": "Returns 500 'Internal Server Error' when ANY twin document has property_id == 'None' (string) or any non-ObjectId-castable value. Stack: operator_twins.py:111 `ObjectId(d['property_id'])` raises bson.errors.InvalidId. Found 1 corrupt doc (_id=6a178242748149cfcadfd3cb, property_id='None'). Need defensive parsing (try/except, or filter via regex/length check before ObjectId cast).",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "POST /api/requests/{id}/review",
+        "issue": "ReviewIn model requires `job_id` field while endpoint URL already carries req_id — redundant. Either drop job_id from model or rename clearly. Test had to pass job_id=req_id to satisfy schema."
+      },
+      {
+        "endpoint": "POST /api/requests",
+        "issue": "RequestCreateIn.priority is Literal['normal','urgent'] but original spec (and frontend mockups) use 'medium'/'low'/'high'/'urgent'. Need to align contract or accept 'medium' alias."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "HealthScoreBadge (Marketplace card)",
+        "issue": "Badge label and score concatenate without separator → 'Bun65' / 'BUN 50' inconsistent. Card variant shows 'Bun65' (no space), large variant shows 'BUN 50' (with space). Minor copy/UX inconsistency.",
+        "selector": "[data-testid='health-badge-good']",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/specialists/{id}",
+        "issues": ["Mixed languages: 'SCOR DE ÎNCREDERE PROPMANAGE' next to 'Login' (EN) in header — minor i18n inconsistency."]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase32_client_operator_audit.py",
+    "/app/test_reports/pytest/phase32_results.xml"
+  ],
+  "action_items": [
+    "Fix GET /api/operator/twins: add defensive ObjectId parsing in operator_twins.py:111 (e.g., `try: ObjectId(pid) except InvalidId: continue`). Also cleanup the corrupt twin doc with property_id='None' (db.twins, _id=6a178242748149cfcadfd3cb).",
+    "Align ReviewIn schema: either remove `job_id` (already in path) or document the duplication.",
+    "Decide canonical priority enum for requests ('normal'/'urgent' vs medium/low/high) and align frontend forms.",
+    "(Optional polish) Standardise health badge label format — `BUN · 65` or `Bun (65)` across small + large variants."
+  ],
+  "critical_code_review_comments": [
+    "operator_twins.py line 111 builds prop_ids via blind ObjectId() — list-comprehension throws on a single bad doc and 500s the whole endpoint. Must filter or use try/except.",
+    "operator_twins.py validate handler returns specialists_notified count (good); confirmed in-app notif `type=twin_specialist_update` reaches the specialist's /api/notifications feed — P2 fix verified.",
+    "Health Score formula (marketplace.py 27-160) clamps at 100, returns rich components — matches spec. Tier thresholds excellent>=80, good>=50, developing<50 confirmed."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase32_client_operator_audit.py (new pytest module, 21 tests)"
+  ],
+  "success_rate": {
+    "backend": "95% (19/20 active tests passing, 1 fail on /api/operator/twins listing)",
+    "frontend": "100% smoke (HealthScoreBadge renders on marketplace + profile, modal opens)"
+  },
+  "test_credentials": "Used /app/memory/test_credentials.md — client@propmanage.io / Client123!, specialist@propmanage.io / Spec123!, operator@propmanage.io / Op123!, admin@propmanage.io / Admin123!. All login OK.",
+  "seed_data_creation": "Tests create TEST_* prefixed properties, requests, twins, disputes under tag uuid (suffix). Confirmed +reviewed lifecycle leaves a real 5-star review on the seeded specialist (intentional for cross-role test).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Phase 32 confirms: HS Health Score backend+frontend; P2 specialists_notified fix on twin approve/reject; Phase 31 nonconformity regression OK; client end-to-end (property → request → escrow → start → complete → confirm → review → dispute) OK; operator end-to-end (queue, twins build/approve/reject, flag, role guard) OK. Remaining bug: /api/operator/twins crashes on corrupt twin doc — main agent should add defensive parsing AND cleanup the bad doc. After fix, only re-run test_O1_queue_and_twins_list.",
+  "rca of the issue": "Bug RCA — /api/operator/twins 500. Reproduction: as operator, GET /api/operator/twins. Backend logs: bson.errors.InvalidId: 'None' is not a valid ObjectId, at operator_twins.py line 111. Root cause: list comprehension `[ObjectId(d['property_id']) for d in docs if d.get('property_id')]` filters falsy but not the string 'None'. A previously persisted twin doc has property_id stored as the literal string 'None' (likely from a prior code path that did `str(None)` instead of leaving it null). Mitigation: (a) cleanup db.twins doc _id=6a178242748149cfcadfd3cb; (b) make the cast defensive: `pid_list = []; for d in docs: pid = d.get('property_id'); if not pid or not isinstance(pid, str) or len(pid) != 24: continue; try: pid_list.append(ObjectId(pid)) except InvalidId: continue`."
+}

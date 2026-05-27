@@ -5,6 +5,7 @@ import axios from "axios";
 import { motion } from "framer-motion";
 import { Building2, Star, CheckCircle2, Search, Filter, ArrowLeft, Shield, QrCode, Copy, Check, Calendar, Wrench, AlertTriangle, CreditCard } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
+import { HealthScoreBadge } from "../components/HealthScoreBadge";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -84,13 +85,16 @@ export const PublicMarketplace = () => {
                   <div className="text-[11px] text-stone-400 capitalize">{s.specialty || "Specialist"}</div>
                 </div>
               </div>
-              <div className="flex items-center gap-3 text-xs mb-4">
+              <div className="flex items-center gap-3 text-xs mb-2">
                 <div className="flex items-center gap-1">
                   <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                   <span>{s.rating || "—"}</span>
                   <span className="text-stone-500">({s.reviews_count})</span>
                 </div>
                 {s.tier && <span className="text-[9px] bg-[#d4ff3a]/15 text-[#d4ff3a] px-2 py-0.5 rounded-full uppercase tracking-wider">{s.tier}</span>}
+              </div>
+              <div className="mb-4">
+                <HealthScoreBadge health={s.health} size="sm" />
               </div>
               <Link to={`/specialists/${s.id}`} className="w-full text-center bg-white/5 hover:bg-white/10 py-2 rounded-xl text-xs font-medium block" data-testid={`mkt-view-${s.id}`}>
                 Vezi profil

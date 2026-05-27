@@ -68,6 +68,96 @@ async def public_marketplace(
         matching_set = set(matching)
         docs = [d for d in docs if str(d["_id"]) in matching_set]
 
+    # ===== HEALTH SCORE (P2 — sugestie main agent) =====
+    # Batch-compute per-specialist signals: total/disputed/confirmed/portfolio counts.
+    health_map = {}
+    if docs:
+        spec_ids = [str(d["_id"]) for d in docs]
+        # Aggregate requests grouped by specialist_id
+        async for row in db.requests.aggregate([
+            {"$match": {"specialist_id": {"$in": spec_ids}}},
+            {"$group": {
+                "_id": "$specialist_id",
+                "total":     {"$sum": 1},
+                "confirmed": {"$sum": {"$cond": [{"$eq": ["$status", "confirmed"]}, 1, 0]}},
+                "disputed":  {"$sum": {"$cond": [{"$eq": ["$disputed", True]}, 1, 0]}},
+            }},
+        ]):
+            health_map[row["_id"]] = row
+        # Batch count portfolio items
+        portfolio_counts = {}
+        async for row in db.portfolio.aggregate([
+            {"$match": {"specialist_id": {"$in": spec_ids}}},
+            {"$group": {"_id": "$specialist_id", "n": {"$sum": 1}}},
+        ]):
+            portfolio_counts[row["_id"]] = row["n"]
+
+    def _compute_health(d):
+        sid = str(d["_id"])
+        stats = health_map.get(sid, {"total": 0, "confirmed": 0, "disputed": 0})
+        rating = float(d.get("rating") or 0)
+        reviews = int(d.get("reviews_count") or 0)
+        verified = bool(d.get("verified"))
+        total = stats["total"]
+        confirmed = stats["confirmed"]
+        disputed = stats["disputed"]
+
+        # Rating component (max 30)
+        score = rating * 6  # 5★ → 30
+
+        # Reviews component (max 15) — diminishing returns
+        if reviews >= 10: score += 15
+        elif reviews >= 5: score += 10
+        elif reviews >= 1: score += 5
+
+        # Verified bonus (max 15)
+        if verified: score += 15
+
+        # Completion rate (max 25) — confirmed / total
+        if total >= 3:
+            completion_rate = confirmed / total
+            score += completion_rate * 25
+        elif total >= 1:
+            # No penalty for low volume — neutral grant
+            score += 12
+        else:
+            # Brand-new specialist — neutral
+            score += 12
+
+        # Dispute penalty / bonus (max 15)
+        if total >= 3:
+            dispute_rate = disputed / total
+            if dispute_rate == 0: score += 15
+            elif dispute_rate < 0.05: score += 10
+            elif dispute_rate < 0.10: score += 5
+            # else 0
+        else:
+            score += 8  # neutral for low volume
+
+        score = max(0, min(100, round(score)))
+        if score >= 80:
+            tier, color, label = "excellent", "emerald", "Excelent"
+        elif score >= 50:
+            tier, color, label = "good", "amber", "Bun"
+        else:
+            tier, color, label = "developing", "rose", "În progres"
+
+        return {
+            "score": score,
+            "tier": tier,
+            "color": color,
+            "label": label,
+            "components": {
+                "rating": rating,
+                "reviews": reviews,
+                "verified": verified,
+                "completed_jobs": confirmed,
+                "total_jobs": total,
+                "disputes": disputed,
+            },
+            "portfolio_count": portfolio_counts.get(sid, 0) if docs else 0,
+        }
+
     return [{
         "id": str(d["_id"]),
         "name": d.get("name"),
@@ -81,6 +171,8 @@ async def public_marketplace(
         "tier": d.get("tier"),
         "verified": d.get("verified", False),
         "availability_status": d.get("availability_status"),
+        "health": _compute_health(d),
+        "portfolio_count": _compute_health(d)["portfolio_count"],
     } for d in docs]
 
 
