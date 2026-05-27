@@ -28,6 +28,30 @@ from models import (
 from email_service import send_template, tpl_welcome
 from digest import DIGEST_BUILDERS, run_daily_digests
 
+
+# --- Admin whitelist enforcement ---
+def _admin_whitelist() -> set:
+    raw = os.environ.get("ADMIN_EMAILS", "")
+    return {e.strip().lower() for e in raw.split(",") if e.strip()}
+
+
+async def _enforce_admin_role(user: dict) -> dict:
+    """If user email is in ADMIN_EMAILS → ensure role=admin. Otherwise demote off admin.
+    Returns the (possibly mutated) user dict; persists changes to DB."""
+    if not user:
+        return user
+    email = (user.get("email") or "").lower()
+    role = user.get("role")
+    whitelist = _admin_whitelist()
+    if email in whitelist and role != "admin":
+        await db.users.update_one({"_id": user["_id"]}, {"$set": {"role": "admin"}})
+        user["role"] = "admin"
+    elif email not in whitelist and role == "admin":
+        # demote stray admins to operator (keeps moderate access for testing)
+        await db.users.update_one({"_id": user["_id"]}, {"$set": {"role": "operator"}})
+        user["role"] = "operator"
+    return user
+
 router = APIRouter(prefix="/api", tags=["auth"])
 
 
@@ -124,6 +148,7 @@ async def login(data: LoginIn, request: Request, response: Response):
             raise HTTPException(401, "Invalid 2FA code")
 
     _login_attempts.pop(ip, None)
+    user = await _enforce_admin_role(user)
     uid = str(user["_id"])
     access = create_access_token(uid, email, user.get("role", "client"))
     refresh = create_refresh_token(uid)
@@ -141,9 +166,14 @@ async def logout(response: Response):
 @router.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
     # Load tutorial seen flag fresh from DB so it reflects across sessions
-    doc = await db.users.find_one({"_id": ObjectId(user["id"])}, {"tutorial_seen": 1, "ai_admin_tour_seen": 1})
+    doc = await db.users.find_one({"_id": ObjectId(user["id"])}, {"tutorial_seen": 1, "ai_admin_tour_seen": 1, "email": 1, "role": 1})
     user["tutorial_seen"] = bool((doc or {}).get("tutorial_seen", False))
     user["ai_admin_tour_seen"] = bool((doc or {}).get("ai_admin_tour_seen", False))
+    # Enforce admin whitelist on every /me call to catch direct DB tampering or stale tokens.
+    if doc:
+        fresh = {"_id": doc["_id"], "email": doc.get("email"), "role": doc.get("role")}
+        await _enforce_admin_role(fresh)
+        user["role"] = fresh["role"]
     return user
 
 
@@ -497,6 +527,7 @@ async def google_session_exchange(request: Request, response: Response):
         user = new_user
         user["_id"] = result.inserted_id
 
+    user = await _enforce_admin_role(user)
     access = create_access_token(uid, email, user.get("role", "client"))
     refresh = create_refresh_token(uid)
     set_auth_cookies(response, access, refresh)

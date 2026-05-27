@@ -5,7 +5,7 @@ import {
   Home, Wrench, Shield, Wallet, Box, Users, AlertTriangle, CheckCircle2,
   ArrowRight, ArrowUpRight, Zap, Droplet, Wind, Building2, Coins, TrendingUp,
   Eye, Lock, Star, Sparkles, FileCheck, Gavel, ChevronRight, Play, Pause,
-  Activity, Layers, Cpu, Award, MessageSquare, Camera, Bell, Plus, Minus, Languages, LogIn, LayoutDashboard
+  Activity, Layers, Cpu, Award, MessageSquare, Camera, Bell, Plus, Minus, Languages, LogIn, LayoutDashboard, ShieldCheck
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./auth";
 import { I18nProvider, useI18n } from "./i18n";
@@ -72,6 +72,16 @@ const Nav = () => {
           <button onClick={toggle} className="flex items-center gap-1 px-2 sm:px-3 py-1.5 hover:bg-white/5 rounded-full text-xs uppercase tracking-wider text-stone-300" data-testid="lang-toggle">
             <Languages className="w-3.5 h-3.5" />{lang.toUpperCase()}
           </button>
+          {user && user !== false && user.role === "admin" && (
+            <Link
+              to="/admin"
+              className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-semibold bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 transition-colors"
+              data-testid="nav-admin"
+              title="Panou Admin"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" /><span className="hidden sm:inline">Admin</span>
+            </Link>
+          )}
           {user && user !== false ? (
             <Link to={`/${user.role}`} className="btn-accent px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium inline-flex items-center gap-1.5" data-testid="nav-dashboard">
               <LayoutDashboard className="w-3.5 h-3.5" /><span className="hidden sm:inline">{t("nav.dashboard")}</span>
