@@ -1406,3 +1406,135 @@ async def alert_history(limit: int = Query(20, le=100), user: dict = Depends(req
         d["_id"] = str(d["_id"])
         items.append(d)
     return {"items": items}
+
+
+# ============= AI HEALTH SCORE (Phase 47E) =============
+# Combines 3 sub-scores into single 0-100 platform-AI fitness score.
+# All computed on-the-fly from existing collections. No new storage required.
+
+SEVERITY_WEIGHTS = {"critical": 25, "high": 10, "warning": 3, "medium": 3, "info": 1, "low": 1}
+
+
+async def _compute_findings_score(days: int = 7) -> dict:
+    """Lower open weighted-severity = higher score. 0 findings = 100, ≥100 weight pts = 0."""
+    cursor = db.admin_ai_findings.find({"status": "open"}, {"severity": 1})
+    weight = 0
+    by_severity = {"critical": 0, "high": 0, "warning": 0, "medium": 0, "info": 0, "low": 0}
+    async for f in cursor:
+        sev = (f.get("severity") or "info").lower()
+        by_severity[sev] = by_severity.get(sev, 0) + 1
+        weight += SEVERITY_WEIGHTS.get(sev, 1)
+    score = max(0, min(100, round(100 - weight)))
+    return {
+        "score": score,
+        "weight_total": weight,
+        "by_severity": by_severity,
+        "total_open": sum(by_severity.values()),
+    }
+
+
+async def _compute_effectiveness_score(days: int = 7) -> dict:
+    """Rolling effectiveness = applied / decided. Score = pct directly. If no decisions → neutral 70."""
+    res = await _compute_rolling_effectiveness(days)
+    eff = res.get("effectiveness_pct")
+    if eff is None:
+        return {"score": 70, "effectiveness_pct": None, "neutral": True, **res}
+    return {"score": round(eff), "effectiveness_pct": eff, "neutral": False, **res}
+
+
+async def _compute_concierge_score(days: int = 7) -> dict:
+    """Higher block_rate = lower score. Score = 100 - block_rate_pct, floored at 30."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    total = await db.concierge_messages.count_documents({"created_at": {"$gte": cutoff}, "role": "assistant"})
+    if total == 0:
+        return {"score": 80, "total": 0, "blocked": 0, "block_rate_pct": None, "neutral": True}
+    blocked = await db.concierge_messages.count_documents({
+        "created_at": {"$gte": cutoff},
+        "role": "assistant",
+        "blocked": True,
+    })
+    block_rate = round((blocked / total) * 100, 1)
+    score = max(30, min(100, round(100 - block_rate * 2)))  # 2x weight on block rate
+    return {"score": score, "total": total, "blocked": blocked, "block_rate_pct": block_rate, "neutral": False}
+
+
+def _grade(score: int) -> str:
+    if score >= 90: return "Excelent"
+    if score >= 75: return "Bună"
+    if score >= 60: return "Acceptabilă"
+    if score >= 40: return "Atenție"
+    return "Critică"
+
+
+def _grade_color(score: int) -> str:
+    if score >= 75: return "emerald"
+    if score >= 60: return "amber"
+    return "red"
+
+
+@router.get("/health-score")
+async def health_score(
+    days: int = Query(7, ge=1, le=30),
+    user: dict = Depends(require_role("admin")),
+):
+    f = await _compute_findings_score(days)
+    e = await _compute_effectiveness_score(days)
+    c = await _compute_concierge_score(days)
+    # Weighted overall: findings 40%, effectiveness 35%, concierge 25%.
+    overall = round(0.40 * f["score"] + 0.35 * e["score"] + 0.25 * c["score"])
+
+    # Trend: snapshot per day for the last 14 days (lightweight — uses same counts).
+    trend = []
+    today = datetime.now(timezone.utc).date()
+    for i in range(13, -1, -1):
+        day = today - timedelta(days=i)
+        day_iso = day.isoformat()
+        # Use simplified per-day: open findings as of *end of day* is expensive; instead, store today's snapshot.
+        # For trend, we read from db.admin_ai_health_history if present; else only today's data point.
+        snap = await db.admin_ai_health_history.find_one({"day": day_iso})
+        if snap:
+            trend.append({"day": day_iso, "overall": snap["overall"], "f": snap.get("findings_score"), "e": snap.get("effectiveness_score"), "c": snap.get("concierge_score")})
+
+    # Persist today's snapshot (idempotent upsert per day)
+    today_iso = today.isoformat()
+    await db.admin_ai_health_history.update_one(
+        {"day": today_iso},
+        {"$set": {
+            "day": today_iso,
+            "overall": overall,
+            "findings_score": f["score"],
+            "effectiveness_score": e["score"],
+            "concierge_score": c["score"],
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+    # Re-fetch trend to include today (after upsert)
+    trend = []
+    for i in range(13, -1, -1):
+        day = today - timedelta(days=i)
+        day_iso = day.isoformat()
+        snap = await db.admin_ai_health_history.find_one({"day": day_iso})
+        if snap:
+            trend.append({"day": day_iso, "overall": snap["overall"], "f": snap.get("findings_score"), "e": snap.get("effectiveness_score"), "c": snap.get("concierge_score")})
+
+    delta_7d = None
+    if len(trend) >= 2:
+        # Compare today's overall vs ~7 days ago (or earliest available)
+        oldest = trend[max(0, len(trend) - 8)]["overall"] if len(trend) > 7 else trend[0]["overall"]
+        delta_7d = overall - oldest
+
+    return {
+        "overall": overall,
+        "grade": _grade(overall),
+        "color": _grade_color(overall),
+        "delta_7d": delta_7d,
+        "window_days": days,
+        "metrics": {
+            "findings": {**f, "weight": 0.40, "label": "Findings deschise"},
+            "effectiveness": {**e, "weight": 0.35, "label": "Eficacitate Repair AI"},
+            "concierge": {**c, "weight": 0.25, "label": "Concierge — block rate"},
+        },
+        "trend": trend,
+        "computed_at": datetime.now(timezone.utc).isoformat(),
+    }

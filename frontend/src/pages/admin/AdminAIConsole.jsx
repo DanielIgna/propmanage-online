@@ -4,6 +4,7 @@ import axios from "axios";
 import { Bot, RefreshCw, Send, AlertTriangle, CheckCircle2, X, Trash2, Plus, FileSearch, Wrench, Sparkles, ShieldCheck } from "lucide-react";
 import { AdminCard, AdminBtn } from "./AdminLayoutMetronic";
 import { RepairAuditLog } from "./RepairAuditLog";
+import { AIHealthScore } from "./AIHealthScore";
 import { API } from "../DashShared";
 
 const SEVERITY_COLORS = {
@@ -167,6 +168,9 @@ export const AdminAIConsole = () => {
 
   return (
     <div className="space-y-4" data-testid="admin-ai-console">
+      {/* AI Health Score hero (Phase 47E) */}
+      <AIHealthScore />
+
       {/* Findings dashboard */}
       <AdminCard
         title={
