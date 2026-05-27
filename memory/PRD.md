@@ -506,6 +506,15 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 
 
 
+### Phase 54 — Digital Twin Phase I: Issue Report PDF + 2 Bug Fixes — Feb 2026
+- **Phase I (Issue Report)** — From a 3D pin's thread modal, click "Trimite raport" (`dt-pin-issue-report-btn`) → `IssueReportModal` opens with recipient + custom message + preview button. Backend generates a multi-section PDF via `/app/backend/dt_issue_report.py` (reportlab): header + pin meta table (category/priority/status/author/coords) + description + custom message + 3D viewer screenshot (captured via R3F `gl.domElement.toDataURL` with `preserveDrawingBuffer:true`) + 2D plan extract from first anchor (rendered via pdf2image @120dpi) + comments thread. Email sent with PDF attached via `send_email_with_attachments()` + new `tpl_dt_issue_report` template (yellow accent #d4ff3a, priority pill, project CTA). Logs to `pin.report_history[]` with id/recipient/sender/comment_count/has_screenshot/has_plan_extract/pdf_size_bytes. In-app notification via `notify()` if recipient is a platform user.
+- **New endpoints**: `POST /api/digital-twin/pins/{id}/issue-report` (send), `GET /api/digital-twin/pins/{id}/issue-report/preview` (inline PDF without email — uses StreamingResponse). Test pass: live capture POST returned 200 with 101 KB PDF including 3D screenshot + 2D extract.
+- **Bug fix 1 (page count validation)** — Uploaded PDF plans now extract `page_count` via `pypdf` and store it. `add_pin_anchor` validates `payload.page <= plan.page_count` (400 with friendly Romanian error "Pagina X nu există. Planul are doar Y pagini.").
+- **Bug fix 2 (member cleanup permissions)** — `remove_pin_anchor` now relies only on `_ensure_project_access` (any project member can delete any anchor). Removed the older creator/author/owner-only check. Non-members still 403 via membership check.
+- **Test results**: iteration_24.json — 27/27 backend pytest (15 new Phase I + 12 updated Phase H) + 100% frontend E2E. Test files: `/app/backend/tests/test_phase_i_issue_report.py`, updated `test_phase_h_anchors.py`.
+
+
+
 ## Roadmap
 ### P1 (Next)
 - `server.py` routers split: auth.py, admin.py, operator.py, payments.py, requests.py, marketplace.py, design.py, portfolio.py (monolith ~2870 lines, refactor postponed multiple times)
