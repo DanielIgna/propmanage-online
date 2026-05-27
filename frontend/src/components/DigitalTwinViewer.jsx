@@ -205,7 +205,9 @@ export const DigitalTwinViewer = ({ modelUrl, projectName, onClose }) => {
     return () => { styleEl?.remove(); };
   }, []);
 
-  const url = modelUrl || null;
+  const url = modelUrl
+    ? (modelUrl.startsWith("http") ? modelUrl : `${process.env.REACT_APP_BACKEND_URL || ""}${modelUrl}`)
+    : null;
   const isDefaultModel = !modelUrl;
 
   const toggleLayer = (key) => {

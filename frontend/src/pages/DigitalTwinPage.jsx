@@ -1,12 +1,12 @@
 // Digital Twin page — Phase C MVP project list + viewer launcher.
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
-import { Box, Plus, Lock, Eye, Trash2, ArrowLeft, Sparkles, ExternalLink } from "lucide-react";
+import { Box, Plus, Lock, Eye, Trash2, ArrowLeft, Sparkles, ExternalLink, Upload, FileBox, X } from "lucide-react";
 import { API } from "./DashShared";
 import DigitalTwinViewer from "../components/DigitalTwinViewer";
 
-const ProjectCard = ({ p, onOpen, onDelete }) => (
+const ProjectCard = ({ p, onOpen, onDelete, onUpload }) => (
   <div className="group relative rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] p-5 transition-colors" data-testid={`dt-project-${p.id}`}>
     <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-t-2xl opacity-50 group-hover:opacity-100 transition-opacity" />
     <div className="flex items-start gap-3 mb-3">
@@ -22,7 +22,7 @@ const ProjectCard = ({ p, onOpen, onDelete }) => (
     <div className="flex gap-3 text-[11px] text-stone-500 mb-4">
       <span>📌 {p.pin_count || 0} pin-uri</span>
       <span>📁 {p.model_count || 0} modele</span>
-      {p.model_url ? <span className="text-emerald-400">● Model încărcat</span> : <span className="text-amber-400">● Demo public</span>}
+      {p.model_url ? <span className="text-emerald-400">● Model încărcat</span> : <span className="text-amber-400">● Demo procedural</span>}
     </div>
     <div className="flex gap-2">
       <button
@@ -31,6 +31,14 @@ const ProjectCard = ({ p, onOpen, onDelete }) => (
         data-testid={`dt-open-${p.id}`}
       >
         <Eye className="w-3.5 h-3.5" /> Deschide viewer
+      </button>
+      <button
+        onClick={() => onUpload(p)}
+        className="px-3 py-2 text-xs rounded-full border border-white/10 text-stone-300 hover:bg-white/5"
+        title="Încarcă model .glb"
+        data-testid={`dt-upload-${p.id}`}
+      >
+        <Upload className="w-3.5 h-3.5" />
       </button>
       <button
         onClick={() => onDelete(p)}
@@ -42,6 +50,159 @@ const ProjectCard = ({ p, onOpen, onDelete }) => (
     </div>
   </div>
 );
+
+// =============== UPLOAD MODAL ===============
+const UploadModal = ({ project, onClose, onUploaded }) => {
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [err, setErr] = useState(null);
+  const dropRef = useRef(null);
+
+  const onDrop = (e) => {
+    e.preventDefault();
+    const f = e.dataTransfer?.files?.[0];
+    if (f) acceptFile(f);
+  };
+  const acceptFile = (f) => {
+    const ext = f.name.toLowerCase().split(".").pop();
+    if (!["glb", "gltf"].includes(ext)) {
+      setErr(`Format invalid: .${ext}. Acceptăm doar .glb / .gltf.`);
+      return;
+    }
+    if (f.size > 200 * 1024 * 1024) {
+      setErr(`Fișier prea mare (${(f.size / (1024 * 1024)).toFixed(1)} MB). Maxim 200 MB.`);
+      return;
+    }
+    setErr(null);
+    setFile(f);
+  };
+
+  const submit = async () => {
+    if (!file) return;
+    setUploading(true);
+    setErr(null);
+    setProgress(0);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const xhr = new XMLHttpRequest();
+      const done = await new Promise((resolve, reject) => {
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText));
+          else {
+            try { reject(new Error(JSON.parse(xhr.responseText).detail || xhr.statusText)); }
+            catch { reject(new Error(xhr.statusText || "Upload error")); }
+          }
+        };
+        xhr.onerror = () => reject(new Error("Network error"));
+        xhr.withCredentials = true;
+        xhr.open("POST", `${API}/digital-twin/projects/${project.id}/upload`);
+        xhr.send(fd);
+      });
+      onUploaded(done);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-stone-900 border border-white/10 rounded-2xl p-6 w-full max-w-lg"
+        data-testid="dt-upload-modal"
+      >
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <h3 className="font-serif text-xl text-white">Încarcă model 3D</h3>
+            <p className="text-xs text-stone-400 mt-0.5">Proiect: <strong>{project.name}</strong></p>
+          </div>
+          <button onClick={onClose} className="text-stone-500 hover:text-white" data-testid="dt-upload-close"><X className="w-5 h-5" /></button>
+        </div>
+
+        <div
+          ref={dropRef}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={onDrop}
+          className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
+            file ? "border-emerald-500/40 bg-emerald-500/5" : "border-white/15 hover:border-white/30"
+          }`}
+          data-testid="dt-upload-dropzone"
+        >
+          {file ? (
+            <div className="flex items-center justify-center gap-3">
+              <FileBox className="w-7 h-7 text-emerald-400" />
+              <div className="text-left">
+                <div className="text-sm text-white truncate max-w-[280px]">{file.name}</div>
+                <div className="text-xs text-stone-500">{(file.size / (1024 * 1024)).toFixed(1)} MB</div>
+              </div>
+              <button onClick={() => setFile(null)} className="text-stone-500 hover:text-red-400" data-testid="dt-upload-clear">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <>
+              <Upload className="w-8 h-8 text-stone-500 mx-auto mb-2" />
+              <div className="text-sm text-stone-300 mb-1">Trage fișierul aici sau</div>
+              <label className="inline-block px-4 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-xs text-white cursor-pointer">
+                alege un fișier
+                <input
+                  type="file"
+                  accept=".glb,.gltf"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && acceptFile(e.target.files[0])}
+                  data-testid="dt-upload-input"
+                />
+              </label>
+              <p className="text-[10px] text-stone-500 mt-3">Format: .glb sau .gltf · max 200 MB</p>
+            </>
+          )}
+        </div>
+
+        {uploading && (
+          <div className="mt-3" data-testid="dt-upload-progress">
+            <div className="flex justify-between text-xs text-stone-400 mb-1">
+              <span>Se încarcă...</span>
+              <span>{progress}%</span>
+            </div>
+            <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-emerald-500 to-cyan-500 transition-all" style={{ width: `${progress}%` }} />
+            </div>
+          </div>
+        )}
+
+        {err && <div className="mt-3 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-2">{err}</div>}
+
+        <div className="mt-4 rounded-xl bg-white/[0.03] border border-white/5 p-3 text-[11px] text-stone-400 leading-relaxed">
+          <strong className="text-stone-300">🛠️ Ai un fișier .skp / .ifc / .pln?</strong> Convertește-l mai întâi în .glb:
+          <ul className="mt-1 space-y-0.5 list-disc list-inside">
+            <li><strong>SketchUp</strong>: File → Export → 3D Model → glTF (.glb)</li>
+            <li><strong>Blender</strong>: File → Export → glTF 2.0 (.glb)</li>
+            <li><strong>Allplan / Revit</strong>: Export IFC, apoi convertește prin <a href="https://products.aspose.app/3d/conversion/ifc-to-glb" target="_blank" rel="noreferrer" className="text-emerald-400 underline">Aspose IFC→GLB online</a></li>
+          </ul>
+        </div>
+
+        <div className="mt-4 flex gap-2">
+          <button onClick={onClose} className="flex-1 px-3 py-2 text-sm rounded-lg bg-white/5 hover:bg-white/10 text-stone-300">Anulează</button>
+          <button
+            onClick={submit}
+            disabled={!file || uploading}
+            className="flex-1 px-3 py-2 text-sm rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-medium"
+            data-testid="dt-upload-submit"
+          >
+            {uploading ? "Se încarcă..." : "Încarcă model"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const CreateModal = ({ onClose, onCreated }) => {
   const [form, setForm] = useState({ name: "", description: "", model_url: "" });
@@ -178,6 +339,7 @@ export default function DigitalTwinPage() {
   const [loading, setLoading] = useState(true);
   const [openCreate, setOpenCreate] = useState(false);
   const [viewing, setViewing] = useState(null);
+  const [uploadingTo, setUploadingTo] = useState(null);
 
   const loadAll = async () => {
     setLoading(true);
@@ -261,7 +423,7 @@ export default function DigitalTwinPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="dt-projects-grid">
             {projects.map((p) => (
-              <ProjectCard key={p.id} p={p} onOpen={setViewing} onDelete={handleDelete} />
+              <ProjectCard key={p.id} p={p} onOpen={setViewing} onDelete={handleDelete} onUpload={setUploadingTo} />
             ))}
           </div>
         )}
@@ -291,6 +453,22 @@ export default function DigitalTwinPage() {
             setProjects((arr) => [p, ...arr]);
             setOpenCreate(false);
             setViewing(p);
+          }}
+        />
+      )}
+
+      {uploadingTo && (
+        <UploadModal
+          project={uploadingTo}
+          onClose={() => setUploadingTo(null)}
+          onUploaded={(model) => {
+            // Patch the project with the new model_url + increment count
+            setProjects((arr) => arr.map((x) =>
+              x.id === uploadingTo.id
+                ? { ...x, model_url: model.url, model_count: (x.model_count || 0) + 1 }
+                : x
+            ));
+            setUploadingTo(null);
           }}
         />
       )}

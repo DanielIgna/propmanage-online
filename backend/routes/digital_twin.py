@@ -10,18 +10,31 @@ Subscription gate: user.digital_twin_pro == True (admin grants for now;
 Stripe wiring is Phase E). Admin and operator can bypass.
 """
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
+import os
+import shutil
 import uuid
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Depends, HTTPException, Body, Query
+from fastapi import APIRouter, Depends, HTTPException, Body, Query, UploadFile, File
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from db import db
 from deps import get_current_user, require_role
 
 router = APIRouter(prefix="/api/digital-twin", tags=["digital-twin"])
+
+
+# ----------------- storage config -----------------
+
+UPLOAD_ROOT = Path(os.environ.get("DT_UPLOAD_DIR") or "/app/backend/uploads/digital_twin")
+UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+
+ALLOWED_EXTS = {".glb", ".gltf"}
+MAX_UPLOAD_BYTES = 200 * 1024 * 1024  # 200 MB hard cap
 
 
 # ----------------- helpers -----------------
@@ -222,7 +235,111 @@ async def delete_project(project_id: str, user: dict = Depends(get_current_user)
     if pin_ids:
         await db.digital_twin_comments.delete_many({"pin_id": {"$in": pin_ids}})
     await db.digital_twin_pins.delete_many({"project_id": project_id})
+    # Remove any uploaded files
+    project_dir = UPLOAD_ROOT / project_id
+    if project_dir.exists():
+        shutil.rmtree(project_dir, ignore_errors=True)
     return {"ok": True}
+
+
+# ----------------- model upload & serve (Phase B) -----------------
+
+@router.post("/projects/{project_id}/upload")
+async def upload_model(
+    project_id: str,
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user),
+):
+    """Upload a .glb/.gltf model for the project. Stored locally and served via /files/."""
+    await _ensure_dt_access(user)
+    p = await _ensure_project_access(project_id, user)
+    if user.get("role") not in ("admin", "operator") and p.get("owner_id") != user["id"]:
+        raise HTTPException(403, "Only owner can upload models.")
+
+    # Validate extension
+    raw_name = file.filename or "model.glb"
+    ext = Path(raw_name).suffix.lower()
+    if ext not in ALLOWED_EXTS:
+        raise HTTPException(400, "Format permis: .glb sau .gltf. Pentru .skp conversie prealabilă în SketchUp Free → File → Export → glTF.")
+
+    # Persist to disk with streaming (chunks of 1 MB) to avoid loading 200MB in RAM
+    project_dir = UPLOAD_ROOT / project_id
+    project_dir.mkdir(parents=True, exist_ok=True)
+    safe_stem = uuid.uuid4().hex[:12]
+    safe_name = f"{safe_stem}{ext}"
+    dest = project_dir / safe_name
+
+    total = 0
+    try:
+        with dest.open("wb") as out:
+            while True:
+                chunk = await file.read(1024 * 1024)  # 1 MB
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > MAX_UPLOAD_BYTES:
+                    out.close()
+                    dest.unlink(missing_ok=True)
+                    raise HTTPException(413, f"Fișier prea mare (max {MAX_UPLOAD_BYTES // (1024*1024)} MB).")
+                out.write(chunk)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        dest.unlink(missing_ok=True)
+        raise HTTPException(500, f"Upload failed: {e}") from e
+
+    # Build the public URL. Use APP_PUBLIC_URL when set, else relative path the frontend will resolve.
+    public_path = f"/api/digital-twin/files/{project_id}/{safe_name}"
+
+    # Save model metadata + set as current model on project
+    model_doc = {
+        "id": _new_id(),
+        "project_id": project_id,
+        "filename": raw_name,
+        "stored_as": safe_name,
+        "size_bytes": total,
+        "url": public_path,
+        "uploaded_by": user["id"],
+        "uploaded_by_name": user.get("name") or user.get("email"),
+        "uploaded_at": _now_iso(),
+    }
+    await db.digital_twin_models.insert_one(model_doc)
+    await db.digital_twin_projects.update_one(
+        {"id": project_id},
+        {"$set": {"model_url": public_path, "updated_at": _now_iso()}, "$inc": {"model_count": 1}},
+    )
+    return _clean(model_doc)
+
+
+@router.get("/files/{project_id}/{filename}")
+async def serve_model_file(project_id: str, filename: str, user: dict = Depends(get_current_user)):
+    """Serve uploaded model files. Permission-checked: only project members + admin/operator."""
+    await _ensure_dt_access(user)
+    await _ensure_project_access(project_id, user)
+    # Sanitize: filename must be a bare name, no path traversal
+    if "/" in filename or "\\" in filename or filename.startswith(".."):
+        raise HTTPException(400, "Invalid filename.")
+    file_path = UPLOAD_ROOT / project_id / filename
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(404, "Model file not found.")
+    media = "model/gltf-binary" if filename.lower().endswith(".glb") else "model/gltf+json"
+    return FileResponse(
+        file_path,
+        media_type=media,
+        filename=filename,
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
+@router.get("/projects/{project_id}/models")
+async def list_models(project_id: str, user: dict = Depends(get_current_user)):
+    """List all uploaded model versions for a project."""
+    await _ensure_dt_access(user)
+    await _ensure_project_access(project_id, user)
+    items = []
+    async for m in db.digital_twin_models.find({"project_id": project_id}).sort("uploaded_at", -1):
+        items.append(_clean(m))
+    return {"items": items, "count": len(items)}
 
 
 # ----------------- pins (3D markup) -----------------
