@@ -237,6 +237,18 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Auto-deschide modalul când pagina e accesată cu `?compare=` (fetch fallback prin `GET /api/admin/audit-log/{id}`)
 - Banner roșu "⚠️ Link invalid" dacă intrările au fost șterse; URL curățat la close
 
+### Phase 40 — Recipient Presets (Feb 2026)
+- Colecția MongoDB `incident_recipient_presets` cu `{name, emails[], sent_count, created_by, created_at}`
+- 4 endpoint-uri CRUD: `GET/POST/PATCH/DELETE /api/admin/recipient-presets[/{id}]`
+- Sanitizare email: regex valid, lowercase, dedupe, max 25/preset, max 80 char nume
+- Dedupe nume case-insensitive (409 Conflict pe duplicate)
+- `POST /audit-log/{id}/email-report` extins cu `preset_id` opțional — increment automat `sent_count` + `last_used_at`
+- List sortat by `sent_count DESC, created_at DESC` → cele mai folosite sus
+- Audit log: `recipient_preset.create/update/delete` (toate trackable & rollback-able)
+- Frontend: chip-uri quick-pick în Email modal (click adaugă emails cu dedupe), buton "+ Preset nou" deschide form inline (nume + emails comma-separated), buton X pe hover pentru ștergere
+- Chip-urile afișează: nume, count emails, badge `{sent_count}↑` dacă > 0
+- Tooltip cu lista completă emails pe hover
+
 ### Phase 39 — Email Incident Report (Feb 2026)
 - Endpoint `POST /api/admin/audit-log/{id}/email-report` cu body `{recipients, note, base_url}`
 - Reutilizează `_build_incident_pdf_bytes` helper (refactor din Phase 38) pentru attachment

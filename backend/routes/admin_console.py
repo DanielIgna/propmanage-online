@@ -1813,6 +1813,17 @@ async def email_incident_report(
                 target={"type": "audit_entry", "id": entry_id, "label": f"{action} → {target_label}"},
                 note=f"Email trimis către {len(recipients)} destinatar(i) via {result.get('provider', '—')}")
 
+    # Increment preset sent_count if a preset was used
+    preset_id = payload.get("preset_id")
+    if preset_id and result.get("ok"):
+        try:
+            await db.incident_recipient_presets.update_one(
+                {"_id": ObjectId(preset_id)},
+                {"$inc": {"sent_count": 1}, "$set": {"last_used_at": datetime.now(timezone.utc).isoformat()}},
+            )
+        except (InvalidId, Exception):  # noqa: BLE001
+            pass
+
     return {
         "ok": result.get("ok", False),
         "provider": result.get("provider"),
@@ -1823,6 +1834,162 @@ async def email_incident_report(
         "warning": result.get("warning"),
         "id": result.get("id"),
     }
+
+
+# ============= RECIPIENT PRESETS =============
+# Reusable groups (e.g. "Compliance Team", "Board") for quick-pick in incident email modal.
+import re as _re_email
+
+_EMAIL_RE = _re_email.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+
+
+def _sanitize_emails(raw) -> tuple[list[str], list[str]]:
+    """Returns (valid_emails_unique, invalid_inputs). Trims, lowercases, dedupes."""
+    if isinstance(raw, str):
+        raw = [r.strip() for r in raw.split(",")]
+    elif not isinstance(raw, list):
+        return [], []
+    valid, invalid, seen = [], [], set()
+    for e in raw:
+        if not isinstance(e, str):
+            continue
+        e = e.strip().lower()
+        if not e:
+            continue
+        if _EMAIL_RE.match(e):
+            if e not in seen:
+                seen.add(e)
+                valid.append(e)
+        else:
+            invalid.append(e)
+    return valid, invalid
+
+
+def _serialize_preset(d: dict) -> dict:
+    return {
+        "id": str(d["_id"]),
+        "name": d.get("name", "—"),
+        "emails": d.get("emails", []),
+        "sent_count": int(d.get("sent_count", 0) or 0),
+        "created_at": d.get("created_at"),
+        "created_by": d.get("created_by"),
+        "created_by_name": d.get("created_by_name"),
+        "last_used_at": d.get("last_used_at"),
+    }
+
+
+@router.get("/recipient-presets")
+async def list_recipient_presets(user: dict = Depends(require_role("admin"))):
+    """List all incident-email recipient presets, sorted by most-used first."""
+    cursor = db.incident_recipient_presets.find({}).sort([("sent_count", -1), ("created_at", -1)])
+    items = [_serialize_preset(d) async for d in cursor]
+    return {"items": items, "total": len(items)}
+
+
+@router.post("/recipient-presets")
+async def create_recipient_preset(
+    payload: dict = Body(...),
+    user: dict = Depends(require_role("admin")),
+):
+    """Create a new preset. Body: { name: str, emails: [str] }"""
+    name = (payload.get("name") or "").strip()[:80]
+    if not name:
+        raise HTTPException(400, "Numele presetului este obligatoriu.")
+    valid, invalid = _sanitize_emails(payload.get("emails") or [])
+    if not valid:
+        raise HTTPException(400, "Adaugă cel puțin o adresă de email validă.")
+    if len(valid) > 25:
+        raise HTTPException(400, "Maxim 25 emailuri per preset.")
+
+    # Dedupe by name (case-insensitive)
+    existing = await db.incident_recipient_presets.find_one({"name_lower": name.lower()})
+    if existing:
+        raise HTTPException(409, f"Un preset cu numele '{name}' există deja.")
+
+    doc = {
+        "name": name,
+        "name_lower": name.lower(),
+        "emails": valid,
+        "sent_count": 0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": user["id"],
+        "created_by_name": user.get("name") or user.get("email"),
+    }
+    res = await db.incident_recipient_presets.insert_one(doc)
+    doc["_id"] = res.inserted_id
+
+    await audit("recipient_preset.create", user,
+                target={"type": "recipient_preset", "id": str(res.inserted_id), "label": name},
+                after={"name": name, "emails": valid},
+                note=f"Preset cu {len(valid)} email(uri)")
+
+    return {"ok": True, "preset": _serialize_preset(doc), "invalid_emails": invalid}
+
+
+@router.patch("/recipient-presets/{preset_id}")
+async def update_recipient_preset(
+    preset_id: str,
+    payload: dict = Body(...),
+    user: dict = Depends(require_role("admin")),
+):
+    """Update name and/or emails."""
+    try:
+        oid = ObjectId(preset_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid preset id")
+    existing = await db.incident_recipient_presets.find_one({"_id": oid})
+    if not existing:
+        raise HTTPException(404, "Preset inexistent.")
+
+    update = {}
+    invalid_emails = []
+    if "name" in payload:
+        name = (payload.get("name") or "").strip()[:80]
+        if not name:
+            raise HTTPException(400, "Numele nu poate fi gol.")
+        # dedupe except current
+        clash = await db.incident_recipient_presets.find_one({"name_lower": name.lower(), "_id": {"$ne": oid}})
+        if clash:
+            raise HTTPException(409, f"Un preset cu numele '{name}' există deja.")
+        update["name"] = name
+        update["name_lower"] = name.lower()
+    if "emails" in payload:
+        valid, invalid_emails = _sanitize_emails(payload.get("emails") or [])
+        if not valid:
+            raise HTTPException(400, "Cel puțin o adresă validă.")
+        if len(valid) > 25:
+            raise HTTPException(400, "Maxim 25 emailuri per preset.")
+        update["emails"] = valid
+
+    if not update:
+        return {"ok": True, "preset": _serialize_preset(existing), "invalid_emails": invalid_emails}
+
+    before = {"name": existing.get("name"), "emails": existing.get("emails", [])}
+    await db.incident_recipient_presets.update_one({"_id": oid}, {"$set": update})
+    fresh = await db.incident_recipient_presets.find_one({"_id": oid})
+    after = {"name": fresh.get("name"), "emails": fresh.get("emails", [])}
+
+    await audit("recipient_preset.update", user,
+                target={"type": "recipient_preset", "id": preset_id, "label": fresh.get("name")},
+                before=before, after=after)
+
+    return {"ok": True, "preset": _serialize_preset(fresh), "invalid_emails": invalid_emails}
+
+
+@router.delete("/recipient-presets/{preset_id}")
+async def delete_recipient_preset(preset_id: str, user: dict = Depends(require_role("admin"))):
+    try:
+        oid = ObjectId(preset_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid preset id")
+    doc = await db.incident_recipient_presets.find_one({"_id": oid})
+    if not doc:
+        raise HTTPException(404, "Preset inexistent.")
+    await db.incident_recipient_presets.delete_one({"_id": oid})
+    await audit("recipient_preset.delete", user,
+                target={"type": "recipient_preset", "id": preset_id, "label": doc.get("name")},
+                before={"name": doc.get("name"), "emails": doc.get("emails", [])})
+    return {"ok": True}
 
 
 @router.post("/audit-log/{entry_id}/rollback")

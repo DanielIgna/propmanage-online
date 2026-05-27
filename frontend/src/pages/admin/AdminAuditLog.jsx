@@ -63,6 +63,63 @@ export const AdminAuditLog = () => {
   const [emailRecipients, setEmailRecipients] = useState("");
   const [emailNote, setEmailNote] = useState("");
   const [emailSending, setEmailSending] = useState(false);
+  const [presets, setPresets] = useState([]);
+  const [activePresetId, setActivePresetId] = useState(null);
+  const [showPresetForm, setShowPresetForm] = useState(false);
+  const [newPresetName, setNewPresetName] = useState("");
+  const [newPresetEmails, setNewPresetEmails] = useState("");
+  const [presetSaving, setPresetSaving] = useState(false);
+
+  const loadPresets = () => {
+    axios.get(`${API}/admin/recipient-presets`).then(r => setPresets(r.data.items || [])).catch(() => {});
+  };
+
+  const applyPreset = (p) => {
+    // Merge with existing recipients (dedupe)
+    const current = emailRecipients.split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+    const merged = [...current];
+    for (const e of p.emails) {
+      if (!merged.includes(e.toLowerCase())) merged.push(e);
+    }
+    setEmailRecipients(merged.join(", "));
+    setActivePresetId(p.id);
+  };
+
+  const createPreset = async () => {
+    if (!newPresetName.trim()) return;
+    const emails = newPresetEmails.split(",").map(s => s.trim()).filter(Boolean);
+    if (emails.length === 0) {
+      flash("❌ Adaugă cel puțin un email");
+      return;
+    }
+    setPresetSaving(true);
+    try {
+      const r = await axios.post(`${API}/admin/recipient-presets`, { name: newPresetName, emails });
+      flash(`✓ Preset "${r.data.preset.name}" creat${r.data.invalid_emails?.length ? ` (${r.data.invalid_emails.length} email invalid ignorat)` : ""}`);
+      setNewPresetName("");
+      setNewPresetEmails("");
+      setShowPresetForm(false);
+      loadPresets();
+      applyPreset(r.data.preset);
+    } catch (e) {
+      flash(`❌ ${e?.response?.data?.detail || "Eroare la creare preset"}`);
+    } finally {
+      setPresetSaving(false);
+    }
+  };
+
+  const deletePreset = async (preset, ev) => {
+    ev.stopPropagation();
+    if (!window.confirm(`Ștergi presetul "${preset.name}"?\nVa pierde și istoricul de ${preset.sent_count} trimiteri.`)) return;
+    try {
+      await axios.delete(`${API}/admin/recipient-presets/${preset.id}`);
+      flash(`✓ Preset șters: ${preset.name}`);
+      loadPresets();
+      if (activePresetId === preset.id) setActivePresetId(null);
+    } catch (e) {
+      flash(`❌ ${e?.response?.data?.detail || "Eroare la ștergere"}`);
+    }
+  };
 
   const sendEmailReport = async () => {
     if (!emailModal) return;
@@ -77,6 +134,7 @@ export const AdminAuditLog = () => {
         recipients,
         note: emailNote,
         base_url: window.location.origin,
+        preset_id: activePresetId,
       });
       const provider = r.data.provider;
       const invalid = r.data.invalid_recipients || [];
@@ -88,6 +146,8 @@ export const AdminAuditLog = () => {
       setEmailModal(null);
       setEmailRecipients("");
       setEmailNote("");
+      setActivePresetId(null);
+      loadPresets(); // refresh sent_count
       load();
     } catch (e) {
       flash(`❌ ${e?.response?.data?.detail || "Eroare la trimiterea emailului"}`);
@@ -386,6 +446,9 @@ export const AdminAuditLog = () => {
                             setEmailModal({ entry: e });
                             setEmailRecipients("");
                             setEmailNote("");
+                            setActivePresetId(null);
+                            setShowPresetForm(false);
+                            loadPresets();
                           }}
                           className="shrink-0 text-[11px] font-semibold px-2.5 py-1.5 rounded-md bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white transition-colors flex items-center gap-1"
                           data-testid={`audit-email-${e.id}`}
@@ -495,14 +558,95 @@ export const AdminAuditLog = () => {
               )}
             </div>
 
-            <label className="block mb-3">
+            <label className="block mb-1">
               <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block">
                 Destinatari <span className="text-slate-500 font-normal">(separate prin virgulă, max 10)</span>
               </span>
+            </label>
+
+            {/* Preset chips */}
+            {(presets.length > 0 || true) && (
+              <div className="mb-3" data-testid="preset-chips">
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  {presets.map(p => {
+                    const active = activePresetId === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => applyPreset(p)}
+                        className={`group text-[11px] font-medium px-2.5 py-1 rounded-full border transition-colors flex items-center gap-1 ${
+                          active
+                            ? "bg-amber-100 dark:bg-amber-500/20 border-amber-400 dark:border-amber-500/60 text-amber-800 dark:text-amber-200"
+                            : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-300 dark:hover:border-amber-500/40 hover:bg-amber-50/50 dark:hover:bg-amber-500/5"
+                        }`}
+                        title={`${p.emails.join(", ")} · trimis ${p.sent_count}x`}
+                        data-testid={`preset-chip-${p.id}`}
+                      >
+                        <span>{p.name}</span>
+                        <span className="text-[9px] opacity-60">({p.emails.length})</span>
+                        {p.sent_count > 0 && (
+                          <span className="text-[9px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full px-1.5 py-0.5 -mr-1">{p.sent_count}↑</span>
+                        )}
+                        <span
+                          onClick={(ev) => deletePreset(p, ev)}
+                          className="opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-red-500 text-[11px] leading-none ml-0.5"
+                          title="Șterge preset"
+                          data-testid={`preset-delete-${p.id}`}
+                        >×</span>
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setShowPresetForm(!showPresetForm)}
+                    className="text-[11px] font-medium px-2.5 py-1 rounded-full border border-dashed border-slate-300 dark:border-slate-600 text-slate-500 hover:border-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                    data-testid="preset-new-toggle"
+                  >
+                    {showPresetForm ? "× anulează" : "+ Preset nou"}
+                  </button>
+                </div>
+
+                {showPresetForm && (
+                  <div className="mt-2 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1.5" data-testid="preset-new-form">
+                    <input
+                      type="text"
+                      value={newPresetName}
+                      onChange={ev => setNewPresetName(ev.target.value)}
+                      placeholder="Nume preset (ex: Compliance Team, Board)"
+                      className="w-full px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                      data-testid="preset-new-name"
+                      maxLength={80}
+                    />
+                    <input
+                      type="text"
+                      value={newPresetEmails}
+                      onChange={ev => setNewPresetEmails(ev.target.value)}
+                      placeholder="emails separate prin virgulă (ex: legal@..., dpo@...)"
+                      className="w-full px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono"
+                      data-testid="preset-new-emails"
+                    />
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={createPreset}
+                        disabled={presetSaving || !newPresetName.trim() || !newPresetEmails.trim()}
+                        className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-50 transition-colors"
+                        data-testid="preset-new-save"
+                      >
+                        {presetSaving ? "Se salvează..." : "Salvează & aplică"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <label className="block mb-3">
               <input
                 type="text"
                 value={emailRecipients}
-                onChange={ev => setEmailRecipients(ev.target.value)}
+                onChange={ev => { setEmailRecipients(ev.target.value); setActivePresetId(null); }}
                 placeholder="legal@firma.ro, compliance@firma.ro"
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-mono"
                 data-testid="email-recipients-input"
