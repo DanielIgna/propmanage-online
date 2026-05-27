@@ -161,23 +161,6 @@ export const LoginPage = () => {
             {t("login.noAccount")} <Link to="/register" className="text-[#d4ff3a] hover:underline" data-testid="login-register-link">{t("login.register")}</Link>
           </div>
         </div>
-        
-        {/* Demo accounts */}
-        <div className="mt-6 glass rounded-3xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Sparkles className="w-4 h-4 text-[#d4ff3a]" />
-            <div className="text-xs uppercase tracking-wider text-stone-400">{t("login.demo")}</div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {["client", "specialist", "admin", "operator"].map(role => (
-              <button key={role} onClick={() => demoLogin(role)} disabled={loading}
-                className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl py-2.5 text-xs font-medium capitalize transition disabled:opacity-50"
-                data-testid={`demo-${role}`}>
-                {role}
-              </button>
-            ))}
-          </div>
-        </div>
       </motion.div>
     </div>
   );
