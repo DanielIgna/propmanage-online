@@ -944,6 +944,231 @@ async def report_approval_decide(payload: ReportDecisionIn):
 
 
 
+# ----------------- Sent reports dashboard + reminder (Phase I+) -----------------
+
+@router.get("/reports/sent")
+async def list_sent_reports(
+    status: Optional[str] = Query(None, pattern="^(pending|confirmed|needs_changes|all)?$"),
+    overdue_only: bool = Query(False),
+    limit: int = Query(200, ge=1, le=500),
+    user: dict = Depends(get_current_user),
+):
+    """List all issue reports the current user has sent (across all their pins)."""
+    pipeline = [
+        {"$match": {"report_history.sender_id": user["id"]}},
+        {"$project": {
+            "_id": 0,
+            "pin_id": "$id",
+            "pin_title": "$title",
+            "pin_category": "$category",
+            "pin_priority": "$priority",
+            "pin_status": "$status",
+            "project_id": "$project_id",
+            "report_history": "$report_history",
+        }},
+        {"$unwind": "$report_history"},
+        {"$match": {"report_history.sender_id": user["id"]}},
+        {"$sort": {"report_history.created_at": -1}},
+        {"$limit": limit},
+    ]
+    raw = await db.digital_twin_pins.aggregate(pipeline).to_list(length=limit)
+    # Resolve project names in bulk
+    project_ids = list({r["project_id"] for r in raw})
+    projects = {}
+    if project_ids:
+        async for p in db.digital_twin_projects.find({"id": {"$in": project_ids}}, {"_id": 0, "id": 1, "name": 1}):
+            projects[p["id"]] = p.get("name")
+
+    now = datetime.now(timezone.utc)
+    items = []
+    for r in raw:
+        h = r["report_history"]
+        h_status = h.get("approval_status", "pending")
+        if status and status != "all" and h_status != status:
+            continue
+        # Compute age in days
+        created_at = h.get("created_at")
+        age_days = 0
+        try:
+            if created_at:
+                dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                age_days = max(0, (now - dt).days)
+        except Exception:  # noqa: BLE001
+            age_days = 0
+        is_overdue = h_status == "pending" and age_days >= 7
+        if overdue_only and not is_overdue:
+            continue
+        items.append({
+            "report_id": h.get("id"),
+            "pin_id": r["pin_id"],
+            "pin_title": r["pin_title"],
+            "pin_category": r["pin_category"],
+            "pin_priority": r["pin_priority"],
+            "pin_status": r["pin_status"],
+            "project_id": r["project_id"],
+            "project_name": projects.get(r["project_id"], "—"),
+            "recipient_email": h.get("recipient_email"),
+            "recipient_name": h.get("recipient_name"),
+            "approval_status": h_status,
+            "decision_comment": h.get("decision_comment"),
+            "decided_at": h.get("decided_at"),
+            "created_at": created_at,
+            "age_days": age_days,
+            "is_overdue": is_overdue,
+            "has_screenshot": h.get("has_screenshot"),
+            "has_plan_extract": h.get("has_plan_extract"),
+            "pdf_size_bytes": h.get("pdf_size_bytes"),
+            "approval_url": h.get("approval_url"),
+            "reminders_sent": h.get("reminders_sent", []),
+            "reminder_count": len(h.get("reminders_sent", []) or []),
+        })
+
+    # Counters for UI badges
+    counters = {
+        "total": 0,
+        "pending": 0,
+        "confirmed": 0,
+        "needs_changes": 0,
+        "overdue": 0,
+    }
+    # Recount (without filter) for accurate badges
+    all_pipeline = [
+        {"$match": {"report_history.sender_id": user["id"]}},
+        {"$unwind": "$report_history"},
+        {"$match": {"report_history.sender_id": user["id"]}},
+        {"$project": {"_id": 0, "approval_status": "$report_history.approval_status", "created_at": "$report_history.created_at"}},
+    ]
+    async for r in db.digital_twin_pins.aggregate(all_pipeline):
+        counters["total"] += 1
+        st = r.get("approval_status", "pending")
+        if st in counters:
+            counters[st] += 1
+        if st == "pending":
+            try:
+                dt = datetime.fromisoformat(r["created_at"].replace("Z", "+00:00"))
+                if (now - dt).days >= 7:
+                    counters["overdue"] += 1
+            except Exception:  # noqa: BLE001
+                pass
+
+    return {"items": items, "count": len(items), "counters": counters}
+
+
+@router.post("/reports/{report_id}/remind")
+async def send_report_reminder(
+    report_id: str,
+    payload: dict = Body(default_factory=dict),
+    user: dict = Depends(get_current_user),
+):
+    """Re-send the approval email for a still-pending report (same token, no PDF regen)."""
+    # Find the pin owning this report by sender_id + report_id (security)
+    pin = await db.digital_twin_pins.find_one({
+        "report_history.id": report_id,
+        "report_history.sender_id": user["id"],
+    })
+    if not pin:
+        raise HTTPException(404, "Raport inexistent sau nu ești expeditorul.")
+    report = next((h for h in pin.get("report_history") or [] if h.get("id") == report_id), None)
+    if not report:
+        raise HTTPException(404, "Raport inexistent.")
+    if report.get("approval_status", "pending") != "pending":
+        raise HTTPException(409, "Raportul a primit deja un răspuns — reminder nu mai e necesar.")
+
+    custom_note = (payload.get("note") or "").strip() if isinstance(payload, dict) else ""
+    if len(custom_note) > 1000:
+        raise HTTPException(400, "Notă prea lungă (max 1000 caractere).")
+
+    project = await db.digital_twin_projects.find_one({"id": pin["project_id"]})
+    project_name = project.get("name", "Proiect") if project else "—"
+
+    # Compose reminder email — same approval link, urgency framing
+    approval_url = report.get("approval_url")
+    if not approval_url:
+        raise HTTPException(500, "Raport vechi fără approval_url. Generează unul nou trimițând raportul din nou.")
+
+    from email_service import _layout, send_email  # noqa: PLC0415
+    days_pending = 0
+    try:
+        if report.get("created_at"):
+            dt = datetime.fromisoformat(report["created_at"].replace("Z", "+00:00"))
+            days_pending = max(0, (datetime.now(timezone.utc) - dt).days)
+    except Exception:  # noqa: BLE001
+        days_pending = 0
+
+    note_block = ""
+    if custom_note:
+        note_block = f"""
+          <div style="background:#0f172a; border-left:3px solid #d4ff3a; padding:14px 18px; border-radius:12px; margin:18px 0;">
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#d4ff3a; margin-bottom:6px;">Notă suplimentară</div>
+            <div style="color:#e5e5e5; line-height:1.6; white-space:pre-wrap;">{custom_note}</div>
+          </div>
+        """
+    sender_name = user.get("name") or user.get("email") or "Utilizator"
+    body = f"""
+      <p>Bună {report.get('recipient_name') or report.get('recipient_email')},</p>
+      <p>Acesta este un <strong style="color:#f59e0b;">reminder amabil</strong> pentru raportul trimis de <strong style="color:#10b981;">{sender_name}</strong> acum <strong>{days_pending} zile</strong> pe proiectul <em>"{project_name}"</em>.</p>
+      <div style="background:#1a1a1f; border:1px solid #ffffff15; border-radius:14px; padding:18px; margin:18px 0;">
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#888893; margin-bottom:6px;">Pin în așteptare</div>
+        <div style="color:#ffffff; font-size:17px; font-weight:600;">{pin.get('title', '—')}</div>
+      </div>
+      {note_block}
+      <div style="background:#1a1a1f; border:1px solid #ffffff15; border-radius:14px; padding:22px; margin:22px 0; text-align:center;">
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#d4ff3a; margin-bottom:10px; font-weight:700;">⚡ Răspuns rapid · fără login</div>
+        <table border="0" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+          <tr>
+            <td style="padding:0 6px;">
+              <a href="{approval_url}?decision=confirmed" style="display:inline-block; padding:12px 22px; border-radius:999px; background:#10b981; color:#ffffff; text-decoration:none; font-size:14px; font-weight:700;">✅ Confirmat</a>
+            </td>
+            <td style="padding:0 6px;">
+              <a href="{approval_url}?decision=needs_changes" style="display:inline-block; padding:12px 22px; border-radius:999px; background:#f59e0b; color:#ffffff; text-decoration:none; font-size:14px; font-weight:700;">📝 Necesită modificări</a>
+            </td>
+          </tr>
+        </table>
+      </div>
+    """
+    html = _layout(
+        "Reminder raport problemă",
+        f"{pin.get('title', '—')} · pending de {days_pending} zile",
+        body,
+        approval_url,
+        "Răspunde acum",
+    )
+    await send_email(report["recipient_email"], f"⏰ Reminder: {pin.get('title', 'Raport')} · {project_name}", html)
+
+    # Append reminder log entry
+    reminder_entry = {
+        "id": _new_id(),
+        "sent_at": _now_iso(),
+        "sent_by": user["id"],
+        "sent_by_name": sender_name,
+        "note": custom_note,
+        "days_pending_at_send": days_pending,
+    }
+    await db.digital_twin_pins.update_one(
+        {"id": pin["id"], "report_history.id": report_id},
+        {"$push": {"report_history.$.reminders_sent": reminder_entry},
+         "$set": {"updated_at": _now_iso()}},
+    )
+
+    # In-app notification to recipient (if known user)
+    recipient_user = await db.users.find_one({"email": report["recipient_email"]}, {"_id": 1})
+    if recipient_user:
+        await notify(
+            str(recipient_user["_id"]),
+            f"⏰ Reminder raport: {pin.get('title', 'Pin')}",
+            f"{sender_name} așteaptă răspunsul tău de {days_pending} zile.",
+            type_="dt_report_reminder",
+            link="/digital-twin",
+        )
+
+    return {
+        "ok": True,
+        "reminder": reminder_entry,
+        "recipient_email": report["recipient_email"],
+        "days_pending": days_pending,
+    }
+
+
 @router.get("/pins/{pin_id}/issue-report/preview")
 async def preview_issue_report(pin_id: str, screenshot_3d: Optional[str] = Query(None), user: dict = Depends(get_current_user)):
     """Generate the PDF in-line WITHOUT sending email (for review/download)."""

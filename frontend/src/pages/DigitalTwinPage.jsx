@@ -2,10 +2,11 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
-import { Box, Plus, Lock, Eye, Trash2, ArrowLeft, Sparkles, ExternalLink, Upload, FileBox, X, Layers } from "lucide-react";
+import { Box, Plus, Lock, Eye, Trash2, ArrowLeft, Sparkles, ExternalLink, Upload, FileBox, X, Layers, BellRing } from "lucide-react";
 import { API } from "./DashShared";
 import DigitalTwinViewer from "../components/DigitalTwinViewer";
 import DigitalTwinPlans from "../components/DigitalTwinPlans";
+import SentReportsDashboard from "../components/SentReportsDashboard";
 
 const ProjectCard = ({ p, onOpen, onDelete, onUpload, onPlans }) => (
   <div className="group relative rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] p-5 transition-colors" data-testid={`dt-project-${p.id}`}>
@@ -351,6 +352,8 @@ export default function DigitalTwinPage() {
   const [viewing, setViewing] = useState(null);
   const [uploadingTo, setUploadingTo] = useState(null);
   const [plansFor, setPlansFor] = useState(null);
+  const [showSentReports, setShowSentReports] = useState(false);
+  const [pendingReportsCount, setPendingReportsCount] = useState(0);
 
   const loadAll = async () => {
     setLoading(true);
@@ -360,6 +363,11 @@ export default function DigitalTwinPage() {
       if (subRes.data.active) {
         const pr = await axios.get(`${API}/digital-twin/projects`);
         setProjects(pr.data.items || []);
+        // Load pending reports count for the badge
+        try {
+          const sr = await axios.get(`${API}/digital-twin/reports/sent`, { params: { status: "pending" } });
+          setPendingReportsCount(sr.data?.counters?.pending || 0);
+        } catch {/* ignore */}
       }
     } catch {/* unauth handled by interceptor */} finally {
       setLoading(false);
@@ -386,6 +394,21 @@ export default function DigitalTwinPage() {
     return <div className="min-h-screen bg-stone-950 text-stone-400 flex items-center justify-center text-sm">Se încarcă...</div>;
   }
   if (!sub?.active) return <LockedScreen onRequest={requestAccess} />;
+
+  if (showSentReports) {
+    return (
+      <SentReportsDashboard
+        onClose={() => { setShowSentReports(false); loadAll(); }}
+        onOpenProject={(projectId) => {
+          const p = projects.find((x) => x.id === projectId);
+          if (p) {
+            setShowSentReports(false);
+            setViewing(p);
+          }
+        }}
+      />
+    );
+  }
 
   if (plansFor) {
     return (
@@ -422,13 +445,28 @@ export default function DigitalTwinPage() {
             <h1 className="font-serif text-4xl">Proiectele tale 3D</h1>
             <p className="text-sm text-stone-400 mt-1">Vizualizare BIM colaborativă · X-Ray · pin-uri · workflow inter-specialități</p>
           </div>
-          <button
-            onClick={() => setOpenCreate(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#d4ff3a] text-black font-medium hover:bg-[#c5f02e]"
-            data-testid="dt-new-project-btn"
-          >
-            <Plus className="w-4 h-4" /> Proiect nou
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSentReports(true)}
+              className="relative inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white/5 hover:bg-white/10 text-stone-300 text-sm"
+              data-testid="dt-sent-reports-btn"
+              title="Răspunsuri așteptate la rapoarte"
+            >
+              <BellRing className="w-4 h-4" /> Răspunsuri
+              {pendingReportsCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-stone-900 text-[10px] font-bold leading-none" data-testid="dt-sent-reports-badge">
+                  {pendingReportsCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setOpenCreate(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#d4ff3a] text-black font-medium hover:bg-[#c5f02e]"
+              data-testid="dt-new-project-btn"
+            >
+              <Plus className="w-4 h-4" /> Proiect nou
+            </button>
+          </div>
         </header>
 
         {projects.length === 0 ? (
