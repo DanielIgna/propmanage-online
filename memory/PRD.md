@@ -492,6 +492,13 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 
 
 
+### Phase 52 — Digital Twin Phase H: 3D ↔ 2D Pin Sync — Feb 2026
+- **Backend**: New `plan_anchors[]` field on `digital_twin_pins` with shape `{id, plan_id, plan_title, page, x_pct, y_pct, created_at, created_by, created_by_name}`. Endpoints `POST /api/digital-twin/pins/{pin_id}/anchors` (validates plan in same project, replaces existing anchor on same (plan_id,page)) and `DELETE /api/digital-twin/pins/{pin_id}/anchors/{anchor_id}` (permission: admin/operator/creator/pin author/project owner). 12/12 pytest pass (`/app/backend/tests/test_phase_h_anchors.py`).
+- **Frontend**: PdfCanvas refactored to render absolute-positioned colored markers on top of the PDF canvas. Markers are category-color-coded (defect=red, plumbing=cyan, electrical=yellow, hvac=violet, finish=orange, structural=dark-red, general=emerald). Click a marker → highlights it (white ring) + auto-switches view to split-screen + highlights the matching 3D pin in the embedded `DigitalTwinViewer` (white halo ring + bigger sphere + ring-2 ring-white on HTML label). Anchor mode toggle (`plan-anchor-toggle`) → click PDF → `AnchorPinPicker` modal → pick pin → POST anchor → marker appears. In anchor mode, clicking an existing marker DELETES the anchor (with confirm). Critical PdfCanvas fix: changed `pdfDocRef` (useRef) → `pdfDoc` (useState) so the render `useEffect([pdfDoc,page,scale])` re-runs when PDF document finishes loading. Without this, markers were not visible because canvas viewport size stayed at 0.
+- **Verified live**: Successfully placed 2 anchors via UI (UI Pin Defect red + UI Pin Plumbing cyan) on a fresh project + plan. Backend persists anchors, GET /pins returns them inline, frontend re-renders markers.
+
+
+
 ## Roadmap
 ### P1 (Next)
 - `server.py` routers split: auth.py, admin.py, operator.py, payments.py, requests.py, marketplace.py, design.py, portfolio.py (monolith ~2870 lines, refactor postponed multiple times)
