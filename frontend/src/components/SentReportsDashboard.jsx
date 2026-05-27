@@ -172,9 +172,9 @@ export default function SentReportsDashboard({ onClose, onOpenProject }) {
         {filterPills.map((p) => (
           <button
             key={p.id}
-            onClick={() => setFilter(p.id)}
+            onClick={() => { setFilter(p.id); setOverdueOnly(false); }}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 ${
-              filter === p.id ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40" : "bg-white/5 text-stone-400 hover:text-white"
+              filter === p.id && !overdueOnly ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40" : "bg-white/5 text-stone-400 hover:text-white"
             }`}
             data-testid={`filter-${p.id}`}
           >

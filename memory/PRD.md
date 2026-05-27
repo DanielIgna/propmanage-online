@@ -527,6 +527,16 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 
 
 
+### Phase 56 — Digital Twin: "Răspunsuri așteptate" Dashboard + Reminder — Feb 2026
+- **Backend**: 2 new endpoints in `digital_twin.py`:
+  - `GET /api/digital-twin/reports/sent` — aggregates pin.report_history[] across all pins for current user (sender_id scoping), with filters `status=pending|confirmed|needs_changes|all` + `overdue_only=true|false`. Returns items[] (with computed age_days, is_overdue, reminder_count) + counters{total, pending, confirmed, needs_changes, overdue}.
+  - `POST /api/digital-twin/reports/{report_id}/remind` — re-sends SAME approval URL (no token rotation, no PDF regen) to original recipient with optional custom `note`. Appends to `report_history.[].reminders_sent[]` with sent_at + days_pending_at_send. Returns 409 if non-pending, 404 if user is not sender, 400 if note >1000 chars, 500 if legacy report without approval_url. In-app `notify()` to recipient if known user (type=`dt_report_reminder`).
+- **Frontend**: New component `SentReportsDashboard.jsx` (250 lines) — fullscreen overlay with header back-button, refresh button, 4 status filter pills with live counts (Toate/În așteptare/Confirmate/Cu modificări) + separate "Overdue >7z" toggle (auto-resets on status pill click — UX fix). Each row: pin_title + status pill (amber/emerald/blue per status) + project name + recipient + age timer + reminder badge + decision_comment inline blockquote. Actions: ExternalLink (open approval URL), 📁 (open project), "Reminder" button (gated on pending+approval_url to hide legacy entries). ReminderModal with pin/project/age context + 1000-char note input.
+- **DigitalTwinPage integration**: New "Răspunsuri" button (data-testid=`dt-sent-reports-btn`) next to "Proiect nou" with live pending badge (data-testid=`dt-sent-reports-badge`). Pre-loads counter on page mount via `/reports/sent?status=pending`. Opens dashboard fullscreen; closing reloads counters.
+- **Test results**: iteration_26.json — 14/14 backend pytest + 100% frontend E2E (login → dashboard → filters → reminder modal → send → toast → counter increment 2→3 → list refresh). All status pill colors verified. One UX issue fixed inline: clicking status pills now resets overdue toggle. Pytest file: `/app/backend/tests/test_phase_i_plus_sent_reports.py`.
+
+
+
 ## Roadmap
 ### P1 (Next)
 - `server.py` routers split: auth.py, admin.py, operator.py, payments.py, requests.py, marketplace.py, design.py, portfolio.py (monolith ~2870 lines, refactor postponed multiple times)
