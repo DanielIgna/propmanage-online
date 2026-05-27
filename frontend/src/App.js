@@ -25,6 +25,7 @@ import { PrivacyPage, TermsPage } from "./pages/LegalPages";
 import { PrivacyNoticesPage } from "./pages/PrivacyNoticesPage";
 import { StatusPage } from "./pages/StatusPage";
 import { GDPRAuditBadge } from "./components/GDPRAuditBadge";
+import { TrustStrip } from "./components/TrustStrip";
 import "./App.css";
 
 // ============= NAV =============
@@ -97,13 +98,13 @@ const Hero = () => {
     
     <div className="max-w-7xl mx-auto w-full relative">
       <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-        <div className="flex flex-wrap items-center gap-3 mb-8">
+        <div className="flex flex-wrap items-center gap-3 mb-6">
           <div className="inline-flex items-center gap-2 px-4 py-2 glass rounded-full" data-testid="hero-badge">
             <div className="w-2 h-2 rounded-full bg-[#d4ff3a] pulse-dot" />
             <span className="text-xs tracking-wide text-stone-300">{t("hero.badge")}</span>
           </div>
-          <GDPRAuditBadge variant="hero" />
         </div>
+        <TrustStrip className="mb-8" />
         
         <h1 className="font-serif text-6xl md:text-8xl lg:text-9xl leading-[0.95] tracking-tight mb-8 max-w-5xl" data-testid="hero-title">
           {t("hero.title1")}<br/>
