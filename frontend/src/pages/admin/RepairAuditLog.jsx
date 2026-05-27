@@ -2,7 +2,7 @@
 // are actually effective (applied/decided ratio) vs which patterns the LLM struggles with.
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { BarChart3, TrendingUp, TrendingDown, RefreshCw, ChevronRight, Trophy, AlertOctagon, X } from "lucide-react";
+import { BarChart3, TrendingUp, TrendingDown, RefreshCw, ChevronRight, Trophy, AlertOctagon, X, Calendar } from "lucide-react";
 import { AdminCard, AdminBtn } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
 
@@ -26,6 +26,142 @@ const Stat = ({ label, value, color }) => (
     <div className="text-[10px] uppercase tracking-wider text-slate-400 mt-0.5">{label}</div>
   </div>
 );
+
+// Color a cell based on effectiveness and activity volume
+const cellColor = (c) => {
+  if (!c || c.count === 0) return "bg-slate-100 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-700/40";
+  if (c.decided === 0) return "bg-slate-200 dark:bg-slate-700 border-slate-300/60 dark:border-slate-600/60"; // pending
+  const e = c.effectiveness_pct;
+  if (e >= 80) return "bg-emerald-500 border-emerald-600";
+  if (e >= 50) return "bg-emerald-300 border-emerald-400 dark:bg-emerald-500/60";
+  if (e >= 30) return "bg-amber-400 border-amber-500";
+  return "bg-red-400 border-red-500";
+};
+
+const WD_LABELS = ["L", "Ma", "Mi", "J", "V", "S", "D"];
+
+const EffectivenessTrend = () => {
+  const [weeks, setWeeks] = useState(4);
+  const [data, setData] = useState(null);
+  const [hovered, setHovered] = useState(null);
+
+  const load = async () => {
+    try {
+      const r = await axios.get(`${API}/admin/ai/repair-suggestions/trend?weeks=${weeks}`);
+      setData(r.data);
+    } catch { /* ignore */ }
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [weeks]);
+
+  if (!data) return null;
+
+  // Build a 7-rows × N-cols grid. Cells are sequential by date.
+  const cells = data.cells || [];
+  const grid = Array.from({ length: 7 }, () => []);
+  cells.forEach((c) => { grid[c.weekday].push(c); });
+
+  const t = data.totals || {};
+  const delta = t.trend_delta_pct;
+  const trendUp = delta != null && delta > 0;
+  const trendDown = delta != null && delta < 0;
+
+  return (
+    <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-700 p-4" data-testid="repair-trend-chart">
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <Calendar className="w-4 h-4 text-purple-500" />
+        <div className="font-semibold text-sm">Trend eficacitate AI ({weeks * 7} zile)</div>
+        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 ml-auto" data-testid="trend-weeks-selector">
+          {[2, 4, 8, 12].map(w => (
+            <button
+              key={w}
+              onClick={() => setWeeks(w)}
+              className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
+                weeks === w ? "bg-white dark:bg-slate-900 text-purple-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+              data-testid={`trend-weeks-${w}`}
+            >{w}săpt</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Trend stats strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3 text-xs">
+        <div className="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-2">
+          <div className="text-[10px] uppercase tracking-wider text-slate-400">Activitate total</div>
+          <div className="text-lg font-semibold text-slate-800 dark:text-slate-200 tabular-nums">{t.count}</div>
+        </div>
+        <div className="rounded-lg bg-blue-50 dark:bg-blue-500/10 p-2">
+          <div className="text-[10px] uppercase tracking-wider text-blue-600 dark:text-blue-300">Aplicate</div>
+          <div className="text-lg font-semibold text-blue-700 dark:text-blue-300 tabular-nums">{t.applied}</div>
+        </div>
+        <div className="rounded-lg bg-purple-50 dark:bg-purple-500/10 p-2">
+          <div className="text-[10px] uppercase tracking-wider text-purple-600 dark:text-purple-300">Eficacitate rolling</div>
+          <div className="text-lg font-semibold text-purple-700 dark:text-purple-300 tabular-nums">{t.rolling_effectiveness_pct != null ? `${t.rolling_effectiveness_pct}%` : "—"}</div>
+        </div>
+        <div className="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-2">
+          <div className="text-[10px] uppercase tracking-wider text-slate-400">Delta față de prima jumătate</div>
+          <div className={`text-lg font-semibold tabular-nums inline-flex items-center gap-1 ${trendUp ? "text-emerald-600 dark:text-emerald-400" : trendDown ? "text-red-600 dark:text-red-400" : "text-slate-500"}`}>
+            {trendUp && <TrendingUp className="w-4 h-4" />}
+            {trendDown && <TrendingDown className="w-4 h-4" />}
+            {delta != null ? `${delta > 0 ? "+" : ""}${delta} pp` : "—"}
+          </div>
+        </div>
+      </div>
+
+      {/* Heatmap grid */}
+      <div className="flex items-start gap-2 overflow-x-auto pb-2">
+        {/* Y-axis weekday labels */}
+        <div className="flex flex-col gap-1 text-[9px] text-slate-400 pt-1 shrink-0">
+          {WD_LABELS.map((wd, i) => (
+            <div key={i} className="h-4 leading-4 w-3 text-right tabular-nums">{wd}</div>
+          ))}
+        </div>
+        {/* Columns: 7 rows × N weeks. Build by iterating weeks then weekdays */}
+        <div className="flex gap-1" data-testid="trend-grid">
+          {Array.from({ length: weeks }).map((_, wIdx) => (
+            <div key={wIdx} className="flex flex-col gap-1">
+              {WD_LABELS.map((_wd, dayIdx) => {
+                const c = grid[dayIdx][wIdx]; // ordered by date asc per weekday
+                if (!c) return <div key={dayIdx} className="w-4 h-4" />;
+                return (
+                  <button
+                    key={dayIdx}
+                    onMouseEnter={() => setHovered(c)}
+                    onMouseLeave={() => setHovered(prev => (prev === c ? null : prev))}
+                    className={`w-4 h-4 rounded-sm border ${cellColor(c)} transition-transform hover:scale-125 hover:ring-2 hover:ring-purple-400 cursor-pointer`}
+                    title={`${c.date} · ${c.count} sugestii · ${c.applied}/${c.decided} aplicate (${c.effectiveness_pct != null ? c.effectiveness_pct + "%" : "—"})`}
+                    data-testid={`trend-cell-${c.date}`}
+                  />
+                );
+              })}
+            </div>
+          ))}
+        </div>
+        {/* Legend */}
+        <div className="ml-auto flex flex-col gap-1 text-[10px] text-slate-500 shrink-0 pt-1">
+          <div className="font-bold uppercase tracking-wider">Legendă</div>
+          <div className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-slate-100 dark:bg-slate-800/50 border border-slate-200" /> 0 sugestii</div>
+          <div className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-slate-200 dark:bg-slate-700 border border-slate-300" /> pending</div>
+          <div className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-red-400 border border-red-500" /> &lt;30%</div>
+          <div className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-amber-400 border border-amber-500" /> 30-50%</div>
+          <div className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-emerald-300 border border-emerald-400" /> 50-80%</div>
+          <div className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-emerald-500 border border-emerald-600" /> ≥80%</div>
+        </div>
+      </div>
+
+      {/* Hover detail */}
+      <div className="mt-2 text-[11px] text-slate-500 min-h-[16px]" data-testid="trend-hover">
+        {hovered ? (
+          <span>
+            <b>{hovered.date}</b> · {hovered.count} sugestii · {hovered.applied} aplicate / {hovered.decided} decise · {hovered.effectiveness_pct != null ? `eficacitate ${hovered.effectiveness_pct}%` : "fără decizii"}
+          </span>
+        ) : (
+          <span className="italic">Plimbă cursorul peste celule pentru detalii zilnice.</span>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const RepairAuditLog = () => {
   const [days, setDays] = useState(30);
@@ -92,6 +228,9 @@ export const RepairAuditLog = () => {
         <Stat label="Respinse" value={totals.rejected} color="text-red-600 dark:text-red-400" />
         <Stat label="Eficacitate globală" value={fmtPct(totals.global_effectiveness_pct)} color="text-indigo-600 dark:text-indigo-400" />
       </div>
+
+      {/* Trend heatmap */}
+      <EffectivenessTrend />
 
       {/* Best / Worst */}
       {(best_pattern || worst_pattern) && (

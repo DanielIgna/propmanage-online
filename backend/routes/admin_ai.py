@@ -839,6 +839,99 @@ async def list_by_pattern(
     return {"pattern": pattern, "items": items, "count": len(items)}
 
 
+@router.get("/repair-suggestions/trend")
+async def repair_trend(
+    weeks: int = Query(4, ge=1, le=12),
+    user: dict = Depends(require_role("admin")),
+):
+    """7×N heatmap of AI Repair Suggester effectiveness over time.
+    Returns one cell per day for the last `weeks*7` days. Each cell has:
+    - date (YYYY-MM-DD), weekday (0=Mon … 6=Sun), is_future (false here, but kept for symmetry)
+    - count, applied, approved, rejected, decided
+    - effectiveness_pct = applied / decided (null when decided==0)
+    """
+    days = weeks * 7
+    # Anchor on Monday so heatmap aligns into clean week-columns
+    today = datetime.now(timezone.utc).date()
+    today_weekday = today.weekday()  # 0=Mon
+    # Last cell is today; total days back = days-1
+    start = today - timedelta(days=days - 1)
+    cutoff_iso = datetime(start.year, start.month, start.day, tzinfo=timezone.utc).isoformat()
+
+    # Aggregate per day
+    pipeline = [
+        {"$match": {"created_at": {"$gte": cutoff_iso}}},
+        {"$project": {
+            "day": {"$substr": ["$created_at", 0, 10]},
+            "status": 1,
+        }},
+        {"$group": {
+            "_id": "$day",
+            "count": {"$sum": 1},
+            "applied": {"$sum": {"$cond": [{"$eq": ["$status", "applied"]}, 1, 0]}},
+            "approved": {"$sum": {"$cond": [{"$eq": ["$status", "approved"]}, 1, 0]}},
+            "rejected": {"$sum": {"$cond": [{"$eq": ["$status", "rejected"]}, 1, 0]}},
+        }},
+    ]
+    by_day = {}
+    async for row in db.admin_ai_repair_suggestions.aggregate(pipeline):
+        by_day[row["_id"]] = row
+
+    cells = []
+    for i in range(days):
+        d = start + timedelta(days=i)
+        key = d.isoformat()
+        row = by_day.get(key, {})
+        applied = row.get("applied", 0)
+        approved = row.get("approved", 0)
+        rejected = row.get("rejected", 0)
+        decided = applied + approved + rejected
+        cells.append({
+            "date": key,
+            "weekday": d.weekday(),
+            "count": row.get("count", 0),
+            "applied": applied,
+            "approved": approved,
+            "rejected": rejected,
+            "decided": decided,
+            "effectiveness_pct": round((applied / decided) * 100, 1) if decided else None,
+        })
+
+    # Rolling totals
+    total_count = sum(c["count"] for c in cells)
+    total_applied = sum(c["applied"] for c in cells)
+    total_decided = sum(c["decided"] for c in cells)
+    rolling_effectiveness = round((total_applied / total_decided) * 100, 1) if total_decided else None
+
+    # Trend: compare last half vs first half effectiveness
+    half = len(cells) // 2
+    fst_applied = sum(c["applied"] for c in cells[:half])
+    fst_decided = sum(c["decided"] for c in cells[:half])
+    snd_applied = sum(c["applied"] for c in cells[half:])
+    snd_decided = sum(c["decided"] for c in cells[half:])
+    fst_eff = (fst_applied / fst_decided) * 100 if fst_decided else None
+    snd_eff = (snd_applied / snd_decided) * 100 if snd_decided else None
+    trend_delta = round(snd_eff - fst_eff, 1) if (fst_eff is not None and snd_eff is not None) else None
+
+    return {
+        "weeks": weeks,
+        "days": days,
+        "start_date": start.isoformat(),
+        "end_date": today.isoformat(),
+        "cells": cells,
+        "today_weekday": today_weekday,
+        "totals": {
+            "count": total_count,
+            "applied": total_applied,
+            "decided": total_decided,
+            "rolling_effectiveness_pct": rolling_effectiveness,
+            "trend_delta_pct": trend_delta,
+            "first_half_effectiveness_pct": round(fst_eff, 1) if fst_eff is not None else None,
+            "second_half_effectiveness_pct": round(snd_eff, 1) if snd_eff is not None else None,
+        },
+    }
+
+
 # ============= CHAT WITH AI INVESTIGATOR =============
 
 def _build_system_prompt() -> str:
