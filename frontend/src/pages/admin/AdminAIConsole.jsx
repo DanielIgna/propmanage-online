@@ -109,8 +109,12 @@ export const AdminAIConsole = () => {
     const note = window.prompt(decision === "approve" ? "Aprob sugestia. Notă (opțional):" : "Resping sugestia. Motiv:", "");
     if (note === null) return;
     try {
-      await axios.post(`${API}/admin/ai/repair-suggestions/${repairModal.suggestion.id}/decide`, { decision, note });
-      await openRepair(repairModal.finding);
+      const r = await axios.post(`${API}/admin/ai/repair-suggestions/${repairModal.suggestion.id}/decide`, { decision, note });
+      const newStatus = r.data?.status || (decision === "approve" ? "approved" : "rejected");
+      setRepairModal(m => m ? ({
+        ...m,
+        suggestion: { ...m.suggestion, status: newStatus, decision_note: note },
+      }) : m);
     } catch (e) {
       window.alert(`Eroare: ${e?.response?.data?.detail || e.message}`);
     }

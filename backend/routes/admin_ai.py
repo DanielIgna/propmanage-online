@@ -584,6 +584,7 @@ async def suggest_repair(
             {"$set": doc, "$inc": {"regeneration_count": 1}},
         )
         doc["_id"] = existing["_id"]
+        doc["regeneration_count"] = existing.get("regeneration_count", 0) + 1
     else:
         doc["regeneration_count"] = 0
         res = await db.admin_ai_repair_suggestions.insert_one(doc)
