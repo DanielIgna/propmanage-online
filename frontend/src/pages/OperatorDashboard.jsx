@@ -4,18 +4,20 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import {
   Building, Clock, AlertTriangle, FileCheck, Wrench, ArrowRight,
-  Bell, Settings as SettingsIcon, Flag,
+  Bell, Settings as SettingsIcon, Flag, Box,
 } from "lucide-react";
 import { TwinEditorModal, TWIN_STATUS_LABELS } from "./OperatorTwin";
 import { API, DashLayout, Stat } from "./DashShared";
 import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
 import { NonConformityFlagModal } from "./ActivityTimeline";
+import { OperatorDigitalTwin } from "./OperatorDigitalTwin";
 
 export const OperatorDashboard = () => {
   const [queue, setQueue] = useState([]);
   const [twins, setTwins] = useState([]);
   const [notifs, setNotifs] = useState([]);
+  const [dtCounters, setDtCounters] = useState({ needs_setup: 0, in_progress: 0, delivered: 0, total: 0 });
   const [tab, setTab] = useState("twins");
   const [editingTwin, setEditingTwin] = useState(null);
   const [flagTarget, setFlagTarget] = useState(null); // {target_type, target_id, label}
@@ -23,6 +25,7 @@ export const OperatorDashboard = () => {
   const load = () => {
     axios.get(`${API}/operator/queue`).then(r => setQueue(r.data)).catch(() => {});
     axios.get(`${API}/operator/twins`).then(r => setTwins(r.data)).catch(() => {});
+    axios.get(`${API}/operator/digital-twin/clients-queue?status=all`).then(r => setDtCounters(r.data.counters || {})).catch(() => {});
   };
   const loadNotifs = () => axios.get(`${API}/notifications`).then(r => setNotifs(r.data)).catch(() => {});
 
@@ -40,6 +43,7 @@ export const OperatorDashboard = () => {
 
   const tabs = [
     { id: "twins", label: "Digital Twins", icon: Building, badge: pendingTwins.length },
+    { id: "dt_pro", label: "DT Pro 3D", icon: Box, badge: (dtCounters.needs_setup || 0) + (dtCounters.in_progress || 0) },
     { id: "logs", label: "Logs", icon: FileCheck, badge: queue.length },
     { id: "notifications", label: "Notificări", icon: Bell, badge: unreadNotifs },
     { id: "settings", label: "Setări", icon: SettingsIcon, badge: 0 },
@@ -47,6 +51,7 @@ export const OperatorDashboard = () => {
 
   const title = {
     twins: "Validare Digital Twin",
+    dt_pro: "Digital Twin Pro · Clienți 3D",
     logs: "Logs Mentenanță",
     notifications: "Notificări",
     settings: "Setări",
@@ -62,6 +67,37 @@ export const OperatorDashboard = () => {
             <Stat icon={AlertTriangle} label="Revizie cerută" value={revisionTwins.length} sub="Așteptare client" color="red" tid="op-revision" />
             <Stat icon={FileCheck} label="Logs mentenanță" value={queue.length} sub="În coadă" tid="op-logs" />
           </div>
+
+          {/* Digital Twin Pro shortcut card (dublat — accesibil și aici și în tab-ul propriu) */}
+          <button
+            onClick={() => setTab("dt_pro")}
+            className="w-full text-left bg-gradient-to-br from-emerald-500/10 to-blue-500/10 hover:from-emerald-500/15 hover:to-blue-500/15 border border-emerald-500/30 rounded-3xl p-5 mb-6 transition-all group"
+            data-testid="op-dt-pro-shortcut"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 flex items-center justify-center">
+                <Box className="w-6 h-6 text-emerald-300" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-300 font-semibold">Digital Twin Pro · Modulul 3D</div>
+                  {(dtCounters.needs_setup || 0) > 0 && (
+                    <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold">
+                      {dtCounters.needs_setup} setup necesar
+                    </span>
+                  )}
+                </div>
+                <div className="font-serif text-lg text-white mt-0.5">Clienți cu acces 3D</div>
+                <div className="text-xs text-stone-400 mt-1">
+                  {dtCounters.total === 0
+                    ? "Niciun client cu DT Pro încă. Click pentru a acorda primul acces."
+                    : `${dtCounters.total} clienți · ${dtCounters.delivered} livrați · ${dtCounters.in_progress} în lucru · ${dtCounters.needs_setup} de setat`}
+                </div>
+              </div>
+              <ArrowRight className="w-5 h-5 text-emerald-300 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </button>
+
           <div className="space-y-4">
             <div className="glass-strong rounded-3xl p-6">
               <h3 className="font-serif text-xl mb-4 flex items-center gap-2"><Clock className="w-4 h-4 text-amber-400" />Twins în validare ({pendingTwins.length})</h3>
@@ -85,6 +121,8 @@ export const OperatorDashboard = () => {
           </div>
         </>
       )}
+
+      {tab === "dt_pro" && <OperatorDigitalTwin />}
 
       {tab === "logs" && (
         <div className="glass-strong rounded-3xl p-8 text-center">

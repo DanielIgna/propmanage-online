@@ -48,8 +48,10 @@ router = APIRouter(prefix="/api/digital-twin", tags=["digital-twin"])
 UPLOAD_ROOT = Path(os.environ.get("DT_UPLOAD_DIR") or "/app/backend/uploads/digital_twin")
 UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
 
-ALLOWED_EXTS = {".glb", ".gltf"}
+ALLOWED_EXTS = {".glb", ".gltf", ".skp"}
 ALLOWED_PLAN_EXTS = {".pdf"}
+# Extensions that can't be rendered in-browser; we store them as downloadable archives only.
+DOWNLOAD_ONLY_EXTS = {".skp"}
 MAX_UPLOAD_BYTES = 200 * 1024 * 1024  # 200 MB hard cap
 MAX_PLAN_BYTES = 50 * 1024 * 1024  # 50 MB cap for PDFs
 
@@ -304,7 +306,7 @@ async def upload_model(
     raw_name = file.filename or "model.glb"
     ext = Path(raw_name).suffix.lower()
     if ext not in ALLOWED_EXTS:
-        raise HTTPException(400, "Format permis: .glb sau .gltf. Pentru .skp conversie prealabilă în SketchUp Free → File → Export → glTF.")
+        raise HTTPException(400, "Format permis: .glb, .gltf sau .skp (SketchUp, descărcabil — pentru randare în browser folosește .glb/.gltf).")
 
     # Persist to disk with streaming (chunks of 1 MB) to avoid loading 200MB in RAM
     project_dir = UPLOAD_ROOT / project_id
@@ -336,6 +338,7 @@ async def upload_model(
     public_path = f"/api/digital-twin/files/{project_id}/{safe_name}"
 
     # Save model metadata + set as current model on project
+    is_archive = ext in DOWNLOAD_ONLY_EXTS
     model_doc = {
         "id": _new_id(),
         "project_id": project_id,
@@ -343,14 +346,21 @@ async def upload_model(
         "stored_as": safe_name,
         "size_bytes": total,
         "url": public_path,
+        "kind": "archive" if is_archive else "model",  # "archive" = .skp (download only), "model" = .glb/.gltf
+        "ext": ext,
         "uploaded_by": user["id"],
         "uploaded_by_name": user.get("name") or user.get("email"),
+        "uploaded_by_role": user.get("role"),
         "uploaded_at": _now_iso(),
     }
     await db.digital_twin_models.insert_one(model_doc)
+    # Only set as the active model_url if it's actually viewable (.glb/.gltf)
+    update_set = {"updated_at": _now_iso()}
+    if not is_archive:
+        update_set["model_url"] = public_path
     await db.digital_twin_projects.update_one(
         {"id": project_id},
-        {"$set": {"model_url": public_path, "updated_at": _now_iso()}, "$inc": {"model_count": 1}},
+        {"$set": update_set, "$inc": {"model_count": 1}},
     )
     # Phase G: notify stakeholders the architect updated the model
     actor_name = user.get("name") or user.get("email") or "Utilizator"
@@ -384,7 +394,15 @@ async def serve_model_file(project_id: str, filename: str, user: dict = Depends(
     file_path = UPLOAD_ROOT / project_id / filename
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(404, "Model file not found.")
-    media = "model/gltf-binary" if filename.lower().endswith(".glb") else "model/gltf+json"
+    fn_lower = filename.lower()
+    if fn_lower.endswith(".glb"):
+        media = "model/gltf-binary"
+    elif fn_lower.endswith(".gltf"):
+        media = "model/gltf+json"
+    elif fn_lower.endswith(".skp"):
+        media = "application/octet-stream"
+    else:
+        media = "application/octet-stream"
     return FileResponse(
         file_path,
         media_type=media,
@@ -1646,14 +1664,171 @@ async def delete_plan(plan_id: str, user: dict = Depends(get_current_user)):
     return {"ok": True}
 
 
-# ----------------- admin: subscription grant -----------------
+# ----------------- operator: digital twin onboarding for clients -----------------
 
-admin_router = APIRouter(prefix="/api/admin/digital-twin", tags=["digital-twin-admin"])
+operator_router = APIRouter(prefix="/api/operator/digital-twin", tags=["digital-twin-operator"])
 
 
 class SubGrant(BaseModel):
     user_id: str
     active: bool = True
+
+
+@operator_router.post("/grant-access")
+async def operator_grant_access(payload: SubGrant, user: dict = Depends(require_role("operator", "admin"))):
+    """Operator (or admin) grants/revokes Digital Twin Pro access to a client.
+    Audit-logged. Required so the operator can prepare projects for paying clients."""
+    target = await db.users.find_one(_user_filter(payload.user_id))
+    if not target:
+        raise HTTPException(404, "Client inexistent.")
+    if target.get("role") != "client":
+        raise HTTPException(400, "Acces Digital Twin Pro se acordă doar clienților.")
+    await db.users.update_one(
+        _user_filter(payload.user_id),
+        {"$set": {"digital_twin_pro": payload.active, "digital_twin_pro_updated_at": _now_iso()}},
+    )
+    await db.audit_log.insert_one({
+        "actor": user["id"],
+        "actor_role": user.get("role"),
+        "action": "digital_twin.subscription." + ("grant" if payload.active else "revoke"),
+        "target_user": payload.user_id,
+        "via": "operator_panel" if user.get("role") == "operator" else "admin_panel",
+        "created_at": _now_iso(),
+    })
+    if payload.active:
+        await notify(
+            payload.user_id,
+            "🧊 Digital Twin Pro activat",
+            f"{user.get('name') or 'Echipa PropManage'} ti-a activat accesul la modulul Digital Twin Pro. Mergi la 'Digital Twin' pentru a-ti vedea proiectul.",
+            type_="dt_subscription",
+            link="/digital-twin",
+        )
+    return {"ok": True, "user_id": payload.user_id, "active": payload.active}
+
+
+@operator_router.get("/clients-queue")
+async def operator_clients_queue(
+    status: str = Query("all", pattern="^(all|needs_setup|in_progress|delivered)$"),
+    user: dict = Depends(require_role("operator", "admin")),  # noqa: ARG001
+):
+    """Lists clients eligible for / using Digital Twin Pro. Three statuses:
+       - needs_setup: digital_twin_pro=true AND project_count==0 (no project created yet)
+       - in_progress: digital_twin_pro=true AND has projects but model_count==0
+       - delivered: digital_twin_pro=true AND has projects with model uploaded
+       - all: union of the above
+    """
+    cursor = db.users.find({"role": "client", "digital_twin_pro": True})
+    items = []
+    async for u in cursor:
+        cid = str(u["_id"])
+        project_count = await db.digital_twin_projects.count_documents({"owner_id": cid})
+        model_count = 0
+        plan_count = 0
+        projects = []
+        if project_count:
+            async for p in db.digital_twin_projects.find({"owner_id": cid}).sort("updated_at", -1):
+                model_count += p.get("model_count", 0)
+                plan_count += p.get("plan_count", 0)
+                projects.append({
+                    "id": p["id"],
+                    "name": p.get("name"),
+                    "model_count": p.get("model_count", 0),
+                    "plan_count": p.get("plan_count", 0),
+                    "pin_count": p.get("pin_count", 0),
+                    "updated_at": p.get("updated_at"),
+                })
+        if project_count == 0:
+            client_status = "needs_setup"
+        elif model_count == 0:
+            client_status = "in_progress"
+        else:
+            client_status = "delivered"
+        if status != "all" and status != client_status:
+            continue
+        items.append({
+            "client_id": cid,
+            "client_name": u.get("name") or u.get("email"),
+            "client_email": u.get("email"),
+            "client_phone": u.get("phone"),
+            "zone": u.get("zone"),
+            "granted_at": u.get("digital_twin_pro_updated_at"),
+            "project_count": project_count,
+            "model_count": model_count,
+            "plan_count": plan_count,
+            "projects": projects,
+            "status": client_status,
+        })
+    items.sort(key=lambda x: (x["status"] != "needs_setup", x["status"] != "in_progress", -(len(x["projects"]) or 0)))
+    counters = {
+        "needs_setup": sum(1 for x in items if x["status"] == "needs_setup"),
+        "in_progress": sum(1 for x in items if x["status"] == "in_progress"),
+        "delivered": sum(1 for x in items if x["status"] == "delivered"),
+        "total": len(items),
+    }
+    return {"items": items, "counters": counters}
+
+
+class OperatorProjectCreate(BaseModel):
+    client_id: str
+    name: str = Field(..., min_length=2, max_length=200)
+    description: Optional[str] = Field(None, max_length=2000)
+
+
+@operator_router.post("/clients/{client_id}/projects")
+async def operator_create_project_for_client(
+    client_id: str,
+    payload: OperatorProjectCreate,
+    user: dict = Depends(require_role("operator", "admin")),
+):
+    """Creates a Digital Twin project owned by the client (not the operator).
+    The operator is recorded as `created_by_operator_id` for audit / project routing."""
+    if payload.client_id != client_id:
+        raise HTTPException(400, "client_id mismatch.")
+    client = await db.users.find_one(_user_filter(client_id))
+    if not client:
+        raise HTTPException(404, "Client inexistent.")
+    if not client.get("digital_twin_pro"):
+        raise HTTPException(400, "Clientul nu are acces Digital Twin Pro. Acordă mai întâi accesul.")
+    pid = _new_id()
+    now = _now_iso()
+    doc = {
+        "id": pid,
+        "name": payload.name.strip(),
+        "description": (payload.description or "").strip(),
+        "model_url": None,
+        "owner_id": client_id,
+        "owner_name": client.get("name") or client.get("email"),
+        "members": [],
+        "model_count": 0,
+        "plan_count": 0,
+        "pin_count": 0,
+        "created_at": now,
+        "updated_at": now,
+        "created_by_operator_id": user["id"],
+        "created_by_operator_name": user.get("name") or user.get("email"),
+    }
+    await db.digital_twin_projects.insert_one(doc)
+    await db.audit_log.insert_one({
+        "actor": user["id"],
+        "actor_role": user.get("role"),
+        "action": "digital_twin.project.create_for_client",
+        "target_user": client_id,
+        "project_id": pid,
+        "created_at": now,
+    })
+    await notify(
+        client_id,
+        "🏗️ Proiect Digital Twin creat",
+        f"{user.get('name') or 'Echipa PropManage'} a creat proiectul '{payload.name}' pentru tine. Va incarca in curand modelul 3D si planurile.",
+        type_="dt_project",
+        link="/digital-twin",
+    )
+    return _clean(doc)
+
+
+# ----------------- admin: subscription grant -----------------
+
+admin_router = APIRouter(prefix="/api/admin/digital-twin", tags=["digital-twin-admin"])
 
 
 @admin_router.post("/subscription/grant")
