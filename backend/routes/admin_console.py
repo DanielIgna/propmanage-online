@@ -1813,14 +1813,27 @@ async def email_incident_report(
                 target={"type": "audit_entry", "id": entry_id, "label": f"{action} → {target_label}"},
                 note=f"Email trimis către {len(recipients)} destinatar(i) via {result.get('provider', '—')}")
 
-    # Increment preset sent_count if a preset was used
+    # Increment preset sent_count if a preset was used + log send history
     preset_id = payload.get("preset_id")
     if preset_id and result.get("ok"):
         try:
+            poid = ObjectId(preset_id)
             await db.incident_recipient_presets.update_one(
-                {"_id": ObjectId(preset_id)},
+                {"_id": poid},
                 {"$inc": {"sent_count": 1}, "$set": {"last_used_at": datetime.now(timezone.utc).isoformat()}},
             )
+            # Record send history for stats per preset
+            await db.preset_send_history.insert_one({
+                "preset_id": poid,
+                "audit_entry_id": entry_id,
+                "target_label": target_label,
+                "action": action,
+                "recipient_count": len(recipients),
+                "sent_by": user["id"],
+                "sent_by_name": user.get("name") or user.get("email"),
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+                "provider": result.get("provider"),
+            })
         except (InvalidId, Exception):  # noqa: BLE001
             pass
 
@@ -1986,10 +1999,102 @@ async def delete_recipient_preset(preset_id: str, user: dict = Depends(require_r
     if not doc:
         raise HTTPException(404, "Preset inexistent.")
     await db.incident_recipient_presets.delete_one({"_id": oid})
+    # Also delete its send history
+    await db.preset_send_history.delete_many({"preset_id": oid})
     await audit("recipient_preset.delete", user,
                 target={"type": "recipient_preset", "id": preset_id, "label": doc.get("name")},
                 before={"name": doc.get("name"), "emails": doc.get("emails", [])})
     return {"ok": True}
+
+
+@router.get("/recipient-presets/{preset_id}/stats")
+async def get_preset_stats(
+    preset_id: str,
+    days: int = Query(180, ge=30, le=365),
+    user: dict = Depends(require_role("admin")),
+):
+    """Return send history + monthly aggregation for a recipient preset.
+    Used by the 'Stats per Preset' panel — incident response cadence insights.
+    """
+    try:
+        oid = ObjectId(preset_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid preset id")
+    preset = await db.incident_recipient_presets.find_one({"_id": oid})
+    if not preset:
+        raise HTTPException(404, "Preset inexistent.")
+
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+    # Recent sends (last 10, newest first)
+    recent_cursor = db.preset_send_history.find(
+        {"preset_id": oid}
+    ).sort("sent_at", -1).limit(10)
+    recent = []
+    async for d in recent_cursor:
+        recent.append({
+            "audit_entry_id": d.get("audit_entry_id"),
+            "target_label": d.get("target_label"),
+            "action": d.get("action"),
+            "recipient_count": d.get("recipient_count"),
+            "sent_by_name": d.get("sent_by_name"),
+            "sent_at": d.get("sent_at"),
+            "provider": d.get("provider"),
+        })
+
+    # Monthly aggregation (YYYY-MM groups) over the requested window
+    pipeline = [
+        {"$match": {"preset_id": oid, "sent_at": {"$gte": cutoff}}},
+        {"$group": {
+            "_id": {"$substr": ["$sent_at", 0, 7]},  # YYYY-MM
+            "count": {"$sum": 1},
+            "recipient_count_total": {"$sum": "$recipient_count"},
+        }},
+        {"$sort": {"_id": 1}},
+    ]
+    months = []
+    async for d in db.preset_send_history.aggregate(pipeline):
+        months.append({"month": d["_id"], "count": d["count"], "recipients": d["recipient_count_total"]})
+
+    # Fill missing months with zero counts so the chart has continuous bars
+    if months:
+        from calendar import monthrange  # noqa: F401  (kept light; not actually needed)
+        # Build full month list between first and now
+        now = datetime.now(timezone.utc)
+        first_m = months[0]["month"]
+        try:
+            y, m = int(first_m[:4]), int(first_m[5:7])
+        except Exception:
+            y, m = now.year, now.month
+        full = []
+        existing_map = {x["month"]: x for x in months}
+        cur_y, cur_m = y, m
+        while (cur_y, cur_m) <= (now.year, now.month):
+            key = f"{cur_y:04d}-{cur_m:02d}"
+            full.append(existing_map.get(key, {"month": key, "count": 0, "recipients": 0}))
+            cur_m += 1
+            if cur_m > 12:
+                cur_m = 1
+                cur_y += 1
+        months = full
+
+    # Aggregate totals
+    total_sends = preset.get("sent_count", 0) or 0
+    first_send = None
+    last_send = preset.get("last_used_at")
+    first_doc = await db.preset_send_history.find_one({"preset_id": oid}, sort=[("sent_at", 1)])
+    if first_doc:
+        first_send = first_doc.get("sent_at")
+
+    return {
+        "preset": _serialize_preset(preset),
+        "recent_sends": recent,
+        "months": months,
+        "total_sends": total_sends,
+        "first_send": first_send,
+        "last_send": last_send,
+        "window_days": days,
+    }
 
 
 @router.post("/audit-log/{entry_id}/rollback")

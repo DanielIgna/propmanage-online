@@ -237,6 +237,15 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Auto-deschide modalul când pagina e accesată cu `?compare=` (fetch fallback prin `GET /api/admin/audit-log/{id}`)
 - Banner roșu "⚠️ Link invalid" dacă intrările au fost șterse; URL curățat la close
 
+### Phase 41 — Stats per Preset (Feb 2026)
+- Colecția `preset_send_history` cu `{preset_id, audit_entry_id, target_label, action, recipient_count, sent_by, sent_at, provider}`
+- Înregistrare automată la fiecare email trimis cu `preset_id` în `email-report` endpoint
+- Endpoint `GET /api/admin/recipient-presets/{id}/stats?days=180`: returnează `preset`, `recent_sends[10]`, `months[]` (full series cu zero-fill), `total_sends`, `first_send`, `last_send`
+- Agregare lunară prin MongoDB pipeline: `$substr(sent_at, 0, 7)` → YYYY-MM, completare luni lipsă pe client side
+- Cleanup automat: ștergerea unui preset șterge și istoricul aferent
+- Frontend: buton 📊 vizibil pe hover pe fiecare chip → modal cu 3 KPI cards (Total / Prima / Ultima), grafic bar lunar CSS-only cu gradient amber, listă istoric recent (badge action, target, timestamp, autor, count, provider)
+- Etichete lunare în română (Ian/Feb/.../Dec), tooltip pe bare cu count + total destinatari
+
 ### Phase 40 — Recipient Presets (Feb 2026)
 - Colecția MongoDB `incident_recipient_presets` cu `{name, emails[], sent_count, created_by, created_at}`
 - 4 endpoint-uri CRUD: `GET/POST/PATCH/DELETE /api/admin/recipient-presets[/{id}]`

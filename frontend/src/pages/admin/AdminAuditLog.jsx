@@ -69,6 +69,25 @@ export const AdminAuditLog = () => {
   const [newPresetName, setNewPresetName] = useState("");
   const [newPresetEmails, setNewPresetEmails] = useState("");
   const [presetSaving, setPresetSaving] = useState(false);
+  const [statsModal, setStatsModal] = useState(null); // { preset } when open
+  const [statsData, setStatsData] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  const openStats = async (preset, ev) => {
+    ev.stopPropagation();
+    setStatsModal({ preset });
+    setStatsData(null);
+    setStatsLoading(true);
+    try {
+      const r = await axios.get(`${API}/admin/recipient-presets/${preset.id}/stats`);
+      setStatsData(r.data);
+    } catch (e) {
+      flash(`❌ ${e?.response?.data?.detail || "Eroare la încărcarea statisticilor"}`);
+      setStatsModal(null);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   const loadPresets = () => {
     axios.get(`${API}/admin/recipient-presets`).then(r => setPresets(r.data.items || [])).catch(() => {});
@@ -533,6 +552,15 @@ export const AdminAuditLog = () => {
           onCopiedLink={() => flash("✓ Link copiat în clipboard — îl poți trimite oricui are acces admin.")}
         />
       )}
+      {statsModal && (
+        <StatsPresetModal
+          preset={statsModal.preset}
+          data={statsData}
+          loading={statsLoading}
+          onClose={() => setStatsModal(null)}
+          fmtTime={fmtTime}
+        />
+      )}
       {emailModal && (
         <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !emailSending && setEmailModal(null)}>
           <div
@@ -588,6 +616,12 @@ export const AdminAuditLog = () => {
                         {p.sent_count > 0 && (
                           <span className="text-[9px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full px-1.5 py-0.5 -mr-1">{p.sent_count}↑</span>
                         )}
+                        <span
+                          onClick={(ev) => openStats(p, ev)}
+                          className="opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-blue-500 text-[11px] leading-none ml-0.5"
+                          title="Vezi statistici trimiteri"
+                          data-testid={`preset-stats-${p.id}`}
+                        >📊</span>
                         <span
                           onClick={(ev) => deletePreset(p, ev)}
                           className="opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-red-500 text-[11px] leading-none ml-0.5"
@@ -932,6 +966,113 @@ const ColumnHeader = ({ entry, role, tone }) => {
       <div className="text-[10px] uppercase tracking-wider font-bold opacity-70 mb-1">{role}</div>
       <div className="text-sm font-medium">{meta.icon} {meta.label}</div>
       <div className="text-[11px] text-slate-500 mt-0.5">{entry.actor_name} · {fmtTime(entry.created_at)}</div>
+    </div>
+  );
+};
+
+
+// ============= STATS PER PRESET MODAL =============
+const MONTH_LABELS_RO = ["Ian", "Feb", "Mar", "Apr", "Mai", "Iun", "Iul", "Aug", "Sep", "Oct", "Noi", "Dec"];
+
+const StatsPresetModal = ({ preset, data, loading, onClose, fmtTime }) => {
+  const maxCount = data?.months?.length ? Math.max(...data.months.map(m => m.count)) : 0;
+
+  return (
+    <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6"
+        onClick={e => e.stopPropagation()}
+        data-testid="stats-preset-modal"
+      >
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold flex items-center gap-2">📊 Statistici · {preset.name}</h3>
+            <p className="text-xs text-slate-500 mt-1">Cadența de incident response pe ultimele luni · {preset.emails.length} destinatari în preset</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none" data-testid="stats-close">×</button>
+        </div>
+
+        {loading && <div className="text-center py-12 text-slate-500" data-testid="stats-loading">Se încarcă...</div>}
+
+        {!loading && data && (
+          <>
+            {/* Top KPIs */}
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800" data-testid="stats-kpi-total">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Total trimiteri</div>
+                <div className="text-2xl font-semibold text-slate-900 dark:text-white">{data.total_sends}</div>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Prima trimitere</div>
+                <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mt-1">{data.first_send ? fmtTime(data.first_send) : <span className="text-slate-400">—</span>}</div>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Ultima trimitere</div>
+                <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mt-1">{data.last_send ? fmtTime(data.last_send) : <span className="text-slate-400">—</span>}</div>
+              </div>
+            </div>
+
+            {/* Monthly bar chart (CSS-only) */}
+            <div className="mb-5 p-4 rounded-xl border border-slate-200 dark:border-slate-800" data-testid="stats-monthly-chart">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold">Trimiteri pe lună</h4>
+                <span className="text-[10px] text-slate-500">Ultimele {data.window_days} zile</span>
+              </div>
+              {data.months.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-sm italic">Nicio trimitere încă</div>
+              ) : (
+                <div className="flex items-end gap-2 h-32">
+                  {data.months.map(m => {
+                    const heightPct = maxCount > 0 ? (m.count / maxCount) * 100 : 0;
+                    const [year, mon] = m.month.split("-");
+                    return (
+                      <div key={m.month} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                        <div className="text-[10px] text-slate-500 font-mono">{m.count > 0 ? m.count : ""}</div>
+                        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-md relative flex-1 flex items-end overflow-hidden">
+                          <div
+                            className={`w-full rounded-md transition-all ${m.count > 0 ? "bg-gradient-to-t from-amber-500 to-amber-300 dark:from-amber-600 dark:to-amber-400" : ""}`}
+                            style={{ height: `${heightPct}%`, minHeight: m.count > 0 ? "4px" : "0" }}
+                            title={`${m.count} trimitere(i), ${m.recipients} destinatari în total`}
+                          />
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-medium">{MONTH_LABELS_RO[parseInt(mon, 10) - 1]}</div>
+                        <div className="text-[9px] text-slate-400">{year.slice(2)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Recent sends list */}
+            <div className="mb-2">
+              <h4 className="text-sm font-semibold mb-2">Istoric recent (ultimele {data.recent_sends.length})</h4>
+              {data.recent_sends.length === 0 ? (
+                <div className="text-center py-6 text-slate-400 text-sm italic border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+                  Nicio trimitere nu a fost înregistrată pentru acest preset.
+                  <br/><span className="text-[11px]">(trimiterile anterioare implementării acestui feature nu apar)</span>
+                </div>
+              ) : (
+                <div className="space-y-1.5" data-testid="stats-recent-list">
+                  {data.recent_sends.map((r, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-2 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                      <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 shrink-0">
+                        {r.action}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{r.target_label || "—"}</div>
+                        <div className="text-[11px] text-slate-500">
+                          {fmtTime(r.sent_at)} · {r.sent_by_name || "—"} · <span className="font-semibold">{r.recipient_count}</span> destinatar(i) via {r.provider}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };
