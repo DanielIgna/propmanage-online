@@ -9,7 +9,7 @@ Isolated module. Touches only its own collections:
 Subscription gate: user.digital_twin_pro == True (admin grants for now;
 Stripe wiring is Phase E). Admin and operator can bypass.
 """
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional, List
 import base64
@@ -26,6 +26,8 @@ from pydantic import BaseModel, Field
 
 from db import db
 from deps import get_current_user, require_role
+from core_utils import JWT_SECRET, JWT_ALGORITHM
+import jwt as _jwt
 from email_service import (
     send_template,
     tpl_dt_pin_created,
@@ -642,6 +644,33 @@ async def remove_pin_anchor(pin_id: str, anchor_id: str, user: dict = Depends(ge
 
 # ----------------- Phase I: Issue Report PDF + Email -----------------
 
+APP_URL = os.environ.get("APP_URL", "https://propmanage.io").rstrip("/")
+REPORT_APPROVAL_TTL_DAYS = 30
+
+
+def _make_report_approval_token(pin_id: str, report_id: str, recipient_email: str) -> str:
+    payload = {
+        "type": "dt_report_approval",
+        "pin_id": pin_id,
+        "report_id": report_id,
+        "recipient": recipient_email.lower().strip(),
+        "exp": datetime.now(timezone.utc) + timedelta(days=REPORT_APPROVAL_TTL_DAYS),
+    }
+    return _jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def _decode_report_approval_token(token: str) -> dict:
+    try:
+        data = _jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(410, "Linkul a expirat (valid 30 zile de la trimitere).")
+    except Exception:
+        raise HTTPException(400, "Token invalid.")
+    if data.get("type") != "dt_report_approval":
+        raise HTTPException(400, "Token de tip greșit.")
+    return data
+
+
 class IssueReportIn(BaseModel):
     recipient_email: Optional[str] = Field(None, description="Override recipient; if absent, use project owner email.")
     custom_message: Optional[str] = Field(None, max_length=4000)
@@ -719,7 +748,12 @@ async def send_issue_report(pin_id: str, payload: IssueReportIn, user: dict = De
     pdf_b64 = base64.b64encode(pdf_bytes).decode("ascii")
     pdf_filename = f"raport_{pin.get('title', 'pin')[:40].replace(' ', '_')}.pdf"
 
-    # Send the email with attachment
+    # Generate signed approval token (30-day TTL)
+    report_id = _new_id()
+    approval_token = _make_report_approval_token(pin_id, report_id, recipient_email)
+    approval_url = f"{APP_URL}/report-respond/{approval_token}"
+
+    # Send the email with attachment + approval CTAs
     tpl = tpl_dt_issue_report(
         recipient_name=recipient_name,
         project_name=project.get("name", "Proiect"),
@@ -730,6 +764,7 @@ async def send_issue_report(pin_id: str, payload: IssueReportIn, user: dict = De
         sender_name=user.get("name") or user.get("email") or "Utilizator",
         sender_role=user.get("role") or "—",
         custom_message=payload.custom_message,
+        approval_url=approval_url,
     )
     await send_email_with_attachments(
         to=recipient_email,
@@ -740,7 +775,7 @@ async def send_issue_report(pin_id: str, payload: IssueReportIn, user: dict = De
 
     # Log to pin history
     history_entry = {
-        "id": _new_id(),
+        "id": report_id,
         "type": "issue_report_sent",
         "recipient_email": recipient_email,
         "recipient_name": recipient_name,
@@ -752,6 +787,8 @@ async def send_issue_report(pin_id: str, payload: IssueReportIn, user: dict = De
         "has_screenshot": bool(payload.screenshot_3d),
         "has_plan_extract": bool(plan_file_path),
         "pdf_size_bytes": len(pdf_bytes),
+        "approval_url": approval_url,
+        "approval_status": "pending",
         "created_at": _now_iso(),
     }
     await db.digital_twin_pins.update_one(
@@ -777,6 +814,134 @@ async def send_issue_report(pin_id: str, payload: IssueReportIn, user: dict = De
         "pdf_size_bytes": len(pdf_bytes),
         "recipient_email": recipient_email,
     }
+
+
+# ----------------- Public approval endpoints (no auth — token-validated) -----------------
+
+@router.get("/reports/approve/info", tags=["digital-twin-public"])
+async def report_approval_info(token: str = Query(...)):
+    """Resolve a signed approval token and return the linked report context (public, no auth)."""
+    data = _decode_report_approval_token(token)
+    pin = await db.digital_twin_pins.find_one({"id": data["pin_id"]})
+    if not pin:
+        raise HTTPException(404, "Pin-ul nu mai există.")
+    report = next(
+        (h for h in (pin.get("report_history") or []) if h.get("id") == data["report_id"]),
+        None,
+    )
+    if not report:
+        raise HTTPException(404, "Raportul nu a fost găsit.")
+    project = await db.digital_twin_projects.find_one({"id": pin["project_id"]})
+    return {
+        "ok": True,
+        "pin_title": pin.get("title"),
+        "pin_category": pin.get("category"),
+        "pin_priority": pin.get("priority"),
+        "pin_status": pin.get("status"),
+        "project_name": project.get("name") if project else "—",
+        "sender_name": report.get("sender_name"),
+        "recipient_name": report.get("recipient_name"),
+        "recipient_email": report.get("recipient_email"),
+        "custom_message_preview": report.get("custom_message_preview"),
+        "comment_count": report.get("comment_count"),
+        "has_screenshot": report.get("has_screenshot"),
+        "has_plan_extract": report.get("has_plan_extract"),
+        "created_at": report.get("created_at"),
+        "approval_status": report.get("approval_status", "pending"),
+        "decision": report.get("decision"),
+        "decision_comment": report.get("decision_comment"),
+        "decided_at": report.get("decided_at"),
+    }
+
+
+class ReportDecisionIn(BaseModel):
+    token: str
+    decision: str = Field(..., pattern="^(confirmed|needs_changes)$")
+    comment: Optional[str] = Field(None, max_length=2000)
+
+
+@router.post("/reports/approve/decide", tags=["digital-twin-public"])
+async def report_approval_decide(payload: ReportDecisionIn):
+    """Record the recipient's decision on a report (public, token-validated, single-use semantics)."""
+    data = _decode_report_approval_token(payload.token)
+    pin = await db.digital_twin_pins.find_one({"id": data["pin_id"]})
+    if not pin:
+        raise HTTPException(404, "Pin-ul nu mai există.")
+    report = next(
+        (h for h in (pin.get("report_history") or []) if h.get("id") == data["report_id"]),
+        None,
+    )
+    if not report:
+        raise HTTPException(404, "Raportul nu a fost găsit.")
+    if report.get("approval_status") and report["approval_status"] != "pending":
+        raise HTTPException(409, "Ai răspuns deja la acest raport. Nu poți schimba decizia ulterior.")
+
+    now_iso = _now_iso()
+    update = {
+        "report_history.$[r].approval_status": payload.decision,
+        "report_history.$[r].decision": payload.decision,
+        "report_history.$[r].decision_comment": (payload.comment or "").strip(),
+        "report_history.$[r].decided_at": now_iso,
+        "report_history.$[r].decided_by_email": data["recipient"],
+        "updated_at": now_iso,
+    }
+    await db.digital_twin_pins.update_one(
+        {"id": data["pin_id"]},
+        {"$set": update},
+        array_filters=[{"r.id": data["report_id"]}],
+    )
+
+    # Notify the original sender (in-app + email if available)
+    sender_id = report.get("sender_id")
+    if sender_id:
+        sender = await db.users.find_one(_user_filter(sender_id), {"_id": 1, "email": 1, "name": 1})
+        decision_label = "Confirmat" if payload.decision == "confirmed" else "Necesită modificări"
+        emoji = "✅" if payload.decision == "confirmed" else "📝"
+        await notify(
+            sender_id,
+            f"{emoji} Raport {decision_label.lower()}: {pin.get('title', 'Pin')}",
+            f"{report.get('recipient_name') or data['recipient']} a răspuns la raportul tău.",
+            type_="dt_report_decision",
+            link="/digital-twin",
+        )
+        if sender and sender.get("email"):
+            from email_service import _layout, send_email  # noqa: PLC0415
+            project = await db.digital_twin_projects.find_one({"id": pin["project_id"]})
+            project_name = project.get("name", "Proiect") if project else "—"
+            color = "#10b981" if payload.decision == "confirmed" else "#f59e0b"
+            comment_block = ""
+            if payload.comment and payload.comment.strip():
+                comment_block = f"""
+                  <div style="background:#0f172a; border-left:3px solid {color}; padding:14px 18px; border-radius:12px; margin:18px 0;">
+                    <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:{color}; margin-bottom:6px;">Răspuns destinatar</div>
+                    <div style="color:#e5e5e5; line-height:1.6; white-space:pre-wrap;">{payload.comment.strip()}</div>
+                  </div>
+                """
+            html_body = f"""
+              <p>Bună {sender.get('name') or sender['email']},</p>
+              <p><strong style="color:{color};">{report.get('recipient_name') or data['recipient']}</strong> a răspuns la raportul tău pentru <em>"{pin.get('title')}"</em> din proiectul <strong>{project_name}</strong>.</p>
+              <div style="background:{color}15; border:1px solid {color}40; border-radius:14px; padding:18px; margin:18px 0; text-align:center;">
+                <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:{color}; margin-bottom:6px; font-weight:700;">Decizie</div>
+                <div style="color:{color}; font-size:24px; font-weight:700;">{emoji} {decision_label}</div>
+              </div>
+              {comment_block}
+            """
+            tpl_html = _layout(
+                "Răspuns la raport",
+                f"{pin.get('title')} → {decision_label}",
+                html_body,
+                f"{APP_URL}/digital-twin",
+                "Vezi pin-ul în viewer",
+            )
+            await send_email(sender["email"], f"{emoji} Răspuns raport: {pin.get('title')}", tpl_html)
+
+    return {
+        "ok": True,
+        "decision": payload.decision,
+        "decided_at": now_iso,
+    }
+
+
 
 
 @router.get("/pins/{pin_id}/issue-report/preview")

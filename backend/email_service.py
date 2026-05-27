@@ -330,7 +330,7 @@ def tpl_dt_plan_uploaded(recipient_name: str, project_name: str, plan_title: str
     return {"subject": f"📐 Plan 2D nou: {plan_title}", "html": _layout("Plan 2D nou", f"Pe {project_name}", body, f"{APP_URL}/digital-twin", "Vezi planul")}
 
 
-def tpl_dt_issue_report(recipient_name: str, project_name: str, pin_title: str, pin_category: str, pin_priority: str, pin_status: str, sender_name: str, sender_role: str, custom_message: Optional[str] = None) -> dict:
+def tpl_dt_issue_report(recipient_name: str, project_name: str, pin_title: str, pin_category: str, pin_priority: str, pin_status: str, sender_name: str, sender_role: str, custom_message: Optional[str] = None, approval_url: Optional[str] = None) -> dict:
     priority_colors = {"low": "#94a3b8", "normal": "#60a5fa", "high": "#f59e0b", "urgent": "#ef4444"}
     priority_color = priority_colors.get(pin_priority, "#60a5fa")
     status_labels = {"open": "Deschis", "in_review": "În analiză", "resolved": "Rezolvat", "rejected": "Respins"}
@@ -341,6 +341,32 @@ def tpl_dt_issue_report(recipient_name: str, project_name: str, pin_title: str, 
         <div style="color:#e5e5e5; line-height:1.6; white-space:pre-wrap;">{custom_message}</div>
       </div>
     """ if custom_message else ""
+    # Digital approval CTA block — green = confirm, amber = needs changes
+    approval_block = ""
+    if approval_url:
+        approval_block = f"""
+          <div style="background:#1a1a1f; border:1px solid #ffffff15; border-radius:14px; padding:22px; margin:22px 0; text-align:center;">
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#d4ff3a; margin-bottom:10px; font-weight:700;">⚡ Răspuns rapid · fără login</div>
+            <p style="color:#c8c8cc; font-size:14px; margin:0 0 18px;">Vezi PDF-ul atașat și răspunde direct cu un click:</p>
+            <table border="0" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+              <tr>
+                <td style="padding:0 6px;">
+                  <a href="{approval_url}?decision=confirmed"
+                     style="display:inline-block; padding:12px 22px; border-radius:999px; background:#10b981; color:#ffffff; text-decoration:none; font-size:14px; font-weight:700;">
+                    ✅ Confirmat
+                  </a>
+                </td>
+                <td style="padding:0 6px;">
+                  <a href="{approval_url}?decision=needs_changes"
+                     style="display:inline-block; padding:12px 22px; border-radius:999px; background:#f59e0b; color:#ffffff; text-decoration:none; font-size:14px; font-weight:700;">
+                    📝 Necesită modificări
+                  </a>
+                </td>
+              </tr>
+            </table>
+            <p style="color:#888; font-size:11px; margin:14px 0 0;">Linkul este valabil 30 de zile. Nu necesită cont sau parolă.</p>
+          </div>
+        """
     body = f"""
       <p>Bună {recipient_name},</p>
       <p><strong style="color:#10b981;">{sender_name}</strong> ({sender_role}) a trimis un <strong style="color:#d4ff3a;">raport oficial de problemă</strong> pe proiectul <em>"{project_name}"</em>.</p>
@@ -362,6 +388,7 @@ def tpl_dt_issue_report(recipient_name: str, project_name: str, pin_title: str, 
         </table>
       </div>
       {custom_block}
+      {approval_block}
       <p style="color:#a8a8b0; font-size:13px;">📎 Atașat: PDF cu detalii complete (descriere, screenshot 3D, plan 2D ancorat, thread de comentarii).</p>
     """
     return {"subject": f"🚨 Raport problemă: {pin_title} · {project_name}", "html": _layout("Raport oficial de problemă", f"Pin: {pin_title}", body, f"{APP_URL}/digital-twin", "Vezi proiectul în viewer")}

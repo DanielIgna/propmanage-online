@@ -27,6 +27,7 @@ import { StatusPage } from "./pages/StatusPage";
 import { GDPRAuditBadge } from "./components/GDPRAuditBadge";
 import { TrustStrip } from "./components/TrustStrip";
 import DigitalTwinPage from "./pages/DigitalTwinPage";
+import ReportApprovalPage from "./pages/ReportApprovalPage";
 import "./App.css";
 
 // ============= NAV =============
@@ -1432,6 +1433,7 @@ function App() {
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/privacy/notices" element={<PrivacyNoticesPage />} />
               <Route path="/digital-twin" element={<DigitalTwinPage />} />
+              <Route path="/report-respond/:token" element={<ReportApprovalPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/status" element={<StatusPage />} />
               <Route path="/login" element={<LoginPage />} />
