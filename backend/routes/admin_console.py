@@ -2169,6 +2169,101 @@ async def incident_cadence_heatmap(
     }
 
 
+@router.get("/incident-cadence-weekly-compare")
+async def incident_cadence_weekly_compare(
+    alert_threshold_pct: int = Query(100, ge=10, le=500),
+    user: dict = Depends(require_role("admin")),
+):
+    """Compare incident-response activity for the current week vs the previous week.
+    Each week starts on Monday. Returns 2 mini-series (7 cells each) + delta% + alert flag.
+    Used by the 'Comparare săptămâni' early-warning widget.
+    """
+    from datetime import date as _date, timedelta as _td
+    today = datetime.now(timezone.utc).date()
+    # Monday of this week
+    monday_curr = today - _td(days=today.weekday())
+    monday_prev = monday_curr - _td(days=7)
+    sunday_prev = monday_curr - _td(days=1)
+    sunday_curr = monday_curr + _td(days=6)
+
+    # Range for the aggregation = from monday_prev to sunday_curr
+    cutoff_iso = monday_prev.isoformat()
+    end_iso = (sunday_curr + _td(days=1)).isoformat()
+
+    pipeline = [
+        {"$match": {"sent_at": {"$gte": cutoff_iso, "$lt": end_iso}}},
+        {"$group": {
+            "_id": {"$substr": ["$sent_at", 0, 10]},
+            "count": {"$sum": 1},
+            "recipients": {"$sum": "$recipient_count"},
+        }},
+    ]
+    raw = {}
+    async for d in db.preset_send_history.aggregate(pipeline):
+        raw[d["_id"]] = {"count": d["count"], "recipients": d.get("recipients", 0)}
+
+    def _build_week(monday):
+        cells = []
+        total = 0
+        total_rec = 0
+        cur = monday
+        for _ in range(7):
+            key = cur.isoformat()
+            d = raw.get(key, {"count": 0, "recipients": 0})
+            is_future = cur > today
+            cells.append({
+                "date": key,
+                "count": d["count"],
+                "recipients": d["recipients"],
+                "weekday": cur.weekday(),
+                "is_future": is_future,
+            })
+            total += d["count"]
+            total_rec += d["recipients"]
+            cur += _td(days=1)
+        return cells, total, total_rec
+
+    curr_cells, curr_total, curr_rec = _build_week(monday_curr)
+    prev_cells, prev_total, prev_rec = _build_week(monday_prev)
+
+    # Delta calculation
+    if prev_total == 0:
+        # Avoid division by zero: if both 0 → 0%, else +inf-like represented as None → frontend handles
+        delta_pct = None if curr_total > 0 else 0
+    else:
+        delta_pct = round(((curr_total - prev_total) / prev_total) * 100, 1)
+
+    alert = False
+    if delta_pct is not None and delta_pct >= alert_threshold_pct:
+        alert = True
+    elif delta_pct is None and curr_total > 0:
+        # From 0 → N is effectively infinite increase → treat as alert
+        alert = True
+
+    return {
+        "current": {
+            "label": "Săptămâna curentă",
+            "monday": monday_curr.isoformat(),
+            "sunday": sunday_curr.isoformat(),
+            "cells": curr_cells,
+            "total_sends": curr_total,
+            "total_recipients": curr_rec,
+        },
+        "previous": {
+            "label": "Săptămâna trecută",
+            "monday": monday_prev.isoformat(),
+            "sunday": sunday_prev.isoformat(),
+            "cells": prev_cells,
+            "total_sends": prev_total,
+            "total_recipients": prev_rec,
+        },
+        "delta_pct": delta_pct,
+        "alert": alert,
+        "alert_threshold_pct": alert_threshold_pct,
+        "today": today.isoformat(),
+    }
+
+
 @router.post("/audit-log/{entry_id}/rollback")
 async def rollback_audit_entry(entry_id: str, user: dict = Depends(require_role("admin"))):
     """Restore the `before` state of an audit entry. Idempotent within reason — creates a new audit entry."""

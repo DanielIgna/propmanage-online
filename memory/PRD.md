@@ -237,6 +237,14 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Auto-deschide modalul când pagina e accesată cu `?compare=` (fetch fallback prin `GET /api/admin/audit-log/{id}`)
 - Banner roșu "⚠️ Link invalid" dacă intrările au fost șterse; URL curățat la close
 
+### Phase 43 — Weekly Compare + Early Warning Alert (Feb 2026)
+- Endpoint `GET /api/admin/incident-cadence-weekly-compare?alert_threshold_pct=100` agregare current vs previous week (Mon→Sun) din `preset_send_history`
+- Returnează 2 serii de 7 cells fiecare cu flag `is_future`, total_sends, total_recipients, `delta_pct` (null când previous=0 și current>0 = increment "infinit"), `alert` boolean
+- Frontend: secțiune `WeeklyCompare` în card-ul Cadence cu 2 mini-heatmaps side-by-side, pill delta colorat (verde=scădere, amber=creștere sub prag, roșu=alertă), badge "⚠️ Alertă" cu pulse animation când peste prag
+- Zilele viitoare afișate cu border dashed și fără click (cursor not-allowed)
+- Banner explicativ jos când alert activ — sugestii de investigare
+- Click pe celule active → navigate la audit log filtrat pe ziua respectivă
+
 ### Phase 42 — Recipient Cadence Heatmap (Feb 2026)
 - Endpoint `GET /api/admin/incident-cadence-heatmap?days=91` agregare zilnică din `preset_send_history`
 - Returnează: `cells[]` (date, count, recipients, weekday) cu zero-fill, `total_sends`, `active_days`, `peak`, `weekday_dist[7]`

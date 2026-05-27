@@ -29,10 +29,12 @@ const fmtDateRo = (iso) => {
 
 export const IncidentCadenceHeatmap = () => {
   const [data, setData] = useState(null);
+  const [weekCompare, setWeekCompare] = useState(null);
   const [hovered, setHovered] = useState(null);
 
   useEffect(() => {
     axios.get(`${API}/admin/incident-cadence-heatmap?days=91`).then(r => setData(r.data)).catch(() => {});
+    axios.get(`${API}/admin/incident-cadence-weekly-compare`).then(r => setWeekCompare(r.data)).catch(() => {});
   }, []);
 
   if (!data) {
@@ -99,6 +101,8 @@ export const IncidentCadenceHeatmap = () => {
           )}
         </div>
       </div>
+
+      {weekCompare && <WeeklyCompare wc={weekCompare} onCellClick={goToDate} />}
 
       <div className="overflow-x-auto">
         <div className="inline-block min-w-full">
@@ -175,5 +179,124 @@ export const IncidentCadenceHeatmap = () => {
         </div>
       </div>
     </AdminCard>
+  );
+};
+
+
+// ============= WEEKLY COMPARE SUB-COMPONENT =============
+const WeeklyCompare = ({ wc, onCellClick }) => {
+  const { current, previous, delta_pct: deltaPct, alert, alert_threshold_pct: threshold } = wc;
+  const maxCount = Math.max(
+    ...current.cells.map(c => c.count),
+    ...previous.cells.map(c => c.count),
+    1,
+  );
+
+  // Format delta label
+  let deltaLabel, deltaTone, deltaArrow;
+  if (deltaPct === null) {
+    if (current.total_sends > 0) {
+      deltaLabel = "—"; deltaTone = "red"; deltaArrow = "↑";
+    } else {
+      deltaLabel = "0%"; deltaTone = "slate"; deltaArrow = "→";
+    }
+  } else if (deltaPct > 0) {
+    deltaLabel = `+${deltaPct}%`; deltaTone = deltaPct >= threshold ? "red" : "amber"; deltaArrow = "↑";
+  } else if (deltaPct < 0) {
+    deltaLabel = `${deltaPct}%`; deltaTone = "emerald"; deltaArrow = "↓";
+  } else {
+    deltaLabel = "0%"; deltaTone = "slate"; deltaArrow = "→";
+  }
+
+  const toneCls = {
+    red: "bg-red-50 text-red-700 border-red-200 dark:bg-red-500/15 dark:text-red-300 dark:border-red-500/40",
+    amber: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/40",
+    emerald: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/40",
+    slate: "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
+  };
+
+  return (
+    <div className="mb-5 p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-slate-50/50 to-white dark:from-slate-800/30 dark:to-slate-900" data-testid="weekly-compare">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold">⚖️ Comparare săptămâni</span>
+          {alert && (
+            <span className="relative inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full bg-red-500 text-white" data-testid="weekly-compare-alert">
+              <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-50"></span>
+              <span className="relative">⚠️ Alertă</span>
+            </span>
+          )}
+        </div>
+        <div className={`text-xs px-3 py-1 rounded-full border font-semibold ${toneCls[deltaTone]}`} data-testid="weekly-compare-delta">
+          {deltaArrow} {deltaLabel} <span className="opacity-60 font-normal">vs săpt. trecută</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <WeekMini week={previous} maxCount={maxCount} onCellClick={onCellClick} accentTone="slate" />
+        <WeekMini week={current} maxCount={maxCount} onCellClick={onCellClick} accentTone={alert ? "red" : "emerald"} />
+      </div>
+
+      {alert && (
+        <div className="mt-3 text-[11px] text-red-700 dark:text-red-300 italic">
+          ⚠️ Activitatea săptămânii curente depășește pragul de <b>+{threshold}%</b> față de săptămâna trecută. Investighează deploy-urile / modificările recente sau verifică audit log-ul pentru anomalii.
+        </div>
+      )}
+    </div>
+  );
+};
+
+const WeekMini = ({ week, maxCount, onCellClick, accentTone }) => {
+  const weekdayLabels = ["L", "Ma", "Mi", "J", "V", "S", "D"];
+  const accentMap = {
+    slate: "text-slate-500",
+    emerald: "text-emerald-600 dark:text-emerald-400",
+    red: "text-red-600 dark:text-red-400",
+  };
+  const fmt = (iso) => {
+    try {
+      const d = new Date(iso + "T00:00:00");
+      return d.toLocaleDateString("ro-RO", { day: "2-digit", month: "short" });
+    } catch { return iso; }
+  };
+  return (
+    <div className="p-3 rounded-lg bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{week.label}</div>
+          <div className="text-[11px] text-slate-500">{fmt(week.monday)} → {fmt(week.sunday)}</div>
+        </div>
+        <div className={`text-2xl font-bold ${accentMap[accentTone]}`}>{week.total_sends}</div>
+      </div>
+      <div className="flex gap-1">
+        {week.cells.map((c) => {
+          const ratio = c.count / Math.max(maxCount, 1);
+          const cls = c.is_future
+            ? "bg-slate-50 dark:bg-slate-800/20 border border-dashed border-slate-200 dark:border-slate-700/40"
+            : c.count === 0
+              ? "bg-slate-100 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/40"
+              : ratio <= 0.34
+                ? "bg-emerald-200 dark:bg-emerald-500/30"
+                : ratio <= 0.67
+                  ? "bg-emerald-400 dark:bg-emerald-500/55"
+                  : "bg-emerald-600 dark:bg-emerald-400";
+          return (
+            <button
+              key={c.date}
+              onClick={() => !c.is_future && onCellClick(c.date)}
+              disabled={c.is_future}
+              className={`flex-1 aspect-square rounded ${cls} ${c.is_future ? "cursor-not-allowed" : "hover:ring-2 hover:ring-orange-400 transition-all"}`}
+              title={`${fmt(c.date)} (${weekdayLabels[c.weekday]})${c.is_future ? " · viitor" : ` · ${c.count} trimitere(i), ${c.recipients} destinatari`}`}
+              data-testid={`weekmini-cell-${c.date}`}
+            />
+          );
+        })}
+      </div>
+      <div className="flex gap-1 mt-1">
+        {weekdayLabels.map((wd, idx) => (
+          <div key={idx} className="flex-1 text-center text-[9px] text-slate-400 font-medium">{wd}</div>
+        ))}
+      </div>
+    </div>
   );
 };
