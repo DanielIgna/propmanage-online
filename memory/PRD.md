@@ -543,6 +543,7 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Live API keys: RESEND_API_KEY (Resend) + STRIPE_API_KEY (Stripe) — code is fully programmed, awaiting user keys
 - AI tools/function-calling for booking actions
 - Contact form backend (currently UI-only)
+- Avatar migration from base64 → S3/Cloudinary (paused; user will share keys later)
 
 ### P2 (Future)
 - Stripe Connect for direct specialist payouts
@@ -552,3 +553,11 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Multi-tenant SaaS
 - Pagination on AI history + Marketplace + Disputes lists
 - CORS_ORIGINS lockdown (currently "*" with credentials)
+- Pytest fixture leakage cleanup (BLOCKED: tests pass individually, fail as full suite)
+
+## Changelog — 2026-02-27
+- Added Logout button to landing Nav (data-testid=nav-logout) — visible only when authenticated next to Dashboard
+- Validated Register page already restricts role selection to Client + Specialist (Operator created from admin panel only)
+- Validated AutoReminderSettingsModal frontend (iteration_28): 7/7 scenarios pass — enable toggle, thresholds CSV input, pause-until date, stop-forever switch, save & toast
+- Custom domain propmanage.ro stuck in "pending": deployment scan confirms codebase is deploy-ready (CORS=*, env vars clean, OAuth uses window.location.origin); user must delete existing A records at registrar then re-link via Entri (15-30 min DNS propagation expected)
+
