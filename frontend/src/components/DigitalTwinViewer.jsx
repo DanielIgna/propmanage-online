@@ -1,7 +1,7 @@
 // Digital Twin 3D viewer — orchestrator (Phase C + D + E + H).
 // Wires the Canvas/scene/tools/pins. Sub-components live in ./viewer/*
-import React, { Suspense, useEffect, useMemo, useState } from "react";
-import { Canvas } from "@react-three/fiber";
+import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import axios from "axios";
@@ -13,6 +13,24 @@ import { FACE_STYLES, TOOLS, SECTION_AXES } from "./viewer/constants";
 import { DemoHouse, ModelWithEvents, ResetCamera } from "./viewer/ViewerScene";
 import { MeasureMarkers } from "./viewer/MeasureSection";
 import { PinMarker, PinDraftModal, PinThreadModal } from "./viewer/PinSystem";
+
+// Captures the WebGL canvas to a PNG data URL on demand.
+const CanvasCapture = ({ captureFnRef }) => {
+  const { gl, scene, camera } = useThree();
+  useEffect(() => {
+    captureFnRef.current = () => {
+      try {
+        gl.render(scene, camera);
+        return gl.domElement.toDataURL("image/png");
+      } catch (e) {
+        console.error("canvas capture error", e);
+        return null;
+      }
+    };
+    return () => { captureFnRef.current = null; };
+  }, [gl, scene, camera, captureFnRef]);
+  return null;
+};
 
 const ViewerOverlay = ({ faceStyle, layersHidden, layersTotal, tool, pinCount }) => (
   <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-stone-900/85 backdrop-blur border border-white/10 text-[11px] text-stone-300 flex items-center gap-4 max-w-[90vw] overflow-x-auto">
@@ -43,6 +61,8 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
   const [pins, setPins] = useState([]);
   const [pinDraft, setPinDraft] = useState(null);
   const [pinOpen, setPinOpen] = useState(null);
+  // Phase I — Canvas screenshot capture
+  const captureFnRef = useRef(null);
 
   // Hide the dev-only React Error Overlay iframe while viewer is open.
   useEffect(() => {
@@ -330,7 +350,7 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
         )}
         <Canvas
           camera={{ position: [12, 9, 14], fov: 50, near: 0.1, far: 2000 }}
-          gl={{ antialias: true, localClippingEnabled: true }}
+          gl={{ antialias: true, localClippingEnabled: true, preserveDrawingBuffer: true }}
           onCreated={({ gl }) => { gl.localClippingEnabled = true; }}
         >
           <color attach="background" args={["#0a0a0a"]} />
@@ -375,6 +395,7 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
             enabled={tool === "orbit" || tool === "section"}
           />
           <ResetCamera resetTrigger={resetTick} />
+          <CanvasCapture captureFnRef={captureFnRef} />
         </Canvas>
         <ViewerOverlay
           faceStyle={faceStyle}
@@ -400,6 +421,7 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
           onClose={() => setPinOpen(null)}
           onDelete={() => deletePin(pinOpen.id)}
           onStatusChange={(s) => updatePinStatus(pinOpen.id, s)}
+          onRequestScreenshot={() => Promise.resolve(captureFnRef.current ? captureFnRef.current() : null)}
         />
       )}
     </div>

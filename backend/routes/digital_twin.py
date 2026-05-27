@@ -11,7 +11,9 @@ Stripe wiring is Phase E). Admin and operator can bypass.
 """
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
+import base64
+import io
 import os
 import shutil
 import uuid
@@ -19,7 +21,7 @@ import uuid
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, Body, Query, UploadFile, File
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from db import db
@@ -31,6 +33,8 @@ from email_service import (
     tpl_dt_pin_status_changed,
     tpl_dt_model_uploaded,
     tpl_dt_plan_uploaded,
+    tpl_dt_issue_report,
+    send_email_with_attachments,
 )
 from services import notify
 
@@ -590,6 +594,10 @@ async def add_pin_anchor(pin_id: str, payload: PlanAnchorIn, user: dict = Depend
     plan = await db.digital_twin_plans.find_one({"id": payload.plan_id, "project_id": pin["project_id"]})
     if not plan:
         raise HTTPException(404, "Plan not found in this project.")
+    # Bug fix: validate against the actual PDF page count if known
+    plan_pages = int(plan.get("page_count") or 0)
+    if plan_pages and payload.page > plan_pages:
+        raise HTTPException(400, f"Pagina {payload.page} nu există. Planul are doar {plan_pages} pagini.")
     anchor = {
         "id": _new_id(),
         "plan_id": payload.plan_id,
@@ -617,25 +625,204 @@ async def remove_pin_anchor(pin_id: str, anchor_id: str, user: dict = Depends(ge
     pin = await db.digital_twin_pins.find_one({"id": pin_id})
     if not pin:
         raise HTTPException(404, "Pin not found.")
-    proj = await _ensure_project_access(pin["project_id"], user)
+    await _ensure_project_access(pin["project_id"], user)
     anchors = pin.get("plan_anchors") or []
     target = next((a for a in anchors if a.get("id") == anchor_id), None)
     if not target:
         raise HTTPException(404, "Anchor not found.")
-    # Only the anchor author / pin author / project owner / admin can remove
-    if (
-        user.get("role") not in ("admin", "operator")
-        and target.get("created_by") != user["id"]
-        and pin.get("author_id") != user["id"]
-        and proj.get("owner_id") != user["id"]
-    ):
-        raise HTTPException(403, "Cannot remove this anchor.")
+    # Bug fix: any project member (verified via _ensure_project_access) can cleanup anchors.
+    # _ensure_project_access already raised 403 for non-members. No extra owner-only gate.
     new_anchors = [a for a in anchors if a.get("id") != anchor_id]
     await db.digital_twin_pins.update_one(
         {"id": pin_id},
         {"$set": {"plan_anchors": new_anchors, "updated_at": _now_iso()}},
     )
     return {"ok": True, "plan_anchors": new_anchors}
+
+
+# ----------------- Phase I: Issue Report PDF + Email -----------------
+
+class IssueReportIn(BaseModel):
+    recipient_email: Optional[str] = Field(None, description="Override recipient; if absent, use project owner email.")
+    custom_message: Optional[str] = Field(None, max_length=4000)
+    screenshot_3d: Optional[str] = Field(None, description="Base64 PNG capture of the viewer canvas.")
+    include_thread: bool = True
+
+
+@router.post("/pins/{pin_id}/issue-report")
+async def send_issue_report(pin_id: str, payload: IssueReportIn, user: dict = Depends(get_current_user)):
+    """Generate a PDF report for a pin and email it to the architect/owner.
+
+    Includes: pin meta, description, optional custom message, 3D screenshot,
+    2D plan extract from first anchor, comments thread.
+    """
+    from dt_issue_report import build_issue_report_pdf
+
+    await _ensure_dt_access(user)
+    pin = await db.digital_twin_pins.find_one({"id": pin_id})
+    if not pin:
+        raise HTTPException(404, "Pin not found.")
+    project = await _ensure_project_access(pin["project_id"], user)
+
+    # Resolve recipient email
+    recipient_email = (payload.recipient_email or "").strip().lower()
+    recipient_name = None
+    if not recipient_email:
+        # Default: project owner
+        owner_id = project.get("owner_id")
+        if owner_id:
+            owner = await db.users.find_one(_user_filter(owner_id), {"_id": 1, "email": 1, "name": 1})
+            if owner and owner.get("email"):
+                recipient_email = owner["email"]
+                recipient_name = owner.get("name")
+    if not recipient_email:
+        raise HTTPException(400, "Nu există email destinatar (nu există owner sau email explicit).")
+    if not recipient_name:
+        # Try to resolve a friendly name for the override email
+        u = await db.users.find_one({"email": recipient_email}, {"_id": 1, "email": 1, "name": 1})
+        recipient_name = (u.get("name") if u else None) or recipient_email.split("@")[0]
+
+    # Collect comments
+    comments = []
+    if payload.include_thread:
+        async for c in db.digital_twin_comments.find({"pin_id": pin_id}).sort("created_at", 1):
+            comments.append(_clean(c))
+
+    # Plan extract from first anchor (if any)
+    plan_file_path = None
+    plan_page = 1
+    plan_title = None
+    anchors = pin.get("plan_anchors") or []
+    if anchors:
+        first = anchors[0]
+        plan = await db.digital_twin_plans.find_one({"id": first.get("plan_id")})
+        if plan:
+            plan_title = plan.get("title")
+            plan_page = int(first.get("page", 1))
+            candidate = UPLOAD_ROOT / pin["project_id"] / "plans" / plan.get("stored_as", "")
+            if candidate.exists() and candidate.is_file():
+                plan_file_path = str(candidate)
+
+    # Build PDF
+    pdf_buf = build_issue_report_pdf(
+        project=project,
+        pin=pin,
+        comments=comments,
+        sender={"name": user.get("name") or user.get("email"), "email": user.get("email"), "role": user.get("role")},
+        custom_message=payload.custom_message,
+        screenshot_3d_b64=payload.screenshot_3d,
+        plan_file_path=plan_file_path,
+        plan_page=plan_page,
+        plan_title=plan_title,
+    )
+    pdf_bytes = pdf_buf.getvalue()
+    pdf_b64 = base64.b64encode(pdf_bytes).decode("ascii")
+    pdf_filename = f"raport_{pin.get('title', 'pin')[:40].replace(' ', '_')}.pdf"
+
+    # Send the email with attachment
+    tpl = tpl_dt_issue_report(
+        recipient_name=recipient_name,
+        project_name=project.get("name", "Proiect"),
+        pin_title=pin.get("title", "—"),
+        pin_category=pin.get("category", "general"),
+        pin_priority=pin.get("priority", "normal"),
+        pin_status=pin.get("status", "open"),
+        sender_name=user.get("name") or user.get("email") or "Utilizator",
+        sender_role=user.get("role") or "—",
+        custom_message=payload.custom_message,
+    )
+    await send_email_with_attachments(
+        to=recipient_email,
+        subject=tpl["subject"],
+        html=tpl["html"],
+        attachments=[{"filename": pdf_filename, "content": pdf_b64, "type": "application/pdf"}],
+    )
+
+    # Log to pin history
+    history_entry = {
+        "id": _new_id(),
+        "type": "issue_report_sent",
+        "recipient_email": recipient_email,
+        "recipient_name": recipient_name,
+        "sender_id": user["id"],
+        "sender_name": user.get("name") or user.get("email"),
+        "sender_role": user.get("role"),
+        "custom_message_preview": (payload.custom_message or "")[:120],
+        "comment_count": len(comments),
+        "has_screenshot": bool(payload.screenshot_3d),
+        "has_plan_extract": bool(plan_file_path),
+        "pdf_size_bytes": len(pdf_bytes),
+        "created_at": _now_iso(),
+    }
+    await db.digital_twin_pins.update_one(
+        {"id": pin_id},
+        {"$push": {"report_history": history_entry}, "$set": {"updated_at": _now_iso()}},
+    )
+
+    # In-app notification to recipient (if known user)
+    recipient_user = await db.users.find_one({"email": recipient_email}, {"_id": 1})
+    if recipient_user:
+        rid = str(recipient_user["_id"])
+        await notify(
+            rid,
+            f"🚨 Raport problemă: {pin.get('title', 'Pin')}",
+            f"{history_entry['sender_name']} a trimis raport PDF pe {project.get('name', 'proiect')}",
+            type_="dt_issue_report",
+            link="/digital-twin",
+        )
+
+    return {
+        "ok": True,
+        "report": history_entry,
+        "pdf_size_bytes": len(pdf_bytes),
+        "recipient_email": recipient_email,
+    }
+
+
+@router.get("/pins/{pin_id}/issue-report/preview")
+async def preview_issue_report(pin_id: str, screenshot_3d: Optional[str] = Query(None), user: dict = Depends(get_current_user)):
+    """Generate the PDF in-line WITHOUT sending email (for review/download)."""
+    from dt_issue_report import build_issue_report_pdf
+
+    await _ensure_dt_access(user)
+    pin = await db.digital_twin_pins.find_one({"id": pin_id})
+    if not pin:
+        raise HTTPException(404, "Pin not found.")
+    project = await _ensure_project_access(pin["project_id"], user)
+
+    comments = []
+    async for c in db.digital_twin_comments.find({"pin_id": pin_id}).sort("created_at", 1):
+        comments.append(_clean(c))
+
+    plan_file_path = None
+    plan_page = 1
+    plan_title = None
+    anchors = pin.get("plan_anchors") or []
+    if anchors:
+        first = anchors[0]
+        plan = await db.digital_twin_plans.find_one({"id": first.get("plan_id")})
+        if plan:
+            plan_title = plan.get("title")
+            plan_page = int(first.get("page", 1))
+            candidate = UPLOAD_ROOT / pin["project_id"] / "plans" / plan.get("stored_as", "")
+            if candidate.exists() and candidate.is_file():
+                plan_file_path = str(candidate)
+
+    pdf_buf = build_issue_report_pdf(
+        project=project,
+        pin=pin,
+        comments=comments,
+        sender={"name": user.get("name") or user.get("email"), "email": user.get("email"), "role": user.get("role")},
+        screenshot_3d_b64=screenshot_3d,
+        plan_file_path=plan_file_path,
+        plan_page=plan_page,
+        plan_title=plan_title,
+    )
+    return StreamingResponse(
+        io.BytesIO(pdf_buf.getvalue()),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="report_preview_{pin_id[:8]}.pdf"'},
+    )
 
 
 # ----------------- comments (per pin thread) -----------------
@@ -788,12 +975,22 @@ async def upload_plan(
         raise HTTPException(500, f"Upload failed: {e}") from e
 
     public_path = f"/api/digital-twin/plans/{project_id}/{safe_name}"
+    # Extract page count via pypdf (bug fix: enable Phase H page validation)
+    page_count = 0
+    try:
+        from pypdf import PdfReader  # type: ignore
+        with dest.open("rb") as fr:
+            reader = PdfReader(fr)
+            page_count = len(reader.pages)
+    except Exception:  # noqa: BLE001
+        page_count = 0
     doc = {
         "id": _new_id(),
         "project_id": project_id,
         "filename": raw_name,
         "stored_as": safe_name,
         "size_bytes": total,
+        "page_count": page_count,
         "url": public_path,
         "title": title.strip(),
         "description": (description or "").strip(),

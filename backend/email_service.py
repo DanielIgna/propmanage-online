@@ -330,6 +330,57 @@ def tpl_dt_plan_uploaded(recipient_name: str, project_name: str, plan_title: str
     return {"subject": f"📐 Plan 2D nou: {plan_title}", "html": _layout("Plan 2D nou", f"Pe {project_name}", body, f"{APP_URL}/digital-twin", "Vezi planul")}
 
 
+def tpl_dt_issue_report(recipient_name: str, project_name: str, pin_title: str, pin_category: str, pin_priority: str, pin_status: str, sender_name: str, sender_role: str, custom_message: Optional[str] = None) -> dict:
+    priority_colors = {"low": "#94a3b8", "normal": "#60a5fa", "high": "#f59e0b", "urgent": "#ef4444"}
+    priority_color = priority_colors.get(pin_priority, "#60a5fa")
+    status_labels = {"open": "Deschis", "in_review": "În analiză", "resolved": "Rezolvat", "rejected": "Respins"}
+    status_label = status_labels.get(pin_status, pin_status)
+    custom_block = f"""
+      <div style="background:#0f172a; border-left:3px solid #d4ff3a; padding:14px 18px; border-radius:12px; margin:18px 0;">
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#d4ff3a; margin-bottom:6px;">Mesaj din partea {sender_name}</div>
+        <div style="color:#e5e5e5; line-height:1.6; white-space:pre-wrap;">{custom_message}</div>
+      </div>
+    """ if custom_message else ""
+    body = f"""
+      <p>Bună {recipient_name},</p>
+      <p><strong style="color:#10b981;">{sender_name}</strong> ({sender_role}) a trimis un <strong style="color:#d4ff3a;">raport oficial de problemă</strong> pe proiectul <em>"{project_name}"</em>.</p>
+      <div style="background:#1a1a1f; border:1px solid #ffffff15; border-radius:14px; padding:18px; margin:18px 0;">
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#888893; margin-bottom:6px;">Pin</div>
+        <div style="color:#ffffff; font-size:17px; font-weight:600; margin-bottom:14px;">{pin_title}</div>
+        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+          <tr>
+            <td style="padding-right:8px;">
+              <span style="display:inline-block; padding:4px 10px; border-radius:999px; background:#ffffff10; color:#c8c8cc; font-size:10px; text-transform:uppercase; letter-spacing:0.5px; font-weight:600;">{pin_category}</span>
+            </td>
+            <td style="padding-right:8px;">
+              <span style="display:inline-block; padding:4px 10px; border-radius:999px; background:{priority_color}25; color:{priority_color}; font-size:10px; text-transform:uppercase; letter-spacing:0.5px; font-weight:700;">{pin_priority}</span>
+            </td>
+            <td>
+              <span style="display:inline-block; padding:4px 10px; border-radius:999px; background:#ffffff10; color:#c8c8cc; font-size:10px; text-transform:uppercase; letter-spacing:0.5px; font-weight:600;">{status_label}</span>
+            </td>
+          </tr>
+        </table>
+      </div>
+      {custom_block}
+      <p style="color:#a8a8b0; font-size:13px;">📎 Atașat: PDF cu detalii complete (descriere, screenshot 3D, plan 2D ancorat, thread de comentarii).</p>
+    """
+    return {"subject": f"🚨 Raport problemă: {pin_title} · {project_name}", "html": _layout("Raport oficial de problemă", f"Pin: {pin_title}", body, f"{APP_URL}/digital-twin", "Vezi proiectul în viewer")}
+
+
+
+
+# ===================== High-level helpers =====================
+
+async def send_email_with_attachments(to: str | List[str], subject: str, html: str, attachments: List[dict], fire_and_forget: bool = True) -> Optional[dict]:
+    """Send an email with PDF/binary attachments. attachments = [{filename, content (base64 str), type}]."""
+    if not to or not attachments:
+        return None
+    if fire_and_forget:
+        asyncio.create_task(send_email(to, subject, html, attachments=attachments))
+        return {"ok": True, "scheduled": True}
+    return await send_email(to, subject, html, attachments=attachments)
+
+
 
 
 # ===================== High-level helper that's fire-and-forget =====================

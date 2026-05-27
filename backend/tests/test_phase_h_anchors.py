@@ -216,7 +216,7 @@ class TestDeleteAnchor:
     def test_delete_anchor_admin(self, admin_session, pin_id, plan_id):
         r = admin_session.post(
             f"{BASE_URL}/api/digital-twin/pins/{pin_id}/anchors",
-            json={"plan_id": plan_id, "page": 2, "x_pct": 0.5, "y_pct": 0.5},
+            json={"plan_id": plan_id, "page": 1, "x_pct": 0.5, "y_pct": 0.5},
             timeout=10,
         )
         assert r.status_code == 200, r.text
@@ -260,7 +260,7 @@ class TestDeleteAnchor:
         )
         assert r.status_code == 403, f"expected 403 got {r.status_code}: {r.text}"
 
-        # Now add specialist as member and retry — still 403 because not creator/author/owner/admin
+        # Bug fix (Phase I): adding specialist as member now allows them to delete anchors.
         spec_uid = getattr(specialist_session, "_user_id", None)
         if spec_uid:
             admin_session.post(
@@ -271,7 +271,7 @@ class TestDeleteAnchor:
                 f"{BASE_URL}/api/digital-twin/pins/{pin}/anchors/{anchor_id}",
                 timeout=10,
             )
-            assert r2.status_code == 403, f"member but not creator should still be 403, got {r2.status_code}"
+            assert r2.status_code == 200, f"member should now be allowed to delete (bug fix), got {r2.status_code}"
 
         # Cleanup
         admin_session.delete(f"{BASE_URL}/api/digital-twin/pins/{pin}")
