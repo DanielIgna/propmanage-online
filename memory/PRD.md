@@ -499,6 +499,13 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 
 
 
+### Phase 53 — Code Refactors (DigitalTwinViewer + concierge) — Feb 2026
+- **DigitalTwinViewer.jsx**: 928 → 409 lines orchestrator + 4 modules in `components/viewer/`: `constants.js` (FACE_STYLES, TOOLS, SECTION_AXES, CATEGORY_COLORS, STATUS_LABEL — 41 lines), `ViewerScene.jsx` (DemoHouse, Model, ModelWithEvents, ResetCamera — 186 lines), `MeasureSection.jsx` (MeasureMarkers — 42 lines), `PinSystem.jsx` (PinMarker with Phase H highlight, PinDraftModal, PinThreadModal — 268 lines).
+- **concierge.py**: 562 → 283 lines (user chat + ROLE_PROMPTS) + `concierge_core.py` (158 lines: _redact_pii, safety patterns, _check_*, _rate_limit_check, _record_block, _get_settings) + `concierge_admin.py` (148 lines: admin_router endpoints). Backward compat: `concierge.py` re-exports `admin_router` so `server.py` line 48 `from routes.concierge import router, admin_router` keeps working unchanged.
+- **Zero regressions**: iteration_23.json confirms 13/13 backend + 100% frontend on viewer surface (mount, all tool/face testids, pin draft modal). Re-test files: `/app/backend/tests/test_concierge_refactor.py`.
+
+
+
 ## Roadmap
 ### P1 (Next)
 - `server.py` routers split: auth.py, admin.py, operator.py, payments.py, requests.py, marketplace.py, design.py, portfolio.py (monolith ~2870 lines, refactor postponed multiple times)
