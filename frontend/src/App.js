@@ -1322,12 +1322,13 @@ const PromoBanner = () => {
 
 // ============= LANDING PAGE =============
 const LandingPage = () => {
-  const { t, showSection } = useI18n();
+  const { t, showSection, isPreview } = useI18n();
   const promoText = t("landing.promo_banner");
   const hasPromo = !!promoText && promoText !== "landing.promo_banner" && sessionStorage.getItem("pm_promo_dismissed") !== "1";
   return (
-    <div className={`grain min-h-screen bg-[#0a0a0b] text-stone-100 ${hasPromo ? "pt-9 sm:pt-10" : ""}`}>
-      <PromoBanner />
+    <div className={`grain min-h-screen bg-[#0a0a0b] text-stone-100 ${(hasPromo || isPreview) ? "pt-9 sm:pt-10" : ""}`}>
+      {isPreview && <PreviewBanner />}
+      {!isPreview && <PromoBanner />}
       <Nav />
       <Hero />
       <Problem />
@@ -1345,6 +1346,14 @@ const LandingPage = () => {
     </div>
   );
 };
+
+// ============= PREVIEW MODE BANNER =============
+const PreviewBanner = () => (
+  <div className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-black text-center text-xs sm:text-sm font-semibold py-2 px-12 flex items-center justify-center gap-2" data-testid="preview-banner">
+    <span>👁 PREVIEW MODE — Modificările tale nesalvate sunt aplicate doar pentru tine</span>
+    <a href="/" className="ml-3 underline hover:no-underline text-[11px] opacity-80 hover:opacity-100">Ieși din preview →</a>
+  </div>
+);
 
 // ============= MAIN APP =============
 function App() {

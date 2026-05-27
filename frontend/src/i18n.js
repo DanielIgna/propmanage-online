@@ -180,14 +180,22 @@ export const I18nProvider = ({ children }) => {
     return translations[lang][key] || key;
   };
   // Helper for landing visibility flags (defaults to true if missing — fail-open for new sections)
+  // Honor ?preview=1&landing_show_X=true/false URL params (admin preview mode)
   const showSection = (key, fallback = true) => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get("preview") === "1" && sp.has(key)) {
+        return sp.get(key) === "true";
+      }
+    }
     const v = cms[`_settings.${key}`];
     return v === undefined ? fallback : v === true || v === "true";
   };
+  const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("preview") === "1";
   const toggle = () => setLang(l => l === "ro" ? "en" : "ro");
 
   return (
-    <I18nContext.Provider value={{ lang, setLang, toggle, t, cms, showSection }}>
+    <I18nContext.Provider value={{ lang, setLang, toggle, t, cms, showSection, isPreview }}>
       {children}
     </I18nContext.Provider>
   );

@@ -191,11 +191,30 @@ export const AdminPlatformSettings = () => {
         </div>
       </AdminCard>
 
-      <div className="flex justify-end gap-2">
-        <AdminBtn variant="secondary" onClick={() => setDirty({})} disabled={!Object.keys(dirty).length}>Anulează</AdminBtn>
-        <AdminBtn onClick={save} disabled={saving || !Object.keys(dirty).length} data-testid="settings-save">
-          {saving ? "Se salvează..." : <><Save className="w-3.5 h-3.5 inline mr-1" /> Salvează ({Object.keys(dirty).length})</>}
+      <div className="flex justify-between gap-2 flex-wrap">
+        <AdminBtn
+          variant="secondary"
+          onClick={() => {
+            // Build preview URL — include all current values (saved + dirty) for landing flags
+            const flagKeys = [
+              "landing_show_admin_trust", "landing_show_business_model",
+              "landing_show_unit_economics", "landing_show_value_proposition",
+              "landing_show_golden_path",
+            ];
+            const params = new URLSearchParams({ preview: "1" });
+            flagKeys.forEach(k => { params.set(k, String(!!val(k))); });
+            window.open(`/?${params.toString()}`, "_blank");
+          }}
+          data-testid="settings-preview-landing"
+        >
+          👁 Preview Landing {Object.keys(dirty).length > 0 && <span className="ml-1 text-[10px] bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-full">cu modificări nesalvate</span>}
         </AdminBtn>
+        <div className="flex gap-2">
+          <AdminBtn variant="secondary" onClick={() => setDirty({})} disabled={!Object.keys(dirty).length}>Anulează</AdminBtn>
+          <AdminBtn onClick={save} disabled={saving || !Object.keys(dirty).length} data-testid="settings-save">
+            {saving ? "Se salvează..." : <><Save className="w-3.5 h-3.5 inline mr-1" /> Salvează ({Object.keys(dirty).length})</>}
+          </AdminBtn>
+        </div>
       </div>
     </div>
   );
