@@ -237,6 +237,14 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Auto-deschide modalul când pagina e accesată cu `?compare=` (fetch fallback prin `GET /api/admin/audit-log/{id}`)
 - Banner roșu "⚠️ Link invalid" dacă intrările au fost șterse; URL curățat la close
 
+### Phase 38 — Incident Report PDF Export (Feb 2026)
+- Endpoint `GET /api/admin/audit-log/{id}/incident-report.pdf?base_url=...` (admin only)
+- PDF generat cu **ReportLab** + font **DejaVu Sans** (Unicode complet, diacritice românești Ț/Ș/Ă/Î/Â)
+- QR code generat cu librăria `qrcode`, linkat la URL-ul shareable deep-link
+- Layout profesional: header, tabel metadată (acțiune, țintă, actor, timestamp, ID, status pinned), casetă amber pentru nota incident, diff side-by-side înainte/după (roșu/verde), QR code + URL, footer cu generator + solicitant
+- Buton "📄 Raport PDF" în expanded view-ul intrărilor pinned (deschide PDF în tab nou cu cookies admin)
+- Util pentru: post-mortems, board meetings, atașamente Jira/Linear, audituri ISO/SOC2, rapoarte legale
+
 ### Phase 37 — Pin Audit Entry (Feb 2026)
 - Buton 📌 pe fiecare rând din Audit Log pentru a marca intrări critice (anomalii, momente importante, modificări de investigat)
 - Promptl pentru notă opțională (max 240 caractere) la pin, confirm la unpin

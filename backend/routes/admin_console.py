@@ -1487,6 +1487,222 @@ async def toggle_pin_audit_entry(
     return {"ok": True, "pinned": new_pinned, "pinned_note": note if new_pinned else None}
 
 
+@router.get("/audit-log/{entry_id}/incident-report.pdf")
+async def export_incident_report_pdf(
+    entry_id: str,
+    base_url: Optional[str] = None,
+    user: dict = Depends(require_role("admin")),
+):
+    """Generate a PDF incident report for an audit entry. Designed for pinned anomalies,
+    legal documentation, board meetings, post-mortems, and ISO/SOC2 compliance attachments.
+
+    Includes: title, actor, timestamp, target, before/after diff, pin note, pin author,
+    and QR code linking to shareable diff URL.
+    """
+    try:
+        oid = ObjectId(entry_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid entry id")
+    entry = await db.admin_audit_log.find_one({"_id": oid})
+    if not entry:
+        raise HTTPException(404, "Audit entry not found")
+
+    # Imports kept local — heavy modules
+    import json as _json
+    import os as _os
+    import qrcode
+    from io import BytesIO
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+        Image as RLImage, KeepTogether,
+    )
+    from reportlab.lib.enums import TA_LEFT
+
+    # Register Unicode-aware fonts for full Romanian diacritics support (Ț, Ș, Ă, Î, Â)
+    BASE_FONT = "Helvetica"
+    BOLD_FONT = "Helvetica-Bold"
+    MONO_FONT = "Courier"
+    OBLIQUE_FONT = "Helvetica-Oblique"
+    _dejavu_paths = {
+        "DejaVu": "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "DejaVu-Bold": "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "DejaVu-Oblique": "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf",
+        "DejaVu-Mono": "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+    }
+    if _os.path.exists(_dejavu_paths["DejaVu"]):
+        try:
+            for name, path in _dejavu_paths.items():
+                if _os.path.exists(path) and name not in pdfmetrics.getRegisteredFontNames():
+                    pdfmetrics.registerFont(TTFont(name, path))
+            BASE_FONT = "DejaVu"
+            BOLD_FONT = "DejaVu-Bold" if _os.path.exists(_dejavu_paths["DejaVu-Bold"]) else "DejaVu"
+            OBLIQUE_FONT = "DejaVu-Oblique" if _os.path.exists(_dejavu_paths["DejaVu-Oblique"]) else "DejaVu"
+            MONO_FONT = "DejaVu-Mono" if _os.path.exists(_dejavu_paths["DejaVu-Mono"]) else "DejaVu"
+        except Exception as e:  # noqa: BLE001
+            logger.warning("PDF font registration failed: %s — falling back to Helvetica", e)
+
+    buf = BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=1.8 * cm, rightMargin=1.8 * cm,
+        topMargin=1.6 * cm, bottomMargin=1.6 * cm,
+        title=f"Incident Report — {entry.get('action')}",
+        author="PropManage Audit System",
+    )
+    styles = getSampleStyleSheet()
+    h1 = ParagraphStyle("H1", parent=styles["Heading1"], fontName=BOLD_FONT, fontSize=18, textColor=colors.HexColor("#0f172a"), spaceAfter=4)
+    h2 = ParagraphStyle("H2", parent=styles["Heading3"], fontName=BASE_FONT, fontSize=11, textColor=colors.HexColor("#64748b"), spaceAfter=8)
+    label = ParagraphStyle("Lbl", parent=styles["Normal"], fontSize=8, textColor=colors.HexColor("#64748b"), fontName=BOLD_FONT)
+    val = ParagraphStyle("Val", parent=styles["Normal"], fontSize=10, textColor=colors.HexColor("#0f172a"), fontName=BASE_FONT)
+    note_style = ParagraphStyle("Note", parent=styles["Normal"], fontSize=10, textColor=colors.HexColor("#92400e"),
+                                fontName=OBLIQUE_FONT, backColor=colors.HexColor("#fef3c7"),
+                                borderColor=colors.HexColor("#fbbf24"), borderWidth=0.5,
+                                borderPadding=8, leftIndent=4, rightIndent=4)
+    diff_style = ParagraphStyle("Diff", parent=styles["Code"], fontSize=8, fontName=MONO_FONT,
+                                textColor=colors.HexColor("#0f172a"), leading=10, alignment=TA_LEFT)
+
+    def fmt_value(v):
+        if v is None:
+            return "—"
+        if isinstance(v, (dict, list)):
+            try:
+                return _json.dumps(v, indent=2, ensure_ascii=False)
+            except Exception:
+                return str(v)
+        return str(v)
+
+    def fmt_dt(iso):
+        if not iso:
+            return "—"
+        try:
+            return datetime.fromisoformat(str(iso).replace("Z", "+00:00")).strftime("%d %b %Y, %H:%M:%S UTC")
+        except Exception:
+            return str(iso)
+
+    story = []
+    # Header
+    story.append(Paragraph("PropManage — Incident Report", h1))
+    story.append(Paragraph(f"Audit Entry · {entry.get('action', '—')}", h2))
+    story.append(Spacer(1, 6))
+
+    # Metadata table
+    pinned = bool(entry.get("pinned"))
+    meta_rows = [
+        [Paragraph("ACȚIUNE", label), Paragraph(entry.get("action", "—"), val)],
+        [Paragraph("ȚINTĂ", label), Paragraph(f"{entry.get('target_label') or '—'} <font color='#94a3b8'>({entry.get('target_type') or '—'})</font>", val)],
+        [Paragraph("ACTOR", label), Paragraph(f"{entry.get('actor_name') or '—'} &lt;{entry.get('actor_email') or '—'}&gt;", val)],
+        [Paragraph("DATA EVENIMENT", label), Paragraph(fmt_dt(entry.get("created_at")), val)],
+        [Paragraph("ID INTRARE", label), Paragraph(f"<font name='{MONO_FONT}' size='9'>{str(entry['_id'])}</font>", val)],
+        [Paragraph("PINNED", label), Paragraph("DA — anomalie marcată" if pinned else "Nu", val)],
+    ]
+    t = Table(meta_rows, colWidths=[3.5 * cm, 13 * cm])
+    t.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f8fafc")),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.3, colors.HexColor("#e2e8f0")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(t)
+    story.append(Spacer(1, 14))
+
+    # Pin note (highlighted)
+    if pinned:
+        pn = entry.get("pinned_note") or "(fără notă)"
+        by = entry.get("pinned_by_name") or "—"
+        at = fmt_dt(entry.get("pinned_at"))
+        story.append(Paragraph(
+            f"<b>Notă incident:</b> {pn}<br/><font size='8' color='#a16207'>Marcat de {by} la {at}</font>",
+            note_style,
+        ))
+        story.append(Spacer(1, 12))
+
+    # Before / After diff
+    before_txt = fmt_value(entry.get("before"))
+    after_txt = fmt_value(entry.get("after"))
+    diff_data = [
+        [
+            Paragraph("<b><font color='#dc2626'>ÎNAINTE</font></b>", val),
+            Paragraph("<b><font color='#059669'>DUPĂ</font></b>", val),
+        ],
+        [
+            Paragraph(f"<font name='{MONO_FONT}'>{before_txt.replace('<', '&lt;').replace('>', '&gt;').replace(chr(10), '<br/>') or '— gol —'}</font>", diff_style),
+            Paragraph(f"<font name='{MONO_FONT}'>{after_txt.replace('<', '&lt;').replace('>', '&gt;').replace(chr(10), '<br/>') or '— gol —'}</font>", diff_style),
+        ],
+    ]
+    diff_tbl = Table(diff_data, colWidths=[8.5 * cm, 8.5 * cm])
+    diff_tbl.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("BACKGROUND", (0, 0), (0, 1), colors.HexColor("#fef2f2")),
+        ("BACKGROUND", (1, 0), (1, 1), colors.HexColor("#ecfdf5")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
+        ("BOX", (0, 0), (0, 1), 0.5, colors.HexColor("#fecaca")),
+        ("BOX", (1, 0), (1, 1), 0.5, colors.HexColor("#a7f3d0")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(Paragraph("<b>Modificare detectată</b>", val))
+    story.append(Spacer(1, 4))
+    story.append(diff_tbl)
+    story.append(Spacer(1, 14))
+
+    # QR code linking to shareable URL
+    if base_url:
+        share_url = f"{base_url.rstrip('/')}/admin?compare={entry_id},{entry_id}"
+        # Actually for single entry, use a deep link to audit log with this entry expanded
+        share_url = f"{base_url.rstrip('/')}/admin?audit_focus={entry_id}"
+        qr_img = qrcode.make(share_url)
+        qr_buf = BytesIO()
+        qr_img.save(qr_buf, format="PNG")
+        qr_buf.seek(0)
+        qr_rl = RLImage(qr_buf, width=3 * cm, height=3 * cm)
+        qr_table = Table([[qr_rl, Paragraph(
+            f"<b>Acces live</b><br/><font size='8'>Scanează codul QR pentru a accesa această intrare în consola admin "
+            f"(necesită login admin).</font><br/><br/><font name='{MONO_FONT}' size='7' color='#475569'>{share_url}</font>",
+            val,
+        )]], colWidths=[3.4 * cm, 13 * cm])
+        qr_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+            ("BOX", (0, 0), (-1, -1), 0.3, colors.HexColor("#cbd5e1")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ]))
+        story.append(KeepTogether([qr_table]))
+        story.append(Spacer(1, 12))
+
+    # Footer
+    now_str = datetime.now(timezone.utc).strftime("%d %b %Y, %H:%M UTC")
+    story.append(Paragraph(
+        f"<font size='8' color='#94a3b8'>Document generat de <b>PropManage Audit System</b> la {now_str} "
+        f"· Solicitat de {user.get('name') or user.get('email')} "
+        f"· Pentru audituri ISO/SOC2, post-mortems, rapoarte legale</font>",
+        val,
+    ))
+
+    doc.build(story)
+    buf.seek(0)
+
+    filename = f"incident-report-{entry_id}.pdf"
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.post("/audit-log/{entry_id}/rollback")
 async def rollback_audit_entry(entry_id: str, user: dict = Depends(require_role("admin"))):
     """Restore the `before` state of an audit entry. Idempotent within reason — creates a new audit entry."""

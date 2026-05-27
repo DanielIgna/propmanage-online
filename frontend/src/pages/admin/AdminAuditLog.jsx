@@ -332,6 +332,18 @@ export const AdminAuditLog = () => {
                           {e.pinned_note && <div className="italic text-amber-700 dark:text-amber-200 mt-0.5">"{e.pinned_note}"</div>}
                           <div className="text-[10px] text-amber-600/80 dark:text-amber-400/80 mt-0.5">de {e.pinned_by_name || "—"} · {fmtTime(e.pinned_at)}</div>
                         </div>
+                        <button
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            const url = `${API}/admin/audit-log/${e.id}/incident-report.pdf?base_url=${encodeURIComponent(window.location.origin)}`;
+                            window.open(url, "_blank");
+                          }}
+                          className="shrink-0 text-[11px] font-semibold px-2.5 py-1.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white transition-colors flex items-center gap-1"
+                          data-testid={`audit-pdf-${e.id}`}
+                          title="Generează raport PDF cu diff, notă incident și QR code. Ideal pentru audituri ISO/SOC2, board meetings, post-mortems."
+                        >
+                          📄 Raport PDF
+                        </button>
                       </div>
                     )}
                     <div className="grid md:grid-cols-2 gap-3">
