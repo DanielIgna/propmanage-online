@@ -1021,6 +1021,12 @@ async def list_sent_reports(
             "approval_url": h.get("approval_url"),
             "reminders_sent": h.get("reminders_sent", []),
             "reminder_count": len(h.get("reminders_sent", []) or []),
+            "auto_reminders_enabled": h.get("auto_reminders_enabled", True),
+            "reminder_thresholds_days": h.get("reminder_thresholds_days") or [7, 14, 21],
+            "paused_until": h.get("paused_until"),
+            "auto_reminders_stopped": h.get("auto_reminders_stopped", False),
+            "auto_reminders_fired_thresholds": h.get("auto_reminders_fired_thresholds") or [],
+            "last_auto_reminder_at": h.get("last_auto_reminder_at"),
         })
 
     # Counters for UI badges
@@ -1068,23 +1074,94 @@ async def send_report_reminder(
     })
     if not pin:
         raise HTTPException(404, "Raport inexistent sau nu ești expeditorul.")
-    report = next((h for h in pin.get("report_history") or [] if h.get("id") == report_id), None)
-    if not report:
-        raise HTTPException(404, "Raport inexistent.")
-    if report.get("approval_status", "pending") != "pending":
-        raise HTTPException(409, "Raportul a primit deja un răspuns — reminder nu mai e necesar.")
-
     custom_note = (payload.get("note") or "").strip() if isinstance(payload, dict) else ""
     if len(custom_note) > 1000:
         raise HTTPException(400, "Notă prea lungă (max 1000 caractere).")
+    try:
+        result = await _dispatch_reminder(pin, report_id, custom_note=custom_note, actor=user, auto=False)
+    except ValueError as e:
+        raise HTTPException(409, str(e)) from e
+    return {"ok": True, **result}
+
+
+class ReminderSettings(BaseModel):
+    auto_reminders_enabled: Optional[bool] = None
+    thresholds_days: Optional[List[int]] = None
+    paused_until: Optional[str] = None  # ISO date, e.g. "2026-03-01"
+    stopped: Optional[bool] = None
+
+
+@router.patch("/reports/{report_id}/reminder-settings")
+async def update_reminder_settings(
+    report_id: str,
+    payload: ReminderSettings,
+    user: dict = Depends(get_current_user),
+):
+    """Configure auto-reminder behavior for a specific report (per-report opt-out/snooze/stop)."""
+    pin = await db.digital_twin_pins.find_one({
+        "report_history.id": report_id,
+        "report_history.sender_id": user["id"],
+    })
+    if not pin:
+        raise HTTPException(404, "Raport inexistent sau nu ești expeditorul.")
+    updates = {}
+    if payload.auto_reminders_enabled is not None:
+        updates["report_history.$.auto_reminders_enabled"] = payload.auto_reminders_enabled
+    if payload.thresholds_days is not None:
+        clean = sorted({int(d) for d in payload.thresholds_days if 1 <= int(d) <= 365})
+        if not clean:
+            raise HTTPException(400, "Trebuie cel puțin un prag de reminder (între 1-365 zile).")
+        updates["report_history.$.reminder_thresholds_days"] = clean
+    if payload.paused_until is not None:
+        if payload.paused_until == "":
+            updates["report_history.$.paused_until"] = None
+        else:
+            try:
+                _ = datetime.fromisoformat(payload.paused_until)
+            except Exception:
+                raise HTTPException(400, "Format dată invalid (folosește YYYY-MM-DD).")
+            updates["report_history.$.paused_until"] = payload.paused_until
+    if payload.stopped is not None:
+        updates["report_history.$.auto_reminders_stopped"] = payload.stopped
+    if not updates:
+        raise HTTPException(400, "Nimic de actualizat.")
+    updates["updated_at"] = _now_iso()
+    await db.digital_twin_pins.update_one(
+        {"id": pin["id"], "report_history.id": report_id},
+        {"$set": updates},
+    )
+    pin2 = await db.digital_twin_pins.find_one({"id": pin["id"]})
+    report = next((h for h in pin2.get("report_history") or [] if h.get("id") == report_id), None)
+    return {
+        "ok": True,
+        "report_id": report_id,
+        "auto_reminders_enabled": report.get("auto_reminders_enabled", True),
+        "reminder_thresholds_days": report.get("reminder_thresholds_days") or [7, 14, 21],
+        "paused_until": report.get("paused_until"),
+        "auto_reminders_stopped": report.get("auto_reminders_stopped", False),
+        "auto_reminders_fired_thresholds": report.get("auto_reminders_fired_thresholds") or [],
+    }
+
+
+async def _dispatch_reminder(
+    pin: dict,
+    report_id: str,
+    custom_note: str,
+    actor: Optional[dict],
+    auto: bool = False,
+) -> dict:
+    """Internal helper: send reminder email + log entry. Raises ValueError if not pending."""
+    report = next((h for h in pin.get("report_history") or [] if h.get("id") == report_id), None)
+    if not report:
+        raise ValueError("Raport inexistent.")
+    if report.get("approval_status", "pending") != "pending":
+        raise ValueError("Raportul a primit deja un răspuns — reminder nu mai e necesar.")
+    approval_url = report.get("approval_url")
+    if not approval_url:
+        raise ValueError("Raport vechi fără approval_url.")
 
     project = await db.digital_twin_projects.find_one({"id": pin["project_id"]})
     project_name = project.get("name", "Proiect") if project else "—"
-
-    # Compose reminder email — same approval link, urgency framing
-    approval_url = report.get("approval_url")
-    if not approval_url:
-        raise HTTPException(500, "Raport vechi fără approval_url. Generează unul nou trimițând raportul din nou.")
 
     from email_service import _layout, send_email  # noqa: PLC0415
     days_pending = 0
@@ -1095,6 +1172,8 @@ async def send_report_reminder(
     except Exception:  # noqa: BLE001
         days_pending = 0
 
+    sender_name = (actor.get("name") if actor else None) or (actor.get("email") if actor else None) or report.get("sender_name") or "Sistem"
+
     note_block = ""
     if custom_note:
         note_block = f"""
@@ -1103,10 +1182,10 @@ async def send_report_reminder(
             <div style="color:#e5e5e5; line-height:1.6; white-space:pre-wrap;">{custom_note}</div>
           </div>
         """
-    sender_name = user.get("name") or user.get("email") or "Utilizator"
+    auto_label = "🤖 Reminder automat" if auto else "Reminder amabil"
     body = f"""
       <p>Bună {report.get('recipient_name') or report.get('recipient_email')},</p>
-      <p>Acesta este un <strong style="color:#f59e0b;">reminder amabil</strong> pentru raportul trimis de <strong style="color:#10b981;">{sender_name}</strong> acum <strong>{days_pending} zile</strong> pe proiectul <em>"{project_name}"</em>.</p>
+      <p>Acesta este un <strong style="color:#f59e0b;">{auto_label.lower()}</strong> pentru raportul trimis de <strong style="color:#10b981;">{sender_name}</strong> acum <strong>{days_pending} zile</strong> pe proiectul <em>"{project_name}"</em>.</p>
       <div style="background:#1a1a1f; border:1px solid #ffffff15; border-radius:14px; padding:18px; margin:18px 0;">
         <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#888893; margin-bottom:6px;">Pin în așteptare</div>
         <div style="color:#ffffff; font-size:17px; font-weight:600;">{pin.get('title', '—')}</div>
@@ -1126,23 +1205,24 @@ async def send_report_reminder(
         </table>
       </div>
     """
+    subject_prefix = "🤖 Reminder automat:" if auto else "⏰ Reminder:"
     html = _layout(
-        "Reminder raport problemă",
+        f"{auto_label} raport problemă",
         f"{pin.get('title', '—')} · pending de {days_pending} zile",
         body,
         approval_url,
         "Răspunde acum",
     )
-    await send_email(report["recipient_email"], f"⏰ Reminder: {pin.get('title', 'Raport')} · {project_name}", html)
+    await send_email(report["recipient_email"], f"{subject_prefix} {pin.get('title', 'Raport')} · {project_name}", html)
 
-    # Append reminder log entry
     reminder_entry = {
         "id": _new_id(),
         "sent_at": _now_iso(),
-        "sent_by": user["id"],
+        "sent_by": actor["id"] if actor else "system",
         "sent_by_name": sender_name,
         "note": custom_note,
         "days_pending_at_send": days_pending,
+        "automatic": auto,
     }
     await db.digital_twin_pins.update_one(
         {"id": pin["id"], "report_history.id": report_id},
@@ -1150,23 +1230,87 @@ async def send_report_reminder(
          "$set": {"updated_at": _now_iso()}},
     )
 
-    # In-app notification to recipient (if known user)
     recipient_user = await db.users.find_one({"email": report["recipient_email"]}, {"_id": 1})
     if recipient_user:
+        title_emoji = "🤖" if auto else "⏰"
         await notify(
             str(recipient_user["_id"]),
-            f"⏰ Reminder raport: {pin.get('title', 'Pin')}",
+            f"{title_emoji} Reminder raport: {pin.get('title', 'Pin')}",
             f"{sender_name} așteaptă răspunsul tău de {days_pending} zile.",
             type_="dt_report_reminder",
             link="/digital-twin",
         )
 
     return {
-        "ok": True,
         "reminder": reminder_entry,
         "recipient_email": report["recipient_email"],
         "days_pending": days_pending,
     }
+
+
+async def run_dt_auto_reminders() -> dict:
+    """Daily job: scan pending reports + send reminders at configured thresholds (default 7/14/21 days)."""
+    now = datetime.now(timezone.utc)
+    today_iso = now.date().isoformat()
+    sent = 0
+    skipped = 0
+    failed = 0
+    seen = 0
+    pipeline = [
+        {"$match": {"report_history": {"$elemMatch": {"approval_status": "pending"}}}},
+        {"$project": {"_id": 0, "id": 1, "title": 1, "project_id": 1, "report_history": 1}},
+    ]
+    async for pin in db.digital_twin_pins.aggregate(pipeline):
+        for h in pin.get("report_history") or []:
+            seen += 1
+            if h.get("approval_status", "pending") != "pending":
+                continue
+            if h.get("auto_reminders_stopped"):
+                skipped += 1
+                continue
+            if h.get("auto_reminders_enabled") is False:
+                skipped += 1
+                continue
+            paused = h.get("paused_until")
+            if paused and paused >= today_iso:
+                skipped += 1
+                continue
+            if not h.get("approval_url"):
+                skipped += 1
+                continue
+            try:
+                dt = datetime.fromisoformat(h["created_at"].replace("Z", "+00:00"))
+            except Exception:
+                skipped += 1
+                continue
+            age_days = max(0, (now - dt).days)
+            thresholds = h.get("reminder_thresholds_days") or [7, 14, 21]
+            fired = set(h.get("auto_reminders_fired_thresholds") or [])
+            due_threshold = None
+            for th in sorted(thresholds):
+                if age_days >= th and th not in fired:
+                    due_threshold = th
+                    break
+            if due_threshold is None:
+                continue
+            try:
+                await _dispatch_reminder(pin, h["id"], custom_note="", actor=None, auto=True)
+                await db.digital_twin_pins.update_one(
+                    {"id": pin["id"], "report_history.id": h["id"]},
+                    {"$addToSet": {"report_history.$.auto_reminders_fired_thresholds": due_threshold},
+                     "$set": {"report_history.$.last_auto_reminder_at": _now_iso()}},
+                )
+                sent += 1
+            except Exception:  # noqa: BLE001
+                failed += 1
+    summary = {"checked_reports": seen, "sent": sent, "skipped": skipped, "failed": failed, "at": _now_iso()}
+    # Persist last run summary for admin visibility
+    await db.scheduler_runs.update_one(
+        {"_id": "dt_auto_reminders"},
+        {"$set": {"last_run": summary, "updated_at": _now_iso()}},
+        upsert=True,
+    )
+    return summary
 
 
 @router.get("/pins/{pin_id}/issue-report/preview")
@@ -1540,3 +1684,16 @@ async def admin_stats(user: dict = Depends(require_role("admin"))):  # noqa: ARG
         "comments": await db.digital_twin_comments.count_documents({}),
         "pro_users": await db.users.count_documents({"digital_twin_pro": True}),
     }
+
+
+
+@admin_router.post("/auto-reminders/run-now")
+async def admin_run_auto_reminders_now(user: dict = Depends(require_role("admin"))):  # noqa: ARG001
+    """Manually trigger the auto-reminder scheduler (idempotent — won't double-fire same threshold)."""
+    return await run_dt_auto_reminders()
+
+
+@admin_router.get("/auto-reminders/last-run")
+async def admin_auto_reminders_last_run(user: dict = Depends(require_role("admin"))):  # noqa: ARG001
+    doc = await db.scheduler_runs.find_one({"_id": "dt_auto_reminders"})
+    return doc.get("last_run") if doc else {"never_ran": True}

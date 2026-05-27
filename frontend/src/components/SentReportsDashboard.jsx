@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import {
   ArrowLeft, BellRing, CheckCircle2, FileEdit, Clock, ExternalLink,
-  AlertTriangle, X, Loader2, Mail, Send, Filter,
+  AlertTriangle, X, Loader2, Mail, Send, Filter, Settings, Pause, Play, BellOff,
 } from "lucide-react";
 import { API } from "../pages/DashShared";
 
@@ -104,6 +104,170 @@ const StatusPill = ({ status }) => {
   );
 };
 
+const AutoReminderSettingsModal = ({ item, onClose, onSaved }) => {
+  const [enabled, setEnabled] = useState(item.auto_reminders_enabled !== false);
+  const [stopped, setStopped] = useState(!!item.auto_reminders_stopped);
+  const [thresholds, setThresholds] = useState((item.reminder_thresholds_days || [7, 14, 21]).join(", "));
+  const [pausedUntil, setPausedUntil] = useState(item.paused_until || "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const save = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const thrArr = thresholds.split(",").map(s => parseInt(s.trim(), 10)).filter(n => Number.isFinite(n) && n >= 1 && n <= 365);
+      if (thrArr.length === 0) {
+        setErr("Cel puțin un prag valid între 1-365 zile.");
+        setBusy(false);
+        return;
+      }
+      const { data } = await axios.patch(`${API}/digital-twin/reports/${item.report_id}/reminder-settings`, {
+        auto_reminders_enabled: enabled,
+        stopped,
+        thresholds_days: thrArr,
+        paused_until: pausedUntil || "",
+      });
+      onSaved?.(data);
+    } catch (e) {
+      setErr(e?.response?.data?.detail || e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const nextDue = (() => {
+    if (!enabled || stopped) return null;
+    if (pausedUntil) {
+      try {
+        const d = new Date(pausedUntil);
+        if (d > new Date()) return `Reluare după ${d.toLocaleDateString("ro-RO")}`;
+      } catch {/* ignore */}
+    }
+    const fired = item.auto_reminders_fired_thresholds || [];
+    const remaining = (item.reminder_thresholds_days || [7, 14, 21]).filter(t => !fired.includes(t));
+    if (remaining.length === 0) return "Toate pragurile au fost trimise";
+    const next = Math.min(...remaining);
+    const remainingDays = next - item.age_days;
+    if (remainingDays <= 0) return "Va fi trimis la următoarea rulare (mâine 08:15)";
+    return `Următorul: peste ${remainingDays} ${remainingDays === 1 ? "zi" : "zile"} (prag: ${next}d)`;
+  })();
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-stone-900 border border-white/10 rounded-2xl p-5 w-full max-w-md space-y-3" data-testid="auto-reminder-settings-modal">
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-400/90 font-semibold">Auto-reminder</div>
+            <h3 className="font-serif text-lg text-white">Setări reminder automat</h3>
+            <p className="text-xs text-stone-400 mt-0.5 max-w-[300px]">Configurează când sistemul trimite automat reminder către <strong>{item.recipient_name || item.recipient_email}</strong>.</p>
+          </div>
+          <button onClick={onClose} className="text-stone-500 hover:text-white"><X className="w-5 h-5" /></button>
+        </div>
+
+        {/* Master toggle */}
+        <label className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/5 cursor-pointer">
+          <div>
+            <div className="text-sm text-white font-medium">Auto-reminder activ</div>
+            <div className="text-[11px] text-stone-500">Sistemul trimite automat email-uri la pragurile setate.</div>
+          </div>
+          <input
+            type="checkbox"
+            checked={enabled && !stopped}
+            onChange={(e) => { setEnabled(e.target.checked); if (e.target.checked) setStopped(false); }}
+            className="w-5 h-5 accent-emerald-500"
+            data-testid="auto-reminder-enabled"
+          />
+        </label>
+
+        {/* Thresholds */}
+        <div>
+          <label className="text-[10px] uppercase text-stone-500 font-semibold">Praguri (zile)</label>
+          <input
+            value={thresholds}
+            onChange={(e) => setThresholds(e.target.value)}
+            disabled={!enabled || stopped}
+            placeholder="7, 14, 21"
+            className="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white disabled:opacity-40"
+            data-testid="auto-reminder-thresholds"
+          />
+          <div className="text-[10px] text-stone-600 mt-0.5">Separă cu virgulă. Un prag = un email automat la X zile pending.</div>
+        </div>
+
+        {/* Pause */}
+        <div>
+          <label className="text-[10px] uppercase text-stone-500 font-semibold">Pauză până la</label>
+          <div className="flex gap-2 mt-1">
+            <input
+              type="date"
+              value={pausedUntil}
+              onChange={(e) => setPausedUntil(e.target.value)}
+              disabled={!enabled || stopped}
+              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white disabled:opacity-40"
+              data-testid="auto-reminder-pause-until"
+            />
+            {pausedUntil && (
+              <button
+                onClick={() => setPausedUntil("")}
+                className="px-2.5 py-1 text-[11px] rounded-lg bg-white/5 hover:bg-white/10 text-stone-400"
+                data-testid="auto-reminder-pause-clear"
+              >
+                Anulează
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Stop forever */}
+        <label className="flex items-center justify-between p-3 rounded-lg bg-red-500/[0.05] border border-red-500/15 cursor-pointer">
+          <div>
+            <div className="text-sm text-red-300 font-medium flex items-center gap-1.5"><BellOff className="w-3.5 h-3.5" /> Oprește definitiv</div>
+            <div className="text-[11px] text-stone-500">Nu vor mai fi trimise reminder-uri automate, indiferent de praguri.</div>
+          </div>
+          <input
+            type="checkbox"
+            checked={stopped}
+            onChange={(e) => setStopped(e.target.checked)}
+            className="w-5 h-5 accent-red-500"
+            data-testid="auto-reminder-stopped"
+          />
+        </label>
+
+        {/* Next due info */}
+        {nextDue && (
+          <div className="text-[11px] text-stone-400 px-3 py-2 rounded-lg bg-emerald-500/[0.05] border border-emerald-500/15">
+            <Clock className="w-3 h-3 inline-block mr-1.5 -mt-0.5 text-emerald-400" />
+            {nextDue}
+          </div>
+        )}
+
+        {/* Fired history */}
+        {(item.auto_reminders_fired_thresholds || []).length > 0 && (
+          <div className="text-[11px] text-stone-500 px-3 py-2 rounded-lg bg-white/[0.02] border border-white/5">
+            Praguri trimise deja: <strong className="text-stone-300">{item.auto_reminders_fired_thresholds.map(t => `${t}d`).join(", ")}</strong>
+          </div>
+        )}
+
+        {err && <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-2">{err}</div>}
+
+        <div className="flex gap-2 pt-1">
+          <button onClick={onClose} className="flex-1 px-3 py-2 text-sm rounded-lg bg-white/5 hover:bg-white/10 text-stone-300">Anulează</button>
+          <button
+            onClick={save}
+            disabled={busy}
+            className="flex-1 px-3 py-2 text-sm rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-medium flex items-center justify-center gap-1.5"
+            data-testid="auto-reminder-save"
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Settings className="w-4 h-4" />}
+            Salvează
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 export default function SentReportsDashboard({ onClose, onOpenProject }) {
   const [filter, setFilter] = useState("pending");
   const [items, setItems] = useState([]);
@@ -112,6 +276,7 @@ export default function SentReportsDashboard({ onClose, onOpenProject }) {
   const [err, setErr] = useState(null);
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [reminderFor, setReminderFor] = useState(null);
+  const [settingsFor, setSettingsFor] = useState(null);
   const [toast, setToast] = useState(null);
 
   const load = async () => {
@@ -253,6 +418,15 @@ export default function SentReportsDashboard({ onClose, onOpenProject }) {
                       {it.reminder_count > 0 && (
                         <span className="text-amber-400">⏰ {it.reminder_count} reminder{it.reminder_count > 1 ? "e" : ""}</span>
                       )}
+                      {it.approval_status === "pending" && it.auto_reminders_stopped && (
+                        <span className="text-red-400 inline-flex items-center gap-1"><BellOff className="w-3 h-3" /> auto-reminder oprit</span>
+                      )}
+                      {it.approval_status === "pending" && !it.auto_reminders_stopped && it.paused_until && (
+                        <span className="text-blue-300 inline-flex items-center gap-1"><Pause className="w-3 h-3" /> pauză până {new Date(it.paused_until).toLocaleDateString("ro-RO")}</span>
+                      )}
+                      {it.approval_status === "pending" && (it.auto_reminders_fired_thresholds || []).length > 0 && !it.auto_reminders_stopped && (
+                        <span className="text-emerald-400">🤖 {it.auto_reminders_fired_thresholds.length} auto</span>
+                      )}
                     </div>
                     {/* Decision comment */}
                     {it.decision_comment && (
@@ -287,6 +461,17 @@ export default function SentReportsDashboard({ onClose, onOpenProject }) {
                     )}
                     {it.approval_status === "pending" && it.approval_url && (
                       <button
+                        onClick={() => setSettingsFor(it)}
+                        title="Auto-reminder settings"
+                        className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-stone-400 hover:text-emerald-300"
+                        data-testid={`settings-${it.report_id}`}
+                      >
+                        {it.auto_reminders_stopped ? <BellOff className="w-3.5 h-3.5" /> :
+                          (it.paused_until ? <Pause className="w-3.5 h-3.5" /> : <Settings className="w-3.5 h-3.5" />)}
+                      </button>
+                    )}
+                    {it.approval_status === "pending" && it.approval_url && (
+                      <button
                         onClick={() => setReminderFor(it)}
                         className="px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-medium flex items-center gap-1.5"
                         data-testid={`send-reminder-${it.report_id}`}
@@ -315,6 +500,20 @@ export default function SentReportsDashboard({ onClose, onOpenProject }) {
           item={reminderFor}
           onClose={() => setReminderFor(null)}
           onSent={handleReminderSent}
+        />
+      )}
+
+      {/* Auto-reminder settings modal */}
+      {settingsFor && (
+        <AutoReminderSettingsModal
+          item={settingsFor}
+          onClose={() => setSettingsFor(null)}
+          onSaved={(_data) => {
+            setSettingsFor(null);
+            setToast("✓ Setări auto-reminder salvate");
+            setTimeout(() => setToast(null), 3500);
+            load();
+          }}
         />
       )}
     </div>

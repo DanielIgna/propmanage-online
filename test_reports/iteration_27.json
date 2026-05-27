@@ -1,0 +1,36 @@
+{
+  "summary": "Phase I++ Auto-reminder scheduler + per-report opt-out/snooze/stop end-to-end tested. Backend: 19/19 pytest cases pass covering all 4 PATCH /reminder-settings combos (enabled/thresholds/paused_until/stopped) with GET persistence; validation (empty thresholds=400, out-of-range silently filtered, all-out-of-range=400, invalid date=400 'Format dată invalid', empty payload=400 'Nimic de actualizat', clear pause via empty string); security (client→admin report=404); admin endpoints (run-now returns {checked_reports,sent,skipped,failed,at}, non-admin=403, last-run returns last summary); scheduler logic (backdated age=10d + thresholds=[3,7,14] fires 3d then 7d on two runs, idempotent on third, 14d not reached); skip rules (stopped=true, paused_until>=today, enabled=false all skipped); auto-fire side effects (reminders_sent.automatic=true, auto_reminders_fired_thresholds[] updated, last_auto_reminder_at set, dt_report_reminder notification delivered to recipient). Frontend: login as admin → /digital-twin → 'Răspunsuri' fullscreen → gear icon (data-testid=settings-{id}) opens auto-reminder-settings-modal with all expected data-testids (enabled, thresholds, pause-until, stopped, save). Filled thresholds='5,10,30' + pause-until=2027-03-15 → save → modal closed + 'Setări auto-reminder salvate' toast appeared + row reflects state changes: '5 remindere' badge, blue 'pauză până 15.03.2027' badge, '🤖 2 auto' emerald badge, button icon switched to Pause. Smart 'Reluare după 15.03.2027' label rendered correctly in modal. 'Praguri trimise deja: 3d, 7d' history visible.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_i_plus_auto_reminders.py",
+    "/app/test_reports/pytest/phase_i_plus_auto_reminders_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "digital_twin.py L1275: `if paused and paused >= today_iso` — string comparison works correctly because paused_until is stored as YYYY-MM-DD ISO date. Good (lexicographic == chronological for that format).",
+    "digital_twin.py L1278: scheduler skips reports without approval_url silently (counted as 'skipped'). This is correct/defensive — matches main-agent context that legacy pre-Phase-I reports without approval_url should not fire.",
+    "digital_twin.py L1111: `clean = sorted({int(d) for d in payload.thresholds_days if 1 <= int(d) <= 365})` silently filters invalid ints and de-duplicates. Spec says 'silently filtered' so behavior is intentional and correctly enforces empty→400 below.",
+    "digital_twin.py L1286: `age_days = max(0, (now - dt).days)` correctly handles the unlikely case of a future-dated created_at. Robust.",
+    "digital_twin.py run_dt_auto_reminders fires only ONE threshold per run per report (first un-fired threshold ≤ age_days), making the scheduler safely idempotent across multiple manual runs.",
+    "SentReportsDashboard.jsx L107-268: AutoReminderSettingsModal cleanly toggles enabled-vs-stopped (stop wins visually, dim other controls via `disabled={!enabled || stopped}`). 'Reluare după' label correctly skipped when stopped=true. Good UX.",
+    "Date input uses browser native `<input type='date'>` which is acceptable for ISO date capture — not using shadcn Calendar but the requirement was unclear on this. Native picker is fully functional and accessibility-friendly."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase_i_plus_auto_reminders.py (NEW, 19 tests, 4.8s run)"
+  ],
+  "success_rate": { "backend": "100% (19/19)", "frontend": "100% on required flows" },
+  "test_credentials": "admin@propmanage.io / Admin123!, client@propmanage.io / Client123!, specialist@propmanage.io / Spec123! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Test fixtures create dedicated 'TEST_AutoReminder_Scheduler' project + pin and ~7 fresh reports across test classes. Project is cleaned via module-scoped fixture teardown. Test uses direct DB write (from db import db) to backdate report_history.[].created_at by N days to exercise scheduler thresholds without waiting real time.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Auto-reminder phase fully covered by pytest at /app/backend/tests/test_phase_i_plus_auto_reminders.py — re-run with `pytest tests/test_phase_i_plus_auto_reminders.py -v`. Backdating helper uses asyncio.get_event_loop().run_until_complete(...) — works in pytest sync test functions. Notifications API returns a list directly (not {items:[]}) — relevant if testing notification delivery elsewhere. The admin endpoints are mounted at /api/admin/digital-twin/auto-reminders/{run-now,last-run}. Test left ~5 backdated reports in DB across runs; cleanup happens via project delete cascade. Pre-existing main-agent test report (id=7040cea7...) still in DB with pause-until=2027-03-15 + thresholds=[5,10,30] after this run.",
+  "rca of the issue": "No issues found. All Phase I++ acceptance criteria met (per-report opt-out/snooze/stop, daily scheduler at 08:15 Bucharest via APScheduler, idempotent multi-threshold firing, admin trigger+inspection endpoints, frontend modal with state-dependent icons + smart next-due label + fired thresholds history + saved toast + list refresh)."
+}
