@@ -237,6 +237,15 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Auto-deschide modalul când pagina e accesată cu `?compare=` (fetch fallback prin `GET /api/admin/audit-log/{id}`)
 - Banner roșu "⚠️ Link invalid" dacă intrările au fost șterse; URL curățat la close
 
+### Phase 44 — Spike Alert Auto-Email (Feb 2026)
+- Backend helper `_compute_weekly_compare()` refactored din endpoint pentru reutilizare cron
+- Endpoint `GET/PUT /api/admin/incident-spike-alert/config` — citește/actualizează `{enabled, preset_id, threshold_pct, last_sent_week, last_result}`
+- Endpoint `POST /api/admin/incident-spike-alert/test` cu `{dry_run, force}` pentru testare manuală
+- Funcție async `run_incident_spike_alert_check()` și `_send_spike_alert_email()` cu HTML branded incluzând mini-heatmap snapshot inline (Resend/SendGrid/console)
+- **APScheduler job nou**: cron Luni 08:00 Europe/Bucharest cu dedupe automat per `last_sent_week`
+- Audit log automat: `incident_spike_alert.sent`, `incident_spike_alert.config_update`, `incident_spike_alert.manual_test`
+- Frontend: panel expandabil "🔔 Alertă automată email" sub WeeklyCompare cu 3 controls (enable/preset/threshold), informații ultimă trimitere, 2 butoane test (Preview + Trimite acum)
+
 ### Phase 43 — Weekly Compare + Early Warning Alert (Feb 2026)
 - Endpoint `GET /api/admin/incident-cadence-weekly-compare?alert_threshold_pct=100` agregare current vs previous week (Mon→Sun) din `preset_send_history`
 - Returnează 2 serii de 7 cells fiecare cu flag `is_future`, total_sends, total_recipients, `delta_pct` (null când previous=0 și current>0 = increment "infinit"), `alert` boolean

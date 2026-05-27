@@ -2169,24 +2169,15 @@ async def incident_cadence_heatmap(
     }
 
 
-@router.get("/incident-cadence-weekly-compare")
-async def incident_cadence_weekly_compare(
-    alert_threshold_pct: int = Query(100, ge=10, le=500),
-    user: dict = Depends(require_role("admin")),
-):
-    """Compare incident-response activity for the current week vs the previous week.
-    Each week starts on Monday. Returns 2 mini-series (7 cells each) + delta% + alert flag.
-    Used by the 'Comparare săptămâni' early-warning widget.
-    """
-    from datetime import date as _date, timedelta as _td
+async def _compute_weekly_compare(alert_threshold_pct: int = 100) -> dict:
+    """Internal helper — same logic as the endpoint but callable from cron jobs."""
+    from datetime import timedelta as _td
     today = datetime.now(timezone.utc).date()
-    # Monday of this week
     monday_curr = today - _td(days=today.weekday())
     monday_prev = monday_curr - _td(days=7)
     sunday_prev = monday_curr - _td(days=1)
     sunday_curr = monday_curr + _td(days=6)
 
-    # Range for the aggregation = from monday_prev to sunday_curr
     cutoff_iso = monday_prev.isoformat()
     end_iso = (sunday_curr + _td(days=1)).isoformat()
 
@@ -2203,20 +2194,14 @@ async def incident_cadence_weekly_compare(
         raw[d["_id"]] = {"count": d["count"], "recipients": d.get("recipients", 0)}
 
     def _build_week(monday):
-        cells = []
-        total = 0
-        total_rec = 0
+        cells, total, total_rec = [], 0, 0
         cur = monday
         for _ in range(7):
             key = cur.isoformat()
             d = raw.get(key, {"count": 0, "recipients": 0})
-            is_future = cur > today
             cells.append({
-                "date": key,
-                "count": d["count"],
-                "recipients": d["recipients"],
-                "weekday": cur.weekday(),
-                "is_future": is_future,
+                "date": key, "count": d["count"], "recipients": d["recipients"],
+                "weekday": cur.weekday(), "is_future": cur > today,
             })
             total += d["count"]
             total_rec += d["recipients"]
@@ -2226,9 +2211,7 @@ async def incident_cadence_weekly_compare(
     curr_cells, curr_total, curr_rec = _build_week(monday_curr)
     prev_cells, prev_total, prev_rec = _build_week(monday_prev)
 
-    # Delta calculation
     if prev_total == 0:
-        # Avoid division by zero: if both 0 → 0%, else +inf-like represented as None → frontend handles
         delta_pct = None if curr_total > 0 else 0
     else:
         delta_pct = round(((curr_total - prev_total) / prev_total) * 100, 1)
@@ -2237,31 +2220,301 @@ async def incident_cadence_weekly_compare(
     if delta_pct is not None and delta_pct >= alert_threshold_pct:
         alert = True
     elif delta_pct is None and curr_total > 0:
-        # From 0 → N is effectively infinite increase → treat as alert
         alert = True
 
     return {
         "current": {
-            "label": "Săptămâna curentă",
-            "monday": monday_curr.isoformat(),
-            "sunday": sunday_curr.isoformat(),
-            "cells": curr_cells,
-            "total_sends": curr_total,
-            "total_recipients": curr_rec,
+            "label": "Săptămâna curentă", "monday": monday_curr.isoformat(), "sunday": sunday_curr.isoformat(),
+            "cells": curr_cells, "total_sends": curr_total, "total_recipients": curr_rec,
         },
         "previous": {
-            "label": "Săptămâna trecută",
-            "monday": monday_prev.isoformat(),
-            "sunday": sunday_prev.isoformat(),
-            "cells": prev_cells,
-            "total_sends": prev_total,
-            "total_recipients": prev_rec,
+            "label": "Săptămâna trecută", "monday": monday_prev.isoformat(), "sunday": sunday_prev.isoformat(),
+            "cells": prev_cells, "total_sends": prev_total, "total_recipients": prev_rec,
         },
         "delta_pct": delta_pct,
         "alert": alert,
         "alert_threshold_pct": alert_threshold_pct,
         "today": today.isoformat(),
     }
+
+
+@router.get("/incident-cadence-weekly-compare")
+async def incident_cadence_weekly_compare(
+    alert_threshold_pct: int = Query(100, ge=10, le=500),
+    user: dict = Depends(require_role("admin")),
+):
+    """Compare incident-response activity for the current week vs the previous week."""
+    return await _compute_weekly_compare(alert_threshold_pct)
+
+
+# ============= INCIDENT SPIKE AUTO-ALERT =============
+async def _get_spike_alert_settings() -> dict:
+    """Load auto-alert settings from platform_settings (with defaults)."""
+    doc = await db.platform_settings.find_one({"_id": "incident_spike_alert"})
+    if not doc:
+        return {
+            "enabled": False, "preset_id": None, "threshold_pct": 100,
+            "last_sent_week": None, "last_result": None,
+        }
+    return {
+        "enabled": bool(doc.get("enabled", False)),
+        "preset_id": doc.get("preset_id"),
+        "threshold_pct": int(doc.get("threshold_pct", 100)),
+        "last_sent_week": doc.get("last_sent_week"),
+        "last_result": doc.get("last_result"),
+    }
+
+
+async def _save_spike_alert_settings(updates: dict):
+    await db.platform_settings.update_one(
+        {"_id": "incident_spike_alert"},
+        {"$set": updates},
+        upsert=True,
+    )
+
+
+@router.get("/incident-spike-alert/config")
+async def get_spike_alert_config(user: dict = Depends(require_role("admin"))):
+    """Read auto-alert configuration for incident spikes."""
+    settings = await _get_spike_alert_settings()
+    # Enrich with preset info if configured
+    preset = None
+    if settings.get("preset_id"):
+        try:
+            pdoc = await db.incident_recipient_presets.find_one({"_id": ObjectId(settings["preset_id"])})
+            if pdoc:
+                preset = _serialize_preset(pdoc)
+        except (InvalidId, Exception):  # noqa: BLE001
+            pass
+    return {**settings, "preset": preset}
+
+
+@router.put("/incident-spike-alert/config")
+async def update_spike_alert_config(
+    payload: dict = Body(...),
+    user: dict = Depends(require_role("admin")),
+):
+    """Update auto-alert config. Body: { enabled, preset_id, threshold_pct }"""
+    updates = {}
+    if "enabled" in payload:
+        updates["enabled"] = bool(payload["enabled"])
+    if "preset_id" in payload:
+        pid = payload.get("preset_id")
+        if pid:
+            try:
+                pdoc = await db.incident_recipient_presets.find_one({"_id": ObjectId(pid)})
+                if not pdoc:
+                    raise HTTPException(404, "Preset inexistent.")
+            except InvalidId:
+                raise HTTPException(400, "preset_id invalid.")
+        updates["preset_id"] = pid
+    if "threshold_pct" in payload:
+        try:
+            tp = int(payload["threshold_pct"])
+            if not (10 <= tp <= 500):
+                raise ValueError()
+            updates["threshold_pct"] = tp
+        except (TypeError, ValueError):
+            raise HTTPException(400, "threshold_pct trebuie să fie un întreg între 10 și 500.")
+
+    if updates:
+        old = await _get_spike_alert_settings()
+        await _save_spike_alert_settings(updates)
+        await audit("incident_spike_alert.config_update", user,
+                    target={"type": "platform_setting", "id": "incident_spike_alert", "label": "Auto-alert Incident Spike"},
+                    before={k: old.get(k) for k in updates},
+                    after=updates)
+
+    return await get_spike_alert_config(user)
+
+
+async def _send_spike_alert_email(wc: dict, preset: dict, dry_run: bool = False) -> dict:
+    """Send the spike-alert email to all recipients in the preset.
+    Returns dict with status. If dry_run=True, only generates content, doesn't send.
+    """
+    delta = wc.get("delta_pct")
+    delta_label = "+∞%" if delta is None else f"{'+' if delta > 0 else ''}{delta}%"
+    curr_total = wc["current"]["total_sends"]
+    prev_total = wc["previous"]["total_sends"]
+    week_label = f"{wc['current']['monday']} → {wc['current']['sunday']}"
+
+    subject = f"[INCIDENT SPIKE] {delta_label} această săptămână ({curr_total} vs {prev_total})"
+
+    # Build mini heatmap as HTML grid
+    def _cells_html(cells, accent_color):
+        out = []
+        for c in cells:
+            cnt = c["count"]
+            bg = ("#1a1a1f" if c["is_future"]
+                  else "#1f2937" if cnt == 0
+                  else accent_color if cnt < 3 else "#dc2626")
+            out.append(
+                f'<td style="width:32px;height:32px;background:{bg};border:1px solid #2a2a30;text-align:center;color:#fff;font-size:11px;font-weight:600;">{cnt or ""}</td>'
+            )
+        return "".join(out)
+
+    accent = "#0f9d58" if delta is not None and delta < 0 else "#fbbf24"
+    if delta is not None and delta >= wc["alert_threshold_pct"]:
+        accent = "#dc2626"
+
+    weeks_html = f"""
+      <table border="0" cellpadding="0" cellspacing="0" style="background:#1a1a1f; border-radius:14px; padding:18px; margin:18px 0; width:100%;">
+        <tr>
+          <td style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#888893; padding-bottom:6px;">Săptămâna trecută ({wc['previous']['monday']} → {wc['previous']['sunday']})</td>
+          <td style="text-align:right; font-size:22px; color:#c8c8cc; font-weight:bold; padding-bottom:6px;">{prev_total}</td>
+        </tr>
+        <tr>
+          <td colspan="2" style="padding-bottom:12px;">
+            <table border="0" cellpadding="0" cellspacing="2"><tr>{_cells_html(wc['previous']['cells'], '#3b3b42')}</tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#888893; padding-bottom:6px;">Săptămâna curentă ({week_label})</td>
+          <td style="text-align:right; font-size:22px; color:{accent}; font-weight:bold; padding-bottom:6px;">{curr_total}</td>
+        </tr>
+        <tr>
+          <td colspan="2">
+            <table border="0" cellpadding="0" cellspacing="2"><tr>{_cells_html(wc['current']['cells'], accent)}</tr></table>
+          </td>
+        </tr>
+      </table>
+    """
+
+    body_html = f"""
+      <p>Bună,</p>
+      <p>Sistemul automat de monitoring a detectat un <strong>spike de activitate</strong> de incident response:</p>
+      <div style="background:{accent}15; border-left:3px solid {accent}; padding:16px 18px; border-radius:12px; margin:18px 0;">
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:{accent}; margin-bottom:6px;">Variație vs săptămâna trecută</div>
+        <div style="font-size:32px; font-weight:bold; color:{accent};">{delta_label}</div>
+        <div style="color:#a8a8b0; font-size:13px; margin-top:6px;">Prag configurat: +{wc['alert_threshold_pct']}%</div>
+      </div>
+      {weeks_html}
+      <p style="color:#a8a8b0; font-size:13px;">Acțiuni recomandate:</p>
+      <ul style="color:#c8c8cc; font-size:13px;">
+        <li>Verifică deploy-urile și modificările recente de pe platformă.</li>
+        <li>Consultă audit log-ul pentru anomalii: <a style="color:#d4ff3a;" href="https://propmanage.io/admin">consola admin</a></li>
+        <li>Distribuie raportul către echipa relevantă dacă e necesar.</li>
+      </ul>
+    """
+
+    from email_service import _layout, send_email as _send_email  # type: ignore
+    html = _layout(
+        title="🚨 Spike Activity Detected",
+        preheader=f"{delta_label} vs săpt. trecută",
+        body_html=body_html,
+    )
+
+    recipients = preset.get("emails", [])
+    if not recipients:
+        return {"ok": False, "error": "Preset gol — niciun destinatar."}
+
+    if dry_run:
+        return {"ok": True, "dry_run": True, "subject": subject, "recipients_count": len(recipients)}
+
+    result = await _send_email(recipients, subject, html)
+    return {
+        "ok": result.get("ok", False),
+        "provider": result.get("provider"),
+        "demo": result.get("demo", False),
+        "subject": subject,
+        "recipients_count": len(recipients),
+        "error": result.get("error"),
+    }
+
+
+async def run_incident_spike_alert_check():
+    """Cron job: runs every Monday 08:00 Europe/Bucharest. Sends auto-alert if spike detected.
+    Deduplicates by `last_sent_week` (one alert per week max).
+    """
+    try:
+        settings = await _get_spike_alert_settings()
+        if not settings.get("enabled"):
+            return
+        if not settings.get("preset_id"):
+            logger.info("[SpikeAlert] enabled but no preset configured — skipping")
+            return
+
+        wc = await _compute_weekly_compare(settings.get("threshold_pct", 100))
+        if not wc.get("alert"):
+            logger.info(f"[SpikeAlert] no spike detected (delta={wc.get('delta_pct')}%)")
+            return
+
+        # Dedupe: don't send twice for the same week
+        week_key = wc["current"]["monday"]
+        if settings.get("last_sent_week") == week_key:
+            logger.info(f"[SpikeAlert] already sent for week {week_key} — skipping")
+            return
+
+        # Fetch preset
+        preset_doc = await db.incident_recipient_presets.find_one({"_id": ObjectId(settings["preset_id"])})
+        if not preset_doc:
+            logger.warning("[SpikeAlert] configured preset not found — skipping")
+            return
+        preset = _serialize_preset(preset_doc)
+
+        result = await _send_spike_alert_email(wc, preset)
+        await _save_spike_alert_settings({
+            "last_sent_week": week_key,
+            "last_result": {
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+                "ok": result.get("ok"),
+                "delta_pct": wc.get("delta_pct"),
+                "recipients_count": result.get("recipients_count"),
+                "error": result.get("error"),
+            },
+        })
+        # Audit log
+        await db.admin_audit_log.insert_one({
+            "action": "incident_spike_alert.sent",
+            "actor_id": "system",
+            "actor_name": "Sistem (auto-alert)",
+            "actor_email": "system@propmanage.io",
+            "target_type": "platform_setting",
+            "target_id": "incident_spike_alert",
+            "target_label": f"Spike Alert {week_key}",
+            "before": None,
+            "after": {"delta_pct": wc.get("delta_pct"), "current_total": wc["current"]["total_sends"], "previous_total": wc["previous"]["total_sends"]},
+            "note": f"Email trimis către {result.get('recipients_count', 0)} destinatari prin {result.get('provider')}",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        logger.info(f"[SpikeAlert] sent for week {week_key}: delta={wc.get('delta_pct')}% to {result.get('recipients_count')} recipients via {result.get('provider')}")
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[SpikeAlert] error: {e}")
+
+
+@router.post("/incident-spike-alert/test")
+async def test_spike_alert(
+    payload: dict = Body(default={}),
+    user: dict = Depends(require_role("admin")),
+):
+    """Manually trigger the spike-alert check (for testing).
+    Body: { dry_run: bool (default false), force: bool (default false — bypasses 'alert detected' check) }
+    """
+    settings = await _get_spike_alert_settings()
+    if not settings.get("preset_id"):
+        raise HTTPException(400, "Niciun preset configurat pentru alertă. Setează unul din UI mai întâi.")
+
+    preset_doc = await db.incident_recipient_presets.find_one({"_id": ObjectId(settings["preset_id"])})
+    if not preset_doc:
+        raise HTTPException(404, "Preset configurat nu a fost găsit (a fost șters?). Actualizează configurarea.")
+    preset = _serialize_preset(preset_doc)
+
+    wc = await _compute_weekly_compare(settings.get("threshold_pct", 100))
+    force = bool(payload.get("force"))
+    if not wc.get("alert") and not force:
+        return {"ok": False, "reason": "Niciun spike detectat în acest moment", "delta_pct": wc.get("delta_pct"), "current": wc["current"]["total_sends"], "previous": wc["previous"]["total_sends"]}
+
+    dry_run = bool(payload.get("dry_run"))
+    result = await _send_spike_alert_email(wc, preset, dry_run=dry_run)
+
+    if not dry_run and result.get("ok"):
+        # Log manual test in audit
+        await audit("incident_spike_alert.manual_test", user,
+                    target={"type": "platform_setting", "id": "incident_spike_alert", "label": "Spike Alert (manual test)"},
+                    after={"delta_pct": wc.get("delta_pct"), "recipients_count": result.get("recipients_count")},
+                    note=f"Test manual de către {user.get('name') or user.get('email')}")
+
+    return {"ok": result.get("ok"), "delta_pct": wc.get("delta_pct"), **result}
 
 
 @router.post("/audit-log/{entry_id}/rollback")

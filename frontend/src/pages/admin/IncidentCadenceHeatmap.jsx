@@ -31,11 +31,41 @@ export const IncidentCadenceHeatmap = () => {
   const [data, setData] = useState(null);
   const [weekCompare, setWeekCompare] = useState(null);
   const [hovered, setHovered] = useState(null);
+  const [alertConfig, setAlertConfig] = useState(null);
+  const [presets, setPresets] = useState([]);
+  const [showAlertSettings, setShowAlertSettings] = useState(false);
 
-  useEffect(() => {
+  const loadAll = () => {
     axios.get(`${API}/admin/incident-cadence-heatmap?days=91`).then(r => setData(r.data)).catch(() => {});
     axios.get(`${API}/admin/incident-cadence-weekly-compare`).then(r => setWeekCompare(r.data)).catch(() => {});
-  }, []);
+    axios.get(`${API}/admin/incident-spike-alert/config`).then(r => setAlertConfig(r.data)).catch(() => {});
+    axios.get(`${API}/admin/recipient-presets`).then(r => setPresets(r.data.items || [])).catch(() => {});
+  };
+  useEffect(() => { loadAll(); }, []);
+
+  const updateAlertConfig = async (changes) => {
+    try {
+      const r = await axios.put(`${API}/admin/incident-spike-alert/config`, changes);
+      setAlertConfig(r.data);
+    } catch (e) {
+      window.alert(e?.response?.data?.detail || "Eroare la actualizare config");
+    }
+  };
+
+  const testAlert = async (dryRun = false) => {
+    try {
+      const r = await axios.post(`${API}/admin/incident-spike-alert/test`, { dry_run: dryRun });
+      if (!r.data.ok && r.data.reason) {
+        window.alert(`ℹ️ ${r.data.reason}\n\nDelta: ${r.data.delta_pct}% (current=${r.data.current}, previous=${r.data.previous})`);
+      } else if (r.data.dry_run) {
+        window.alert(`✓ Preview generat:\n\nSubject: ${r.data.subject}\nDestinatari: ${r.data.recipients_count}\n\n(dry-run — nu s-a trimis nimic)`);
+      } else {
+        window.alert(`✓ Test trimis!\n\nProvider: ${r.data.provider}${r.data.demo ? " (console — RESEND_API_KEY lipsește)" : ""}\nSubject: ${r.data.subject}\nDestinatari: ${r.data.recipients_count}`);
+      }
+    } catch (e) {
+      window.alert(`❌ ${e?.response?.data?.detail || "Eroare la trimitere"}`);
+    }
+  };
 
   if (!data) {
     return (
@@ -103,6 +133,108 @@ export const IncidentCadenceHeatmap = () => {
       </div>
 
       {weekCompare && <WeeklyCompare wc={weekCompare} onCellClick={goToDate} />}
+
+      {alertConfig && (
+        <div className="mb-5 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden" data-testid="auto-alert-panel">
+          <button
+            onClick={() => setShowAlertSettings(!showAlertSettings)}
+            className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+            data-testid="auto-alert-toggle"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold">🔔 Alertă automată email</span>
+              {alertConfig.enabled ? (
+                <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">Activă</span>
+              ) : (
+                <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">Inactivă</span>
+              )}
+              {alertConfig.preset && (
+                <span className="text-xs text-slate-500">→ {alertConfig.preset.name} ({alertConfig.preset.emails.length} destinatari)</span>
+              )}
+            </div>
+            <span className={`text-slate-400 transition-transform ${showAlertSettings ? "rotate-180" : ""}`}>▼</span>
+          </button>
+
+          {showAlertSettings && (
+            <div className="px-4 pb-4 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
+              <p className="text-xs text-slate-500">
+                Sistemul verifică automat în fiecare <b>Luni la 08:00 (Europa/București)</b> dacă numărul de trimiteri pentru săptămâna anterioară depășește pragul față de săptămâna dinainte. Dacă da, trimite automat un raport cu snapshot heatmap către presetul ales (max o alertă pe săptămână).
+              </p>
+
+              <div className="grid md:grid-cols-3 gap-3">
+                <label className="flex items-center gap-2 p-3 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                  <input
+                    type="checkbox"
+                    checked={alertConfig.enabled}
+                    onChange={(ev) => updateAlertConfig({ enabled: ev.target.checked })}
+                    className="w-4 h-4 accent-emerald-500"
+                    data-testid="auto-alert-enabled"
+                  />
+                  <span className="text-sm font-medium">Activează alertă</span>
+                </label>
+
+                <label className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 block">
+                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold block mb-1">Preset destinatari</span>
+                  <select
+                    value={alertConfig.preset_id || ""}
+                    onChange={(ev) => updateAlertConfig({ preset_id: ev.target.value || null })}
+                    className="w-full px-2 py-1 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded"
+                    data-testid="auto-alert-preset"
+                  >
+                    <option value="">— Niciun preset —</option>
+                    {presets.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.emails.length} dest.)</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 block">
+                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold block mb-1">Prag % (10-500)</span>
+                  <input
+                    type="number"
+                    min={10}
+                    max={500}
+                    value={alertConfig.threshold_pct}
+                    onChange={(ev) => updateAlertConfig({ threshold_pct: parseInt(ev.target.value, 10) || 100 })}
+                    className="w-full px-2 py-1 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded"
+                    data-testid="auto-alert-threshold"
+                  />
+                </label>
+              </div>
+
+              {alertConfig.last_result && (
+                <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/30 text-xs">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">Ultima trimitere</div>
+                  <div className="text-slate-700 dark:text-slate-300">
+                    {new Date(alertConfig.last_result.sent_at).toLocaleString("ro-RO")} ·
+                    delta: <b>{alertConfig.last_result.delta_pct ?? "∞"}%</b> ·
+                    {alertConfig.last_result.recipients_count} destinatari ·
+                    {alertConfig.last_result.ok ? <span className="text-emerald-600"> ✓ ok</span> : <span className="text-red-600"> ✗ eșec</span>}
+                  </div>
+                  {alertConfig.last_sent_week && (
+                    <div className="text-slate-500 mt-0.5">Pentru săptămâna: {alertConfig.last_sent_week}</div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => testAlert(true)}
+                  disabled={!alertConfig.preset_id}
+                  className="text-xs font-semibold px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  data-testid="auto-alert-test-dry"
+                >👁 Preview (dry-run)</button>
+                <button
+                  onClick={() => testAlert(false)}
+                  disabled={!alertConfig.preset_id}
+                  className="text-xs font-semibold px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  data-testid="auto-alert-test-real"
+                >📨 Trimite test acum</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="overflow-x-auto">
         <div className="inline-block min-w-full">
