@@ -232,6 +232,23 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Checkbox-uri pe rândurile din Audit Log (max 2 selectate simultan, FIFO drop)
 - Buton "🔬 Compară selectate (2)" în toolbar care deschide modal Diff Compare
 - Modal afișează cronologic Mai vechi (stânga) / Mai nou (dreapta) cu header (acțiune, actor, timestamp)
+- 2 moduri vizualizare (toggle): tabel câmpuri key-by-key + diff linie cu linie (LCS algorithm, GitHub-style)
+- Shareable Diff Links — buton "🔗 Copiază link Diff" generează URL `?compare=ID1,ID2`
+- Auto-deschide modalul când pagina e accesată cu `?compare=` (fetch fallback prin `GET /api/admin/audit-log/{id}`)
+- Banner roșu "⚠️ Link invalid" dacă intrările au fost șterse; URL curățat la close
+
+### Phase 37 — Pin Audit Entry (Feb 2026)
+- Buton 📌 pe fiecare rând din Audit Log pentru a marca intrări critice (anomalii, momente importante, modificări de investigat)
+- Promptl pentru notă opțională (max 240 caractere) la pin, confirm la unpin
+- Backend: `POST /api/admin/audit-log/{id}/pin` (toggle) + extindere list/single cu câmpurile `pinned`, `pinned_note`, `pinned_at`, `pinned_by`, `pinned_by_name`
+- Filtru `?pinned=true` în list endpoint + sortare pinned-first
+- Toggle "Doar Pinned" în toolbar cu badge counter (numărul total de pinned)
+- Visual: border-left amber gros, badge `📌 PIN` lângă target, notă afișată inline sub titlu
+- Detail-view: casetă amber "Marcat ca anomalie / moment important" cu nota completă, autor și timestamp
+- Search-ul include și `pinned_note`
+- Checkbox-uri pe rândurile din Audit Log (max 2 selectate simultan, FIFO drop)
+- Buton "🔬 Compară selectate (2)" în toolbar care deschide modal Diff Compare
+- Modal afișează cronologic Mai vechi (stânga) / Mai nou (dreapta) cu header (acțiune, actor, timestamp)
 - **2 moduri vizualizare** (toggle):
   1. **Tabel câmpuri** — key-by-key comparison pentru obiecte, marker amber `●` pe câmpuri schimbate
   2. **Diff linie cu linie** — GitHub-style side-by-side cu numere de linie, LCS algorithm, fundal roșu/verde, prefixe `−`/`+`, statistici `+N −N linii modificate`

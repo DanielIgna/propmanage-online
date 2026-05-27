@@ -18,7 +18,7 @@ from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -1155,6 +1155,7 @@ async def list_audit_log(
     actor_id: Optional[str] = None,
     target_type: Optional[str] = None,
     q: Optional[str] = None,
+    pinned: Optional[bool] = None,
     limit: int = Query(100, le=500),
     skip: int = 0,
 ):
@@ -1165,15 +1166,19 @@ async def list_audit_log(
         filt["actor_id"] = actor_id
     if target_type:
         filt["target_type"] = target_type
+    if pinned is True:
+        filt["pinned"] = True
     if q:
         filt["$or"] = [
             {"actor_name": {"$regex": q, "$options": "i"}},
             {"actor_email": {"$regex": q, "$options": "i"}},
             {"target_label": {"$regex": q, "$options": "i"}},
             {"note": {"$regex": q, "$options": "i"}},
+            {"pinned_note": {"$regex": q, "$options": "i"}},
         ]
     total = await db.admin_audit_log.count_documents(filt)
-    cursor = db.admin_audit_log.find(filt).sort("created_at", -1).skip(skip).limit(limit)
+    # Sort: pinned first, then newest
+    cursor = db.admin_audit_log.find(filt).sort([("pinned", -1), ("created_at", -1)]).skip(skip).limit(limit)
     items = []
     async for d in cursor:
         items.append({
@@ -1190,8 +1195,14 @@ async def list_audit_log(
             "note": d.get("note"),
             "created_at": d.get("created_at"),
             "rollbackable": d.get("action") in ROLLBACKABLE_ACTIONS,
+            "pinned": bool(d.get("pinned")),
+            "pinned_note": d.get("pinned_note"),
+            "pinned_at": d.get("pinned_at"),
+            "pinned_by": d.get("pinned_by"),
+            "pinned_by_name": d.get("pinned_by_name"),
         })
-    return {"items": items, "total": total, "skip": skip, "limit": limit}
+    pinned_total = await db.admin_audit_log.count_documents({"pinned": True})
+    return {"items": items, "total": total, "skip": skip, "limit": limit, "pinned_total": pinned_total}
 
 
 @router.get("/audit-log/actions")
@@ -1421,7 +1432,59 @@ async def get_audit_entry(entry_id: str, user: dict = Depends(require_role("admi
         "note": d.get("note"),
         "created_at": d.get("created_at"),
         "rollbackable": d.get("action") in ROLLBACKABLE_ACTIONS,
+        "pinned": bool(d.get("pinned")),
+        "pinned_note": d.get("pinned_note"),
+        "pinned_at": d.get("pinned_at"),
+        "pinned_by": d.get("pinned_by"),
+        "pinned_by_name": d.get("pinned_by_name"),
     }
+
+
+@router.post("/audit-log/{entry_id}/pin")
+async def toggle_pin_audit_entry(
+    entry_id: str,
+    payload: dict = Body(default={}),
+    user: dict = Depends(require_role("admin")),
+):
+    """Toggle pin state on an audit entry. Pinned entries surface at top + appear in Pinned Anomalies dashboard widget.
+    Body: { pinned: bool (optional, default toggle), note: str (optional, max 240 chars) }
+    """
+    try:
+        oid = ObjectId(entry_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid entry id")
+    entry = await db.admin_audit_log.find_one({"_id": oid})
+    if not entry:
+        raise HTTPException(404, "Audit entry not found")
+
+    current_pinned = bool(entry.get("pinned"))
+    # Allow explicit pinned value, else toggle
+    new_pinned = payload.get("pinned")
+    if new_pinned is None:
+        new_pinned = not current_pinned
+    else:
+        new_pinned = bool(new_pinned)
+
+    note = (payload.get("note") or "").strip()[:240] if payload.get("note") else None
+
+    if new_pinned:
+        await db.admin_audit_log.update_one(
+            {"_id": oid},
+            {"$set": {
+                "pinned": True,
+                "pinned_note": note,
+                "pinned_at": datetime.now(timezone.utc).isoformat(),
+                "pinned_by": user["id"],
+                "pinned_by_name": user.get("name") or user.get("email"),
+            }},
+        )
+    else:
+        await db.admin_audit_log.update_one(
+            {"_id": oid},
+            {"$set": {"pinned": False}, "$unset": {"pinned_note": "", "pinned_at": "", "pinned_by": "", "pinned_by_name": ""}},
+        )
+
+    return {"ok": True, "pinned": new_pinned, "pinned_note": note if new_pinned else None}
 
 
 @router.post("/audit-log/{entry_id}/rollback")

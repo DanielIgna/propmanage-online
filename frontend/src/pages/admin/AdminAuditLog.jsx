@@ -1,7 +1,7 @@
 // Audit Log — view all admin actions (CMS edits, user bans, setting changes, presets, etc.)
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { Search, Download, RefreshCw, ChevronRight } from "lucide-react";
+import { Search, Download, RefreshCw, ChevronRight, Pin, PinOff } from "lucide-react";
 import { AdminCard, AdminBtn } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
 
@@ -57,6 +57,37 @@ export const AdminAuditLog = () => {
   const [showCompare, setShowCompare] = useState(false);
   const [pendingCompare, setPendingCompare] = useState(null); // [id1, id2] from URL ?compare=
   const [missingCompare, setMissingCompare] = useState(false); // shareable link entries not found
+  const [pinnedOnly, setPinnedOnly] = useState(false);
+  const [pinning, setPinning] = useState(null); // entry id being pinned/unpinned
+
+  const togglePin = async (entry) => {
+    let note = entry.pinned_note;
+    if (!entry.pinned) {
+      // Show prompt for optional context note when pinning (not when unpinning)
+      const input = window.prompt(
+        `📌 Marchezi această intrare ca anomalie/eveniment important.\n\nAdaugă o notă scurtă (opțional, max 240 caractere):\n\nEx: "Modificarea care a stricat producția pe 15 feb"`,
+        ""
+      );
+      // null = cancelled
+      if (input === null) return;
+      note = (input || "").trim().slice(0, 240);
+    } else if (!window.confirm("Demarchezi această intrare? Nota anexată va fi ștearsă.")) {
+      return;
+    }
+    setPinning(entry.id);
+    try {
+      await axios.post(`${API}/admin/audit-log/${entry.id}/pin`, {
+        pinned: !entry.pinned,
+        note,
+      });
+      flash(entry.pinned ? "✓ Pin eliminat" : `📌 Intrare marcată${note ? ` cu nota: "${note.slice(0, 40)}${note.length > 40 ? "..." : ""}"` : ""}`);
+      load();
+    } catch (e) {
+      flash(`❌ ${e?.response?.data?.detail || "Eroare la pin"}`);
+    } finally {
+      setPinning(null);
+    }
+  };
 
   const toggleSelect = (id) => {
     setSelected(prev => {
@@ -88,6 +119,7 @@ export const AdminAuditLog = () => {
     const params = { limit: 100, skip };
     if (filterAction) params.action = filterAction;
     if (q) params.q = q;
+    if (pinnedOnly) params.pinned = true;
     axios.get(`${API}/admin/audit-log`, { params })
       .then(r => setData(r.data))
       .finally(() => setLoading(false));
@@ -106,7 +138,7 @@ export const AdminAuditLog = () => {
     } catch { /* ignore */ }
   }, []);
 
-  useEffect(() => { load(); }, [filterAction, skip]);
+  useEffect(() => { load(); }, [filterAction, skip, pinnedOnly]);
 
   // Auto-resolve shareable compare link once data is loaded
   useEffect(() => {
@@ -169,6 +201,22 @@ export const AdminAuditLog = () => {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={() => { setPinnedOnly(!pinnedOnly); setSkip(0); }}
+            className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors flex items-center gap-1.5 ${
+              pinnedOnly
+                ? "border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:border-amber-500/50 dark:text-amber-300"
+                : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+            }`}
+            data-testid="audit-pinned-only-toggle"
+            title="Afișează doar intrările marcate (anomalii / momente importante)"
+          >
+            <Pin className="w-3.5 h-3.5" /> {pinnedOnly ? "Doar Pinned ✓" : "Doar Pinned"}
+            {data.pinned_total > 0 && !pinnedOnly && (
+              <span className="ml-1 text-[10px] bg-amber-500 text-white rounded-full px-1.5 py-0.5">{data.pinned_total}</span>
+            )}
+          </button>
           <AdminBtn variant="ghost" type="button" onClick={load} data-testid="audit-refresh">
             <RefreshCw className="w-3.5 h-3.5 inline mr-1" /> Refresh
           </AdminBtn>
@@ -207,7 +255,9 @@ export const AdminAuditLog = () => {
                 className={`rounded-lg border ${
                   isSelected
                     ? "border-amber-400 dark:border-amber-500/60 bg-amber-50 dark:bg-amber-500/10 ring-2 ring-amber-200 dark:ring-amber-500/30"
-                    : isOpen ? "border-blue-200 dark:border-blue-500/30 bg-blue-50/30 dark:bg-blue-500/5" : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30"
+                    : e.pinned
+                      ? "border-l-4 border-l-amber-500 border-amber-200 dark:border-amber-500/40 bg-amber-50/40 dark:bg-amber-500/5"
+                      : isOpen ? "border-blue-200 dark:border-blue-500/30 bg-blue-50/30 dark:bg-blue-500/5" : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30"
                 } transition-colors`}
                 data-testid={`audit-row-${e.id}`}
               >
@@ -230,21 +280,60 @@ export const AdminAuditLog = () => {
                       {meta.icon} {meta.label}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm">
+                      <div className="text-sm flex items-center gap-1.5 flex-wrap">
                         <span className="font-medium">{e.actor_name || "Sistem"}</span>
-                        <span className="text-slate-500"> a modificat </span>
+                        <span className="text-slate-500">a modificat</span>
                         <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{e.target_label || e.target_type || "—"}</span>
+                        {e.pinned && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-white" title={e.pinned_note || "Marcat ca anomalie"}>
+                            <Pin className="w-2.5 h-2.5" /> PIN
+                          </span>
+                        )}
                       </div>
+                      {e.pinned && e.pinned_note && (
+                        <div className="text-xs text-amber-700 dark:text-amber-300 mt-0.5 italic flex items-start gap-1" data-testid={`audit-pin-note-${e.id}`}>
+                          <span>📌</span><span className="truncate">{e.pinned_note}</span>
+                        </div>
+                      )}
                       <div className="text-[11px] text-slate-500 mt-0.5">{fmtTime(e.created_at)} · {e.actor_email}</div>
                     </div>
                     {hasDetail && (
                       <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${isOpen ? "rotate-90" : ""}`} />
                     )}
                   </button>
+                  <button
+                    onClick={(ev) => { ev.stopPropagation(); togglePin(e); }}
+                    disabled={pinning === e.id}
+                    className={`shrink-0 px-3 flex items-center justify-center border-l ${
+                      e.pinned
+                        ? "text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/30 hover:bg-amber-100/50 dark:hover:bg-amber-500/10"
+                        : "text-slate-400 hover:text-amber-600 border-slate-100 dark:border-slate-800 hover:bg-amber-50 dark:hover:bg-amber-500/5"
+                    } disabled:opacity-50 transition-colors`}
+                    title={e.pinned ? "Demarchează" : "Marchează ca anomalie / moment important"}
+                    data-testid={`audit-pin-${e.id}`}
+                  >
+                    {pinning === e.id ? (
+                      <span className="text-xs">...</span>
+                    ) : e.pinned ? (
+                      <PinOff className="w-4 h-4" />
+                    ) : (
+                      <Pin className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
 
                 {isOpen && hasDetail && (
                   <div className="px-3 pb-3 pt-1 border-t border-slate-100 dark:border-slate-800" data-testid={`audit-detail-${e.id}`}>
+                    {e.pinned && (
+                      <div className="mb-3 p-2 rounded-lg bg-amber-100/60 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-xs flex items-start gap-2" data-testid={`audit-pin-detail-${e.id}`}>
+                        <Pin className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-amber-800 dark:text-amber-300">Marcat ca anomalie / moment important</div>
+                          {e.pinned_note && <div className="italic text-amber-700 dark:text-amber-200 mt-0.5">"{e.pinned_note}"</div>}
+                          <div className="text-[10px] text-amber-600/80 dark:text-amber-400/80 mt-0.5">de {e.pinned_by_name || "—"} · {fmtTime(e.pinned_at)}</div>
+                        </div>
+                      </div>
+                    )}
                     <div className="grid md:grid-cols-2 gap-3">
                       {e.before && (
                         <div>
