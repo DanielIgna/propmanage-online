@@ -730,6 +730,115 @@ async def list_repair_suggestions(
     return {"items": items, "counts": counts}
 
 
+@router.get("/repair-suggestions/audit")
+async def repair_audit_log(
+    days: int = Query(30, ge=1, le=365),
+    user: dict = Depends(require_role("admin")),
+):
+    """Aggregate repair-suggestion effectiveness per finding pattern over the last N days.
+    Returns rows so admin can see which AI suggestions actually work (high apply rate)
+    and which patterns the LLM struggles with (high reject rate or low apply rate).
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+    # Per-pattern aggregation
+    pipeline = [
+        {"$match": {"created_at": {"$gte": cutoff}}},
+        {"$group": {
+            "_id": "$finding_pattern",
+            "total": {"$sum": 1},
+            "proposed": {"$sum": {"$cond": [{"$eq": ["$status", "proposed"]}, 1, 0]}},
+            "approved": {"$sum": {"$cond": [{"$eq": ["$status", "approved"]}, 1, 0]}},
+            "rejected": {"$sum": {"$cond": [{"$eq": ["$status", "rejected"]}, 1, 0]}},
+            "applied": {"$sum": {"$cond": [{"$eq": ["$status", "applied"]}, 1, 0]}},
+            "avg_minutes": {"$avg": "$estimated_minutes"},
+            "avg_regenerations": {"$avg": "$regeneration_count"},
+            "high_risk": {"$sum": {"$cond": [{"$eq": ["$risk_level", "high"]}, 1, 0]}},
+            "last_label": {"$last": "$finding_label"},
+            "last_created_at": {"$max": "$created_at"},
+        }},
+        {"$sort": {"total": -1}},
+    ]
+
+    rows = []
+    async for r in db.admin_ai_repair_suggestions.aggregate(pipeline):
+        total = r["total"] or 1
+        applied = r["applied"]
+        rejected = r["rejected"]
+        approved_total = r["approved"] + applied  # approved (not yet applied) + applied
+        # Effectiveness = applied / (decided)  where decided = approved+rejected+applied
+        decided = approved_total + rejected
+        effectiveness = round((applied / decided) * 100, 1) if decided else None
+        rows.append({
+            "pattern": r["_id"] or "unknown",
+            "pattern_label": r.get("last_label") or r["_id"],
+            "total": r["total"],
+            "proposed": r["proposed"],
+            "approved": r["approved"],
+            "applied": r["applied"],
+            "rejected": r["rejected"],
+            "approve_rate_pct": round((approved_total / total) * 100, 1),
+            "reject_rate_pct": round((rejected / total) * 100, 1),
+            "apply_rate_pct": round((applied / total) * 100, 1),
+            "effectiveness_pct": effectiveness,  # apply / decided (excludes proposed)
+            "avg_minutes": round(r.get("avg_minutes") or 0, 1),
+            "avg_regenerations": round(r.get("avg_regenerations") or 0, 2),
+            "high_risk": r["high_risk"],
+            "last_created_at": r["last_created_at"],
+        })
+
+    # Global totals
+    totals = {
+        "total": sum(r["total"] for r in rows),
+        "applied": sum(r["applied"] for r in rows),
+        "approved": sum(r["approved"] for r in rows),
+        "rejected": sum(r["rejected"] for r in rows),
+        "proposed": sum(r["proposed"] for r in rows),
+    }
+    decided_global = totals["applied"] + totals["approved"] + totals["rejected"]
+    totals["global_effectiveness_pct"] = round((totals["applied"] / decided_global) * 100, 1) if decided_global else None
+    totals["global_apply_rate_pct"] = round((totals["applied"] / totals["total"]) * 100, 1) if totals["total"] else 0
+    totals["window_days"] = days
+
+    # Highlight best & worst (only if pattern has ≥3 decided)
+    best = None
+    worst = None
+    for r in rows:
+        decided = r["approved"] + r["applied"] + r["rejected"]
+        if decided < 3:
+            continue
+        eff = r["effectiveness_pct"]
+        if eff is None:
+            continue
+        if best is None or eff > best["effectiveness_pct"]:
+            best = r
+        if worst is None or eff < worst["effectiveness_pct"]:
+            worst = r
+
+    return {
+        "rows": rows,
+        "totals": totals,
+        "best_pattern": best,
+        "worst_pattern": worst,
+    }
+
+
+@router.get("/repair-suggestions/by-pattern/{pattern}")
+async def list_by_pattern(
+    pattern: str,
+    days: int = Query(90, ge=1, le=365),
+    user: dict = Depends(require_role("admin")),
+):
+    """Drill-down: all suggestions for a given pattern in the window."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    cursor = db.admin_ai_repair_suggestions.find({
+        "finding_pattern": pattern,
+        "created_at": {"$gte": cutoff},
+    }).sort("created_at", -1).limit(200)
+    items = [_serialize_repair(d) async for d in cursor]
+    return {"pattern": pattern, "items": items, "count": len(items)}
+
+
 # ============= CHAT WITH AI INVESTIGATOR =============
 
 def _build_system_prompt() -> str:

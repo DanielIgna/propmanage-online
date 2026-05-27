@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { Bot, RefreshCw, Send, AlertTriangle, CheckCircle2, X, Trash2, Plus, FileSearch, Wrench, Sparkles, ShieldCheck } from "lucide-react";
 import { AdminCard, AdminBtn } from "./AdminLayoutMetronic";
+import { RepairAuditLog } from "./RepairAuditLog";
 import { API } from "../DashShared";
 
 const SEVERITY_COLORS = {
@@ -247,6 +248,9 @@ export const AdminAIConsole = () => {
           </div>
         )}
       </AdminCard>
+
+      {/* Repair Audit Log — metrics per finding pattern */}
+      <RepairAuditLog />
 
       {/* Chat console */}
       <AdminCard
