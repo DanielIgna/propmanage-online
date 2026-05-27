@@ -449,6 +449,22 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Banner roșu "⚠️ Link de compare invalid" dacă una/ambele intrări au fost șterse
 - URL e șters din browser history la închiderea modalului (no auto-reopen on refresh)
 
+### Phase 49 — GDPR Compliance Pack (Part A) — Feb 2026
+- **Backend** `routes/gdpr.py` (854 lines, fully built earlier) — now **registered in `server.py`** (router + admin_router live).
+  - Public endpoints: `GET /api/gdpr/documents/{ropa|sub-processors|cookies|dpia|breach-plan|company}` + PDF exports (`/pdf/ropa`, `/pdf/dpia`, `/pdf/notice/{role}`).
+  - Admin endpoints (Parts B-E ready for activation when needed): DSAR queue, breach drills audit, ROPA/Cookies/Subs CRUD, gdpr_audit collection.
+  - Defaults seeded: 10 ROPA activities, 5 sub-processors, 5 cookies, DPIA doc, 5-step breach plan.
+- **Frontend** `pages/admin/AdminGDPR.jsx` — 5-tab DPO-ready panel inside Admin Console:
+  - 📋 ROPA — expandable cards (10 procesări) with legal basis, retention, transfers, security.
+  - 🤖 DPIA AI Layer — risk factors vs mitigations grid + residual risk callout + PDF download.
+  - 🌐 Sub-procesatori — table with status pills (active/ready_to_activate), DPA links, SCC mechanism.
+  - 🍪 Cookies & Storage — first-party inventory + tracking-pixel-free disclaimer.
+  - 🚨 Breach Plan 72h — vertical timeline 5 steps with bullet actions per phase.
+- Sidebar nav: new **COMPLIANCE** section → "GDPR Pack" item (NEW badge) wired in `AdminLayoutMetronic.jsx` + `AdminConsole.jsx`.
+- Fixed pre-existing syntax error in `gdpr.py` (smart-quote string termination, line 766).
+
+
+
 ## Roadmap
 ### P1 (Next)
 - `server.py` routers split: auth.py, admin.py, operator.py, payments.py, requests.py, marketplace.py, design.py, portfolio.py (monolith ~2870 lines, refactor postponed multiple times)

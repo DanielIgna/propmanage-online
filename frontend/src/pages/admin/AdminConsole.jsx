@@ -16,6 +16,7 @@ import { AdminAIConsole } from "./AdminAIConsole";
 import { AdminConciergePanel } from "./AdminConciergePanel";
 import { AdminDemoTimeMachine } from "./AdminDemoTimeMachine";
 import { AdminDemoLeads } from "./AdminDemoLeads";
+import { AdminGDPR } from "./AdminGDPR";
 
 const TITLES = {
   overview: { title: "Dashboard", subtitle: "Privire de ansamblu asupra platformei" },
@@ -36,6 +37,7 @@ const TITLES = {
   trust: { title: "Trust Score Weights", subtitle: "Ajustează ponderea fiecărui factor (suma = 100%)" },
   audit: { title: "Audit Log", subtitle: "Istoric complet al acțiunilor admin · GDPR compliance" },
   settings: { title: "Setări Platformă", subtitle: "Feature flags, comisioane, branding" },
+  gdpr: { title: "GDPR Compliance Pack", subtitle: "Pachet documentar pentru DPO · ROPA · DPIA · Sub-procesatori · Cookies · Breach Plan" },
 };
 
 export const AdminDashboard = () => {
@@ -77,6 +79,7 @@ export const AdminDashboard = () => {
       {active === "abtests" && <AdminABTests />}
       {active === "audit" && <AdminAuditLog />}
       {active === "settings" && <AdminPlatformSettings />}
+      {active === "gdpr" && <AdminGDPR />}
     </AdminLayoutMetronic>
   );
 };

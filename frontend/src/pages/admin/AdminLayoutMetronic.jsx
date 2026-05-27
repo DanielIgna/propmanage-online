@@ -56,6 +56,12 @@ const NAV_SECTIONS = [
       { id: "settings", label: "Setări Platformă", icon: Settings },
     ],
   },
+  {
+    title: "COMPLIANCE",
+    items: [
+      { id: "gdpr", label: "GDPR Pack", icon: ShieldCheck, badge: "NEW" },
+    ],
+  },
 ];
 
 export const useAdminTheme = () => {

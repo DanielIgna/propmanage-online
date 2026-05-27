@@ -763,7 +763,7 @@ def _per_role_content(role: str):
             ]},
             {"title": "Ce colectăm de la tine", "paragraphs": [], "bullets": [
                 "Cookies necesare (autentificare, preferințe UI) — fără consent banner pentru cele strict necesare.",
-                "Dacă completezi formular „Programează demo": nume, email, telefon/WhatsApp opțional, companie.",
+                "Dacă completezi formular „Programează demo”: nume, email, telefon/WhatsApp opțional, companie.",
                 "Logs tehnice anonime (IP în formă agregată pentru rate limiting).",
             ]},
             {"title": "Ce NU facem", "paragraphs": [], "bullets": [
