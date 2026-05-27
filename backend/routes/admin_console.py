@@ -1222,6 +1222,181 @@ async def export_audit_log_csv(user: dict = Depends(require_role("admin"))):
     return _csv_response(rows, "audit_log.csv")
 
 
+# ============= SNAPSHOTS (full-state bookmarks) =============
+SNAPSHOT_PARTS = ["cms", "settings", "trust_weights", "presets"]
+
+
+class SnapshotIn(BaseModel):
+    name: str = Field(min_length=2, max_length=100)
+    description: Optional[str] = Field(default=None, max_length=500)
+    parts: List[str] = Field(default_factory=lambda: list(SNAPSHOT_PARTS))
+
+
+@router.post("/snapshots")
+async def create_snapshot(data: SnapshotIn, user: dict = Depends(require_role("admin"))):
+    parts = [p for p in data.parts if p in SNAPSHOT_PARTS]
+    if not parts:
+        raise HTTPException(400, "Selectează cel puțin o componentă pentru snapshot")
+    if await db.admin_snapshots.find_one({"name": data.name}):
+        raise HTTPException(400, "Un snapshot cu acest nume există deja")
+    snapshot_data = {}
+    counts = {}
+    if "cms" in parts:
+        cms_docs = await db.cms_content.find({}).to_list(500)
+        snapshot_data["cms"] = [{"key": d["key"], "value": d.get("value", "")} for d in cms_docs]
+        counts["cms"] = len(snapshot_data["cms"])
+    if "settings" in parts:
+        s = await db.platform_config.find_one({"key": "settings"})
+        snapshot_data["settings"] = (s or {}).get("value", {})
+        counts["settings"] = len(snapshot_data["settings"] or {})
+    if "trust_weights" in parts:
+        t = await db.platform_config.find_one({"key": "trust_weights"})
+        snapshot_data["trust_weights"] = (t or {}).get("value", {})
+        counts["trust_weights"] = 1 if snapshot_data["trust_weights"] else 0
+    if "presets" in parts:
+        ps = await db.landing_presets.find({}).to_list(100)
+        snapshot_data["presets"] = [
+            {"name": p["name"], "description": p.get("description"), "flags": p.get("flags", {}), "system": bool(p.get("system"))}
+            for p in ps
+        ]
+        counts["presets"] = len(snapshot_data["presets"])
+    doc = {
+        "name": data.name.strip(),
+        "description": data.description,
+        "parts": parts,
+        "data": snapshot_data,
+        "counts": counts,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": user["id"],
+        "created_by_name": user.get("name"),
+    }
+    res = await db.admin_snapshots.insert_one(doc)
+    await audit("snapshot.create", user,
+                target={"type": "snapshot", "id": str(res.inserted_id), "label": data.name},
+                after={"parts": parts, "counts": counts})
+    return {"ok": True, "id": str(res.inserted_id), "counts": counts}
+
+
+@router.get("/snapshots")
+async def list_snapshots(user: dict = Depends(require_role("admin"))):
+    docs = await db.admin_snapshots.find({}, {"data": 0}).sort("created_at", -1).to_list(100)
+    return [
+        {
+            "id": str(d["_id"]),
+            "name": d.get("name"),
+            "description": d.get("description"),
+            "parts": d.get("parts", []),
+            "counts": d.get("counts", {}),
+            "created_at": d.get("created_at"),
+            "created_by_name": d.get("created_by_name"),
+        }
+        for d in docs
+    ]
+
+
+@router.get("/snapshots/{snapshot_id}")
+async def get_snapshot(snapshot_id: str, user: dict = Depends(require_role("admin"))):
+    try:
+        oid = ObjectId(snapshot_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid snapshot id")
+    doc = await db.admin_snapshots.find_one({"_id": oid})
+    if not doc:
+        raise HTTPException(404, "Snapshot not found")
+    return {
+        "id": str(doc["_id"]),
+        "name": doc.get("name"),
+        "description": doc.get("description"),
+        "parts": doc.get("parts", []),
+        "counts": doc.get("counts", {}),
+        "data": doc.get("data"),
+        "created_at": doc.get("created_at"),
+        "created_by_name": doc.get("created_by_name"),
+    }
+
+
+@router.post("/snapshots/{snapshot_id}/restore")
+async def restore_snapshot(snapshot_id: str, user: dict = Depends(require_role("admin"))):
+    """Restore the snapshot's saved state. CMS/settings/trust replaced; presets only re-create missing custom ones."""
+    try:
+        oid = ObjectId(snapshot_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid snapshot id")
+    snap = await db.admin_snapshots.find_one({"_id": oid})
+    if not snap:
+        raise HTTPException(404, "Snapshot not found")
+    data = snap.get("data", {})
+    now_iso = datetime.now(timezone.utc).isoformat()
+    restored = {}
+
+    if "cms" in data:
+        # Wipe current overrides and insert snapshot overrides
+        await db.cms_content.delete_many({})
+        if data["cms"]:
+            await db.cms_content.insert_many([
+                {"key": e["key"], "value": e.get("value", ""), "updated_at": now_iso, "updated_by": user["id"]}
+                for e in data["cms"]
+            ])
+        restored["cms"] = len(data["cms"])
+
+    if "settings" in data and data["settings"]:
+        merged = {**DEFAULT_SETTINGS, **data["settings"]}
+        await db.platform_config.update_one(
+            {"key": "settings"},
+            {"$set": {"key": "settings", "value": merged, "updated_at": now_iso, "updated_by": user["id"]}},
+            upsert=True,
+        )
+        restored["settings"] = len(data["settings"])
+
+    if "trust_weights" in data and data["trust_weights"]:
+        await db.platform_config.update_one(
+            {"key": "trust_weights"},
+            {"$set": {"key": "trust_weights", "value": data["trust_weights"], "updated_at": now_iso, "updated_by": user["id"]}},
+            upsert=True,
+        )
+        restored["trust_weights"] = 1
+
+    if "presets" in data:
+        # Re-create custom presets if missing by name (preserves system ones, doesn't duplicate)
+        added = 0
+        for p in data["presets"]:
+            if p.get("system"):
+                continue  # Don't touch system presets
+            existing = await db.landing_presets.find_one({"name": p["name"]})
+            if not existing:
+                await db.landing_presets.insert_one({
+                    "name": p["name"],
+                    "description": p.get("description"),
+                    "flags": p.get("flags", {}),
+                    "system": False,
+                    "created_at": now_iso,
+                    "created_by": user["id"],
+                    "restored_from_snapshot": str(oid),
+                })
+                added += 1
+        restored["presets_added"] = added
+
+    await audit("snapshot.restore", user,
+                target={"type": "snapshot", "id": snapshot_id, "label": snap.get("name")},
+                after={"restored": restored})
+    return {"ok": True, "name": snap.get("name"), "restored": restored}
+
+
+@router.delete("/snapshots/{snapshot_id}")
+async def delete_snapshot(snapshot_id: str, user: dict = Depends(require_role("admin"))):
+    try:
+        oid = ObjectId(snapshot_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid snapshot id")
+    doc = await db.admin_snapshots.find_one({"_id": oid}, {"name": 1})
+    if not doc:
+        raise HTTPException(404, "Not found")
+    await db.admin_snapshots.delete_one({"_id": oid})
+    await audit("snapshot.delete", user,
+                target={"type": "snapshot", "id": snapshot_id, "label": doc.get("name")})
+    return {"ok": True}
+
+
 @router.post("/audit-log/{entry_id}/rollback")
 async def rollback_audit_entry(entry_id: str, user: dict = Depends(require_role("admin"))):
     """Restore the `before` state of an audit entry. Idempotent within reason — creates a new audit entry."""
