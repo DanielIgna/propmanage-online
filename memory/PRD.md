@@ -473,6 +473,16 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - **Bug fix**: Syntax error in `gdpr.py` (smart-quote string termination line 766).
 - **Test results**: All endpoints validated end-to-end (client login → erasure submit → admin sees request with SLA 30z; bundle ZIP returns 23KB application/zip; granular consents persisted). Notices page renders 5 cards. All 7 GDPR tabs render in admin.
 
+### Phase 50 — Digital Twin Pro Module (Phases A-F) — Feb 2026 — verified live
+- **Phase A (Backend infra + Subscription Gate)** — Isolated `routes/digital_twin.py` with collections `digital_twin_projects` / `_models` / `_pins` / `_comments` / `_plans`. Subscription gating via `user.digital_twin_pro` flag (admin/operator bypass). Admin grant endpoint `POST /api/admin/digital-twin/subscription/grant`. Pin-only DT Pro stripe wiring deferred.
+- **Phase B (GLB Upload)** — `POST /api/digital-twin/projects/{id}/upload` streaming chunked PUT (1MB chunks, 200MB hard cap), .glb/.gltf only. Files stored at `/app/backend/uploads/digital_twin/{pid}/`. Auth-checked serve route `/files/{pid}/{filename}` returns `model/gltf-binary`.
+- **Phase C (R3F Viewer MVP)** — `components/DigitalTwinViewer.jsx` with three.js + @react-three/fiber + @react-three/drei. 5 face styles (Shaded/X-Ray/Wireframe/White/Monochrome), auto-detected layer toggle from mesh names (AR_PERETI, AR_USI, AR_STALPI etc.), OrbitControls with damping. Procedural demo house when no model uploaded. **CRITICAL**: `/app/scripts/patch_r3f.sh` patches @react-three/fiber RESERVED_PROPS to ignore Emergent's JSX `x-line-number` injection (must re-run after `yarn install`).
+- **Phase D (Tools)** — Tape Measure (click 2 points → distance with axis labels), Section Plane (X/Y/Z axis clipping with slider, localClippingEnabled on GL).
+- **Phase E (3D Pins + Threaded Comments)** — Raycast pin drop on mesh click, draft modal with category (general/structural/plumbing/electrical/hvac/finish/defect) + priority (low/normal/high/urgent), threaded comments modal per pin with status workflow (open/in_review/resolved/rejected) + delete. Stakeholder email notifications on pin creation + comments (tpl_dt_pin_created, tpl_dt_comment_added).
+- **Phase F (2D Plans PDF Viewer)** — New `components/DigitalTwinPlans.jsx` using `pdfjs-dist@4.7.76` (worker at `/pdf.worker.min.mjs`). Upload PDF (50MB cap, plan_type: floorplan/section/elevation/detail/site/other), sidebar list with filter pills, canvas-based PDF render with page nav + zoom (40-300%), authenticated serve route `/api/digital-twin/plans/{pid}/{file}`. Project cards now show 📐 plan_count + Layers button to open panel. Inside 3D viewer, new `dt-open-plans` button jumps to plans panel for same project. Path traversal protected.
+- **Test results**: Phase D+E iteration_19.json 100% frontend pass. Phase F iteration_20.json 15/15 backend pytest + 100% frontend E2E pass (upload/list/serve/PATCH/DELETE + filter/zoom/page-nav + 3D viewer→plans jump). Pytest file: `/app/backend/tests/test_phase_f_plans.py`.
+- **Auth whitelist enforcement**: `ADMIN_EMAILS` env (danieligna1@gmail.com, carlospacu@gmail.com, admin@propmanage.io) — `/auth/me` auto-demotes stray admins to operator on every request, auto-promotes whitelisted emails to admin.
+
 
 
 ## Roadmap
