@@ -232,7 +232,7 @@ const QuickProfileSwitch = ({ dark }) => {
     <div className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+        className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors whitespace-nowrap ${
           dark
             ? "bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/25"
             : "bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
@@ -241,7 +241,8 @@ const QuickProfileSwitch = ({ dark }) => {
         title="Intră rapid într-un profil (jurnalizat GDPR · 2h)"
       >
         <UserCheck className="w-3.5 h-3.5" />
-        Schimbă profilul
+        <span className="hidden sm:inline">Schimbă profilul</span>
+        <span className="sm:hidden">Profil</span>
         <ChevronDown className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
