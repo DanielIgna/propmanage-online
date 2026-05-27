@@ -24,7 +24,15 @@ from pydantic import BaseModel, Field
 
 from db import db
 from deps import get_current_user, require_role
-from email_service import send_template, tpl_dt_pin_created, tpl_dt_comment_added
+from email_service import (
+    send_template,
+    tpl_dt_pin_created,
+    tpl_dt_comment_added,
+    tpl_dt_pin_status_changed,
+    tpl_dt_model_uploaded,
+    tpl_dt_plan_uploaded,
+)
+from services import notify
 
 router = APIRouter(prefix="/api/digital-twin", tags=["digital-twin"])
 
@@ -338,6 +346,24 @@ async def upload_model(
         {"id": project_id},
         {"$set": {"model_url": public_path, "updated_at": _now_iso()}, "$inc": {"model_count": 1}},
     )
+    # Phase G: notify stakeholders the architect updated the model
+    actor_name = user.get("name") or user.get("email") or "Utilizator"
+    project_name = p.get("name", "Proiect")
+    size_mb = total / (1024 * 1024)
+    stakeholders = await _project_stakeholders(p, exclude_user_id=user["id"])
+    for s in stakeholders:
+        await notify(
+            s["id"],
+            "🏗️ Model 3D actualizat",
+            f"{actor_name} a încărcat {raw_name} pe {project_name}",
+            type_="dt_model",
+            link="/digital-twin",
+        )
+        await send_template(
+            tpl_dt_model_uploaded,
+            s["name"], project_name, raw_name, size_mb, actor_name,
+            to=s["email"],
+        )
     return _clean(model_doc)
 
 
@@ -418,13 +444,21 @@ async def create_pin(project_id: str, payload: PinCreate, user: dict = Depends(g
         {"id": project_id},
         {"$set": {"updated_at": _now_iso()}, "$inc": {"pin_count": 1}},
     )
-    # Notify stakeholders (fire-and-forget)
+    # Notify stakeholders (fire-and-forget): in-app + email + push
     stakeholders = await _project_stakeholders(project, exclude_user_id=user["id"])
     actor_name = user.get("name") or user.get("email") or "Utilizator"
+    project_name = project.get("name", "Proiect")
     for s in stakeholders:
+        await notify(
+            s["id"],
+            f"📌 Pin nou pe {project_name}",
+            f"{actor_name}: {doc['title']}",
+            type_="dt_pin",
+            link="/digital-twin",
+        )
         await send_template(
             tpl_dt_pin_created,
-            s["name"], project.get("name", "Proiect"), doc["title"], doc["category"], doc["priority"], actor_name,
+            s["name"], project_name, doc["title"], doc["category"], doc["priority"], actor_name,
             to=s["email"],
         )
     return _clean(doc)
@@ -463,14 +497,52 @@ async def update_pin(pin_id: str, payload: PinUpdate, user: dict = Depends(get_c
     pin = await db.digital_twin_pins.find_one({"id": pin_id})
     if not pin:
         raise HTTPException(404, "Pin not found.")
-    await _ensure_project_access(pin["project_id"], user)
+    project = await _ensure_project_access(pin["project_id"], user)
     updates = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not updates:
         return _clean(pin)
+    old_status = pin.get("status")
     updates["updated_at"] = _now_iso()
     await db.digital_twin_pins.update_one({"id": pin_id}, {"$set": updates})
-    pin = await db.digital_twin_pins.find_one({"id": pin_id})
-    return _clean(pin)
+    pin_after = await db.digital_twin_pins.find_one({"id": pin_id})
+
+    # Phase G: workflow notification on status change
+    new_status = updates.get("status")
+    if new_status and new_status != old_status:
+        actor_name = user.get("name") or user.get("email") or "Utilizator"
+        project_name = project.get("name", "Proiect")
+        # Notify pin author (if not the actor) + all stakeholders
+        recipients_ids = set()
+        if pin.get("author_id") and pin["author_id"] != user["id"]:
+            recipients_ids.add(pin["author_id"])
+        stakeholders = await _project_stakeholders(project, exclude_user_id=user["id"])
+        status_label = {"open": "Deschis", "in_review": "În analiză", "resolved": "Rezolvat", "rejected": "Respins"}.get(new_status, new_status)
+        for s in stakeholders:
+            recipients_ids.add(s["id"])
+            await send_template(
+                tpl_dt_pin_status_changed,
+                s["name"], project_name, pin_after["title"], old_status, new_status, actor_name,
+                to=s["email"],
+            )
+        # Always also email the original author if not the actor
+        if pin.get("author_id") and pin["author_id"] != user["id"]:
+            author = await db.users.find_one(_user_filter(pin["author_id"]), {"_id": 1, "email": 1, "name": 1})
+            if author and author.get("email") and not any(s["id"] == pin["author_id"] for s in stakeholders):
+                await send_template(
+                    tpl_dt_pin_status_changed,
+                    author.get("name") or author["email"], project_name, pin_after["title"], old_status, new_status, actor_name,
+                    to=author["email"],
+                )
+        # In-app notification for everyone touched
+        for uid in recipients_ids:
+            await notify(
+                uid,
+                f"🔄 Pin {status_label.lower()}",
+                f"{pin_after['title']} pe {project_name}",
+                type_="dt_pin_status",
+                link="/digital-twin",
+            )
+    return _clean(pin_after)
 
 
 @router.delete("/pins/{pin_id}")
@@ -509,7 +581,7 @@ async def add_comment(pin_id: str, payload: CommentCreate, user: dict = Depends(
     pin = await db.digital_twin_pins.find_one({"id": pin_id})
     if not pin:
         raise HTTPException(404, "Pin not found.")
-    await _ensure_project_access(pin["project_id"], user)
+    project = await _ensure_project_access(pin["project_id"], user)
     doc = {
         "id": _new_id(),
         "pin_id": pin_id,
@@ -526,6 +598,51 @@ async def add_comment(pin_id: str, payload: CommentCreate, user: dict = Depends(
         {"id": pin_id},
         {"$inc": {"comment_count": 1}, "$set": {"updated_at": _now_iso()}},
     )
+
+    # Phase G: workflow notification on comment added
+    actor_name = doc["author_name"] or "Utilizator"
+    project_name = project.get("name", "Proiect")
+    # Recipients: pin author (if not actor) + all project stakeholders + all previous commenters on this pin
+    recipient_ids = set()
+    if pin.get("author_id") and pin["author_id"] != user["id"]:
+        recipient_ids.add(pin["author_id"])
+    # Previous commenters in the thread
+    async for prev in db.digital_twin_comments.find({"pin_id": pin_id, "author_id": {"$ne": user["id"]}}, {"author_id": 1}):
+        if prev.get("author_id"):
+            recipient_ids.add(prev["author_id"])
+    stakeholders = await _project_stakeholders(project, exclude_user_id=user["id"])
+    for s in stakeholders:
+        recipient_ids.add(s["id"])
+    # Email each unique recipient (resolve email for non-stakeholder IDs too)
+    emailed = set()
+    for s in stakeholders:
+        if s["email"] not in emailed:
+            emailed.add(s["email"])
+            await send_template(
+                tpl_dt_comment_added,
+                s["name"], project_name, pin["title"], actor_name, user.get("role"), doc["message"],
+                to=s["email"],
+            )
+    # Email pin author + thread commenters even if not stakeholders
+    extra_ids = recipient_ids - {s["id"] for s in stakeholders}
+    for uid in extra_ids:
+        u = await db.users.find_one(_user_filter(uid), {"_id": 1, "email": 1, "name": 1})
+        if u and u.get("email") and u["email"] not in emailed:
+            emailed.add(u["email"])
+            await send_template(
+                tpl_dt_comment_added,
+                u.get("name") or u["email"], project_name, pin["title"], actor_name, user.get("role"), doc["message"],
+                to=u["email"],
+            )
+    # In-app notification
+    for uid in recipient_ids:
+        await notify(
+            uid,
+            "💬 Răspuns pe pin",
+            f"{actor_name}: {pin['title']}",
+            type_="dt_comment",
+            link="/digital-twin",
+        )
     return _clean(doc)
 
 
@@ -620,6 +737,23 @@ async def upload_plan(
         {"id": project_id},
         {"$set": {"updated_at": _now_iso()}, "$inc": {"plan_count": 1}},
     )
+    # Phase G: notify stakeholders a new 2D plan was uploaded
+    actor_name = user.get("name") or user.get("email") or "Utilizator"
+    project_name = p.get("name", "Proiect")
+    stakeholders = await _project_stakeholders(p, exclude_user_id=user["id"])
+    for s in stakeholders:
+        await notify(
+            s["id"],
+            f"📐 Plan 2D nou: {doc['title']}",
+            f"{actor_name} pe {project_name}",
+            type_="dt_plan",
+            link="/digital-twin",
+        )
+        await send_template(
+            tpl_dt_plan_uploaded,
+            s["name"], project_name, doc["title"], doc["plan_type"], actor_name,
+            to=s["email"],
+        )
     return _clean(doc)
 
 

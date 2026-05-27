@@ -392,6 +392,7 @@ export default function DigitalTwinPage() {
       <DigitalTwinPlans
         projectId={plansFor.id}
         projectName={plansFor.name}
+        projectModelUrl={plansFor.model_url}
         onClose={() => setPlansFor(null)}
       />
     );

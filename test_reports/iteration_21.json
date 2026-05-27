@@ -1,0 +1,28 @@
+{
+  "summary": "Phase F+ (split view-mode) and Phase G (workflow notifications) — full backend + frontend validation. Backend pytest 6/6 PASS covering pin created, pin status changed, comment added, model uploaded, plan uploaded events + actor-self-exclusion. Frontend E2E PASS: dt-view-mode-toggle visible with 3 buttons (2d/split/3d), split mode mounts both plans-pdf-pane (~832px) and plans-3d-pane (~832px) with embedded dt-viewer using compact w-56 sidebar (224px verified), 3D-only mode hides PDF pane and viewer expands to full 1920px width with class 'relative w-full h-full' (no fixed inset-0), 2D mode hides 3d pane correctly. All assertions met.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_g_notifications.py",
+    "/app/test_reports/pytest/phase_g_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "services.notify() L108 (services.py) calls db.users.find_one({'_id': ObjectId(user_id)}) — if user_id is ever passed as something that is not a valid 24-char hex (e.g. a custom uuid id), bson.ObjectId() will raise InvalidId. Currently all DT recipient ids come from str(u['_id']) so this works, but worth wrapping in try/except to harden against future regressions when other modules call notify().",
+    "DigitalTwinPlans.jsx 'dt-view-mode-toggle' wrapper uses 'hidden sm:flex' — on mobile (<640px) the toggle is hidden entirely with no alternative; mobile users have no way to switch to split/3D. Consider a mobile-friendly dropdown or always-visible compact toggle.",
+    "In 3D-only view mode, compactSidebar={viewMode === 'split'} resolves to false → embedded viewer still renders the full w-72 sidebar. The Phase F+ spec mentions 'Sidebar list also disappears' for 3d mode, but current implementation keeps the full sidebar in 3d-only embedded view. Functionality-wise this is arguably better (gives access to all tools), but it diverges slightly from the written spec. Confirm intent with PM.",
+    "tpl_dt_* email templates are fire-and-forget via asyncio.create_task in notify() — if the email provider is misconfigured, failure is only visible in backend logs. Consider adding a /api/admin/email-health endpoint surfacing last-N failures."
+  ],
+  "updated_files": ["/app/backend/tests/test_phase_g_notifications.py"],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100% on all Phase F+ flows"},
+  "test_credentials": "admin@propmanage.io / Admin123! (auto DT Pro via role bypass), specialist@propmanage.io / Spec123! (DT Pro granted via /api/admin/digital-twin/subscription/grant during fixture setup).",
+  "seed_data_creation": "Tests create a fresh DT project 'TEST_PhaseG_{ts}' with admin as owner + specialist as member, post 1 pin, change status, add 2 comments, upload 1 .glb (108 bytes) and 1 minimal PDF (~390 bytes). Project is deleted via fixture teardown.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Reusable Phase G test at /app/backend/tests/test_phase_g_notifications.py — uses module-scoped admin/spec sessions and creates fresh project per run (deleted on teardown). /auth/login response does NOT include {user} payload for this app — must call /auth/me separately after login (already handled in helper). The notify() function persists docs to db.notifications and is checked via GET /api/notifications. All 5 notification events confirmed: dt_pin (created), dt_pin_status (status change), dt_comment (comments), dt_model (model upload), dt_plan (plan upload). Actor self-exclusion verified for both create + status + comment flows. Frontend Phase F+ split-view toggle works end-to-end; embedded viewer correctly uses 'relative w-full h-full' instead of 'fixed inset-0'.",
+  "rca_of_the_issue": "N/A — all features behave as specified, no bugs found."
+}

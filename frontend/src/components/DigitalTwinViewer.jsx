@@ -303,7 +303,7 @@ const ResetCamera = ({ resetTrigger }) => {
   return null;
 };
 
-export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, onOpenPlans }) => {
+export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, onOpenPlans, embedded = false, compactSidebar = false }) => {
   const [faceStyle, setFaceStyle] = useState("shaded");
   const [hiddenLayers, setHiddenLayers] = useState(new Set());
   const [layers, setLayers] = useState([]);
@@ -421,9 +421,9 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
   };
 
   return (
-    <div className="fixed inset-0 z-40 bg-stone-950 flex" data-testid="dt-viewer">
+    <div className={(embedded ? "relative w-full h-full" : "fixed inset-0 z-40") + " bg-stone-950 flex"} data-testid="dt-viewer">
       {/* Sidebar */}
-      <aside className="w-72 shrink-0 bg-stone-900 border-r border-white/10 flex flex-col">
+      <aside className={(compactSidebar ? "w-56" : "w-72") + " shrink-0 bg-stone-900 border-r border-white/10 flex flex-col"}>
         <div className="px-4 py-4 border-b border-white/10">
           <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-400/80 font-semibold mb-1">Digital Twin</div>
           <h2 className="font-serif text-lg text-white truncate">{projectName || "Demo Hyper-Model"}</h2>

@@ -3,9 +3,10 @@
 // page navigation, zoom controls, delete.
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { Upload, X, FileText, Trash2, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Layers, Loader2, Download } from "lucide-react";
+import { Upload, X, FileText, Trash2, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Layers, Loader2, Download, Box, Columns } from "lucide-react";
 import { API } from "../pages/DashShared";
 import * as pdfjsLib from "pdfjs-dist";
+import DigitalTwinViewer from "./DigitalTwinViewer";
 
 // Tell pdf.js where to find the worker.
 // We copied build/pdf.worker.min.mjs into /app/frontend/public/, so it's served at /pdf.worker.min.mjs
@@ -277,7 +278,7 @@ const UploadPlanModal = ({ projectId, onClose, onUploaded }) => {
 };
 
 // ============== MAIN PANEL ==============
-export default function DigitalTwinPlans({ projectId, projectName, onClose, embedded = false }) {
+export default function DigitalTwinPlans({ projectId, projectName, projectModelUrl, onClose, embedded = false }) {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -286,6 +287,8 @@ export default function DigitalTwinPlans({ projectId, projectName, onClose, embe
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.2);
   const [showUpload, setShowUpload] = useState(false);
+  // View mode: "2d" (only PDF + sidebar), "3d" (only 3D viewer), "split" (both side-by-side)
+  const [viewMode, setViewMode] = useState("2d");
 
   const load = async () => {
     setLoading(true);
@@ -336,8 +339,35 @@ export default function DigitalTwinPlans({ projectId, projectName, onClose, embe
       <div className="flex items-center gap-3 px-4 sm:px-6 py-3 border-b border-white/10 bg-stone-950/80 backdrop-blur shrink-0">
         <Layers className="w-5 h-5 text-emerald-400" />
         <div className="flex-1 min-w-0">
-          <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-400/80 font-semibold">Planuri 2D · Phase F</div>
+          <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-400/80 font-semibold">Planuri 2D + 3D · Phase F</div>
           <div className="text-sm text-white truncate">{projectName || "Proiect"}</div>
+        </div>
+        {/* View mode toggle */}
+        <div className="hidden sm:flex items-center gap-0.5 bg-white/5 rounded-full p-0.5" data-testid="dt-view-mode-toggle">
+          <button
+            onClick={() => setViewMode("2d")}
+            className={`px-3 py-1.5 text-[11px] rounded-full transition-colors flex items-center gap-1.5 ${viewMode === "2d" ? "bg-emerald-500/20 text-emerald-300" : "text-stone-400 hover:text-white"}`}
+            data-testid="dt-mode-2d"
+            title="Doar planuri 2D"
+          >
+            <FileText className="w-3.5 h-3.5" /> 2D
+          </button>
+          <button
+            onClick={() => setViewMode("split")}
+            className={`px-3 py-1.5 text-[11px] rounded-full transition-colors flex items-center gap-1.5 ${viewMode === "split" ? "bg-emerald-500/20 text-emerald-300" : "text-stone-400 hover:text-white"}`}
+            data-testid="dt-mode-split"
+            title="Split — 2D + 3D side-by-side"
+          >
+            <Columns className="w-3.5 h-3.5" /> Split
+          </button>
+          <button
+            onClick={() => setViewMode("3d")}
+            className={`px-3 py-1.5 text-[11px] rounded-full transition-colors flex items-center gap-1.5 ${viewMode === "3d" ? "bg-emerald-500/20 text-emerald-300" : "text-stone-400 hover:text-white"}`}
+            data-testid="dt-mode-3d"
+            title="Doar 3D"
+          >
+            <Box className="w-3.5 h-3.5" /> 3D
+          </button>
         </div>
         <button
           onClick={() => setShowUpload(true)}
@@ -355,132 +385,143 @@ export default function DigitalTwinPlans({ projectId, projectName, onClose, embe
 
       {/* CONTENT */}
       <div className="flex-1 flex min-h-0">
-        {/* SIDEBAR */}
-        <aside className="w-64 sm:w-72 border-r border-white/10 bg-stone-950 flex flex-col shrink-0">
-          {/* Filter pills */}
-          <div className="p-3 border-b border-white/5 flex flex-wrap gap-1.5" data-testid="plans-filter">
-            <button
-              onClick={() => setFilter("all")}
-              className={`px-2.5 py-1 text-[10px] rounded-full border ${filter === "all" ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300" : "border-white/10 text-stone-400 hover:text-white"}`}
-              data-testid="plans-filter-all"
-            >
-              Toate ({plans.length})
-            </button>
-            {PLAN_TYPES.map((t) => {
-              const count = plans.filter((p) => p.plan_type === t.id).length;
-              if (!count) return null;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setFilter(t.id)}
-                  className={`px-2.5 py-1 text-[10px] rounded-full border ${filter === t.id ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300" : "border-white/10 text-stone-400 hover:text-white"}`}
-                  data-testid={`plans-filter-${t.id}`}
-                >
-                  {t.label} ({count})
-                </button>
-              );
-            })}
-          </div>
-
-          {/* List */}
-          <div className="flex-1 overflow-y-auto p-2 space-y-1" data-testid="plans-list">
-            {loading ? (
-              <div className="text-xs text-stone-500 p-4">Se încarcă…</div>
-            ) : filtered.length === 0 ? (
-              <div className="text-center p-6">
-                <FileText className="w-8 h-8 text-stone-700 mx-auto mb-2" />
-                <p className="text-xs text-stone-500">Niciun plan încărcat încă.</p>
-                <button
-                  onClick={() => setShowUpload(true)}
-                  className="mt-3 text-[11px] text-emerald-400 hover:underline"
-                  data-testid="plans-empty-upload"
-                >
-                  Încarcă primul plan
-                </button>
-              </div>
-            ) : (
-              filtered.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => handleSelect(p)}
-                  className={`w-full text-left p-2.5 rounded-lg border transition-colors group ${selected?.id === p.id ? "bg-emerald-500/10 border-emerald-500/30" : "border-white/5 hover:bg-white/[0.03]"}`}
-                  data-testid={`plan-item-${p.id}`}
-                >
-                  <div className="flex items-start gap-2">
-                    <FileText className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-white truncate">{p.title}</div>
-                      <div className="text-[10px] text-stone-500 mt-0.5 flex items-center gap-1.5">
-                        <span className="px-1.5 py-0.5 rounded bg-white/5 text-stone-400">{TYPE_LABELS[p.plan_type] || p.plan_type}</span>
-                        <span>{(p.size_bytes / (1024 * 1024)).toFixed(1)} MB</span>
-                      </div>
-                      <div className="text-[10px] text-stone-600 truncate mt-0.5">{p.uploaded_by_name}</div>
-                    </div>
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-        </aside>
-
-        {/* PDF VIEWER */}
-        <main className="flex-1 flex flex-col min-w-0">
-          {selected ? (
-            <>
-              {/* Viewer toolbar */}
-              <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5 bg-stone-950/60 shrink-0 flex-wrap">
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm text-white truncate">{selected.title}</div>
-                  {selected.description && <div className="text-[11px] text-stone-500 truncate">{selected.description}</div>}
-                </div>
-                <div className="flex items-center gap-1 bg-white/5 rounded-full px-1 py-1">
-                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="px-2 py-1 text-xs text-stone-300 hover:text-white disabled:opacity-30" data-testid="plan-page-prev">
-                    <ChevronLeft className="w-3.5 h-3.5" />
+        {/* SIDEBAR — only visible in 2d & split modes */}
+        {viewMode !== "3d" && (
+          <aside className="w-60 sm:w-64 border-r border-white/10 bg-stone-950 flex flex-col shrink-0">
+            {/* Filter pills */}
+            <div className="p-3 border-b border-white/5 flex flex-wrap gap-1.5" data-testid="plans-filter">
+              <button
+                onClick={() => setFilter("all")}
+                className={`px-2.5 py-1 text-[10px] rounded-full border ${filter === "all" ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300" : "border-white/10 text-stone-400 hover:text-white"}`}
+                data-testid="plans-filter-all"
+              >
+                Toate ({plans.length})
+              </button>
+              {PLAN_TYPES.map((t) => {
+                const count = plans.filter((p) => p.plan_type === t.id).length;
+                if (!count) return null;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setFilter(t.id)}
+                    className={`px-2.5 py-1 text-[10px] rounded-full border ${filter === t.id ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300" : "border-white/10 text-stone-400 hover:text-white"}`}
+                    data-testid={`plans-filter-${t.id}`}
+                  >
+                    {t.label} ({count})
                   </button>
-                  <span className="text-[11px] text-stone-400 px-1" data-testid="plan-page-info">
-                    {page} / {totalPages || "—"}
-                  </span>
-                  <button onClick={() => setPage((p) => Math.min(totalPages || p, p + 1))} disabled={totalPages > 0 && page >= totalPages} className="px-2 py-1 text-xs text-stone-300 hover:text-white disabled:opacity-30" data-testid="plan-page-next">
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-1 bg-white/5 rounded-full px-1 py-1">
-                  <button onClick={() => setScale((s) => Math.max(0.4, s - 0.2))} className="px-2 py-1 text-xs text-stone-300 hover:text-white" data-testid="plan-zoom-out">
-                    <ZoomOut className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="text-[11px] text-stone-400 px-1 w-10 text-center" data-testid="plan-zoom-info">{Math.round(scale * 100)}%</span>
-                  <button onClick={() => setScale((s) => Math.min(3, s + 0.2))} className="px-2 py-1 text-xs text-stone-300 hover:text-white" data-testid="plan-zoom-in">
-                    <ZoomIn className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                <a href={pdfUrl} target="_blank" rel="noreferrer" className="px-2.5 py-1 text-[11px] text-stone-400 hover:text-white" title="Deschide PDF original" data-testid="plan-download">
-                  <Download className="w-3.5 h-3.5" />
-                </a>
-                <button onClick={() => handleDelete(selected)} className="px-2.5 py-1 text-[11px] text-red-400 hover:text-red-300" title="Șterge plan" data-testid={`plan-delete-${selected.id}`}>
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* PDF canvas */}
-              <div className="flex-1 p-3 min-h-0" data-testid="plan-viewer-area">
-                <PdfCanvas
-                  url={pdfUrl}
-                  page={page}
-                  scale={scale}
-                  onLoaded={(n) => setTotalPages(n)}
-                />
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center max-w-sm" data-testid="plans-no-selection">
-                <FileText className="w-12 h-12 text-stone-700 mx-auto mb-3" />
-                <h3 className="text-lg text-white mb-1">Niciun plan selectat</h3>
-                <p className="text-sm text-stone-500">Selectează un plan din stânga sau încarcă unul nou pentru a-l vizualiza.</p>
-              </div>
+                );
+              })}
             </div>
-          )}
-        </main>
+
+            {/* List */}
+            <div className="flex-1 overflow-y-auto p-2 space-y-1" data-testid="plans-list">
+              {loading ? (
+                <div className="text-xs text-stone-500 p-4">Se încarcă…</div>
+              ) : filtered.length === 0 ? (
+                <div className="text-center p-6">
+                  <FileText className="w-8 h-8 text-stone-700 mx-auto mb-2" />
+                  <p className="text-xs text-stone-500">Niciun plan încărcat încă.</p>
+                  <button
+                    onClick={() => setShowUpload(true)}
+                    className="mt-3 text-[11px] text-emerald-400 hover:underline"
+                    data-testid="plans-empty-upload"
+                  >
+                    Încarcă primul plan
+                  </button>
+                </div>
+              ) : (
+                filtered.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => handleSelect(p)}
+                    className={`w-full text-left p-2.5 rounded-lg border transition-colors group ${selected?.id === p.id ? "bg-emerald-500/10 border-emerald-500/30" : "border-white/5 hover:bg-white/[0.03]"}`}
+                    data-testid={`plan-item-${p.id}`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <FileText className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium text-white truncate">{p.title}</div>
+                        <div className="text-[10px] text-stone-500 mt-0.5 flex items-center gap-1.5">
+                          <span className="px-1.5 py-0.5 rounded bg-white/5 text-stone-400">{TYPE_LABELS[p.plan_type] || p.plan_type}</span>
+                          <span>{(p.size_bytes / (1024 * 1024)).toFixed(1)} MB</span>
+                        </div>
+                        <div className="text-[10px] text-stone-600 truncate mt-0.5">{p.uploaded_by_name}</div>
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </aside>
+        )}
+
+        {/* PDF VIEWER — only in 2d & split modes */}
+        {viewMode !== "3d" && (
+          <main className={`${viewMode === "split" ? "w-1/2" : "flex-1"} flex flex-col min-w-0 border-r border-white/10`} data-testid="plans-pdf-pane">
+            {selected ? (
+              <>
+                {/* Viewer toolbar */}
+                <div className="flex items-center gap-2 px-3 py-2 border-b border-white/5 bg-stone-950/60 shrink-0 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-white truncate">{selected.title}</div>
+                    {selected.description && <div className="text-[10px] text-stone-500 truncate">{selected.description}</div>}
+                  </div>
+                  <div className="flex items-center gap-0.5 bg-white/5 rounded-full px-1 py-1">
+                    <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="px-2 py-1 text-xs text-stone-300 hover:text-white disabled:opacity-30" data-testid="plan-page-prev">
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-[11px] text-stone-400 px-1" data-testid="plan-page-info">
+                      {page} / {totalPages || "—"}
+                    </span>
+                    <button onClick={() => setPage((p) => Math.min(totalPages || p, p + 1))} disabled={totalPages > 0 && page >= totalPages} className="px-2 py-1 text-xs text-stone-300 hover:text-white disabled:opacity-30" data-testid="plan-page-next">
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-0.5 bg-white/5 rounded-full px-1 py-1">
+                    <button onClick={() => setScale((s) => Math.max(0.4, s - 0.2))} className="px-2 py-1 text-xs text-stone-300 hover:text-white" data-testid="plan-zoom-out">
+                      <ZoomOut className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-[11px] text-stone-400 px-1 w-9 text-center" data-testid="plan-zoom-info">{Math.round(scale * 100)}%</span>
+                    <button onClick={() => setScale((s) => Math.min(3, s + 0.2))} className="px-2 py-1 text-xs text-stone-300 hover:text-white" data-testid="plan-zoom-in">
+                      <ZoomIn className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <a href={pdfUrl} target="_blank" rel="noreferrer" className="px-2 py-1 text-[11px] text-stone-400 hover:text-white" title="Descarcă" data-testid="plan-download">
+                    <Download className="w-3.5 h-3.5" />
+                  </a>
+                  <button onClick={() => handleDelete(selected)} className="px-2 py-1 text-[11px] text-red-400 hover:text-red-300" title="Șterge" data-testid={`plan-delete-${selected.id}`}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {/* PDF canvas */}
+                <div className="flex-1 p-3 min-h-0" data-testid="plan-viewer-area">
+                  <PdfCanvas url={pdfUrl} page={page} scale={scale} onLoaded={(n) => setTotalPages(n)} />
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center max-w-sm" data-testid="plans-no-selection">
+                  <FileText className="w-12 h-12 text-stone-700 mx-auto mb-3" />
+                  <h3 className="text-lg text-white mb-1">Niciun plan selectat</h3>
+                  <p className="text-sm text-stone-500">Selectează un plan din stânga sau încarcă unul nou.</p>
+                </div>
+              </div>
+            )}
+          </main>
+        )}
+
+        {/* 3D VIEWER — only in 3d & split modes */}
+        {(viewMode === "split" || viewMode === "3d") && (
+          <main className={viewMode === "split" ? "w-1/2 flex flex-col min-w-0" : "flex-1 flex flex-col min-w-0"} data-testid="plans-3d-pane">
+            <DigitalTwinViewer
+              projectId={projectId}
+              modelUrl={projectModelUrl}
+              projectName={projectName}
+              embedded
+              compactSidebar={viewMode === "split"}
+            />
+          </main>
+        )}
       </div>
 
       {showUpload && (

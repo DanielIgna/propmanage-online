@@ -285,6 +285,51 @@ def tpl_dt_comment_added(recipient_name: str, project_name: str, pin_title: str,
     return {"subject": f"💬 Comentariu nou: {pin_title}", "html": _layout("Comentariu Digital Twin", f"Pin: {pin_title}", body, f"{APP_URL}/digital-twin", "Deschide threadul")}
 
 
+def tpl_dt_pin_status_changed(recipient_name: str, project_name: str, pin_title: str, old_status: str, new_status: str, actor_name: str) -> dict:
+    status_labels = {"open": "Deschis", "in_review": "În analiză", "resolved": "Rezolvat", "rejected": "Respins"}
+    status_colors = {"open": "#f59e0b", "in_review": "#60a5fa", "resolved": "#10b981", "rejected": "#ef4444"}
+    new_label = status_labels.get(new_status, new_status)
+    new_color = status_colors.get(new_status, "#10b981")
+    body = f"""
+      <p>Bună {recipient_name},</p>
+      <p><strong style="color:#10b981;">{actor_name}</strong> a actualizat statusul unui pin în proiectul <em>"{project_name}"</em>.</p>
+      <div style="background:{new_color}15; border-left:3px solid {new_color}; padding:14px 18px; border-radius:12px; margin:18px 0;">
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:{new_color}; margin-bottom:6px;">Pin: {pin_title}</div>
+        <div style="color:#e5e5e5; font-size:15px;">
+          {status_labels.get(old_status, old_status)} <span style="color:#888;">→</span> <strong style="color:{new_color};">{new_label}</strong>
+        </div>
+      </div>
+    """
+    return {"subject": f"🔄 Pin {new_label.lower()}: {pin_title}", "html": _layout("Status pin actualizat", f"{pin_title} → {new_label}", body, f"{APP_URL}/digital-twin", "Vezi proiectul")}
+
+
+def tpl_dt_model_uploaded(recipient_name: str, project_name: str, filename: str, size_mb: float, actor_name: str) -> dict:
+    body = f"""
+      <p>Bună {recipient_name},</p>
+      <p><strong style="color:#10b981;">{actor_name}</strong> a încărcat o versiune nouă de model 3D în proiectul <em>"{project_name}"</em>.</p>
+      <div style="background:#10b98115; border-left:3px solid #10b981; padding:14px 18px; border-radius:12px; margin:18px 0;">
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#10b981; margin-bottom:6px;">Model 3D nou</div>
+        <div style="color:#e5e5e5; font-weight:600; font-size:15px;">{filename}</div>
+        <div style="color:#999; font-size:12px; margin-top:4px;">{size_mb:.1f} MB</div>
+      </div>
+      <p>Deschide viewer-ul pentru a inspecta noul model.</p>
+    """
+    return {"subject": f"🏗️ Model 3D actualizat: {project_name}", "html": _layout("Model 3D nou", f"Pe {project_name}", body, f"{APP_URL}/digital-twin", "Deschide viewer 3D")}
+
+
+def tpl_dt_plan_uploaded(recipient_name: str, project_name: str, plan_title: str, plan_type: str, actor_name: str) -> dict:
+    type_labels = {"floorplan": "Plan etaj", "section": "Secțiune", "elevation": "Elevație", "detail": "Detaliu", "site": "Plan teren", "other": "Altul"}
+    body = f"""
+      <p>Bună {recipient_name},</p>
+      <p><strong style="color:#10b981;">{actor_name}</strong> a încărcat un plan 2D nou în proiectul <em>"{project_name}"</em>.</p>
+      <div style="background:#10b98115; border-left:3px solid #10b981; padding:14px 18px; border-radius:12px; margin:18px 0;">
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#10b981; margin-bottom:6px;">{type_labels.get(plan_type, plan_type)}</div>
+        <div style="color:#e5e5e5; font-weight:600; font-size:15px;">{plan_title}</div>
+      </div>
+    """
+    return {"subject": f"📐 Plan 2D nou: {plan_title}", "html": _layout("Plan 2D nou", f"Pe {project_name}", body, f"{APP_URL}/digital-twin", "Vezi planul")}
+
+
 
 
 # ===================== High-level helper that's fire-and-forget =====================
