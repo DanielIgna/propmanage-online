@@ -8,7 +8,7 @@ import re
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body, HTTPException, Depends
 
 from db import db
 
@@ -26,6 +26,7 @@ async def demo_request(payload: dict = Body(...)):
     company = (payload.get("company") or "").strip()[:160]
     role = (payload.get("role") or "").strip()[:60]
     message = (payload.get("message") or "").strip()[:1000]
+    whatsapp = (payload.get("whatsapp") or "").strip()[:32]
     if not name or not EMAIL_RX.match(email):
         raise HTTPException(400, "Nume și email valid sunt obligatorii.")
 
@@ -35,7 +36,8 @@ async def demo_request(payload: dict = Body(...)):
         "company": company,
         "role": role,
         "message": message,
-        "status": "new",
+        "whatsapp": whatsapp,
+        "status": "new",  # new, contacted, scheduled, closed_won, closed_lost
         "created_at": datetime.now(timezone.utc).isoformat(),
         "source": "landing_book_demo",
     }
@@ -43,7 +45,7 @@ async def demo_request(payload: dict = Body(...)):
     day = doc["created_at"][:10]
     existing = await db.demo_leads.find_one({"email": email, "created_at": {"$regex": f"^{day}"}})
     if existing:
-        await db.demo_leads.update_one({"_id": existing["_id"]}, {"$set": {"name": name, "company": company, "message": message, "role": role, "updated_at": doc["created_at"]}})
+        await db.demo_leads.update_one({"_id": existing["_id"]}, {"$set": {"name": name, "company": company, "message": message, "role": role, "whatsapp": whatsapp, "updated_at": doc["created_at"]}})
         return {"ok": True, "deduped": True}
     await db.demo_leads.insert_one(doc)
 
@@ -56,6 +58,13 @@ async def demo_request(payload: dict = Body(...)):
                 admin_emails.append(u["email"])
         if not admin_emails:
             admin_emails = [os.environ.get("ADMIN_EMAIL", "admin@propmanage.io")]
+        # Build WhatsApp deep link if provided
+        wa_html = ""
+        if whatsapp:
+            digits = re.sub(r"\D", "", whatsapp)
+            if len(digits) >= 9:
+                wa_link = f"https://wa.me/{digits}"
+                wa_html = f'<tr><td><b>WhatsApp:</b></td><td><a href="{wa_link}" style="color:#25d366;">{whatsapp} →</a></td></tr>'
         html = _layout(
             title="📩 Cerere demo nouă",
             preheader=f"{name} de la {company or '—'} vrea o demonstrație",
@@ -64,6 +73,7 @@ async def demo_request(payload: dict = Body(...)):
               <table style="width:100%; background:#1a1a1f; border-radius:12px; padding:14px; margin:12px 0; color:#fff;">
                 <tr><td><b>Nume:</b></td><td>{name}</td></tr>
                 <tr><td><b>Email:</b></td><td><a href="mailto:{email}" style="color:#d4ff3a;">{email}</a></td></tr>
+                {wa_html}
                 <tr><td><b>Companie:</b></td><td>{company or '—'}</td></tr>
                 <tr><td><b>Rol:</b></td><td>{role or '—'}</td></tr>
                 <tr><td valign="top"><b>Mesaj:</b></td><td>{(message or '—').replace(chr(10), '<br/>')}</td></tr>
@@ -103,3 +113,109 @@ async def health_check():
     skey = os.environ.get("STRIPE_API_KEY", "")
     status["checks"]["stripe"] = "demo" if skey == "sk_test_emergent" or not skey else "live" if skey.startswith("sk_live_") else "test"
     return status
+
+
+@router.get("/public/status")
+async def public_status():
+    """Public status endpoint — sanitized output for /status page (no internal config details)."""
+    out = {
+        "status": "operational",
+        "components": {},
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
+    # DB
+    try:
+        await db.users.find_one({}, {"_id": 1})
+        out["components"]["api"] = "operational"
+        out["components"]["database"] = "operational"
+    except Exception:  # noqa: BLE001
+        out["components"]["api"] = "degraded"
+        out["components"]["database"] = "outage"
+        out["status"] = "degraded"
+    # AI
+    out["components"]["ai_concierge"] = "operational" if os.environ.get("EMERGENT_LLM_KEY") else "limited"
+    out["components"]["payments"] = "operational"
+    out["components"]["email"] = "operational" if os.environ.get("RESEND_API_KEY") else "limited"
+
+    # 90-day uptime: simple read from health_pings collection (created by daily cron)
+    from datetime import timedelta as _td
+    cutoff = (datetime.now(timezone.utc) - _td(days=90)).isoformat()
+    total_pings = 0
+    ok_pings = 0
+    async for p in db.health_pings.find({"created_at": {"$gte": cutoff}}):
+        total_pings += 1
+        if p.get("status") == "ok":
+            ok_pings += 1
+    out["uptime_pct_90d"] = round((ok_pings / total_pings) * 100, 2) if total_pings else None
+    out["pings_total"] = total_pings
+    return out
+
+
+# ============= ADMIN DEMO LEADS =============
+
+from deps import require_role  # local import to avoid circular  # noqa: E402
+
+admin_router = APIRouter(prefix="/api/admin/demo-leads", tags=["admin-demo-leads"])
+
+
+@admin_router.get("")
+async def list_demo_leads(
+    status: str = None,
+    limit: int = 100,
+    user: dict = Depends(require_role("admin")),
+):
+    filt = {}
+    if status and status != "all":
+        filt["status"] = status
+    cursor = db.demo_leads.find(filt).sort("created_at", -1).limit(min(limit, 500))
+    items = []
+    async for d in cursor:
+        d["_id"] = str(d["_id"])
+        # Build WhatsApp deep link
+        wa = d.get("whatsapp")
+        if wa:
+            digits = re.sub(r"\D", "", wa)
+            if len(digits) >= 9:
+                d["whatsapp_link"] = f"https://wa.me/{digits}"
+        items.append(d)
+    counts = {
+        "new": await db.demo_leads.count_documents({"status": "new"}),
+        "contacted": await db.demo_leads.count_documents({"status": "contacted"}),
+        "scheduled": await db.demo_leads.count_documents({"status": "scheduled"}),
+        "closed_won": await db.demo_leads.count_documents({"status": "closed_won"}),
+        "closed_lost": await db.demo_leads.count_documents({"status": "closed_lost"}),
+    }
+    counts["total"] = sum(counts.values())
+    return {"items": items, "counts": counts}
+
+
+@admin_router.patch("/{lead_id}")
+async def update_demo_lead(lead_id: str, payload: dict = Body(...), user: dict = Depends(require_role("admin"))):
+    from bson import ObjectId
+    from bson.errors import InvalidId
+    try:
+        oid = ObjectId(lead_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid lead id")
+    allowed = {"status", "notes", "follow_up_at"}
+    updates = {k: v for k, v in payload.items() if k in allowed}
+    if "status" in updates and updates["status"] not in {"new", "contacted", "scheduled", "closed_won", "closed_lost"}:
+        raise HTTPException(400, "Invalid status")
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    updates["updated_by"] = user["id"]
+    res = await db.demo_leads.update_one({"_id": oid}, {"$set": updates})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Lead not found")
+    return {"ok": True}
+
+
+@admin_router.delete("/{lead_id}")
+async def delete_demo_lead(lead_id: str, user: dict = Depends(require_role("admin"))):
+    from bson import ObjectId
+    from bson.errors import InvalidId
+    try:
+        oid = ObjectId(lead_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid lead id")
+    await db.demo_leads.delete_one({"_id": oid})
+    return {"ok": True}

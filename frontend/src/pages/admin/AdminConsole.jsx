@@ -15,12 +15,14 @@ import { AdminAuditLog } from "./AdminAuditLog";
 import { AdminAIConsole } from "./AdminAIConsole";
 import { AdminConciergePanel } from "./AdminConciergePanel";
 import { AdminDemoTimeMachine } from "./AdminDemoTimeMachine";
+import { AdminDemoLeads } from "./AdminDemoLeads";
 
 const TITLES = {
   overview: { title: "Dashboard", subtitle: "Privire de ansamblu asupra platformei" },
   ai: { title: "AI Investigator", subtitle: "Consilier AI cu memorie persistentă · Claude Sonnet 4.5 · acces read-only" },
   concierge: { title: "Concierge & Security", subtitle: "AI pentru utilizatori · GEO/VPN/bot block · prompt-injection guard" },
   demo: { title: "Demo Tools", subtitle: "Time Machine pentru ciclul plății — simulare flow complet pentru prospecți" },
+  leads: { title: "Demo Leads", subtitle: "Cererile primite de pe site · status tracking · WhatsApp directe" },
   activity: { title: "Activitate Live", subtitle: "Toate evenimentele din sistem (refresh la 10s)" },
   users: { title: "Toți userii", subtitle: "Caută, filtrează, editează, banează" },
   verification: { title: "Verificare specialiști", subtitle: "Coadă de aprobare cu documente" },
@@ -61,6 +63,7 @@ export const AdminDashboard = () => {
       {active === "ai" && <AdminAIConsole />}
       {active === "concierge" && <AdminConciergePanel />}
       {active === "demo" && <AdminDemoTimeMachine />}
+      {active === "leads" && <AdminDemoLeads />}
       {active === "activity" && <AdminActivityFull />}
       {active === "users" && <AdminUsers />}
       {active === "verification" && <AdminVerification />}

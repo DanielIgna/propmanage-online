@@ -5,7 +5,7 @@ import axios from "axios";
 import {
   LayoutDashboard, Users, ShieldCheck, Scale, Wallet, FolderKanban,
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
-  LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, Sparkles, Bot, Zap
+  LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, Sparkles, Bot, Zap, Inbox
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { API } from "../DashShared";
@@ -20,6 +20,7 @@ const NAV_SECTIONS = [
       { id: "ai", label: "AI Investigator", icon: Bot, badge: "NEW" },
       { id: "concierge", label: "Concierge & Security", icon: ShieldCheck, badge: "NEW" },
       { id: "demo", label: "Demo Tools", icon: Zap, badge: "NEW" },
+      { id: "leads", label: "Demo Leads", icon: Inbox, badge: "NEW" },
       { id: "activity", label: "Activitate Live", icon: Sparkles },
     ],
   },

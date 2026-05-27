@@ -21,6 +21,8 @@ import { PaymentSuccess } from "./pages/PaymentSuccess";
 import { TutorialOverlay } from "./pages/TutorialOverlay";
 import { AIConciergeBubble } from "./components/AIConciergeBubble";
 import { BookDemoModal } from "./pages/BookDemoModal";
+import { PrivacyPage, TermsPage } from "./pages/LegalPages";
+import { StatusPage } from "./pages/StatusPage";
 import "./App.css";
 
 // ============= NAV =============
@@ -1296,9 +1298,12 @@ const Footer = () => (
         <span className="text-xs text-stone-500 ml-2">© 2026 · Property Operating System</span>
       </div>
       <div className="flex gap-6 text-xs text-stone-500">
-        <a href="#" className="hover:text-white transition-colors">Termeni</a>
-        <a href="#" className="hover:text-white transition-colors">Confidențialitate</a>
-        <a href="#" className="hover:text-white transition-colors">Contact</a>
+        <Link to="/terms" className="hover:text-white transition-colors" data-testid="footer-terms">Termeni</Link>
+        <Link to="/privacy" className="hover:text-white transition-colors" data-testid="footer-privacy">Confidențialitate</Link>
+        <Link to="/status" className="hover:text-white transition-colors inline-flex items-center gap-1" data-testid="footer-status">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Status
+        </Link>
+        <a href="mailto:admin@propmanage.io" className="hover:text-white transition-colors">Contact</a>
       </div>
     </div>
   </footer>
@@ -1394,6 +1399,9 @@ function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<LandingPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/terms" element={<TermsPage />} />
+              <Route path="/status" element={<StatusPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/auth/callback" element={<AuthCallback />} />

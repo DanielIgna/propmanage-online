@@ -5,7 +5,7 @@ import { X, Calendar, CheckCircle2 } from "lucide-react";
 import { API } from "./DashShared";
 
 export const BookDemoModal = ({ open, onClose }) => {
-  const [form, setForm] = useState({ name: "", email: "", company: "", role: "", message: "" });
+  const [form, setForm] = useState({ name: "", email: "", whatsapp: "", company: "", role: "", message: "" });
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState(null);
@@ -85,6 +85,14 @@ export const BookDemoModal = ({ open, onClose }) => {
                 required
                 className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 focus:border-[#d4ff3a] outline-none text-white text-sm"
                 data-testid="book-demo-email"
+              />
+              <input
+                type="tel"
+                value={form.whatsapp}
+                onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
+                placeholder="WhatsApp / telefon (opțional, +40...)"
+                className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 focus:border-[#25d366] outline-none text-white text-sm"
+                data-testid="book-demo-whatsapp"
               />
               <div className="grid grid-cols-2 gap-3">
                 <input
