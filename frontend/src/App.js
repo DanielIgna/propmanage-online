@@ -20,6 +20,7 @@ import { ProjectWorkspace } from "./pages/ProjectWorkspace";
 import { PaymentSuccess } from "./pages/PaymentSuccess";
 import { TutorialOverlay } from "./pages/TutorialOverlay";
 import { AIConciergeBubble } from "./components/AIConciergeBubble";
+import { BookDemoModal } from "./pages/BookDemoModal";
 import "./App.css";
 
 // ============= NAV =============
@@ -1326,10 +1327,28 @@ const LandingPage = () => {
   const { t, showSection, isPreview } = useI18n();
   const promoText = t("landing.promo_banner");
   const hasPromo = !!promoText && promoText !== "landing.promo_banner" && sessionStorage.getItem("pm_promo_dismissed") !== "1";
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [demoModeDismissed, setDemoModeDismissed] = useState(() => sessionStorage.getItem("pm_demo_mode_dismissed") === "1");
+
+  React.useEffect(() => {
+    const handler = () => setDemoOpen(true);
+    window.addEventListener("propmanage:book-demo", handler);
+    return () => window.removeEventListener("propmanage:book-demo", handler);
+  }, []);
+
   return (
-    <div className={`grain min-h-screen bg-[#0a0a0b] text-stone-100 ${(hasPromo || isPreview) ? "pt-9 sm:pt-10" : ""}`}>
+    <div className={`grain min-h-screen bg-[#0a0a0b] text-stone-100 ${(hasPromo || isPreview || !demoModeDismissed) ? "pt-9 sm:pt-10" : ""}`}>
       {isPreview && <PreviewBanner />}
-      {!isPreview && <PromoBanner />}
+      {!isPreview && !demoModeDismissed && (
+        <div className="fixed top-0 left-0 right-0 z-[58] bg-stone-900/95 backdrop-blur border-b border-amber-500/30 text-amber-200 text-center text-[11px] sm:text-xs py-1.5 px-10 flex items-center justify-center gap-2" data-testid="demo-mode-banner">
+          <span className="opacity-80">🧪 Demo Mode · Plățile Stripe sunt în mod test, fără bani reali</span>
+          <button onClick={() => setDemoOpen(true)} className="underline hover:no-underline font-medium opacity-100 text-[#d4ff3a]" data-testid="demo-mode-cta">Programează demo</button>
+          <button onClick={() => { sessionStorage.setItem("pm_demo_mode_dismissed", "1"); setDemoModeDismissed(true); }} className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 hover:bg-white/10 rounded text-stone-400" aria-label="Închide" data-testid="demo-mode-dismiss">
+            <Minus className="w-3.5 h-3.5 rotate-45" />
+          </button>
+        </div>
+      )}
+      {!isPreview && demoModeDismissed && <PromoBanner />}
       <Nav />
       <Hero />
       <Problem />
@@ -1344,6 +1363,16 @@ const LandingPage = () => {
       {showSection("landing_show_golden_path", true) && <GoldenPath />}
       <CTA />
       <Footer />
+      {/* Sticky "Book a Demo" floating CTA (bottom-left, doesn't fight Emergent badge) */}
+      <button
+        onClick={() => setDemoOpen(true)}
+        className="fixed bottom-6 left-6 z-[55] inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#d4ff3a] text-black font-semibold text-sm shadow-2xl shadow-lime-500/30 hover:scale-105 transition-transform"
+        data-testid="floating-book-demo"
+      >
+        <Sparkles className="w-4 h-4" />
+        Programează o demonstrație
+      </button>
+      <BookDemoModal open={demoOpen} onClose={() => setDemoOpen(false)} />
     </div>
   );
 };
