@@ -52,6 +52,9 @@ async def audit(action: str, actor: dict, target: Optional[dict] = None, before:
         logger.warning(f"Audit log write failed for {action}: {exc}")
 
 
+ROLLBACKABLE_ACTIONS = {"cms.update", "cms.reset", "settings.update", "trust_weights.update"}
+
+
 # ============= DEFAULTS =============
 DEFAULT_CMS = {
     "landing.promo_banner": "",
@@ -1186,6 +1189,7 @@ async def list_audit_log(
             "after": d.get("after"),
             "note": d.get("note"),
             "created_at": d.get("created_at"),
+            "rollbackable": d.get("action") in ROLLBACKABLE_ACTIONS,
         })
     return {"items": items, "total": total, "skip": skip, "limit": limit}
 
@@ -1216,4 +1220,109 @@ async def export_audit_log_csv(user: dict = Depends(require_role("admin"))):
             "after": str(d.get("after") or "")[:200],
         })
     return _csv_response(rows, "audit_log.csv")
+
+
+@router.post("/audit-log/{entry_id}/rollback")
+async def rollback_audit_entry(entry_id: str, user: dict = Depends(require_role("admin"))):
+    """Restore the `before` state of an audit entry. Idempotent within reason — creates a new audit entry."""
+    try:
+        oid = ObjectId(entry_id)
+    except InvalidId:
+        raise HTTPException(400, "Invalid entry id")
+    entry = await db.admin_audit_log.find_one({"_id": oid})
+    if not entry:
+        raise HTTPException(404, "Audit entry not found")
+    action = entry.get("action")
+    if action not in ROLLBACKABLE_ACTIONS:
+        raise HTTPException(400, f"Acțiunea '{action}' nu poate fi anulată automat.")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    if action == "cms.update":
+        target_key = entry.get("target_id")
+        before_value = (entry.get("before") or {}).get("value")
+        if not target_key:
+            raise HTTPException(400, "Lipsește target_id")
+        # Snapshot current to log rollback
+        current = await db.cms_content.find_one({"key": target_key})
+        current_value = (current or {}).get("value")
+        if before_value is None:
+            # Originally there was no override → delete current
+            await db.cms_content.delete_one({"key": target_key})
+        else:
+            await db.cms_content.update_one(
+                {"key": target_key},
+                {"$set": {"key": target_key, "value": before_value, "updated_at": now_iso, "updated_by": user["id"]}},
+                upsert=True,
+            )
+        await audit("cms.rollback", user,
+                    target={"type": "cms_key", "id": target_key, "label": target_key},
+                    before={"value": current_value},
+                    after={"value": before_value},
+                    note=f"Rollback to entry {entry_id}")
+        return {"ok": True, "restored_to": before_value}
+
+    if action == "cms.reset":
+        # Reset deleted → rollback = re-create with the old value
+        target_key = entry.get("target_id")
+        before_value = (entry.get("before") or {}).get("value")
+        if before_value is None:
+            raise HTTPException(400, "Nu există valoare de restaurat.")
+        current = await db.cms_content.find_one({"key": target_key})
+        current_value = (current or {}).get("value")
+        await db.cms_content.update_one(
+            {"key": target_key},
+            {"$set": {"key": target_key, "value": before_value, "updated_at": now_iso, "updated_by": user["id"]}},
+            upsert=True,
+        )
+        await audit("cms.rollback", user,
+                    target={"type": "cms_key", "id": target_key, "label": target_key},
+                    before={"value": current_value},
+                    after={"value": before_value},
+                    note=f"Rollback (un-reset) of entry {entry_id}")
+        return {"ok": True, "restored_to": before_value}
+
+    if action == "settings.update":
+        before_map = entry.get("before") or {}
+        if not before_map:
+            raise HTTPException(400, "Nu există valori 'înainte' de restaurat.")
+        doc = await db.platform_config.find_one({"key": "settings"})
+        current = (doc or {}).get("value", {})
+        # Snapshot only fields we are rolling back
+        snapshot = {k: current.get(k) for k in before_map.keys()}
+        merged = {**DEFAULT_SETTINGS, **current, **before_map}
+        await db.platform_config.update_one(
+            {"key": "settings"},
+            {"$set": {"key": "settings", "value": merged, "updated_at": now_iso, "updated_by": user["id"]}},
+            upsert=True,
+        )
+        await audit("settings.rollback", user,
+                    target={"type": "platform_settings", "id": "settings", "label": "Platform Settings"},
+                    before=snapshot,
+                    after=before_map,
+                    note=f"Rollback to entry {entry_id}")
+        return {"ok": True, "restored_keys": list(before_map.keys())}
+
+    if action == "trust_weights.update":
+        before_weights = entry.get("before") or {}
+        if not before_weights:
+            raise HTTPException(400, "Nu există ponderi vechi de restaurat.")
+        total = sum(before_weights.values())
+        if abs(total - 1.0) > 0.001:
+            raise HTTPException(400, "Ponderile salvate sunt inconsistente (suma ≠ 1.0).")
+        doc = await db.platform_config.find_one({"key": "trust_weights"})
+        current = (doc or {}).get("value", {})
+        await db.platform_config.update_one(
+            {"key": "trust_weights"},
+            {"$set": {"key": "trust_weights", "value": before_weights, "updated_at": now_iso, "updated_by": user["id"]}},
+            upsert=True,
+        )
+        await audit("trust_weights.rollback", user,
+                    target={"type": "trust_weights", "id": "trust_weights", "label": "Trust Score Algorithm"},
+                    before=current,
+                    after=before_weights,
+                    note=f"Rollback to entry {entry_id}")
+        return {"ok": True, "restored_to": before_weights}
+
+    raise HTTPException(400, "Acțiune nesuportată pentru rollback.")
 

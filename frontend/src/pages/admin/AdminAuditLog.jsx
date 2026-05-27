@@ -8,11 +8,14 @@ import { API } from "../DashShared";
 const ACTION_META = {
   "cms.update": { color: "blue", icon: "📝", label: "CMS Editat" },
   "cms.reset": { color: "amber", icon: "↺", label: "CMS Resetat" },
+  "cms.rollback": { color: "violet", icon: "⏪", label: "CMS Rollback" },
   "settings.update": { color: "violet", icon: "⚙️", label: "Setări actualizate" },
+  "settings.rollback": { color: "violet", icon: "⏪", label: "Setări Rollback" },
   "user.update": { color: "blue", icon: "👤", label: "User editat" },
   "user.ban": { color: "red", icon: "🚫", label: "User banat" },
   "user.unban": { color: "emerald", icon: "✓", label: "User reactivat" },
   "trust_weights.update": { color: "amber", icon: "⭐", label: "Trust weights" },
+  "trust_weights.rollback": { color: "violet", icon: "⏪", label: "Trust Rollback" },
   "preset.create": { color: "emerald", icon: "💾", label: "Preset creat" },
   "preset.delete": { color: "red", icon: "🗑️", label: "Preset șters" },
 };
@@ -48,6 +51,25 @@ export const AdminAuditLog = () => {
   const [expanded, setExpanded] = useState(null);
   const [loading, setLoading] = useState(false);
   const [skip, setSkip] = useState(0);
+  const [rolling, setRolling] = useState(null);
+  const [toast, setToast] = useState("");
+
+  const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 3500); };
+
+  const doRollback = async (entry) => {
+    if (!window.confirm(`Restaurezi starea anterioară pentru "${entry.target_label || entry.action}"?\n\nAceasta va crea o intrare nouă în audit log de tip "${entry.action}.rollback".`)) return;
+    setRolling(entry.id);
+    try {
+      await axios.post(`${API}/admin/audit-log/${entry.id}/rollback`);
+      flash(`✓ Restaurat cu succes: ${entry.target_label || entry.action}`);
+      setExpanded(null);
+      load();
+    } catch (e) {
+      flash(`❌ ${e?.response?.data?.detail || "Eroare la rollback"}`);
+    } finally {
+      setRolling(null);
+    }
+  };
 
   const load = () => {
     setLoading(true);
@@ -104,6 +126,7 @@ export const AdminAuditLog = () => {
       </AdminCard>
 
       <AdminCard testid="audit-list-card">
+        {toast && <div className="mb-3 text-sm font-medium text-emerald-600 dark:text-emerald-400" data-testid="audit-toast">{toast}</div>}
         {loading && <div className="text-center py-8 text-slate-500">Se încarcă...</div>}
         {!loading && data.items.length === 0 && (
           <div className="text-center py-12 text-slate-500">
@@ -144,20 +167,37 @@ export const AdminAuditLog = () => {
                 </button>
 
                 {isOpen && hasDetail && (
-                  <div className="px-3 pb-3 pt-1 border-t border-slate-100 dark:border-slate-800 grid md:grid-cols-2 gap-3" data-testid={`audit-detail-${e.id}`}>
-                    {e.before && (
-                      <div>
-                        <div className="text-[10px] uppercase tracking-wider text-red-600 dark:text-red-400 font-bold mb-1">Înainte</div>
-                        <pre className="bg-red-50 dark:bg-red-500/5 border border-red-100 dark:border-red-500/20 rounded-lg p-2 text-[11px] font-mono overflow-x-auto max-h-48">{formatDiff(e.before)}</pre>
+                  <div className="px-3 pb-3 pt-1 border-t border-slate-100 dark:border-slate-800" data-testid={`audit-detail-${e.id}`}>
+                    <div className="grid md:grid-cols-2 gap-3">
+                      {e.before && (
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-red-600 dark:text-red-400 font-bold mb-1">Înainte</div>
+                          <pre className="bg-red-50 dark:bg-red-500/5 border border-red-100 dark:border-red-500/20 rounded-lg p-2 text-[11px] font-mono overflow-x-auto max-h-48">{formatDiff(e.before)}</pre>
+                        </div>
+                      )}
+                      {e.after && (
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-bold mb-1">După</div>
+                          <pre className="bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/20 rounded-lg p-2 text-[11px] font-mono overflow-x-auto max-h-48">{formatDiff(e.after)}</pre>
+                        </div>
+                      )}
+                      {e.note && <div className="md:col-span-2 text-xs italic text-slate-600 dark:text-slate-300">📝 {e.note}</div>}
+                    </div>
+                    {e.rollbackable && e.before && (
+                      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 flex-wrap">
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                          💡 Poți reveni la starea anterioară cu un singur click.
+                        </div>
+                        <AdminBtn
+                          variant="primary"
+                          onClick={() => doRollback(e)}
+                          disabled={rolling === e.id}
+                          data-testid={`audit-rollback-${e.id}`}
+                        >
+                          {rolling === e.id ? "Se restaurează..." : "↺ Restaurează valoarea anterioară"}
+                        </AdminBtn>
                       </div>
                     )}
-                    {e.after && (
-                      <div>
-                        <div className="text-[10px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-bold mb-1">După</div>
-                        <pre className="bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/20 rounded-lg p-2 text-[11px] font-mono overflow-x-auto max-h-48">{formatDiff(e.after)}</pre>
-                      </div>
-                    )}
-                    {e.note && <div className="md:col-span-2 text-xs italic text-slate-600 dark:text-slate-300">📝 {e.note}</div>}
                   </div>
                 )}
               </div>
