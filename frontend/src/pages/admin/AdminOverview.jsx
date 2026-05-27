@@ -4,6 +4,7 @@ import axios from "axios";
 import { Users, Briefcase, DollarSign, Scale, TrendingUp, Activity } from "lucide-react";
 import { AdminCard } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
+import { IncidentCadenceHeatmap } from "./IncidentCadenceHeatmap";
 
 const KpiCard = ({ icon: Icon, label, value, sub, tone = "blue", testid }) => {
   const tones = {
@@ -138,6 +139,8 @@ export const AdminOverview = () => {
           </div>
         </AdminCard>
       </div>
+
+      <IncidentCadenceHeatmap />
     </div>
   );
 };

@@ -1156,6 +1156,8 @@ async def list_audit_log(
     target_type: Optional[str] = None,
     q: Optional[str] = None,
     pinned: Optional[bool] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     limit: int = Query(100, le=500),
     skip: int = 0,
 ):
@@ -1168,6 +1170,13 @@ async def list_audit_log(
         filt["target_type"] = target_type
     if pinned is True:
         filt["pinned"] = True
+    if date_from or date_to:
+        date_filter = {}
+        if date_from:
+            date_filter["$gte"] = date_from
+        if date_to:
+            date_filter["$lte"] = date_to
+        filt["created_at"] = date_filter
     if q:
         filt["$or"] = [
             {"actor_name": {"$regex": q, "$options": "i"}},
@@ -2094,6 +2103,69 @@ async def get_preset_stats(
         "first_send": first_send,
         "last_send": last_send,
         "window_days": days,
+    }
+
+
+@router.get("/incident-cadence-heatmap")
+async def incident_cadence_heatmap(
+    days: int = Query(91, ge=30, le=365),
+    user: dict = Depends(require_role("admin")),
+):
+    """GitHub-style activity heatmap for incident-response cadence across ALL presets.
+    Returns daily aggregation for the last `days` days, plus weekday distribution.
+    """
+    from datetime import date as _date, timedelta as _td
+    today = datetime.now(timezone.utc).date()
+    start_date = today - _td(days=days - 1)
+    cutoff_iso = start_date.isoformat()  # YYYY-MM-DD compares fine with sent_at prefix
+
+    # Aggregate by day from preset_send_history
+    pipeline = [
+        {"$match": {"sent_at": {"$gte": cutoff_iso}}},
+        {"$group": {
+            "_id": {"$substr": ["$sent_at", 0, 10]},  # YYYY-MM-DD
+            "count": {"$sum": 1},
+            "recipients": {"$sum": "$recipient_count"},
+        }},
+    ]
+    raw = {}
+    async for d in db.preset_send_history.aggregate(pipeline):
+        raw[d["_id"]] = {"count": d["count"], "recipients": d.get("recipients", 0)}
+
+    # Build full cell series with zero-fill
+    cells = []
+    weekday_dist = [0] * 7  # Mon=0..Sun=6
+    total_sends = 0
+    total_recipients = 0
+    cur = start_date
+    while cur <= today:
+        key = cur.isoformat()
+        d = raw.get(key, {"count": 0, "recipients": 0})
+        cells.append({
+            "date": key,
+            "count": d["count"],
+            "recipients": d["recipients"],
+            "weekday": cur.weekday(),  # 0=Mon
+        })
+        weekday_dist[cur.weekday()] += d["count"]
+        total_sends += d["count"]
+        total_recipients += d["recipients"]
+        cur += _td(days=1)
+
+    # Active days + peak day
+    active_days = sum(1 for c in cells if c["count"] > 0)
+    peak = max(cells, key=lambda c: c["count"]) if cells else None
+
+    return {
+        "cells": cells,
+        "days": days,
+        "start_date": start_date.isoformat(),
+        "end_date": today.isoformat(),
+        "total_sends": total_sends,
+        "total_recipients": total_recipients,
+        "active_days": active_days,
+        "weekday_dist": weekday_dist,
+        "peak": ({"date": peak["date"], "count": peak["count"]} if peak and peak["count"] > 0 else None),
     }
 
 

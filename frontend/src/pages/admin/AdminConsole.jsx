@@ -34,6 +34,15 @@ export const AdminDashboard = () => {
   const { user } = useAuth();
   const [active, setActive] = useState("overview");
 
+  // Listen for cross-component navigation events (e.g. heatmap → audit log)
+  React.useEffect(() => {
+    const handler = (ev) => {
+      if (ev.detail?.tab) setActive(ev.detail.tab);
+    };
+    window.addEventListener("propmanage:nav-admin", handler);
+    return () => window.removeEventListener("propmanage:nav-admin", handler);
+  }, []);
+
   if (!user) return <div className="min-h-screen flex items-center justify-center text-slate-500">Se încarcă...</div>;
   if (user === false) return <Navigate to="/login" replace />;
   const effectiveRole = user.active_view || user.role;

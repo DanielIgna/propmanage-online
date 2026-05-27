@@ -58,6 +58,7 @@ export const AdminAuditLog = () => {
   const [pendingCompare, setPendingCompare] = useState(null); // [id1, id2] from URL ?compare=
   const [missingCompare, setMissingCompare] = useState(false); // shareable link entries not found
   const [pinnedOnly, setPinnedOnly] = useState(false);
+  const [dateFilter, setDateFilter] = useState(null); // YYYY-MM-DD from heatmap navigation
   const [pinning, setPinning] = useState(null); // entry id being pinned/unpinned
   const [emailModal, setEmailModal] = useState(null); // { entry } when open
   const [emailRecipients, setEmailRecipients] = useState("");
@@ -235,6 +236,10 @@ export const AdminAuditLog = () => {
     if (filterAction) params.action = filterAction;
     if (q) params.q = q;
     if (pinnedOnly) params.pinned = true;
+    if (dateFilter) {
+      params.date_from = `${dateFilter}T00:00:00`;
+      params.date_to = `${dateFilter}T23:59:59.999Z`;
+    }
     axios.get(`${API}/admin/audit-log`, { params })
       .then(r => setData(r.data))
       .finally(() => setLoading(false));
@@ -250,10 +255,12 @@ export const AdminAuditLog = () => {
         const ids = cmp.split(",").map(s => s.trim()).filter(Boolean).slice(0, 2);
         if (ids.length === 2) setPendingCompare(ids);
       }
+      const dt = sp.get("audit_date");
+      if (dt && /^\d{4}-\d{2}-\d{2}$/.test(dt)) setDateFilter(dt);
     } catch { /* ignore */ }
   }, []);
 
-  useEffect(() => { load(); }, [filterAction, skip, pinnedOnly]);
+  useEffect(() => { load(); }, [filterAction, skip, pinnedOnly, dateFilter]);
 
   // Auto-resolve shareable compare link once data is loaded
   useEffect(() => {
@@ -332,6 +339,25 @@ export const AdminAuditLog = () => {
               <span className="ml-1 text-[10px] bg-amber-500 text-white rounded-full px-1.5 py-0.5">{data.pinned_total}</span>
             )}
           </button>
+          {dateFilter && (
+            <button
+              type="button"
+              onClick={() => {
+                setDateFilter(null);
+                setSkip(0);
+                try {
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete("audit_date");
+                  window.history.replaceState({}, "", url.toString());
+                } catch { /* ignore */ }
+              }}
+              className="px-3 py-2 rounded-lg border border-orange-400 bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:border-orange-500/50 dark:text-orange-300 text-sm font-medium flex items-center gap-1.5"
+              data-testid="audit-date-filter-clear"
+              title="Click pentru a elimina filtrul de dată"
+            >
+              📅 {dateFilter} <span className="text-base leading-none ml-0.5">×</span>
+            </button>
+          )}
           <AdminBtn variant="ghost" type="button" onClick={load} data-testid="audit-refresh">
             <RefreshCw className="w-3.5 h-3.5 inline mr-1" /> Refresh
           </AdminBtn>

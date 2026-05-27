@@ -237,6 +237,17 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Auto-deschide modalul când pagina e accesată cu `?compare=` (fetch fallback prin `GET /api/admin/audit-log/{id}`)
 - Banner roșu "⚠️ Link invalid" dacă intrările au fost șterse; URL curățat la close
 
+### Phase 42 — Recipient Cadence Heatmap (Feb 2026)
+- Endpoint `GET /api/admin/incident-cadence-heatmap?days=91` agregare zilnică din `preset_send_history`
+- Returnează: `cells[]` (date, count, recipients, weekday) cu zero-fill, `total_sends`, `active_days`, `peak`, `weekday_dist[7]`
+- Backend audit-log endpoint extins cu `date_from` + `date_to` query params
+- Frontend: componentă nouă `IncidentCadenceHeatmap.jsx` pe Admin Overview
+- GitHub-style 7×13 grid cu 5 nuanțe de verde (Mai puțin → Mai mult), labels axe (FEB/MAR/.../MAI sus, L/Mi/V stânga)
+- Click pe cell → custom event `propmanage:nav-admin` cu detail `{tab, date}` → AdminConsole switch active tab + AdminAuditLog citește `?audit_date=` URL param
+- Pill portocaliu **"📅 YYYY-MM-DD ×"** în toolbar audit log pentru clear filter
+- Hover: scale 125% + ring portocaliu + detalii la footer (data + count + destinatari)
+- Stats top-right card: total trimiteri + zile active + peak
+
 ### Phase 41 — Stats per Preset (Feb 2026)
 - Colecția `preset_send_history` cu `{preset_id, audit_entry_id, target_label, action, recipient_count, sent_by, sent_at, provider}`
 - Înregistrare automată la fiecare email trimis cu `preset_id` în `email-report` endpoint
