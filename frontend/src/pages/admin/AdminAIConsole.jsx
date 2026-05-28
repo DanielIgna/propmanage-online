@@ -6,6 +6,7 @@ import { AdminCard, AdminBtn } from "./AdminLayoutMetronic";
 import { RepairAuditLog } from "./RepairAuditLog";
 import { AIHealthScore } from "./AIHealthScore";
 import { SmokeTestCard } from "./SmokeTestCard";
+import { HealthcheckCard } from "./HealthcheckCard";
 import { API } from "../DashShared";
 
 const SEVERITY_COLORS = {
@@ -171,6 +172,9 @@ export const AdminAIConsole = () => {
     <div className="space-y-4" data-testid="admin-ai-console">
       {/* AI Health Score hero (Phase 47E) */}
       <AIHealthScore />
+
+      {/* Healthcheck — integrations status (MongoDB, LLM, Email, Stripe, OAuth, Push) */}
+      <HealthcheckCard />
 
       {/* Smoke Test E2E — manual health probe against live API */}
       <SmokeTestCard />

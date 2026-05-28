@@ -53,6 +53,7 @@ from routes.gdpr import router as gdpr_router, admin_router as gdpr_admin_router
 from routes.digital_twin import router as digital_twin_router, admin_router as digital_twin_admin_router, operator_router as digital_twin_operator_router
 from routes.impersonation import router as impersonation_router
 from routes.admin_smoketest import router as admin_smoketest_router, run_smoke_test_monitor_tick
+from routes.admin_healthcheck import router as admin_healthcheck_router
 from demo_reset import reset_demo_accounts
 
 logging.basicConfig(level=logging.INFO)
@@ -104,6 +105,7 @@ for r in (
     digital_twin_router, digital_twin_admin_router, digital_twin_operator_router,
     impersonation_router,
     admin_smoketest_router,
+    admin_healthcheck_router,
 ):
     app.include_router(r)
 

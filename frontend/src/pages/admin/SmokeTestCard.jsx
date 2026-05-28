@@ -2,13 +2,15 @@
 // the live API. Triggered manually by admin; results stored in DB for history.
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { PlayCircle, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp, History, ExternalLink, Bell, BellOff } from "lucide-react";
+import { PlayCircle, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp, History, ExternalLink, Bell, BellOff, Users } from "lucide-react";
 import { AdminCard, AdminBtn } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
 
 export const SmokeTestCard = () => {
   const [running, setRunning] = useState(false);
+  const [runningAll, setRunningAll] = useState(false);
   const [lastRun, setLastRun] = useState(null);
+  const [allRolesReport, setAllRolesReport] = useState(null);
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [baseUrl, setBaseUrl] = useState("");
@@ -46,6 +48,20 @@ export const SmokeTestCard = () => {
     }
   };
 
+  const runAllRoles = async () => {
+    setRunningAll(true);
+    try {
+      const params = baseUrl.trim() ? `?base_url=${encodeURIComponent(baseUrl.trim())}` : "";
+      const r = await axios.post(`${API}/admin/smoke-test/run-all-roles${params}`);
+      setAllRolesReport(r.data);
+      loadHistory();
+    } catch (e) {
+      window.alert(`Run-all-roles eșuat: ${e?.response?.data?.detail || e.message}`);
+    } finally {
+      setRunningAll(false);
+    }
+  };
+
   const toggleMonitor = async () => {
     if (!monitor) return;
     setMonitorBusy(true);
@@ -73,15 +89,26 @@ export const SmokeTestCard = () => {
         </div>
       }
       action={
-        <AdminBtn
-          variant="primary"
-          onClick={runTest}
-          disabled={running}
-          data-testid="smoke-test-run-btn"
-        >
-          <PlayCircle className={`w-3.5 h-3.5 ${running ? "animate-pulse" : ""}`} />
-          {running ? "Se rulează..." : "Rulează test"}
-        </AdminBtn>
+        <div className="flex items-center gap-2">
+          <AdminBtn
+            variant="secondary"
+            onClick={runAllRoles}
+            disabled={runningAll || running}
+            data-testid="smoke-test-run-all-roles-btn"
+          >
+            <Users className={`w-3.5 h-3.5 ${runningAll ? "animate-pulse" : ""}`} />
+            {runningAll ? "Testez toate..." : "Toate rolurile"}
+          </AdminBtn>
+          <AdminBtn
+            variant="primary"
+            onClick={runTest}
+            disabled={running || runningAll}
+            data-testid="smoke-test-run-btn"
+          >
+            <PlayCircle className={`w-3.5 h-3.5 ${running ? "animate-pulse" : ""}`} />
+            {running ? "Se rulează..." : "Rulează test"}
+          </AdminBtn>
+        </div>
       }
     >
       <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
@@ -149,6 +176,8 @@ export const SmokeTestCard = () => {
           Prod
         </button>
       </div>
+
+      {allRolesReport && <AllRolesReport report={allRolesReport} />}
 
       {lastRun && <RunReport run={lastRun} />}
 
@@ -262,6 +291,102 @@ const RunReport = ({ run }) => {
           ))}
         </div>
       )}
+    </div>
+  );
+};
+
+
+const ROLE_META = {
+  client:     { label: "Client",     emoji: "👤", color: "blue" },
+  specialist: { label: "Specialist", emoji: "🔧", color: "purple" },
+  operator:   { label: "Operator",   emoji: "🏢", color: "amber" },
+  admin:      { label: "Admin",      emoji: "🛡️", color: "red" },
+};
+
+const AllRolesReport = ({ report }) => {
+  return (
+    <div
+      className={`rounded-xl border p-3 mb-3 ${
+        report.ok
+          ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30"
+          : "bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30"
+      }`}
+      data-testid="smoke-test-all-roles-report"
+    >
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          {report.ok
+            ? <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            : <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+          }
+          <div>
+            <div className={`font-semibold text-sm ${report.ok ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}`}>
+              Toate rolurile: {report.summary.passed_roles}/{report.summary.total_roles} OK
+            </div>
+            <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+              {report.base_url} · paralel · {new Date(report.started_at).toLocaleString("ro-RO")}
+            </div>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-lg font-bold text-slate-700 dark:text-slate-200">{report.total_duration_ms}ms</div>
+          <div className="text-[9px] uppercase tracking-wider text-slate-400">durată (max)</div>
+        </div>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-2">
+        {report.roles?.map((r) => {
+          const meta = ROLE_META[r.role] || { label: r.role, emoji: "?", color: "slate" };
+          return (
+            <div
+              key={r.role}
+              className={`rounded-lg border p-3 ${
+                r.ok
+                  ? "bg-white/60 dark:bg-emerald-500/5 border-emerald-200/60 dark:border-emerald-500/20"
+                  : "bg-red-100 dark:bg-red-500/15 border-red-300 dark:border-red-500/40"
+              }`}
+              data-testid={`smoke-role-${r.role}`}
+            >
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{meta.emoji}</span>
+                  <div>
+                    <div className="text-sm font-semibold capitalize">{meta.label}</div>
+                    <div className="text-[10px] text-slate-500 font-mono">{r.passed}/{r.total} · {r.total_duration_ms}ms</div>
+                  </div>
+                </div>
+                {r.ok
+                  ? <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                  : <XCircle className="w-5 h-5 text-red-500" />
+                }
+              </div>
+              <div className="space-y-0.5">
+                {r.steps?.map((s, i) => (
+                  <div key={i} className="flex items-center gap-1.5 text-[11px] py-0.5">
+                    {s.ok
+                      ? <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                      : <XCircle className="w-3 h-3 text-red-500 shrink-0" />
+                    }
+                    <span className="flex-1 truncate text-slate-600 dark:text-slate-300">{s.name}</span>
+                    {s.status_code && (
+                      <span className={`font-mono text-[9px] px-1 py-0.5 rounded ${
+                        s.ok ? "bg-emerald-200/50 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300"
+                             : "bg-red-200/60 text-red-700 dark:bg-red-500/20 dark:text-red-300"
+                      }`}>{s.status_code}</span>
+                    )}
+                    <span className="text-slate-400 font-mono text-[9px] shrink-0">{s.duration_ms}ms</span>
+                  </div>
+                ))}
+              </div>
+              {!r.ok && r.steps?.filter(s => !s.ok).map((s, i) => s.error && (
+                <div key={i} className="mt-2 bg-red-100/60 dark:bg-red-500/15 rounded p-1.5 text-[10px] font-mono text-red-700 dark:text-red-300 break-all">
+                  {s.error?.slice(0, 200)}
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

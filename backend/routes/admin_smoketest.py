@@ -29,6 +29,15 @@ router = APIRouter(prefix="/api/admin/smoke-test", tags=["admin-smoketest"])
 SMOKE_EMAIL = "client@propmanage.io"
 SMOKE_PASSWORD = "Client123!"
 
+# Role-specific demo credentials for multi-role smoke tests.
+# All accounts are seeded and reset nightly by demo_reset.py.
+ROLE_CREDENTIALS = {
+    "client":     {"email": "client@propmanage.io",     "password": "Client123!"},
+    "specialist": {"email": "specialist@propmanage.io", "password": "Spec123!"},
+    "admin":      {"email": "admin@propmanage.io",      "password": "Admin123!"},
+    "operator":   {"email": "operator@propmanage.io",   "password": "Op123!"},
+}
+
 # Default base URL preference:
 # 1. SMOKE_TEST_BASE_URL (explicit override)
 # 2. http://localhost:8001 (safest — tests the backend pod itself, works in both
@@ -249,6 +258,196 @@ async def list_smoke_test_runs(
     cursor = db.smoke_test_runs.find({}, {"_id": 0}).sort("started_at", -1).limit(limit)
     items = await cursor.to_list(limit)
     return {"items": items, "count": len(items)}
+
+
+# ===========================================================================
+# PER-ROLE SMOKE TESTS
+# ===========================================================================
+# Each role-specific test runs a representative flow for that user type:
+# - specialist: login → marketplace → /auth/me → logout
+# - operator: login → operator queue → /auth/me → logout
+# - admin: login → admin stats → /auth/me → logout
+# All tests are read-only (no writes) → safe to run repeatedly without cleanup.
+
+
+async def _login_and_get_cookie(cli: httpx.AsyncClient, email: str, password: str,
+                                steps: List[dict]) -> Optional[str]:
+    """Helper: login + return Cookie header string. Returns None on failure."""
+    t = time.perf_counter()
+    try:
+        r = await cli.post("/api/auth/login", json={"email": email, "password": password})
+        token = r.cookies.get("access_token")
+        ok = r.status_code == 200 and bool(token)
+        await _record_step(
+            steps, f"Login ({email})", t, ok,
+            status_code=r.status_code,
+            error=None if ok else (r.text[:200] if r.text else "no cookie"),
+        )
+        return f"access_token={token}" if ok else None
+    except Exception as e:  # noqa: BLE001
+        await _record_step(steps, f"Login ({email})", t, False, error=str(e)[:200])
+        return None
+
+
+async def _verify_role(cli: httpx.AsyncClient, cookie: str, expected_role: str,
+                       steps: List[dict]) -> bool:
+    """Helper: GET /auth/me and verify role matches expectation."""
+    t = time.perf_counter()
+    try:
+        r = await cli.get("/api/auth/me", headers={"Cookie": cookie})
+        data = r.json() if r.status_code == 200 else {}
+        actual = data.get("role")
+        ok = r.status_code == 200 and actual == expected_role
+        await _record_step(
+            steps, f"GET /auth/me (verifică rol={expected_role})", t, ok,
+            status_code=r.status_code,
+            error=None if ok else f"got role={actual}",
+            payload={"role": actual, "email": data.get("email")} if ok else None,
+        )
+        return ok
+    except Exception as e:  # noqa: BLE001
+        await _record_step(steps, f"GET /auth/me (verifică rol={expected_role})", t, False,
+                           error=str(e)[:200])
+        return False
+
+
+async def _logout(cli: httpx.AsyncClient, cookie: str, steps: List[dict]) -> None:
+    t = time.perf_counter()
+    try:
+        r = await cli.post("/api/auth/logout", headers={"Cookie": cookie})
+        ok = r.status_code in (200, 204)
+        await _record_step(steps, "POST /auth/logout", t, ok,
+                           status_code=r.status_code,
+                           error=None if ok else r.text[:200])
+    except Exception as e:  # noqa: BLE001
+        await _record_step(steps, "POST /auth/logout", t, False, error=str(e)[:200])
+
+
+async def _run_role_sequence(base_url: str, role: str) -> dict:
+    """Run a role-specific smoke test sequence.
+
+    Each role has its own representative endpoint to call after login,
+    chosen to be lightweight (read-only) and high-signal (failure indicates
+    a broken core flow for that role).
+    """
+    creds = ROLE_CREDENTIALS.get(role)
+    if not creds:
+        raise ValueError(f"Unknown role: {role}")
+
+    steps: List[dict] = []
+    run_id = str(uuid.uuid4())
+    started_at = _now()
+    overall_ok = True
+
+    async with httpx.AsyncClient(base_url=base_url, timeout=15.0, follow_redirects=True) as cli:
+        cookie = await _login_and_get_cookie(cli, creds["email"], creds["password"], steps)
+        if not cookie:
+            return _finalize_role(run_id, started_at, steps, False, base_url, role)
+
+        if not await _verify_role(cli, cookie, role, steps):
+            overall_ok = False
+
+        # Role-specific representative endpoint
+        role_endpoints = {
+            "specialist": ("/api/marketplace/specialists", "Marketplace specialiști vizibilă"),
+            "operator":   ("/api/operator/twins",          "Lista twins de operator"),
+            "admin":      ("/api/admin/stats",             "Admin stats dashboard"),
+            "client":     ("/api/properties",              "Lista proprietăților clientului"),
+        }
+        endpoint, label = role_endpoints[role]
+        t = time.perf_counter()
+        try:
+            r = await cli.get(endpoint, headers={"Cookie": cookie})
+            ok = r.status_code == 200
+            payload = None
+            if ok:
+                data = r.json()
+                if isinstance(data, list):
+                    payload = {"count": len(data)}
+                elif isinstance(data, dict):
+                    payload = {"keys": list(data.keys())[:6]}
+            await _record_step(steps, f"GET {endpoint} ({label})", t, ok,
+                               status_code=r.status_code,
+                               error=None if ok else r.text[:200],
+                               payload=payload)
+            if not ok:
+                overall_ok = False
+        except Exception as e:  # noqa: BLE001
+            await _record_step(steps, f"GET {endpoint} ({label})", t, False,
+                               error=str(e)[:200])
+            overall_ok = False
+
+        await _logout(cli, cookie, steps)
+
+    return _finalize_role(run_id, started_at, steps, overall_ok, base_url, role)
+
+
+def _finalize_role(run_id: str, started_at: str, steps: list, overall_ok: bool,
+                   base_url: str, role: str) -> dict:
+    return {
+        "id": run_id,
+        "role": role,
+        "started_at": started_at,
+        "finished_at": _now(),
+        "ok": overall_ok,
+        "base_url": base_url,
+        "total_duration_ms": sum(s.get("duration_ms", 0) for s in steps),
+        "steps": steps,
+        "passed": sum(1 for s in steps if s["ok"]),
+        "failed": sum(1 for s in steps if not s["ok"]),
+        "total": len(steps),
+    }
+
+
+@router.post("/run-all-roles")
+async def run_all_roles(
+    base_url: Optional[str] = Query(None),
+    user: dict = Depends(require_role("admin")),
+):
+    """Run smoke tests for ALL 4 roles (client, specialist, operator, admin)
+    in parallel. Returns one aggregated report.
+    """
+    import asyncio
+    target = (base_url or DEFAULT_BASE).rstrip("/")
+    logger.info(f"[SmokeTest][all-roles] starting against {target}")
+
+    # Run client variant via the existing full E2E sequence (which exercises CRUD)
+    # to keep the rich smoke for that role. Others use the lighter read-only flow.
+    runs = await asyncio.gather(
+        _run_smoke_sequence(target),               # client full E2E (existing)
+        _run_role_sequence(target, "specialist"),
+        _run_role_sequence(target, "operator"),
+        _run_role_sequence(target, "admin"),
+    )
+    # Stamp the client run with role="client" so the UI can render uniformly
+    runs[0]["role"] = "client"
+
+    overall_ok = all(r["ok"] for r in runs)
+    aggregated = {
+        "started_at": runs[0]["started_at"],
+        "finished_at": _now(),
+        "ok": overall_ok,
+        "base_url": target,
+        "triggered_by": user.get("email"),
+        "total_duration_ms": max(r["total_duration_ms"] for r in runs),  # parallel → max
+        "roles": runs,
+        "summary": {
+            "total_roles": len(runs),
+            "passed_roles": sum(1 for r in runs if r["ok"]),
+            "failed_roles": sum(1 for r in runs if not r["ok"]),
+        },
+    }
+    # Persist individual runs so they appear in history alongside manual runs
+    try:
+        for r in runs:
+            r_copy = r.copy()
+            r_copy["triggered_by"] = f"all-roles ({user.get('email')})"
+            await db.smoke_test_runs.insert_one(r_copy)
+    except Exception:  # noqa: BLE001
+        pass
+    logger.info(f"[SmokeTest][all-roles] done · {aggregated['summary']}")
+    return aggregated
+
 
 
 

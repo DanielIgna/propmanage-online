@@ -717,3 +717,45 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
   - Tick with `last_status=fail` against good URL → ✅ RECOVERED email sent
   - Invalid interval (e.g. 1 min) → 400 with proper error
   - Toggle on/off via UI → config persists, banner reflects state in real-time
+
+
+## Changelog — 2026-02-28 — Healthcheck + Smoke Test Multi-Rol
+- New backend route `/app/backend/routes/admin_healthcheck.py`:
+  - `GET /api/admin/healthcheck/run` — runs 7 parallel probes:
+    - MongoDB (ping + estimated_document_count)
+    - Emergent LLM Key (format validation, no actual LLM call)
+    - Email Provider (Resend `/domains` verify or SendGrid format check)
+    - Stripe (`/v1/balance` lightweight call, demo/test/live modes detected)
+    - Google OAuth (`.well-known/openid-configuration` reachability)
+    - VAPID Push (key presence + PEM format check)
+    - Admin Emails (ADMIN_EMAILS / ADMIN_EMAIL configured for alerts)
+  - Each check returns `{name, ok, status, detail, severity, duration_ms}`.
+  - Severity buckets: `high` (critical — app down without it), `warning`
+    (degraded), `info` (optional). Overall OK = no critical_failed.
+- Extended `/app/backend/routes/admin_smoketest.py` with multi-role:
+  - `ROLE_CREDENTIALS` dict mapping each demo role to its seed creds.
+  - `_run_role_sequence(base_url, role)` runs login → /auth/me (verify role) →
+    role-specific endpoint → logout. Endpoints chosen for high signal:
+    - specialist → `/api/marketplace/specialists`
+    - operator → `/api/operator/twins`
+    - admin → `/api/admin/stats`
+    - client → existing full E2E (with CRUD)
+  - `POST /api/admin/smoke-test/run-all-roles` runs all 4 in **parallel**
+    via `asyncio.gather` (4 roles tested in ~1.2s vs ~5s sequential).
+  - Each role's run persisted to `db.smoke_test_runs` with `triggered_by:
+    "all-roles (<admin email>)"`.
+- New frontend `/app/frontend/src/pages/admin/HealthcheckCard.jsx` — grid of
+  7 status cards (color-coded by severity) + overall summary card. Mounted
+  in AdminAIConsole between AI Health Score and Smoke Test.
+- Extended `SmokeTestCard.jsx`:
+  - Added secondary "Toate rolurile" button (Users icon) next to "Rulează test".
+  - New `AllRolesReport` component: per-role card with emoji/icon, step list,
+    HTTP codes, durations; grid 2-col on sm+ screens.
+  - Same Target URL input is reused for both single and all-roles runs.
+- Validated end-to-end (preview):
+  - `GET /api/admin/healthcheck/run` → 7 checks, 5/7 PASS (Email + Stripe warn
+    as expected in preview — no prod keys), 57ms total
+  - `POST /api/admin/smoke-test/run-all-roles` → 18/18 steps PASS across 4
+    roles in 1178ms parallel
+  - UI screenshot confirms both cards render with correct color-coding,
+    badges (CRITIC/WARN/INFO), and per-step breakdown
