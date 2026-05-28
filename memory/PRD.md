@@ -830,3 +830,32 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
     stripped from all updates (privacy check passed)
   - Frontend screenshots confirm both `/status` (public) and AI Investigator
     (admin) render incidents correctly with all badges and update timelines
+
+
+## Changelog — 2026-02-28 — Data Integrity Check
+- New backend `/app/backend/routes/admin_data_integrity.py`:
+  - `GET /api/admin/data-integrity/run` runs 9 parallel checks (read-only):
+    1. **Twins orfane** (warning) — twins with deleted property_id
+    2. **Proprietăți fără proprietar valid** (HIGH) — owner_id not in users
+    3. **Cereri cu proprietate inexistentă** (warning) — request.property_id orphan
+    4. **Cereri cu utilizatori inexistenți** (HIGH) — client_id/specialist_id missing
+    5. **Inconsistențe wallet ↔ tranzacții** (HIGH) — wallet_balance vs SUM(tx)
+    6. **Dispute cu cereri inexistente** (HIGH) — dispute.request_id orphan
+    7. **Solduri negative** (warning) — users with wallet_balance<0 or tokens<0
+    8. **Emailuri duplicate** (warning) — same email case-insensitive
+    9. **Dispute active pe cereri închise** (warning) — open dispute on completed/cancelled
+  - Each check returns `{name, severity, ok, issue_count, samples[5], duration_ms}`.
+  - Persisted to `db.data_integrity_runs` for trend analysis.
+  - `GET /api/admin/data-integrity/history?limit=10` for past runs.
+- Frontend `/app/frontend/src/pages/admin/DataIntegrityCard.jsx`:
+  - Mounted in AdminAIConsole between HealthcheckCard and SmokeTestCard.
+  - Color-coded summary banner (green/amber/red by severity).
+  - Per-check accordion: click to expand and see JSON samples (first 5).
+  - Auto-expands failed checks for immediate inspection.
+- Validated end-to-end on preview:
+  - 7/9 checks PASS, 42 issues found (legacy test data — 22 orphan twins + 20
+    requests with deleted property). 0 critical, 2 warning.
+  - All HIGH severity checks PASS (no lost money, no orphan disputes).
+  - 7ms total execution time across 9 parallel checks.
+- Future: add scheduler job to run daily and email admins if HIGH severity
+  issues detected (gated by config flag, similar to smoke test monitor).
