@@ -36,6 +36,12 @@ ADMIN_STASH_COOKIE = "admin_access_token"
 ACCESS_COOKIE = "access_token"
 COOKIE_PATH = "/"
 
+# Match auth cookie config so cross-site (e.g. propmanage.ro → emergent.host) works
+_COOKIE_SAMESITE = (os.environ.get("COOKIE_SAMESITE") or "none").lower()
+if _COOKIE_SAMESITE not in ("lax", "strict", "none"):
+    _COOKIE_SAMESITE = "none"
+_COOKIE_SECURE = (os.environ.get("COOKIE_SECURE") or "true").lower() != "false" or _COOKIE_SAMESITE == "none"
+
 
 class ImpersonateIn(BaseModel):
     user_id: str
@@ -117,12 +123,12 @@ async def start_impersonation(
     # Stash the admin's existing token so /stop-impersonation can restore it
     response.set_cookie(
         ADMIN_STASH_COOKIE, current_token,
-        httponly=True, secure=False, samesite="lax",
+        httponly=True, secure=_COOKIE_SECURE, samesite=_COOKIE_SAMESITE,
         max_age=IMPERSONATION_TTL_SECONDS, path=COOKIE_PATH,
     )
     response.set_cookie(
         ACCESS_COOKIE, imp_token,
-        httponly=True, secure=False, samesite="lax",
+        httponly=True, secure=_COOKIE_SECURE, samesite=_COOKIE_SAMESITE,
         max_age=IMPERSONATION_TTL_SECONDS, path=COOKIE_PATH,
     )
 
@@ -192,7 +198,7 @@ async def stop_impersonation(
     # Restore admin cookie
     response.set_cookie(
         ACCESS_COOKIE, admin_token,
-        httponly=True, secure=False, samesite="lax",
+        httponly=True, secure=_COOKIE_SECURE, samesite=_COOKIE_SAMESITE,
         max_age=86400, path=COOKIE_PATH,
     )
     response.delete_cookie(ADMIN_STASH_COOKIE, path=COOKIE_PATH)

@@ -74,8 +74,23 @@ def serialize_doc(doc):
 
 
 def set_auth_cookies(response: Response, access: str, refresh: str):
-    response.set_cookie("access_token", access, httponly=True, secure=False, samesite="lax", max_age=86400, path="/")
-    response.set_cookie("refresh_token", refresh, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
+    """Set httpOnly auth cookies.
+
+    `SameSite=lax + secure=false` works for same-origin dev/preview.
+    `SameSite=none + secure=true` is REQUIRED when frontend (e.g. propmanage.ro)
+    and backend (e.g. phased-document.emergent.host) are on DIFFERENT domains,
+    because Chrome blocks AJAX cookies cross-site with SameSite=lax.
+
+    Controlled via env: COOKIE_SAMESITE (defaults to 'none' for production safety)
+    and COOKIE_SECURE ('true' / 'false', defaults to 'true').
+    """
+    samesite = (os.environ.get("COOKIE_SAMESITE") or "none").lower()
+    if samesite not in ("lax", "strict", "none"):
+        samesite = "none"
+    secure_env = (os.environ.get("COOKIE_SECURE") or "true").lower()
+    secure = secure_env != "false" or samesite == "none"  # SameSite=None REQUIRES Secure
+    response.set_cookie("access_token", access, httponly=True, secure=secure, samesite=samesite, max_age=86400, path="/")
+    response.set_cookie("refresh_token", refresh, httponly=True, secure=secure, samesite=samesite, max_age=604800, path="/")
 
 
 def effective_role(user: dict) -> str:
