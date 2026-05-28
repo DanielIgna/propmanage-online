@@ -34,7 +34,7 @@ export const AIConciergeBubble = () => {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [enabled, setEnabled] = useState(false);
-  const [supportEmail, setSupportEmail] = useState("admin@propmanage.io");
+  const [supportEmail, setSupportEmail] = useState("contact@propmanage.ro");
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);

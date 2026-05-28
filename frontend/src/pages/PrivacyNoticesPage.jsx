@@ -159,7 +159,7 @@ export const PrivacyNoticesPage = () => {
         </section>
 
         <footer className="mt-10 text-xs text-stone-500">
-          Contact DPO: <a href="mailto:dpo@propmanage.io" className="text-[#d4ff3a] hover:underline">dpo@propmanage.io</a>
+          Contact DPO: <a href="mailto:contact@propmanage.ro" className="text-[#d4ff3a] hover:underline">contact@propmanage.ro</a>
           {" · "} Răspuns garantat în 30 zile conform GDPR.
         </footer>
       </div>

@@ -1342,7 +1342,7 @@ const Footer = () => (
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Status
         </Link>
         <GDPRAuditBadge variant="footer" />
-        <a href="mailto:admin@propmanage.io" className="hover:text-white transition-colors">Contact</a>
+        <a href="mailto:contact@propmanage.ro" className="hover:text-white transition-colors">Contact</a>
       </div>
     </div>
   </footer>

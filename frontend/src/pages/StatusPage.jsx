@@ -217,7 +217,7 @@ export const StatusPage = () => {
         <div className="rounded-2xl border border-stone-800 bg-stone-900/40 p-4 text-xs text-stone-400">
           <div className="font-semibold text-stone-300 mb-1">Despre această pagină</div>
           <p>Pagină live actualizată automat la fiecare minut. Pentru incidente majore, vom posta detalii suplimentare aici și vom notifica prin email utilizatorii cu cont activ.</p>
-          <p className="mt-2">Probleme persistente? Scrie la <a href="mailto:admin@propmanage.io" className="text-[#d4ff3a]">admin@propmanage.io</a>.</p>
+          <p className="mt-2">Probleme persistente? Scrie la <a href="mailto:contact@propmanage.ro" className="text-[#d4ff3a]">contact@propmanage.ro</a>.</p>
         </div>
       </div>
     </div>

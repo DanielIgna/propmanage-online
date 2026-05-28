@@ -104,7 +104,7 @@ def _layout(title: str, preheader: str, body_html: str, cta_url: Optional[str] =
             <td style="padding: 24px 32px; border-top: 1px solid #ffffff10; background-color: #0e0e10;">
               <p style="margin: 0; font-size: 11px; color: #888893; line-height: 1.5;">
                 © {datetime.now().year} PropManage · Property Operating System<br/>
-                Acest email a fost trimis de PropManage. Pentru întrebări, răspunde direct sau scrie pe <a href="mailto:support@propmanage.io" style="color: #d4ff3a; text-decoration: none;">support@propmanage.io</a>
+                Acest email a fost trimis de PropManage. Pentru întrebări, răspunde direct sau scrie pe <a href="mailto:contact@propmanage.ro" style="color: #d4ff3a; text-decoration: none;">contact@propmanage.ro</a>
               </p>
             </td>
           </tr>

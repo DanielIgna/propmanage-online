@@ -1174,7 +1174,7 @@ async def send_daily_ai_digest_email():
             {rows_html}
           </table>
           <p style="color:#a8a8b0; font-size:13px;">Deschide consola admin pentru a vedea detalii complete, a aproba acțiuni sau a marca finding-uri ca rezolvate:</p>
-          <p><a href="https://propmanage.io/admin" style="display:inline-block; padding:12px 24px; background:#d4ff3a; color:#000; text-decoration:none; border-radius:8px; font-weight:bold;">Deschide AI Console</a></p>
+          <p><a href="https://propmanage.ro/admin" style="display:inline-block; padding:12px 24px; background:#d4ff3a; color:#000; text-decoration:none; border-radius:8px; font-weight:bold;">Deschide AI Console</a></p>
         """
         html = _layout(
             title="🤖 Daily AI Investigator Digest",

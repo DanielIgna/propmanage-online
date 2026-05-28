@@ -18,7 +18,7 @@ const Layout = ({ icon: Icon, title, subtitle, children, testid }) => (
         {children}
       </article>
       <div className="mt-12 pt-6 border-t border-stone-800 text-xs text-stone-500">
-        Pentru întrebări legate de date sau drepturile tale: <a href="mailto:admin@propmanage.io" className="text-[#d4ff3a]">admin@propmanage.io</a>
+        Pentru întrebări legate de date sau drepturile tale: <a href="mailto:contact@propmanage.ro" className="text-[#d4ff3a]">contact@propmanage.ro</a>
       </div>
     </div>
   </div>
@@ -64,7 +64,7 @@ export const PrivacyPage = () => (
       <li><strong>Obiecție</strong>: opune-te procesării pentru anumite scopuri.</li>
       <li><strong>Plângere ANSPDCP</strong>: dacă consideri că drepturile îți sunt încălcate.</li>
     </ul>
-    <p>Pentru orice cerere DSAR, scrie la <a href="mailto:admin@propmanage.io">admin@propmanage.io</a> — răspundem în maximum 30 zile.</p>
+    <p>Pentru orice cerere DSAR, scrie la <a href="mailto:contact@propmanage.ro">contact@propmanage.ro</a> — răspundem în maximum 30 zile.</p>
 
     <p className="mt-4 p-4 rounded-xl bg-white/5 border border-white/10">
       <strong className="text-[#d4ff3a]">📑 Notificări de confidențialitate per rol:</strong>{" "}
@@ -95,7 +95,7 @@ export const TermsPage = () => (
     <p>Prin utilizarea platformei <strong>PropManage</strong> ("Platforma"), accepți acești Termeni. Dacă nu ești de acord, te rugăm să nu folosești serviciile.</p>
 
     <h2>1. Cine este responsabil</h2>
-    <p>Operator: <strong>PropManage SRL</strong>, sediu social în România. Contact: <a href="mailto:admin@propmanage.io">admin@propmanage.io</a>.</p>
+    <p>Operator: <strong>PropManage SRL</strong>, sediu social în România. Contact: <a href="mailto:contact@propmanage.ro">contact@propmanage.ro</a>.</p>
 
     <h2>2. Cont utilizator</h2>
     <ul>

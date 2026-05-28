@@ -129,7 +129,7 @@ DEFAULT_SETTINGS = {
     "lead_fee_ron": 45.0,
     "primary_color": "#d4ff3a",
     "logo_text": "PropManage",
-    "support_email": "support@propmanage.io",
+    "support_email": "contact@propmanage.ro",
     "maintenance_mode": False,
     # Landing page section visibility flags
     "landing_show_admin_trust": False,
@@ -2480,7 +2480,7 @@ async def _send_spike_alert_email(wc: dict, tier: dict, preset: dict, dry_run: b
       <p style="color:#a8a8b0; font-size:13px;">Acțiuni recomandate pentru {tier_label}:</p>
       <ul style="color:#c8c8cc; font-size:13px;">
         <li>Verifică deploy-urile și modificările recente.</li>
-        <li>Consultă audit log-ul pentru anomalii: <a style="color:#d4ff3a;" href="https://propmanage.io/admin">consola admin</a></li>
+        <li>Consultă audit log-ul pentru anomalii: <a style="color:#d4ff3a;" href="https://propmanage.ro/admin">consola admin</a></li>
         <li>Distribuie raportul către echipa relevantă dacă e necesar.</li>
       </ul>
     """
@@ -2562,7 +2562,7 @@ async def run_incident_spike_alert_check():
             "action": "incident_spike_alert.sent",
             "actor_id": "system",
             "actor_name": "Sistem (auto-alert)",
-            "actor_email": "system@propmanage.io",
+            "actor_email": "system@propmanage.ro",
             "target_type": "platform_setting",
             "target_id": "incident_spike_alert",
             "target_label": f"Spike Alert {week_key} · {matched['name']}",
