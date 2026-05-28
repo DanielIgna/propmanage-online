@@ -374,7 +374,7 @@ const ProfileModal = ({ onClose }) => {
           />
         </Field>
 
-        <Field label="Locație / Zonă" icon={MapPin}>
+        <Field label="Locație / Zonă" icon={MapPinIcon}>
           <input
             value={form.zone}
             onChange={(e) => setForm({ ...form, zone: e.target.value })}

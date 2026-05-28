@@ -645,3 +645,20 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 
 
 
+
+
+## Changelog — 2026-02-28 — Backup Password Email (Google OAuth lockout recovery)
+- Backend endpoint `POST /api/auth/password/send-backup` (in `/app/backend/routes/auth.py`):
+  - Generates a strong temp password (`secrets.token_urlsafe(9)`), hashes & stores it on user
+  - Sends an HTML email (Romanian copy) via `send_email` (SendGrid in prod, MongoDB email_log demo fallback)
+  - Blocks impersonation contexts so admins cannot trigger it for other users
+  - Returns `{ok, email_to, expires_note}` — never echoes the password in response
+- `GET /api/auth/me` now exposes `has_password` and `google_auth` boolean flags (private to the user) so the UI can decide when to surface the backup-password CTA
+- Frontend `SettingsPanel.jsx`:
+  - New `BackupPasswordModal` component (lines 481-554) with Romanian copy, success state, error state, contextual warning when overwriting existing password
+  - Row "Trimite parolă de backup pe email" (accent yellow) only renders when `user.google_auth || !user.has_password`
+  - Wired via `modal === "backup-password"` handler
+- Bugfix: `Field icon={MapPin}` → `MapPinIcon` in ProfileModal (latent ReferenceError when opening profile editor)
+- Validated end-to-end:
+  - Backend `curl POST /api/auth/password/send-backup` → 200 OK, password updated in DB, email logged
+  - Frontend screenshot (client@propmanage.io with google_auth=true) → row visible, modal opens, copy & buttons render correctly
