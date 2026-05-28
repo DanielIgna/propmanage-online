@@ -7,6 +7,7 @@ import { RepairAuditLog } from "./RepairAuditLog";
 import { AIHealthScore } from "./AIHealthScore";
 import { SmokeTestCard } from "./SmokeTestCard";
 import { HealthcheckCard } from "./HealthcheckCard";
+import { IncidentsCard } from "./IncidentsCard";
 import { API } from "../DashShared";
 
 const SEVERITY_COLORS = {
@@ -178,6 +179,9 @@ export const AdminAIConsole = () => {
 
       {/* Smoke Test E2E — manual health probe against live API */}
       <SmokeTestCard />
+
+      {/* Public incidents manager (companion to /status page) */}
+      <IncidentsCard />
 
       {/* Findings dashboard */}
       <AdminCard

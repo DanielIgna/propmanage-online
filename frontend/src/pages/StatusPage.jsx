@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Activity, CheckCircle2, AlertTriangle, XCircle, RefreshCw, TrendingUp } from "lucide-react";
+import { ArrowLeft, Activity, CheckCircle2, AlertTriangle, XCircle, RefreshCw, TrendingUp, AlertOctagon, Clock } from "lucide-react";
 import { API } from "./DashShared";
 
 const COMP_LABELS = {
@@ -148,6 +148,7 @@ const UptimeSparkline = ({ history }) => {
 export const StatusPage = () => {
   const [data, setData] = useState(null);
   const [history, setHistory] = useState(null);
+  const [incidents, setIncidents] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const load = async () => {
@@ -159,6 +160,10 @@ export const StatusPage = () => {
     try {
       const h = await axios.get(`${API}/public/status-history?days=30`);
       setHistory(h.data);
+    } catch {/* ignore */}
+    try {
+      const inc = await axios.get(`${API}/public/status-incidents?days=30`);
+      setIncidents(inc.data);
     } catch {/* ignore */}
   };
   useEffect(() => {
@@ -239,12 +244,127 @@ export const StatusPage = () => {
           })}
         </div>
 
+        {/* Incidents history — recent posts from admin */}
+        <IncidentsSection incidents={incidents} />
+
         <div className="rounded-2xl border border-stone-800 bg-stone-900/40 p-4 text-xs text-stone-400">
           <div className="font-semibold text-stone-300 mb-1">Despre această pagină</div>
-          <p>Pagină live actualizată automat la fiecare minut. Pentru incidente majore, vom posta detalii suplimentare aici și vom notifica prin email utilizatorii cu cont activ.</p>
+          <p>Pagină live actualizată automat la fiecare minut. Pentru incidente majore, postăm update-uri în secțiunea de mai sus și notificăm prin email utilizatorii cu cont activ.</p>
           <p className="mt-2">Probleme persistente? Scrie la <a href="mailto:contact@propmanage.ro" className="text-[#d4ff3a]">contact@propmanage.ro</a>.</p>
         </div>
       </div>
+    </div>
+  );
+};
+
+// ============= INCIDENTS SECTION =============
+const SEVERITY_META = {
+  minor:    { label: "Minor",    color: "text-amber-400 border-amber-500/40 bg-amber-500/10" },
+  major:    { label: "Major",    color: "text-orange-400 border-orange-500/40 bg-orange-500/10" },
+  critical: { label: "Critic",   color: "text-red-400 border-red-500/40 bg-red-500/10" },
+};
+
+const STATUS_META = {
+  investigating: { label: "Investigăm",  color: "text-amber-300 bg-amber-500/20" },
+  identified:    { label: "Identificat", color: "text-orange-300 bg-orange-500/20" },
+  monitoring:    { label: "Monitorizăm", color: "text-blue-300 bg-blue-500/20" },
+  resolved:      { label: "Rezolvat",    color: "text-emerald-300 bg-emerald-500/20" },
+};
+
+const COMP_LABELS_COMPACT = {
+  api: "API", database: "DB", ai_concierge: "AI", payments: "Plăți",
+  email: "Email", authentication: "Auth", push_notifications: "Push",
+};
+
+const IncidentsSection = ({ incidents }) => {
+  if (!incidents) return null;
+
+  return (
+    <div className="mb-6" data-testid="incidents-section">
+      <div className="flex items-center justify-between text-xs text-stone-500 mb-3 px-1">
+        <span className="uppercase tracking-wider font-semibold flex items-center gap-1.5">
+          <AlertOctagon className="w-3 h-3" />
+          Incidente recente (30 zile)
+        </span>
+        <span>
+          {incidents.active_count > 0
+            ? <span className="text-amber-400 font-semibold">{incidents.active_count} în curs</span>
+            : `${incidents.count} total · 0 în curs`}
+        </span>
+      </div>
+
+      {incidents.items.length === 0 ? (
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-center text-sm text-emerald-300" data-testid="incidents-empty">
+          <CheckCircle2 className="w-5 h-5 mx-auto mb-1 opacity-80" />
+          Niciun incident raportat în ultimele 30 zile.
+        </div>
+      ) : (
+        <div className="space-y-3" data-testid="incidents-list">
+          {incidents.items.map((inc) => <IncidentCard key={inc.id} incident={inc} />)}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const IncidentCard = ({ incident }) => {
+  const [expanded, setExpanded] = useState(incident.status !== "resolved");
+  const sev = SEVERITY_META[incident.severity] || SEVERITY_META.minor;
+  const st = STATUS_META[incident.status] || STATUS_META.investigating;
+  const isActive = incident.status !== "resolved";
+
+  return (
+    <div
+      className={`rounded-xl border p-4 ${isActive ? "border-amber-500/30 bg-amber-500/5" : "border-stone-800 bg-stone-900/40"}`}
+      data-testid={`incident-${incident.id}`}
+    >
+      <div className="flex items-start gap-3 cursor-pointer" onClick={() => setExpanded(e => !e)}>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <span className={`text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded border ${sev.color}`}>
+              {sev.label}
+            </span>
+            <span className={`text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded ${st.color}`}>
+              {st.label}
+            </span>
+            {(incident.components || []).map(c => (
+              <span key={c} className="text-[10px] uppercase tracking-wider font-medium px-1.5 py-0.5 rounded bg-stone-800 text-stone-400">
+                {COMP_LABELS_COMPACT[c] || c}
+              </span>
+            ))}
+          </div>
+          <div className="text-sm font-semibold text-white">{incident.title}</div>
+          <div className="flex items-center gap-2 mt-1 text-[11px] text-stone-500">
+            <Clock className="w-3 h-3" />
+            <span>{new Date(incident.started_at).toLocaleString("ro-RO", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+            {incident.duration_minutes != null && (
+              <span>· durată: {incident.duration_minutes < 60
+                ? `${incident.duration_minutes} min`
+                : `${Math.floor(incident.duration_minutes / 60)}h ${incident.duration_minutes % 60}m`}</span>
+            )}
+            <span className="ml-auto text-[10px]">{(incident.updates || []).length} update-uri</span>
+          </div>
+        </div>
+      </div>
+
+      {expanded && (incident.updates || []).length > 0 && (
+        <div className="mt-3 pt-3 border-t border-white/5 space-y-2.5" data-testid={`incident-updates-${incident.id}`}>
+          {[...incident.updates].reverse().map((u, i) => {
+            const us = STATUS_META[u.status] || STATUS_META.investigating;
+            return (
+              <div key={i} className="text-xs">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className={`text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded ${us.color}`}>{us.label}</span>
+                  <span className="text-stone-500 text-[10px]">{new Date(u.posted_at).toLocaleString("ro-RO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                </div>
+                <div className="text-stone-300 leading-relaxed pl-1 border-l-2 border-stone-700">
+                  <span className="block pl-2">{u.message}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

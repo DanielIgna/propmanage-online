@@ -791,3 +791,42 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
   - Frontend screenshot of `/status` shows: hero, sparkline 30d, 7 component
     cards with descriptions, "5/7 funcționale" counter, auto-refresh
 - Auto-refresh every 60s already implemented in StatusPage useEffect.
+
+
+## Changelog — 2026-02-28 — Status Page Incidents (admin-posted, public)
+- New backend route `/app/backend/routes/incidents.py` with two router groups:
+  - **Admin** (`/api/admin/incidents`):
+    - `POST /api/admin/incidents` — create incident with title, severity
+      (minor/major/critical), affected components, initial message
+    - `POST /api/admin/incidents/{id}/update` — add an update with new status
+      (investigating/identified/monitoring/resolved); auto-computes
+      `duration_minutes` when status transitions to "resolved"
+    - `GET /api/admin/incidents?days=60` — full history (admin metadata)
+    - `DELETE /api/admin/incidents/{id}` — hard-delete (for posted-by-mistake)
+  - **Public** (`/api/public/status-incidents`):
+    - Returns sanitized incidents (no `created_by` or `posted_by` per update)
+    - Includes `active_count` and `count` for the page header
+- New `db.incidents` collection schema documented at top of file.
+- New frontend `/app/frontend/src/pages/admin/IncidentsCard.jsx`:
+  - Mounted in AdminAIConsole between SmokeTestCard and Findings.
+  - Lists active + resolved incidents with severity / status / components badges.
+  - Modal "New Incident" with form (title, severity buttons, component chips,
+    initial message textarea).
+  - Modal "Update Incident" with status selector (4 options) + message.
+  - Delete button (with confirm dialog) per incident.
+  - All in Romanian copy.
+- Extended `/app/frontend/src/pages/StatusPage.jsx`:
+  - New `IncidentsSection` component fetches from `/api/public/status-incidents`.
+  - Renders timeline-style cards with severity (color-coded), status badge,
+    affected components, duration (when resolved), and expanded update history
+    (most recent first, with timestamp and message).
+  - Active incidents auto-expanded; resolved collapsed by default.
+  - Section header shows "X în curs" count for live transparency.
+- Validated end-to-end:
+  - Created incident via admin curl → 200 with id and 1 initial update
+  - Posted update "identified" → status changed, 2 updates
+  - Resolved → status="resolved", duration_minutes computed, 3 updates total
+  - Public endpoint → returns 2 incidents (1 active + 1 resolved), `posted_by`
+    stripped from all updates (privacy check passed)
+  - Frontend screenshots confirm both `/status` (public) and AI Investigator
+    (admin) render incidents correctly with all badges and update timelines
