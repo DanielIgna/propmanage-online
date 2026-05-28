@@ -30,6 +30,7 @@ const NAV_SECTIONS = [
     items: [
       { id: "users", label: "Toți userii", icon: Users },
       { id: "verification", label: "Verificare specialiști", icon: ShieldCheck },
+      { id: "beta_testers", label: "Beta Testers", icon: Sparkles, badge: "NEW" },
     ],
   },
   {

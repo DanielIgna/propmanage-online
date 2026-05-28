@@ -18,6 +18,7 @@ import { AdminDemoTimeMachine } from "./AdminDemoTimeMachine";
 import { AdminDemoLeads } from "./AdminDemoLeads";
 import { AdminGDPR } from "./AdminGDPR";
 import { AdminImpersonationLogs } from "./AdminImpersonationLogs";
+import { AdminBetaTesters } from "./AdminBetaTesters";
 
 const TITLES = {
   overview: { title: "Dashboard", subtitle: "Privire de ansamblu asupra platformei" },
@@ -40,6 +41,7 @@ const TITLES = {
   settings: { title: "Setări Platformă", subtitle: "Feature flags, comisioane, branding" },
   gdpr: { title: "GDPR Compliance Pack", subtitle: "Pachet documentar pentru DPO · ROPA · DPIA · Sub-procesatori · Cookies · Breach Plan" },
   impersonation: { title: "Impersonare utilizatori", subtitle: "Jurnal sesiuni admin care au accesat contul altor utilizatori · GDPR audit" },
+  beta_testers: { title: "Beta Testers", subtitle: "Useri noi în beta · Provenance Google/Email · Activitate engagement" },
 };
 
 export const AdminDashboard = () => {
@@ -83,6 +85,7 @@ export const AdminDashboard = () => {
       {active === "settings" && <AdminPlatformSettings />}
       {active === "gdpr" && <AdminGDPR />}
       {active === "impersonation" && <AdminImpersonationLogs />}
+      {active === "beta_testers" && <AdminBetaTesters />}
     </AdminLayoutMetronic>
   );
 };

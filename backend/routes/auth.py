@@ -150,6 +150,11 @@ async def login(data: LoginIn, request: Request, response: Response):
     _login_attempts.pop(ip, None)
     user = await _enforce_admin_role(user)
     uid = str(user["_id"])
+    # Track last_seen for beta engagement analytics
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"last_seen": datetime.now(timezone.utc).isoformat()}}
+    )
     access = create_access_token(uid, email, user.get("role", "client"))
     refresh = create_refresh_token(uid)
     set_auth_cookies(response, access, refresh)
@@ -532,6 +537,11 @@ async def google_session_exchange(request: Request, response: Response):
         user["_id"] = result.inserted_id
 
     user = await _enforce_admin_role(user)
+    # Track last_seen for beta engagement analytics
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"last_seen": datetime.now(timezone.utc).isoformat()}}
+    )
     access = create_access_token(uid, email, user.get("role", "client"))
     refresh = create_refresh_token(uid)
     set_auth_cookies(response, access, refresh)

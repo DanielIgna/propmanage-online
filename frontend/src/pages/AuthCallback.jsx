@@ -35,11 +35,20 @@ export const AuthCallback = () => {
         // Clear fragment from URL
         window.history.replaceState(null, "", window.location.pathname);
         // Re-fetch user from cookie-based session
-        await refreshUser();
+        const me = await refreshUser();
+        if (!me) {
+          // Cookie was set but /auth/me failed — likely cross-site cookie blocked.
+          // Show actionable error instead of redirecting to login (which would loop).
+          setError("Autentificarea Google a reușit dar cookie-ul a fost blocat. Activează cookies pentru propmanage.ro și încearcă din nou.");
+          return;
+        }
         navigate(`/${data.role || "client"}`, { replace: true });
       } catch (e) {
-        setError(e?.response?.data?.detail || "Autentificare eșuată");
-        setTimeout(() => navigate("/login"), 2000);
+        const detail = e?.response?.data?.detail || e.message || "Autentificare eșuată";
+        setError(detail);
+        // Log for debug
+        console.error("[GoogleOAuth] Failed:", e?.response?.status, detail, e);
+        setTimeout(() => navigate("/login"), 3500);
       }
     })();
   }, [navigate, refreshUser]);

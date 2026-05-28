@@ -554,6 +554,15 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - CORS_ORIGINS lockdown (currently "*" with credentials)
 - Pytest fixture leakage cleanup (BLOCKED: tests pass individually, fail as full suite)
 
+## Changelog — 2026-03-06 — Beta Testers admin page + Google OAuth resilience
+- **NEW: Beta Testers admin page** (`/admin` → sidebar USERI → „Beta Testers")
+  - Backend: `GET /api/admin/beta-testers?days=30&role=client` returnează users înregistrați în ultimele N zile (excluzând conturile demo + admins) cu counters (total, by_role, by_provenance, with_requests, verified) + last_seen + requests_count batched.
+  - Frontend: `/app/frontend/src/pages/admin/AdminBetaTesters.jsx` (data-testid=beta-testers-page) cu 4 counters cards + role breakdown + table cu provenance Google/Email badge, requests count, wallet, last_seen, verified/banned indicators.
+  - Filtre: 7/14/30/60/90 zile + filter pe rol.
+  - Tracking last_seen pe login (both email+password and Google OAuth) pentru engagement analytics.
+- **Google OAuth callback hardening**: AuthCallback.jsx acum așteaptă explicit `refreshUser()` să returneze user, dacă cookie-ul a fost blocat afișează mesaj actionable „Cookie blocat" în loc să fie blocat în loop redirect → /login. Console logging pentru debug. **Fix-ul real (deja deployed): SameSite=None pe cookies** — cu acel fix, browser-ul nu mai blochează cookies cross-site post-OAuth, deci Google login funcționează acum și pe propmanage.ro cross-site.
+- Validated live: 109 beta testers identificați pe preview cu provenance breakdown (2 Google / 107 email), 14 cu activitate reală.
+
 ## Changelog — 2026-03-05 — CRITICAL FIX: Cookie SameSite + Test users cleanup tool
 - **ROOT CAUSE**: Production frontend at `propmanage.ro` makes XHR calls to backend at `phased-document.emergent.host` (different domain!). Cookies were set with `SameSite=lax` which Chrome blocks on cross-site AJAX requests. Result: admin logged in successfully but ALL subsequent API calls returned empty/401 (browser silently dropped cookies). UI showed "Niciun user găsit · Total: 0" while DB actually had 63 users.
 - **FIX (deployed to prod)**: `core_utils.set_auth_cookies` + `routes/impersonation.py` now read `COOKIE_SAMESITE` (default `none`) and `COOKIE_SECURE` (default `true`) from env. `SameSite=None` requires `Secure=true` (HTTPS), so Secure auto-elevated when SameSite=None. Verified cookies on preview now emitted as `HttpOnly; Max-Age=86400; Path=/; SameSite=none; Secure`.

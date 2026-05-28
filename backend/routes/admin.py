@@ -32,6 +32,92 @@ async def admin_trigger_demo_reset(user: dict = Depends(require_role("admin"))):
     return res
 
 
+@router.get("/admin/beta-testers")
+async def admin_beta_testers(
+    days: int = 30,
+    role: str = "",
+    user: dict = Depends(require_role("admin")),
+):
+    """Beta Testers dashboard — list users registered in the last N days with
+    provenance (Google OAuth vs email register) + activity stats (login count,
+    requests count, last_seen) so admin can monitor engagement during beta."""
+    from datetime import datetime, timezone, timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=max(1, days))).isoformat()
+
+    q = {
+        "created_at": {"$gte": cutoff},
+        "email": {"$nin": [
+            "admin@propmanage.io", "client@propmanage.io",
+            "specialist@propmanage.io", "operator@propmanage.io",
+            "danieligna1@gmail.com", "carlospacu@gmail.com",
+        ]},
+    }
+    if role in ("client", "specialist", "operator"):
+        q["role"] = role
+
+    docs = await db.users.find(q, {
+        "email": 1, "name": 1, "role": 1, "picture": 1, "phone": 1,
+        "google_auth": 1, "created_at": 1, "last_seen": 1, "verified": 1,
+        "wallet_balance": 1, "tokens": 1, "banned": 1,
+    }).sort("created_at", -1).to_list(200)
+
+    user_ids = [str(d["_id"]) for d in docs]
+
+    # Activity stats (batched)
+    req_counts = {}
+    if user_ids:
+        async for r in db.requests.aggregate([
+            {"$match": {"$or": [
+                {"client_id": {"$in": user_ids}},
+                {"specialist_id": {"$in": user_ids}},
+            ]}},
+            {"$group": {"_id": None, "ids": {"$push": "$client_id"}, "sids": {"$push": "$specialist_id"}}},
+        ]):
+            for cid in r.get("ids") or []:
+                req_counts[cid] = req_counts.get(cid, 0) + 1
+            for sid in r.get("sids") or []:
+                if sid:
+                    req_counts[sid] = req_counts.get(sid, 0) + 1
+
+    items = []
+    for d in docs:
+        uid = str(d["_id"])
+        provenance = "google" if d.get("google_auth") else "email"
+        items.append({
+            "id": uid,
+            "email": d.get("email"),
+            "name": d.get("name") or "—",
+            "role": d.get("role"),
+            "picture": d.get("picture"),
+            "phone": d.get("phone"),
+            "provenance": provenance,
+            "verified": bool(d.get("verified")),
+            "banned": bool(d.get("banned")),
+            "wallet_balance": d.get("wallet_balance", 0),
+            "tokens": d.get("tokens", 0),
+            "requests_count": req_counts.get(uid, 0),
+            "created_at": d.get("created_at"),
+            "last_seen": d.get("last_seen"),
+        })
+
+    counters = {
+        "total": len(items),
+        "by_role": {
+            "client": sum(1 for x in items if x["role"] == "client"),
+            "specialist": sum(1 for x in items if x["role"] == "specialist"),
+            "operator": sum(1 for x in items if x["role"] == "operator"),
+        },
+        "by_provenance": {
+            "google": sum(1 for x in items if x["provenance"] == "google"),
+            "email": sum(1 for x in items if x["provenance"] == "email"),
+        },
+        "with_requests": sum(1 for x in items if x["requests_count"] > 0),
+        "verified": sum(1 for x in items if x["verified"]),
+    }
+
+    return {"items": items, "counters": counters, "days": days}
+
+
 # Regex patterns considered "test/seed/junk" accounts (kept conservative —
 # never matches real-looking emails like @gmail.com / @yahoo.com etc.).
 TEST_USER_PATTERNS = [
