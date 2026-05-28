@@ -7,6 +7,7 @@ import { RepairAuditLog } from "./RepairAuditLog";
 import { AIHealthScore } from "./AIHealthScore";
 import { SmokeTestCard } from "./SmokeTestCard";
 import { HealthcheckCard } from "./HealthcheckCard";
+import { DataIntegrityCard } from "./DataIntegrityCard";
 import { IncidentsCard } from "./IncidentsCard";
 import { API } from "../DashShared";
 
@@ -176,6 +177,9 @@ export const AdminAIConsole = () => {
 
       {/* Healthcheck — integrations status (MongoDB, LLM, Email, Stripe, OAuth, Push) */}
       <HealthcheckCard />
+
+      {/* Data Integrity — scan for orphans, inconsistencies, lost money */}
+      <DataIntegrityCard />
 
       {/* Smoke Test E2E — manual health probe against live API */}
       <SmokeTestCard />
