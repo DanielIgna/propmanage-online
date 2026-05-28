@@ -662,3 +662,28 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Validated end-to-end:
   - Backend `curl POST /api/auth/password/send-backup` → 200 OK, password updated in DB, email logged
   - Frontend screenshot (client@propmanage.io with google_auth=true) → row visible, modal opens, copy & buttons render correctly
+
+
+## Changelog — 2026-02-28 — Smoke Test E2E (AI Investigator)
+- New backend route `/app/backend/routes/admin_smoketest.py`:
+  - `POST /api/admin/smoke-test/run?base_url=...` — runs a 6-step E2E sequence
+    (Login → /auth/me → POST /properties → GET /properties → DELETE → /auth/logout)
+    using demo client credentials (`client@propmanage.io`).
+  - Marks created properties with `[SMOKE <run_id>]` prefix and cleans them up.
+  - Persists each run in `db.smoke_test_runs` collection with per-step status,
+    HTTP code, duration_ms, and error message.
+  - `GET /api/admin/smoke-test/history?limit=N` — returns last N runs.
+  - Default base URL = `http://localhost:8001` (tests the backend pod itself,
+    works in preview and prod without external DNS / OAuth dependency). Admin
+    can override via `?base_url=https://propmanage.ro` to test the live deploy.
+  - Cookies extracted from login response and forwarded as `Cookie:` header so
+    `Secure` cookies work over HTTP localhost.
+- Frontend new component `/app/frontend/src/pages/admin/SmokeTestCard.jsx`:
+  - Mounted at top of `AdminAIConsole.jsx` (above Findings dashboard).
+  - "Rulează test" button + optional Target URL input + "Prod" quick-fill.
+  - Per-step report with HTTP code badges, durations, error details.
+  - Collapsible history (last 10 runs) — click to load any historical run.
+- Validated end-to-end: 6/6 steps PASS in ~460ms; history persists across runs.
+- Use case: After each `Re-deploy changes` in production panel, admin opens
+  AI Investigator → clicks "Smoke Test" → confirms in <1s that login/CRUD/logout
+  all work on the live domain.
