@@ -5,6 +5,7 @@ import { Users, Briefcase, DollarSign, Scale, TrendingUp, Activity } from "lucid
 import { AdminCard } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
 import { IncidentCadenceHeatmap } from "./IncidentCadenceHeatmap";
+import { MorningBriefing } from "./MorningBriefing";
 
 const KpiCard = ({ icon: Icon, label, value, sub, tone = "blue", testid }) => {
   const tones = {
@@ -43,6 +44,8 @@ export const AdminOverview = () => {
 
   return (
     <div className="space-y-6">
+      <MorningBriefing />
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard icon={Users} label="Useri Total" value={stats?.users ?? "—"} tone="blue" testid="kpi-users" />
         <KpiCard icon={Briefcase} label="Joburi Active" value={stats?.active_jobs ?? "—"} sub={`${stats?.completed_jobs || 0} finalizate`} tone="amber" testid="kpi-jobs" />

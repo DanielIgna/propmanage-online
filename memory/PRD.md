@@ -859,3 +859,38 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
   - 7ms total execution time across 9 parallel checks.
 - Future: add scheduler job to run daily and email admins if HIGH severity
   issues detected (gated by config flag, similar to smoke test monitor).
+
+
+## Changelog — 2026-02-28 — Morning Briefing (Admin Dashboard at-a-glance)
+- New frontend `/app/frontend/src/pages/admin/MorningBriefing.jsx`:
+  - Mounted at TOP of `AdminOverview.jsx` (the default landing page after admin login)
+  - **Frontend-only** — no new backend endpoints; aggregates 6 existing APIs:
+    - `/admin/healthcheck/run`
+    - `/admin/smoke-test/history?limit=1` + `/admin/smoke-test/monitor/config`
+    - `/admin/data-integrity/history?limit=1`
+    - `/admin/incidents?days=30`
+    - `/admin/ai/findings?status=open`
+  - Loads all 6 in parallel via `Promise.all`. Auto-refresh every 5 minutes.
+  - Time-of-day greeting: "Bună dimineața / ziua / seara" based on local hour.
+  - **Overall verdict banner** (green/amber/red) computed from worst tile:
+    - "Toate sistemele funcționează normal. Zi liniștită!" (all OK)
+    - "Câteva avertizări — verifică detaliile mai jos" (any warn)
+    - "Atenție necesară — există probleme critice" (any fail)
+  - **5 system tiles** in responsive grid (1/2/5 cols) with severity tone:
+    1. Healthcheck — X critical / Y OK ratio
+    2. Smoke Test — last result + monitor on/off + interval
+    3. Data Integrity — total issues from last scan
+    4. Incidents — active count + worst severity
+    5. AI Findings — high/warning counts breakdown
+  - Each tile has contextual quick-action button (Detalii / Rulează / Scanează /
+    Vezi /status / Investighează) that either navigates to AI Investigator tab
+    (via `propmanage:nav-admin` custom event) or opens `/status` in new tab.
+  - Manual refresh button in card header (RefreshCw with spin animation).
+- Validated end-to-end via screenshot in preview:
+  - 5 tiles rendered with correct color-coding per current state
+  - Greeting matches time of day ("Bună seara")
+  - Verdict banner correctly shows red for "2 findings critice" + integrity warnings
+  - Action buttons clickable, navigation events fire correctly
+- Use case: morning login → 5 second glance → admin knows if today is a "all good"
+  day or needs to investigate something. Replaces need to manually check 6
+  different cards inside AI Investigator.
