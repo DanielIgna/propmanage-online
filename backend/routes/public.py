@@ -123,7 +123,7 @@ async def public_status():
         "components": {},
         "checked_at": datetime.now(timezone.utc).isoformat(),
     }
-    # DB
+    # DB (critical)
     try:
         await db.users.find_one({}, {"_id": 1})
         out["components"]["api"] = "operational"
@@ -131,11 +131,47 @@ async def public_status():
     except Exception:  # noqa: BLE001
         out["components"]["api"] = "degraded"
         out["components"]["database"] = "outage"
-        out["status"] = "degraded"
-    # AI
+        out["status"] = "outage"
+
+    # AI Concierge (depends on LLM key)
     out["components"]["ai_concierge"] = "operational" if os.environ.get("EMERGENT_LLM_KEY") else "limited"
-    out["components"]["payments"] = "operational"
-    out["components"]["email"] = "operational" if os.environ.get("RESEND_API_KEY") else "limited"
+
+    # Payments — reflect reality: demo mode shows as "limited"
+    skey = (os.environ.get("STRIPE_API_KEY") or "").strip()
+    if skey.startswith("sk_live_"):
+        out["components"]["payments"] = "operational"
+    elif skey.startswith("sk_test_") and skey != "sk_test_emergent":
+        out["components"]["payments"] = "limited"  # test mode = no real charges
+    else:
+        out["components"]["payments"] = "limited"  # demo / missing
+
+    # Email — Resend > SendGrid > console fallback
+    if os.environ.get("RESEND_API_KEY"):
+        out["components"]["email"] = "operational"
+    elif os.environ.get("SENDGRID_API_KEY"):
+        out["components"]["email"] = "operational"
+    else:
+        out["components"]["email"] = "limited"
+
+    # Authentication (Google OAuth + JWT) — JWT always works, OAuth is light check
+    out["components"]["authentication"] = "operational"
+
+    # Push notifications (VAPID)
+    has_vapid = bool(os.environ.get("VAPID_PUBLIC_KEY") and os.environ.get("VAPID_PRIVATE_KEY_PEM"))
+    out["components"]["push_notifications"] = "operational" if has_vapid else "limited"
+
+    # Aggregate status: outage > degraded > limited > operational
+    severities = list(out["components"].values())
+    if "outage" in severities:
+        out["status"] = "outage"
+    elif "degraded" in severities:
+        out["status"] = "degraded"
+    elif out["status"] == "operational" and "limited" in severities:
+        # Only mark global as "limited" if a CORE component is limited;
+        # peripheral "limited" (push, email-fallback) doesn't degrade overall.
+        core_limited = out["components"].get("api") == "limited" or out["components"].get("database") == "limited"
+        if core_limited:
+            out["status"] = "degraded"
 
     # 90-day uptime: simple read from health_pings collection (created by daily cron)
     from datetime import timedelta as _td
@@ -166,8 +202,11 @@ async def record_health_ping():
             components["database"] = "down"
             overall = "degraded"
         components["ai_concierge"] = "ok" if os.environ.get("EMERGENT_LLM_KEY") else "limited"
-        components["payments"] = "ok"
-        components["email"] = "ok" if os.environ.get("RESEND_API_KEY") else "limited"
+        skey = (os.environ.get("STRIPE_API_KEY") or "").strip()
+        components["payments"] = "ok" if skey.startswith("sk_live_") else "limited"
+        components["email"] = "ok" if (os.environ.get("RESEND_API_KEY") or os.environ.get("SENDGRID_API_KEY")) else "limited"
+        components["push_notifications"] = "ok" if (os.environ.get("VAPID_PUBLIC_KEY") and os.environ.get("VAPID_PRIVATE_KEY_PEM")) else "limited"
+        components["authentication"] = "ok"
         if overall == "ok" and any(v in ("down", "degraded") for v in components.values()):
             overall = "ok"  # limited != degraded for our SLA
         await db.health_pings.insert_one({

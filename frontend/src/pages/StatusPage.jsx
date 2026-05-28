@@ -8,9 +8,21 @@ import { API } from "./DashShared";
 const COMP_LABELS = {
   api: "API",
   database: "Bază de date",
-  ai_concierge: "AI Concierge",
+  ai_concierge: "AI Concierge (Claude)",
   payments: "Plăți (Stripe)",
   email: "Notificări email",
+  authentication: "Autentificare",
+  push_notifications: "Notificări push",
+};
+
+const COMP_DESCRIPTIONS = {
+  api: "Endpoint-urile principale ale platformei",
+  database: "Stocarea datelor utilizatorilor și tranzacțiilor",
+  ai_concierge: "Asistentul AI pentru recomandări și suport",
+  payments: "Procesare plăți escrow și taxe de lead",
+  email: "Notificări tranzacționale și rezumate zilnice",
+  authentication: "Login email/parolă și Google OAuth",
+  push_notifications: "Alerte browser/mobile pentru lead-uri și update-uri",
 };
 
 const COMP_META = {
@@ -21,9 +33,10 @@ const COMP_META = {
 };
 
 const GLOBAL_STATUS = {
-  operational: { label: "Toate sistemele funcționează", color: "text-emerald-400", bg: "from-emerald-500/20 to-emerald-500/5" },
-  degraded: { label: "Funcționare parțial degradată", color: "text-amber-400", bg: "from-amber-500/20 to-amber-500/5" },
-  outage: { label: "Întrerupere serviciu", color: "text-red-400", bg: "from-red-500/20 to-red-500/5" },
+  operational: { label: "Toate sistemele funcționează normal", color: "text-emerald-400", bg: "from-emerald-500/20 to-emerald-500/5", dot: "bg-emerald-400" },
+  degraded: { label: "Funcționare parțial degradată", color: "text-amber-400", bg: "from-amber-500/20 to-amber-500/5", dot: "bg-amber-400" },
+  outage: { label: "Întrerupere serviciu", color: "text-red-400", bg: "from-red-500/20 to-red-500/5", dot: "bg-red-400" },
+  limited: { label: "Funcționalitate parțial limitată", color: "text-amber-400", bg: "from-amber-500/15 to-amber-500/5", dot: "bg-amber-400" },
 };
 
 // ============= UPTIME SPARKLINE =============
@@ -180,8 +193,8 @@ export const StatusPage = () => {
         {/* Hero status */}
         <div className={`rounded-3xl border border-white/10 bg-gradient-to-br ${meta.bg} p-6 mb-6`} data-testid="status-hero">
           <div className="flex items-center gap-3 mb-2">
-            <span className={`w-3 h-3 rounded-full ${data.status === "operational" ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
-            <div className={`text-xl font-semibold ${meta.color}`}>{meta.label}</div>
+            <span className={`w-3 h-3 rounded-full ${meta.dot} ${data.status === "operational" ? "animate-pulse" : ""}`} />
+            <div className={`text-xl font-semibold ${meta.color}`} data-testid="status-hero-label">{meta.label}</div>
             <button onClick={load} className="ml-auto p-2 rounded-lg hover:bg-white/5 text-stone-400" data-testid="status-refresh">
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </button>
@@ -192,6 +205,7 @@ export const StatusPage = () => {
           {data.uptime_pct_90d != null && (
             <div className="mt-3 text-xs text-stone-300">
               Uptime ultimele 90 zile: <span className="text-[#d4ff3a] font-semibold">{data.uptime_pct_90d}%</span>
+              {data.pings_total > 0 && <span className="text-stone-500"> · {data.pings_total} probe verificate</span>}
             </div>
           )}
         </div>
@@ -201,14 +215,25 @@ export const StatusPage = () => {
 
         {/* Components */}
         <div className="space-y-2 mb-6" data-testid="status-components">
+          <div className="flex items-center justify-between text-xs text-stone-500 mb-2 px-1">
+            <span className="uppercase tracking-wider font-semibold">Componente sistem</span>
+            <span>{Object.values(data.components || {}).filter(v => v === "operational").length} / {Object.keys(data.components || {}).length} funcționale</span>
+          </div>
           {Object.entries(data.components || {}).map(([k, v]) => {
             const cm = COMP_META[v] || COMP_META.operational;
             const Icon = cm.icon;
             return (
-              <div key={k} className={`rounded-xl border ${cm.color} p-3 flex items-center gap-3`} data-testid={`status-comp-${k}`}>
-                <Icon className="w-4 h-4 shrink-0" />
-                <span className="font-medium text-white">{COMP_LABELS[k] || k}</span>
-                <span className="ml-auto text-xs uppercase tracking-wider font-bold opacity-80">{cm.label}</span>
+              <div key={k} className={`rounded-xl border ${cm.color} p-3`} data-testid={`status-comp-${k}`}>
+                <div className="flex items-center gap-3">
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-white text-sm">{COMP_LABELS[k] || k}</div>
+                    {COMP_DESCRIPTIONS[k] && (
+                      <div className="text-[11px] text-stone-400 mt-0.5">{COMP_DESCRIPTIONS[k]}</div>
+                    )}
+                  </div>
+                  <span className="text-xs uppercase tracking-wider font-bold opacity-80 shrink-0">{cm.label}</span>
+                </div>
               </div>
             );
           })}

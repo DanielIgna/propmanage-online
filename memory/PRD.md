@@ -759,3 +759,35 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
     roles in 1178ms parallel
   - UI screenshot confirms both cards render with correct color-coding,
     badges (CRITIC/WARN/INFO), and per-step breakdown
+
+
+## Changelog — 2026-02-28 — Public Status Page enhancement (/status)
+- Page already existed at `/status` (linked in landing footer with pulsing dot)
+  but with only 5 generic components. Enhanced to 7 detailed components:
+  api, database, ai_concierge, payments, email, **authentication**, **push_notifications**
+- Backend `/app/backend/routes/public.py`:
+  - `/public/status` now derives statuses from actual env config:
+    - `payments`: `operational` for `sk_live_*`, `limited` for sk_test / demo
+    - `email`: `operational` for Resend OR SendGrid configured, else `limited`
+    - `push_notifications`: `operational` when both VAPID keys present
+    - `authentication`: always operational (JWT works regardless of OAuth)
+  - Aggregate `status` now follows severity hierarchy: outage > degraded >
+    limited > operational. Peripheral "limited" doesn't degrade global status
+    (only `api`/`database` limited would mark global as degraded).
+  - Added `pings_total` count to hero (transparency for prospects).
+  - `record_health_ping` cron updated to track the 2 new components in
+    `db.health_pings` so sparkline reflects new components historically.
+- Frontend `/app/frontend/src/pages/StatusPage.jsx`:
+  - Added `COMP_DESCRIPTIONS` map — each component now shows a friendly RO
+    description below its name (e.g. "Endpoint-urile principale ale platformei").
+  - New "Componente sistem" header row with "5/7 funcționale" counter.
+  - Hero status message refined ("Toate sistemele funcționează normal" vs old
+    truncated version) and `dot` color now matches global status (green/amber/red).
+  - Added `data-testid="status-hero-label"` for QA hooks.
+- Validated:
+  - `GET /api/public/status` (no auth) → 200 with 7 components, correct
+    severity mapping (preview shows 5 operational + 2 limited expected for
+    payments+email)
+  - Frontend screenshot of `/status` shows: hero, sparkline 30d, 7 component
+    cards with descriptions, "5/7 funcționale" counter, auto-refresh
+- Auto-refresh every 60s already implemented in StatusPage useEffect.
