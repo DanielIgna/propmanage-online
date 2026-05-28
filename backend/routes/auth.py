@@ -3,6 +3,7 @@ GDPR export/delete, referral, support/contact, push subscribe, 2FA, Google OAuth
 digest preference/preview."""
 import os
 import io
+import logging
 import asyncio
 import secrets
 import base64 as b64
@@ -27,6 +28,8 @@ from models import (
 )
 from email_service import send_template, tpl_welcome
 from digest import DIGEST_BUILDERS, run_daily_digests
+
+logger = logging.getLogger(__name__)
 
 
 # --- Admin whitelist enforcement ---
@@ -490,17 +493,37 @@ async def google_session_exchange(request: Request, response: Response):
     """Exchange Emergent session_id for our JWT cookie + user record."""
     session_id = request.headers.get("X-Session-ID")
     if not session_id:
-        raise HTTPException(400, "Missing X-Session-ID header")
+        raise HTTPException(400, "Lipsește header-ul X-Session-ID")
+    upstream_status = None
+    upstream_body = None
     async with httpx.AsyncClient(timeout=10) as http_client:
         try:
             r = await http_client.get(
                 "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
                 headers={"X-Session-ID": session_id}
             )
-            r.raise_for_status()
+            upstream_status = r.status_code
+            try:
+                upstream_body = r.text[:300]
+            except Exception:
+                upstream_body = "(no body)"
+            if r.status_code != 200:
+                # Surface the EXACT upstream error so we can diagnose redirect-URL whitelist /
+                # session expiry / wrong client_id from the user's side.
+                logger.warning(f"Emergent OAuth exchange failed: status={upstream_status} body={upstream_body[:200]}")
+                raise HTTPException(
+                    401,
+                    f"Emergent OAuth a refuzat sesiunea (upstream HTTP {upstream_status}). "
+                    f"Detaliu: {upstream_body[:200]}. Cauze posibile: (1) session_id expirat — încearcă din nou rapid, "
+                    f"(2) propmanage.ro/auth/callback nu este whitelisted în panoul OAuth Emergent — "
+                    f"contactează support@emergent.sh."
+                )
             data = r.json()
-        except Exception as e:
-            raise HTTPException(401, f"Invalid Emergent session: {e}")
+        except HTTPException:
+            raise
+        except httpx.HTTPError as e:
+            logger.error(f"Emergent OAuth network failure: {e!r}")
+            raise HTTPException(502, f"Nu pot contacta serverul OAuth Emergent: {e}")
 
     email = data.get("email", "").lower()
     name = data.get("name", "")
