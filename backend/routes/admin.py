@@ -31,6 +31,114 @@ async def admin_trigger_demo_reset(user: dict = Depends(require_role("admin"))):
     res = await reset_demo_accounts()
     return res
 
+
+# Regex patterns considered "test/seed/junk" accounts (kept conservative —
+# never matches real-looking emails like @gmail.com / @yahoo.com etc.).
+TEST_USER_PATTERNS = [
+    r"^test_.*@test\.io$",
+    r"^test_.*@propmanage\.io$",
+    r"^beta_.*@example\.com$",
+    r"^.*_[0-9a-f]{6,}@(test\.io|example\.com|propmanage\.io)$",
+]
+
+
+@router.get("/admin/test-users/preview")
+async def admin_preview_test_users(user: dict = Depends(require_role("admin"))):
+    """Lists accounts that match the test-user patterns. Always preview before delete."""
+    q = {"$and": [
+        {"$or": [{"email": {"$regex": p, "$options": "i"}} for p in TEST_USER_PATTERNS]},
+        # never wipe the protected demo / admin accounts
+        {"email": {"$nin": [
+            "admin@propmanage.io", "client@propmanage.io",
+            "specialist@propmanage.io", "operator@propmanage.io",
+            "danieligna1@gmail.com", "carlospacu@gmail.com",
+        ]}},
+        {"role": {"$ne": "admin"}},
+    ]}
+    docs = await db.users.find(q, {"email": 1, "name": 1, "role": 1, "created_at": 1}).to_list(500)
+    items = [{"id": str(d["_id"]), "email": d.get("email"), "name": d.get("name"),
+              "role": d.get("role"), "created_at": d.get("created_at")} for d in docs]
+    return {"items": items, "count": len(items), "patterns": TEST_USER_PATTERNS}
+
+
+@router.post("/admin/test-users/cleanup")
+async def admin_cleanup_test_users(
+    confirm: str = "",
+    user: dict = Depends(require_role("admin")),
+):
+    """Delete all accounts that match the test-user patterns + their owned data.
+    Body MUST include `confirm=STERGE` to actually delete. Returns counts per resource."""
+    if confirm != "STERGE":
+        raise HTTPException(400, "Confirmare obligatorie: trimite `?confirm=STERGE` pentru a executa.")
+
+    # Pick targets
+    q = {"$and": [
+        {"$or": [{"email": {"$regex": p, "$options": "i"}} for p in TEST_USER_PATTERNS]},
+        {"email": {"$nin": [
+            "admin@propmanage.io", "client@propmanage.io",
+            "specialist@propmanage.io", "operator@propmanage.io",
+            "danieligna1@gmail.com", "carlospacu@gmail.com",
+        ]}},
+        {"role": {"$ne": "admin"}},
+    ]}
+    targets = await db.users.find(q, {"_id": 1, "email": 1}).to_list(500)
+    target_ids = [str(t["_id"]) for t in targets]
+    target_emails = [t.get("email") for t in targets]
+
+    if not target_ids:
+        return {"deleted_users": 0, "details": "Niciun user de test găsit."}
+
+    # Cascade-delete owned data (best-effort; if a collection doesn't exist, ignore)
+    from bson import ObjectId as _OID
+    obj_ids = []
+    for tid in target_ids:
+        try:
+            obj_ids.append(_OID(tid))
+        except Exception:
+            pass
+
+    counts = {}
+    async def _del(col_name, query):
+        try:
+            r = await db[col_name].delete_many(query)
+            counts[col_name] = r.deleted_count
+        except Exception:
+            counts[col_name] = 0
+
+    # Property-related
+    await _del("properties", {"owner_id": {"$in": target_ids}})
+    # Requests as client OR specialist
+    await _del("requests", {"$or": [
+        {"client_id": {"$in": target_ids}},
+        {"specialist_id": {"$in": target_ids}},
+    ]})
+    # Reviews
+    await _del("reviews", {"$or": [
+        {"specialist_id": {"$in": target_ids}},
+        {"client_id": {"$in": target_ids}},
+    ]})
+    # Portfolio + offers + disputes + notifications + chat
+    await _del("portfolio", {"specialist_id": {"$in": target_ids}})
+    await _del("offers", {"specialist_id": {"$in": target_ids}})
+    await _del("disputes", {"$or": [{"opened_by": {"$in": target_ids}}, {"specialist_id": {"$in": target_ids}}, {"client_id": {"$in": target_ids}}]})
+    await _del("notifications", {"user_id": {"$in": target_ids}})
+    await _del("chat_messages", {"sender_id": {"$in": target_ids}})
+    await _del("specialist_documents", {"specialist_id": {"$in": target_ids}})
+    # Finally delete the users themselves
+    await _del("users", {"_id": {"$in": obj_ids}})
+
+    # Audit log
+    await db.audit_log.insert_one({
+        "actor": user["id"],
+        "actor_role": "admin",
+        "action": "admin.cleanup_test_users",
+        "target_emails": target_emails,
+        "counts": counts,
+        "created_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+    })
+
+    return {"deleted_users": counts.get("users", 0), "counts": counts, "emails": target_emails}
+
 # ============= ADMIN =============
 @router.get("/admin/stats")
 async def admin_stats(user: dict = Depends(require_role("admin"))):

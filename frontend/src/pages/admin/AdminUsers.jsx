@@ -1,7 +1,7 @@
 // Unified user management: list, filter, edit, ban
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { Search, Download, Edit2, Ban, CheckCircle2, X, UserCheck } from "lucide-react";
+import { Search, Download, Edit2, Ban, CheckCircle2, X, UserCheck, Trash2, AlertTriangle } from "lucide-react";
 import { AdminCard, AdminBtn } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
 import { ImpersonateModal } from "./ImpersonateModal";
@@ -88,6 +88,7 @@ export const AdminUsers = () => {
   const [editing, setEditing] = useState(null);
   const [impersonating, setImpersonating] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showCleanup, setShowCleanup] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -135,6 +136,14 @@ export const AdminUsers = () => {
           </select>
           <AdminBtn variant="secondary" onClick={exportCsv} data-testid="users-export-csv">
             <Download className="w-3.5 h-3.5 inline mr-1.5" /> CSV
+          </AdminBtn>
+          <AdminBtn
+            variant="secondary"
+            onClick={() => setShowCleanup(true)}
+            data-testid="users-cleanup-test-btn"
+            title="Șterge userii de test (test_*@test.io, beta_*@example.com, etc.)"
+          >
+            <Trash2 className="w-3.5 h-3.5 inline mr-1.5 text-red-500" />Curăță userii de test
           </AdminBtn>
         </div>
       </AdminCard>
@@ -212,6 +221,123 @@ export const AdminUsers = () => {
 
       {editing && <EditUserModal user={editing} onClose={() => setEditing(null)} onSaved={load} />}
       {impersonating && <ImpersonateModal user={impersonating} onClose={() => setImpersonating(null)} />}
+      {showCleanup && <CleanupTestUsersModal onClose={() => setShowCleanup(false)} onCleaned={load} />}
+    </div>
+  );
+};
+
+
+// ============= CLEANUP TEST USERS MODAL =============
+const CleanupTestUsersModal = ({ onClose, onCleaned }) => {
+  const [preview, setPreview] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    axios.get(`${API}/admin/test-users/preview`)
+      .then(r => setPreview(r.data))
+      .catch(e => setResult({ error: e?.response?.data?.detail || e.message }));
+  }, []);
+
+  const doCleanup = async () => {
+    if (confirmText !== "STERGE") return;
+    setBusy(true);
+    try {
+      const { data } = await axios.post(`${API}/admin/test-users/cleanup?confirm=STERGE`);
+      setResult(data);
+      setTimeout(() => { onCleaned?.(); }, 800);
+    } catch (e) {
+      setResult({ error: e?.response?.data?.detail || e.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 w-full max-w-lg max-h-[90vh] overflow-y-auto" data-testid="cleanup-test-users-modal">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-500/15 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">Curăță userii de test</h3>
+              <div className="text-xs text-slate-500">Șterge ireversibil conturile create în timpul testelor backend.</div>
+            </div>
+          </div>
+          <button onClick={onClose}><X className="w-5 h-5 text-slate-500" /></button>
+        </div>
+
+        {result?.deleted_users != null ? (
+          <div className="text-sm bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-lg p-4" data-testid="cleanup-success">
+            <div className="font-semibold text-emerald-700 dark:text-emerald-400 mb-2">✓ {result.deleted_users} useri șterși</div>
+            <div className="text-xs text-slate-600 dark:text-slate-400">Resurse cascade-deleted:</div>
+            <ul className="text-xs text-slate-600 dark:text-slate-400 mt-1 space-y-0.5">
+              {Object.entries(result.counts || {}).filter(([_, v]) => v > 0).map(([k, v]) => (
+                <li key={k}>• <strong>{k}</strong>: {v}</li>
+              ))}
+            </ul>
+            <button onClick={onClose} className="mt-3 w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium">Închide</button>
+          </div>
+        ) : result?.error ? (
+          <div className="text-sm bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-lg p-3 text-red-700 dark:text-red-400">{result.error}</div>
+        ) : preview === null ? (
+          <div className="text-center py-6 text-sm text-slate-500">Se încarcă...</div>
+        ) : preview.count === 0 ? (
+          <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-lg p-4 text-center">
+            <div className="text-emerald-700 dark:text-emerald-400 font-semibold mb-1">✓ Niciun user de test găsit</div>
+            <div className="text-xs text-slate-500">Baza ta de date e deja curată.</div>
+          </div>
+        ) : (
+          <>
+            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg p-3 mb-3">
+              <div className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">
+                Vor fi șterși <span data-testid="cleanup-count">{preview.count}</span> useri
+              </div>
+              <div className="text-[11px] text-slate-600 dark:text-slate-400 mb-2">
+                Match-uri după pattern-uri test (test_*@test.io, beta_*@example.com, etc.). Conturile demo + admins protejate sunt EXCLUSE automat.
+              </div>
+              <div className="max-h-40 overflow-y-auto bg-white dark:bg-slate-950/50 rounded p-2 text-[11px] font-mono space-y-0.5">
+                {preview.items.slice(0, 30).map(u => (
+                  <div key={u.id} className="flex justify-between gap-2 text-slate-700 dark:text-slate-300" data-testid={`cleanup-target-${u.id}`}>
+                    <span className="truncate">{u.email}</span>
+                    <span className="text-slate-500 shrink-0">{u.role}</span>
+                  </div>
+                ))}
+                {preview.items.length > 30 && <div className="text-slate-500 italic text-center pt-1">... și încă {preview.items.length - 30}</div>}
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-600 dark:text-slate-400 mb-2">
+              Scrie <code className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono text-red-600 dark:text-red-400">STERGE</code> pentru a confirma:
+            </div>
+            <input
+              type="text"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="STERGE"
+              autoComplete="off"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-mono"
+              data-testid="cleanup-confirm-input"
+            />
+
+            <div className="flex gap-2 mt-3">
+              <button onClick={onClose} className="flex-1 px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-sm">Anulează</button>
+              <button
+                onClick={doCleanup}
+                disabled={busy || confirmText !== "STERGE"}
+                className="flex-1 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-medium flex items-center justify-center gap-1.5"
+                data-testid="cleanup-confirm-btn"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {busy ? "Se șterg..." : `Șterge ${preview.count} useri`}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };
