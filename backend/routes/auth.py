@@ -4,6 +4,7 @@ digest preference/preview."""
 import os
 import io
 import logging
+import jwt
 import asyncio
 import secrets
 import base64 as b64
@@ -19,7 +20,7 @@ from pydantic import BaseModel, Field
 from db import db
 from core_utils import (
     hash_password, verify_password, create_access_token, create_refresh_token,
-    serialize_doc, set_auth_cookies,
+    serialize_doc, set_auth_cookies, JWT_SECRET, JWT_ALGORITHM,
 )
 from deps import get_current_user, require_role, block_in_impersonation, block_impersonation_dep
 from services import send_email, VAPID_PUBLIC_KEY
@@ -189,6 +190,101 @@ async def me(user: dict = Depends(get_current_user)):
         user["role"] = fresh["role"]
     # `impersonation` field is already injected by get_current_user when applicable.
     return user
+
+
+class PasswordForgotIn(BaseModel):
+    email: str
+
+
+class PasswordResetIn(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+@router.post("/auth/password/forgot")
+async def password_forgot(data: PasswordForgotIn):
+    """Send a password reset magic link to the user's email if the account exists.
+    Always returns 200 + identical message (no email enumeration leak).
+    Token is signed JWT with 1h TTL + single-use via jti rotation."""
+    email = data.email.strip().lower()
+    if not email or "@" not in email:
+        # Same response — don't leak validation
+        return {"ok": True, "message": "Dacă există un cont cu acest email, vei primi un link în câteva minute."}
+    user = await db.users.find_one({"email": email})
+    if user and not user.get("banned"):
+        token_payload = {
+            "sub": str(user["_id"]),
+            "email": email,
+            "type": "password_reset",
+            "jti": secrets.token_urlsafe(12),
+            "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+        }
+        token = jwt.encode(token_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+        # Store jti so it can only be used once
+        await db.users.update_one(
+            {"_id": user["_id"]},
+            {"$set": {
+                "pw_reset_jti": token_payload["jti"],
+                "pw_reset_requested_at": datetime.now(timezone.utc).isoformat(),
+            }}
+        )
+        front_url = os.environ.get("FRONTEND_URL", "https://propmanage.ro")
+        reset_url = f"{front_url}/reset-password?token={token}"
+        name = user.get("name") or "utilizator"
+        html = (
+            f"<div style='font-family: Inter, sans-serif; max-width:560px; margin:0 auto; "
+            f"background:#0a0a0b; color:#fafaf9; padding:24px; border-radius:12px;'>"
+            f"<h2 style='font-family: Georgia, serif; color:#d4ff3a;'>Resetează parola PropManage</h2>"
+            f"<p>Salut {name},</p>"
+            f"<p>Ai cerut resetarea parolei pentru contul <strong>{email}</strong>.</p>"
+            f"<p style='margin:24px 0;text-align:center;'>"
+            f"<a href='{reset_url}' style='display:inline-block;background:#d4ff3a;color:#0a0a0b;"
+            f"padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:bold;'>"
+            f"Setează parolă nouă</a></p>"
+            f"<p style='color:#a8a29e;font-size:13px;'>Link-ul expiră în <strong>1 oră</strong> și poate fi folosit o singură dată.</p>"
+            f"<p style='color:#a8a29e;font-size:13px;'>Dacă NU ai cerut tu această resetare, ignoră emailul — parola ta veche rămâne neschimbată.</p>"
+            f"<hr style='border:none;border-top:1px solid #292524; margin:24px 0;'/>"
+            f"<p style='color:#78716c;font-size:11px;text-align:center;word-break:break-all;'>"
+            f"Dacă butonul nu funcționează, deschide acest link în browser:<br/>{reset_url}</p>"
+            f"</div>"
+        )
+        try:
+            await send_email(email, "Resetează parola PropManage", html)
+        except Exception as e:
+            logger.warning(f"Failed to send reset email to {email}: {e}")
+    # Always return success to prevent email enumeration
+    return {"ok": True, "message": "Dacă există un cont cu acest email, vei primi un link în câteva minute."}
+
+
+@router.post("/auth/password/reset")
+async def password_reset(data: PasswordResetIn):
+    """Consume reset token + set new password. Token must be valid + match stored jti."""
+    try:
+        payload = jwt.decode(data.token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "password_reset":
+            raise HTTPException(400, "Token invalid.")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(400, "Link-ul a expirat. Cere un nou link de resetare.")
+    except jwt.InvalidTokenError:
+        raise HTTPException(400, "Token invalid sau corupt.")
+
+    user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
+    if not user:
+        raise HTTPException(404, "Utilizator inexistent.")
+    if user.get("banned"):
+        raise HTTPException(403, "Cont suspendat.")
+    if user.get("pw_reset_jti") != payload.get("jti"):
+        raise HTTPException(400, "Link-ul a fost deja folosit. Cere un nou link de resetare.")
+
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {
+            "password_hash": hash_password(data.new_password),
+            "pw_reset_jti": None,
+            "pw_reset_used_at": datetime.now(timezone.utc).isoformat(),
+        }}
+    )
+    return {"ok": True, "email": user.get("email")}
 
 
 @router.post("/auth/password/send-backup")
