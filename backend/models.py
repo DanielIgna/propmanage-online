@@ -1,6 +1,6 @@
 """Pydantic models + literals + constants used across the app."""
 from typing import Optional, List, Literal, Dict
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 Role = Literal["client", "specialist", "admin", "operator"]
 
@@ -83,9 +83,20 @@ class RequestIn(BaseModel):
     category: str
     title: str
     description: str
-    priority: Literal["normal", "urgent"] = "normal"
+    priority: Literal["low", "normal", "medium", "high", "urgent"] = "normal"
     budget_estimate: Optional[float] = None
     photos: Optional[List[str]] = None
+
+    @field_validator("priority", mode="before")
+    @classmethod
+    def _coerce_priority(cls, v):
+        """Normalize legacy + UI variants: 'medium' → 'normal' for backward compat."""
+        if v is None:
+            return "normal"
+        v = str(v).lower().strip()
+        if v in ("medium", "med"):
+            return "normal"
+        return v
 
 
 class OfferIn(BaseModel):
@@ -96,7 +107,8 @@ class OfferIn(BaseModel):
 
 
 class ReviewIn(BaseModel):
-    job_id: str
+    # job_id kept optional for backward compatibility; the canonical id is the URL path param.
+    job_id: Optional[str] = None
     rating: int = Field(ge=1, le=5)
     comment: Optional[str] = None
 

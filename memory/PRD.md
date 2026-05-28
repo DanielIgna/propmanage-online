@@ -539,11 +539,10 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 
 ## Roadmap
 ### P1 (Next)
-- `server.py` routers split: auth.py, admin.py, operator.py, payments.py, requests.py, marketplace.py, design.py, portfolio.py (monolith ~2870 lines, refactor postponed multiple times)
-- Live API keys: RESEND_API_KEY (Resend) + STRIPE_API_KEY (Stripe) — code is fully programmed, awaiting user keys
 - AI tools/function-calling for booking actions
 - Contact form backend (currently UI-only)
 - Avatar migration from base64 → S3/Cloudinary (paused; user will share keys later)
+- Live API keys: RESEND_API_KEY (Resend) + STRIPE_API_KEY (Stripe) — code is fully programmed, awaiting user keys
 
 ### P2 (Future)
 - Stripe Connect for direct specialist payouts
@@ -554,6 +553,12 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Pagination on AI history + Marketplace + Disputes lists
 - CORS_ORIGINS lockdown (currently "*" with credentials)
 - Pytest fixture leakage cleanup (BLOCKED: tests pass individually, fail as full suite)
+
+## Changelog — 2026-03-04 — Pytest state leakage + P3 schema polish + server.py refactor confirmed
+- **Pytest state leakage FIX**: created `/app/backend/tests/conftest.py` with session-scoped autouse `reset_demo_state` fixture that calls new `POST /api/admin/demo/reset` endpoint before each test session. Added per-test `reset_demo_state_before_test` fixture for tests asserting exact baselines (TestAuth.test_login_client + test_login_specialist). Updated `DEMO_BASELINE` in `demo_reset.py`: client → 5000 RON / 250 tokens, specialist → 800 RON / verified, operator → 0. New endpoint `POST /api/admin/demo/reset` (admin-only) triggers the same nightly reset on demand.
+- **Pytest results**: previously 21 failures + 6 errors in full suite → now 36/36 pass in `test_propmanage_api.py` and 87/87 pass in mixed chain (test_phase4+8+11+12 + TestAuth). Remaining `test_phase{3,5,7,9,47,47b}` failures are unrelated schema drift (category strings must be lowercase now, AI Concierge API key absent locally) — separate cleanup.
+- **P3 schema polish**: `RequestIn.priority` now accepts `low|normal|medium|high|urgent` with `field_validator` coercing legacy `medium` → `normal` for backward compat. `ReviewIn.job_id` made optional (URL path is canonical id).
+- **server.py refactor — ALREADY DONE**: file is currently 201 lines, pure app wire-up (CORS, lifecycle, scheduler, router includes). 37 route files under `/routes/*.py`. Task removed from backlog.
 
 ## Changelog — 2026-02-27
 - Added Logout button to landing Nav (data-testid=nav-logout) — visible only when authenticated next to Dashboard

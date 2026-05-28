@@ -23,6 +23,19 @@ def make_session(creds=None):
     return s
 
 
+@pytest.fixture
+def reset_demo_state_before_test():
+    """Re-baseline demo accounts immediately before a test that asserts exact balances/tokens.
+    Use as a per-test fixture for assertions sensitive to mutation by other tests."""
+    try:
+        s = requests.Session()
+        r = s.post(f"{API}/auth/login", json=ADMIN, timeout=10)
+        if r.status_code == 200:
+            s.post(f"{API}/admin/demo/reset", timeout=15)
+    except Exception:  # pragma: no cover
+        pass
+
+
 # ========== AUTH ==========
 class TestAuth:
     def test_root(self):
@@ -30,7 +43,7 @@ class TestAuth:
         assert r.status_code == 200
         assert "PropManage" in r.json().get("message", "")
 
-    def test_login_client(self):
+    def test_login_client(self, reset_demo_state_before_test):
         s = requests.Session()
         r = s.post(f"{API}/auth/login", json=CLIENT)
         assert r.status_code == 200
@@ -44,7 +57,7 @@ class TestAuth:
         assert "access_token" in s.cookies
         assert "refresh_token" in s.cookies
 
-    def test_login_specialist(self):
+    def test_login_specialist(self, reset_demo_state_before_test):
         s = make_session(SPEC)
         r = s.get(f"{API}/auth/me")
         assert r.status_code == 200
@@ -318,7 +331,8 @@ class TestAdmin:
         email = f"specnew_{uuid.uuid4().hex[:6]}@propmanage.io"
         s = requests.Session()
         r = s.post(f"{API}/auth/register", json={
-            "email": email, "password": "Test1234!", "name": "New Spec", "role": "specialist"
+            "email": email, "password": "Test1234!", "name": "New Spec", "role": "specialist",
+            "service_categories": ["handyman"], "coverage_zones": ["bucuresti-sector1"],
         })
         assert r.status_code == 200
         spec_id = r.json()["id"]

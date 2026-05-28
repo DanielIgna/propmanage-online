@@ -18,9 +18,18 @@ from email_service import (
     send_template, tpl_welcome, tpl_dispute_opened, tpl_dispute_resolved,
     tpl_design_phase_quote, tpl_specialist_verified, tpl_escrow_funded,
 )
+from demo_reset import reset_demo_accounts
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["admin"])
+
+
+@router.post("/admin/demo/reset")
+async def admin_trigger_demo_reset(user: dict = Depends(require_role("admin"))):
+    """Manually trigger the nightly demo reset (idempotent).
+    Used by CI/pytest conftest to ensure a clean baseline between test runs."""
+    res = await reset_demo_accounts()
+    return res
 
 # ============= ADMIN =============
 @router.get("/admin/stats")

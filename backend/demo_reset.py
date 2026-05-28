@@ -19,9 +19,9 @@ from db import db
 logger = logging.getLogger("propmanage.demo_reset")
 
 DEMO_BASELINE = {
-    "client@propmanage.io": {"wallet_balance": 800, "rating": 4.9, "review_count": 24, "tier": "verified"},
-    "specialist@propmanage.io": {"wallet_balance": 1250, "rating": 4.7, "review_count": 18, "tier": "verified"},
-    "operator@propmanage.io": {"wallet_balance": 0, "rating": None, "review_count": 0},
+    "client@propmanage.io":     {"wallet_balance": 5000, "tokens": 250, "rating": 4.9, "review_count": 24, "tier": "verified"},
+    "specialist@propmanage.io": {"wallet_balance": 800,  "tokens": 0,   "rating": 4.9, "reviews_count": 24, "tier": "VERIFIED", "verified": True},
+    "operator@propmanage.io":   {"wallet_balance": 0,    "tokens": 0,   "rating": None, "review_count": 0},
 }
 
 
