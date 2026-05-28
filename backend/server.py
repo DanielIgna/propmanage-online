@@ -59,10 +59,16 @@ logging.basicConfig(level=logging.INFO)
 app = FastAPI(title="PropManage API")
 
 # CORS: read from env, support "*" wildcard for dev OR comma-separated origins for prod.
+# Default regex auto-permits both preview (*.preview.emergentagent.com) AND the production
+# custom domain (*.propmanage.ro) so cookies/credentials work cross-origin out of the box.
 _raw_origins = os.environ.get("CORS_ORIGINS", "*").strip()
+_default_origin_regex = r"^https?://(.*\.)?(propmanage\.ro|propmanage\.io|preview\.emergentagent\.com|emergentagent\.com)$"
+_origin_regex = os.environ.get("CORS_ORIGIN_REGEX") or _default_origin_regex
 if _raw_origins == "*" or not _raw_origins:
-    _origins = ["*"]
-    _allow_credentials = False  # Browsers reject credentials with "*"
+    # Use empty allow_origins + regex so allow_credentials=True can still work
+    # (browsers reject credentials only with literal "*", not with regex matches).
+    _origins = []
+    _allow_credentials = True
 else:
     _origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
     _allow_credentials = True
@@ -70,13 +76,13 @@ else:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
-    allow_origin_regex=os.environ.get("CORS_ORIGIN_REGEX") or None,
+    allow_origin_regex=_origin_regex,
     allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 logger = logging.getLogger(__name__)
-logger.info(f"CORS configured: origins={_origins} credentials={_allow_credentials}")
+logger.info(f"CORS configured: origins={_origins} regex={_origin_regex} credentials={_allow_credentials}")
 
 # Register all routers
 for r in (
