@@ -12,11 +12,11 @@ import os
 import time
 import uuid
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 
 from db import db
 from deps import require_role
@@ -249,3 +249,195 @@ async def list_smoke_test_runs(
     cursor = db.smoke_test_runs.find({}, {"_id": 0}).sort("started_at", -1).limit(limit)
     items = await cursor.to_list(limit)
     return {"items": items, "count": len(items)}
+
+
+
+# ===========================================================================
+# AUTO-MONITOR (APScheduler background job)
+# ===========================================================================
+# Runs the smoke test every N minutes and sends an email alert to ADMIN_EMAILS
+# when:
+#   - Status transitions OK → FAIL (immediate alert)
+#   - Failures persist (1 alert every 3h cooldown to avoid spam)
+# Config stored in db.smoke_test_config (singleton doc with _id="config").
+
+DEFAULT_INTERVAL_MIN = 30
+COOLDOWN_HOURS = 3
+
+
+async def _get_monitor_config() -> dict:
+    """Singleton config doc. Defaults to monitoring DISABLED until admin enables it."""
+    cfg = await db.smoke_test_config.find_one({"_id": "config"})
+    if not cfg:
+        cfg = {
+            "_id": "config",
+            "enabled": False,
+            "interval_minutes": DEFAULT_INTERVAL_MIN,
+            "base_url": DEFAULT_BASE,
+            "last_alert_at": None,
+            "last_status": None,  # "ok" | "fail" | None
+            "updated_at": _now(),
+        }
+        await db.smoke_test_config.insert_one(cfg)
+    return cfg
+
+
+async def _send_failure_alert(report: dict, prev_status: Optional[str]) -> None:
+    """Email the admins. Imported lazily to avoid circular deps at module load."""
+    from services import send_email  # noqa: WPS433 — lazy import is intentional
+    admin_emails_raw = os.environ.get("ADMIN_EMAILS", "") or os.environ.get("ADMIN_EMAIL", "")
+    recipients = [e.strip() for e in admin_emails_raw.split(",") if e.strip()]
+    if not recipients:
+        logger.warning("[SmokeTest][monitor] No ADMIN_EMAILS configured — skipping alert email")
+        return
+
+    is_recovery = report["ok"] and prev_status == "fail"
+    if is_recovery:
+        subject = "✅ PropManage Smoke Test — RECOVERED"
+        intro = "Smoke test-ul a revenit la <strong>PASS</strong> după o eșuare anterioară."
+        color = "#10b981"
+    else:
+        subject = f"🚨 PropManage Smoke Test FAILED ({report['failed']}/{report['total']})"
+        intro = (
+            f"Smoke test-ul automat a detectat <strong>{report['failed']} pași eșuați</strong> "
+            f"din {report['total']} pe <code>{report['base_url']}</code>."
+        )
+        color = "#ef4444"
+
+    rows = ""
+    for s in report.get("steps", []):
+        icon = "✅" if s["ok"] else "❌"
+        code = s.get("status_code") or "—"
+        err = f"<div style='color:#fca5a5;font-size:11px;margin-top:4px;font-family:monospace'>{s.get('error','')[:200]}</div>" if not s["ok"] and s.get("error") else ""
+        rows += (
+            f"<tr><td style='padding:6px 10px;border-bottom:1px solid #292524'>"
+            f"{icon} {s['name']}{err}</td>"
+            f"<td style='padding:6px 10px;border-bottom:1px solid #292524;font-family:monospace;color:#a8a29e'>{code}</td>"
+            f"<td style='padding:6px 10px;border-bottom:1px solid #292524;font-family:monospace;color:#a8a29e;text-align:right'>{s['duration_ms']}ms</td></tr>"
+        )
+
+    html = (
+        f"<div style='font-family:Inter,sans-serif;max-width:640px;margin:0 auto;background:#0a0a0b;color:#fafaf9;padding:24px;border-radius:12px'>"
+        f"<h2 style='font-family:Georgia,serif;color:{color};margin:0 0 8px'>{subject}</h2>"
+        f"<p style='color:#d6d3d1;font-size:14px;line-height:1.6'>{intro}</p>"
+        f"<p style='color:#a8a29e;font-size:12px'>Started: {report['started_at']} · Total: {report['total_duration_ms']}ms</p>"
+        f"<table style='width:100%;border-collapse:collapse;margin:16px 0;font-size:13px;background:#1c1917;border-radius:8px;overflow:hidden'>"
+        f"<thead><tr style='background:#292524'>"
+        f"<th style='padding:8px 10px;text-align:left;color:#a8a29e'>Pas</th>"
+        f"<th style='padding:8px 10px;text-align:left;color:#a8a29e'>HTTP</th>"
+        f"<th style='padding:8px 10px;text-align:right;color:#a8a29e'>Durată</th>"
+        f"</tr></thead><tbody>{rows}</tbody></table>"
+        f"<p style='color:#78716c;font-size:11px;text-align:center'>"
+        f"Acest email este trimis automat de <strong>PropManage AI Investigator</strong> când Smoke Test-ul detectează probleme. "
+        f"Poți dezactiva monitorul din AI Investigator → Smoke Test E2E → toggle 'Monitorizare automată'.</p>"
+        f"</div>"
+    )
+    try:
+        for r in recipients:
+            await send_email(r, subject, html)
+        logger.info(f"[SmokeTest][monitor] Alert email sent to {len(recipients)} admin(s)")
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[SmokeTest][monitor] failed to send alert: {e}")
+
+
+async def run_smoke_test_monitor_tick() -> Optional[dict]:
+    """Scheduler tick: runs smoke test, persists, and conditionally alerts.
+
+    Returns the report dict, or None if monitor is disabled.
+    """
+    cfg = await _get_monitor_config()
+    if not cfg.get("enabled"):
+        return None
+
+    base_url = (cfg.get("base_url") or DEFAULT_BASE).rstrip("/")
+    logger.info(f"[SmokeTest][monitor] tick — testing {base_url}")
+    report = await _run_smoke_sequence(base_url)
+    report["triggered_by"] = "auto_monitor"
+    try:
+        await db.smoke_test_runs.insert_one(report.copy())
+    except Exception:  # noqa: BLE001
+        pass
+
+    prev_status = cfg.get("last_status")
+    new_status = "ok" if report["ok"] else "fail"
+    last_alert_at = cfg.get("last_alert_at")
+
+    # Decide whether to send an alert
+    should_alert = False
+    if not report["ok"]:
+        # Always alert on first failure after OK (immediate notification)
+        if prev_status != "fail":
+            should_alert = True
+        # Otherwise, alert with cooldown to avoid spamming
+        elif last_alert_at:
+            try:
+                last_dt = datetime.fromisoformat(last_alert_at.replace("Z", "+00:00"))
+                if datetime.now(timezone.utc) - last_dt > timedelta(hours=COOLDOWN_HOURS):
+                    should_alert = True
+            except Exception:  # noqa: BLE001
+                should_alert = True
+        else:
+            should_alert = True
+    elif report["ok"] and prev_status == "fail":
+        # Recovery notification
+        should_alert = True
+
+    if should_alert:
+        await _send_failure_alert(report, prev_status)
+
+    await db.smoke_test_config.update_one(
+        {"_id": "config"},
+        {"$set": {
+            "last_status": new_status,
+            "last_run_at": report["finished_at"],
+            "last_alert_at": _now() if should_alert else last_alert_at,
+            "updated_at": _now(),
+        }},
+    )
+    return report
+
+
+# ===========================================================================
+# MONITOR CONFIG ENDPOINTS
+# ===========================================================================
+
+
+@router.get("/monitor/config")
+async def get_monitor_config(user: dict = Depends(require_role("admin"))):
+    """Return current monitor config (enabled, interval, last status)."""
+    cfg = await _get_monitor_config()
+    cfg.pop("_id", None)
+    return cfg
+
+
+@router.post("/monitor/config")
+async def update_monitor_config(
+    payload: dict = Body(...),
+    user: dict = Depends(require_role("admin")),
+):
+    """Enable/disable the auto monitor or change its interval / target URL."""
+    updates: dict = {}
+    if "enabled" in payload:
+        updates["enabled"] = bool(payload["enabled"])
+    if "interval_minutes" in payload:
+        try:
+            iv = int(payload["interval_minutes"])
+            if iv < 5 or iv > 1440:
+                raise HTTPException(400, "interval_minutes must be between 5 and 1440")
+            updates["interval_minutes"] = iv
+        except (TypeError, ValueError):
+            raise HTTPException(400, "interval_minutes must be an integer") from None
+    if "base_url" in payload:
+        url = (payload["base_url"] or "").strip()
+        if url and not (url.startswith("http://") or url.startswith("https://")):
+            raise HTTPException(400, "base_url must start with http:// or https://")
+        updates["base_url"] = url or DEFAULT_BASE
+    if not updates:
+        raise HTTPException(400, "Nothing to update")
+    updates["updated_at"] = _now()
+    updates["updated_by"] = user.get("email")
+    await db.smoke_test_config.update_one({"_id": "config"}, {"$set": updates}, upsert=True)
+    cfg = await _get_monitor_config()
+    cfg.pop("_id", None)
+    logger.info(f"[SmokeTest][monitor] config updated by {user.get('email')}: {updates}")
+    return cfg

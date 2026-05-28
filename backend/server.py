@@ -52,7 +52,7 @@ from routes.demo_time_machine import router as demo_time_machine_router
 from routes.gdpr import router as gdpr_router, admin_router as gdpr_admin_router
 from routes.digital_twin import router as digital_twin_router, admin_router as digital_twin_admin_router, operator_router as digital_twin_operator_router
 from routes.impersonation import router as impersonation_router
-from routes.admin_smoketest import router as admin_smoketest_router
+from routes.admin_smoketest import router as admin_smoketest_router, run_smoke_test_monitor_tick
 from demo_reset import reset_demo_accounts
 
 logging.basicConfig(level=logging.INFO)
@@ -185,6 +185,14 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=3600,
         )
+        # Smoke Test auto-monitor — runs every 30 min, alerts admins on failure
+        scheduler.add_job(
+            run_smoke_test_monitor_tick,
+            CronTrigger(minute="*/30", timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="smoke_test_monitor",
+            replace_existing=True,
+            misfire_grace_time=600,
+        )
         scheduler.start()
         # Record an immediate ping on startup so sparkline is non-empty from minute 1.
         try:
@@ -200,6 +208,7 @@ async def startup():
         logger.info("AI effectiveness low-alert scheduler started (Monday 09:00 Europe/Bucharest).")
         logger.info("Demo accounts auto-reset scheduler started (daily 02:00 Europe/Bucharest).")
         logger.info("Health ping scheduler started (every 15 min, powers /status sparkline).")
+        logger.info("Smoke Test auto-monitor scheduler started (every 30 min — alerts on FAIL).")
 
 
 @app.on_event("shutdown")

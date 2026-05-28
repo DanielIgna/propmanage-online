@@ -2,7 +2,7 @@
 // the live API. Triggered manually by admin; results stored in DB for history.
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { PlayCircle, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp, History, ExternalLink } from "lucide-react";
+import { PlayCircle, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp, History, ExternalLink, Bell, BellOff } from "lucide-react";
 import { AdminCard, AdminBtn } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
 
@@ -12,6 +12,8 @@ export const SmokeTestCard = () => {
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [baseUrl, setBaseUrl] = useState("");
+  const [monitor, setMonitor] = useState(null);
+  const [monitorBusy, setMonitorBusy] = useState(false);
 
   const loadHistory = async () => {
     try {
@@ -21,7 +23,14 @@ export const SmokeTestCard = () => {
     } catch { /* ignore */ }
   };
 
-  useEffect(() => { loadHistory(); }, []);
+  const loadMonitor = async () => {
+    try {
+      const r = await axios.get(`${API}/admin/smoke-test/monitor/config`);
+      setMonitor(r.data);
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => { loadHistory(); loadMonitor(); }, []);
 
   const runTest = async () => {
     setRunning(true);
@@ -34,6 +43,23 @@ export const SmokeTestCard = () => {
       window.alert(`Smoke test eșuat: ${e?.response?.data?.detail || e.message}`);
     } finally {
       setRunning(false);
+    }
+  };
+
+  const toggleMonitor = async () => {
+    if (!monitor) return;
+    setMonitorBusy(true);
+    try {
+      const next = !monitor.enabled;
+      const payload = { enabled: next };
+      // When enabling, also save the current target URL the admin picked
+      if (next && baseUrl.trim()) payload.base_url = baseUrl.trim();
+      const r = await axios.post(`${API}/admin/smoke-test/monitor/config`, payload);
+      setMonitor(r.data);
+    } catch (e) {
+      window.alert(`Eroare toggle monitor: ${e?.response?.data?.detail || e.message}`);
+    } finally {
+      setMonitorBusy(false);
     }
   };
 
@@ -63,6 +89,46 @@ export const SmokeTestCard = () => {
         Folosește un cont demo izolat, marchează datele cu prefix <code className="px-1 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-[10px]">[SMOKE ID]</code> și
         face cleanup la final. Rulează în {"<"}1 secundă.
       </p>
+
+      {/* Auto-monitor toggle */}
+      {monitor && (
+        <div
+          className={`flex items-center gap-3 p-3 rounded-lg border mb-3 ${
+            monitor.enabled
+              ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30"
+              : "bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700"
+          }`}
+          data-testid="smoke-monitor-banner"
+        >
+          {monitor.enabled
+            ? <Bell className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            : <BellOff className="w-4 h-4 text-slate-400 shrink-0" />
+          }
+          <div className="flex-1 min-w-0">
+            <div className={`text-sm font-medium ${monitor.enabled ? "text-emerald-700 dark:text-emerald-300" : "text-slate-600 dark:text-slate-300"}`}>
+              Monitorizare automată: {monitor.enabled ? "ACTIVĂ" : "INACTIVĂ"}
+            </div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              {monitor.enabled
+                ? <>Rulează la fiecare {monitor.interval_minutes} min pe <code className="text-[10px]">{monitor.base_url}</code>. Email alertă la admin doar dacă pică ceva (cooldown 3h). {monitor.last_status && <>Ultim status: <strong className={monitor.last_status === "ok" ? "text-emerald-600" : "text-red-600"}>{monitor.last_status.toUpperCase()}</strong>.</>}</>
+                : "Activează pentru a primi alertă pe email când smoke test-ul detectează probleme pe domeniul live."
+              }
+            </div>
+          </div>
+          <button
+            onClick={toggleMonitor}
+            disabled={monitorBusy}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium shrink-0 transition ${
+              monitor.enabled
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                : "bg-slate-700 hover:bg-slate-800 dark:bg-slate-200 dark:hover:bg-white dark:text-slate-900 text-white"
+            }`}
+            data-testid="smoke-monitor-toggle"
+          >
+            {monitorBusy ? "..." : monitor.enabled ? "Dezactivează" : "Activează"}
+          </button>
+        </div>
+      )}
 
       {/* Target URL input (optional override) */}
       <div className="flex items-center gap-2 mb-3 text-xs">

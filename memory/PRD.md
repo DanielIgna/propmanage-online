@@ -687,3 +687,33 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Use case: After each `Re-deploy changes` in production panel, admin opens
   AI Investigator → clicks "Smoke Test" → confirms in <1s that login/CRUD/logout
   all work on the live domain.
+
+
+## Changelog — 2026-02-28 — Smoke Test Auto-Monitor (proactive alerts)
+- Extended `/app/backend/routes/admin_smoketest.py` with:
+  - `run_smoke_test_monitor_tick()` — async function called by APScheduler every
+    30 min. Reads config from `db.smoke_test_config` (singleton `_id="config"`),
+    runs full smoke sequence, persists result.
+  - Smart alert logic via `_send_failure_alert()`:
+    - **Immediate** alert on OK → FAIL transition (subject 🚨 ... FAILED)
+    - **Cooldown 3h** for persistent failures (avoids spamming)
+    - **Recovery** alert on FAIL → OK transition (subject ✅ ... RECOVERED)
+    - HTML email with full step-by-step table (HTTP code, durations, errors)
+    - Recipients: `ADMIN_EMAILS` env (comma-separated) or `ADMIN_EMAIL` fallback
+  - `GET /api/admin/smoke-test/monitor/config` — return current config
+  - `POST /api/admin/smoke-test/monitor/config` — admin updates `enabled`,
+    `interval_minutes` (5-1440), `base_url`. Default: disabled.
+- Server-side scheduler job `smoke_test_monitor` added in `server.py`
+  (CronTrigger `minute="*/30"`, misfire_grace_time=600). Started on startup
+  alongside the other 9 scheduler jobs.
+- Frontend `SmokeTestCard.jsx`:
+  - New monitor banner (green when ACTIVĂ, gray when INACTIVĂ) above the
+    Target input, with toggle button "Activează" / "Dezactivează".
+  - Shows interval, target URL, last status (OK/FAIL) when enabled.
+  - Uses Lucide `Bell` / `BellOff` icons.
+- Validated end-to-end:
+  - Tick against good URL → no email sent (status remains OK)
+  - Tick with `last_status=ok` against bad URL → 🚨 FAILED email sent
+  - Tick with `last_status=fail` against good URL → ✅ RECOVERED email sent
+  - Invalid interval (e.g. 1 min) → 400 with proper error
+  - Toggle on/off via UI → config persists, banner reflects state in real-time
