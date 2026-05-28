@@ -554,6 +554,14 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - CORS_ORIGINS lockdown (currently "*" with credentials)
 - Pytest fixture leakage cleanup (BLOCKED: tests pass individually, fail as full suite)
 
+## Changelog — 2026-03-07 — Backup password for Google-only accounts
+- **NEW: Buton „Trimite parolă de backup"** în `Settings → Cont` (data-testid=row-backup-password) vizibil DOAR pentru users cu `google_auth=true` SAU `has_password=false` (conturi creat doar prin Google OAuth).
+- Backend: `POST /api/auth/password/send-backup` (auth required, blocat în impersonare) generează o parolă de 12 caractere base64-urlsafe, o hash-uiește în DB, și trimite email HTML stilizat cu parola către user-ul logged-in.
+- `GET /api/auth/me` returnează acum câmpuri noi `has_password` și `google_auth` pentru UI logic.
+- Modal cu 2 stări: confirm + use case (când Google nu merge / device nou) → email trimis cu success + reminder schimbă parola.
+- Util pentru cazul propmanage.ro Google OAuth deocamdată blocat (whitelist URL Emergent) — user-ul cu cont Google poate folosi backup password să se logheze cu email+parolă.
+- **OAuth diagnostic backend**: `/api/auth/google/session` returnează acum mesajul exact de la upstream Emergent (`user_data_not_found` etc.) + 2 cauze posibile + recomandare contact support — în loc de generic "Invalid Emergent session".
+
 ## Changelog — 2026-03-06 — Black screen fix + OAuth diagnostic page + ErrorBoundary
 - **FIX pagină neagră pe laptop**: AdminConsole afișa loading invisibil (text gri-slate-500 pe body #0a0a0b). Acum: spinner verde lime + text vizibil „Se încarcă consola admin...". User-ul neautentificat e redirectat la /login imediat ce `user` devine `false`.
 - **NEW: ErrorBoundary global** (`/app/frontend/src/components/ErrorBoundary.jsx`) — wrap-uiește tot app-ul în BrowserRouter. Orice eroare neașteptată în React afișează acum un ecran cu mesaj clar + buton „Reîncarcă" / „Înapoi acasă" în loc de blank screen. data-testid: errorboundary-reload, errorboundary-home.

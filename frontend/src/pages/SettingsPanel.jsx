@@ -8,7 +8,7 @@ import {
   User as UserIcon, Settings as SettingsIcon, RefreshCw, Share2, Heart,
   LifeBuoy, MessageCircle, Lock, ChevronRight, X, Mail, Phone, MapPin as MapPinIcon,
   Download, Trash2, AlertTriangle, CheckCircle2, Shield, BellRing, BellOff,
-  Sun, Eye, Globe, Clock,
+  Sun, Eye, Globe, Clock, KeyRound,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { API } from "./DashShared";
@@ -85,15 +85,15 @@ export const SettingsPanel = () => {
     }
   };
 
-  const Row = ({ icon: Icon, title, subtitle, onClick, danger, tid }) => (
+  const Row = ({ icon: Icon, title, subtitle, onClick, danger, accent, tid }) => (
     <button
       onClick={onClick}
       className={`w-full flex items-center gap-4 py-4 border-b border-white/5 hover:bg-white/[0.02] transition-colors group ${
         danger ? "text-red-400" : ""
-      }`}
+      } ${accent ? "bg-[#d4ff3a]/[0.04]" : ""}`}
       data-testid={tid}
     >
-      <Icon className={`w-5 h-5 shrink-0 ${danger ? "text-red-400" : "text-stone-400"}`} />
+      <Icon className={`w-5 h-5 shrink-0 ${danger ? "text-red-400" : accent ? "text-[#d4ff3a]" : "text-stone-400"}`} />
       <div className="flex-1 text-left">
         <div className="text-sm font-medium">{title}</div>
         {subtitle && <div className="text-xs text-stone-500 mt-0.5">{subtitle}</div>}
@@ -146,6 +146,16 @@ export const SettingsPanel = () => {
           onClick={() => setModal("password")}
           tid="row-password"
         />
+        {(user.google_auth || !user.has_password) && (
+          <Row
+            icon={KeyRound}
+            title="Trimite parolă de backup pe email"
+            subtitle="Pentru conturile Google — primești o parolă pe email cu care te poți loga când Google nu este disponibil."
+            onClick={() => setModal("backup-password")}
+            tid="row-backup-password"
+            accent
+          />
+        )}
         {user.role === "specialist" && (
           <Row
             icon={MapPinIcon}
@@ -252,6 +262,7 @@ export const SettingsPanel = () => {
 
       {modal === "profile" && <ProfileModal onClose={() => setModal(null)} />}
       {modal === "password" && <PasswordModal onClose={() => setModal(null)} />}
+      {modal === "backup-password" && <BackupPasswordModal onClose={() => setModal(null)} />}
       {modal === "coverage" && <CoverageModal user={user} refreshUser={refreshUser} onClose={() => setModal(null)} />}
       {modal === "privacy" && <PrivacyModal onClose={() => setModal(null)} />}
       {modal === "referral" && <ReferralModal onClose={() => setModal(null)} />}
@@ -462,6 +473,81 @@ const PasswordModal = ({ onClose }) => {
             </button>
           </div>
         </form>
+      )}
+    </ModalShell>
+  );
+};
+
+// ============= BACKUP PASSWORD MODAL =============
+const BackupPasswordModal = ({ onClose }) => {
+  const { user } = useAuth();
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(null);
+  const [err, setErr] = useState(null);
+
+  const send = async () => {
+    setSending(true); setErr(null);
+    try {
+      const { data } = await axios.post(`${API}/auth/password/send-backup`);
+      setDone(data);
+    } catch (e) {
+      setErr(formatApiError(e));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <ModalShell title="Parolă de backup" onClose={onClose} tid="backup-password-modal">
+      {done ? (
+        <div className="space-y-3">
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex gap-3" data-testid="backup-password-success">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <div className="font-semibold text-emerald-300 mb-1">Email trimis cu succes</div>
+              <div className="text-stone-300">Verifică inbox-ul <strong className="text-white">{done.email_to}</strong> — vei primi o parolă pe care o poți folosi imediat pentru login.</div>
+            </div>
+          </div>
+          <div className="text-xs text-stone-500 leading-relaxed">
+            💡 Recomandare: după primul login cu această parolă, schimb-o din <em>Setări → Schimbă parola</em> cu una memorabilă pentru tine.
+          </div>
+          <button onClick={onClose} className="w-full btn-accent py-3 rounded-xl text-sm font-medium">Am înțeles</button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="bg-white/5 rounded-xl p-4 text-sm text-stone-300 leading-relaxed">
+            Vei primi pe email-ul <strong className="text-white">{user?.email}</strong> o parolă nouă pe care o poți folosi pentru login.
+            <br /><br />
+            Util când:
+            <ul className="list-disc pl-5 mt-2 space-y-1 text-stone-400 text-xs">
+              <li>Google OAuth nu funcționează (popup blocat, browser nou, etc.)</li>
+              <li>Vrei să te loghezi de pe un device unde nu ai cont Google</li>
+              <li>Vrei o metodă alternativă de login pentru siguranță</li>
+            </ul>
+          </div>
+
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-xs text-amber-200">
+            ⚠ Atenție: dacă deja ai o parolă setată, această acțiune o va <strong>înlocui</strong>. Parola veche nu va mai funcționa.
+          </div>
+
+          {err && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-xs text-red-300" data-testid="backup-password-error">
+              {err}
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 py-3 bg-white/5 rounded-xl text-sm">Anulează</button>
+            <button
+              onClick={send}
+              disabled={sending}
+              className="flex-1 btn-accent py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2"
+              data-testid="backup-password-send"
+            >
+              {sending ? "Se trimite..." : <><Mail className="w-4 h-4" />Trimite-mi parola</>}
+            </button>
+          </div>
+        </div>
       )}
     </ModalShell>
   );

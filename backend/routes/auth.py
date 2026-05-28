@@ -176,9 +176,12 @@ async def logout(response: Response):
 @router.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
     # Load tutorial seen flag fresh from DB so it reflects across sessions
-    doc = await db.users.find_one({"_id": ObjectId(user["id"])}, {"tutorial_seen": 1, "ai_admin_tour_seen": 1, "email": 1, "role": 1})
+    doc = await db.users.find_one({"_id": ObjectId(user["id"])}, {"tutorial_seen": 1, "ai_admin_tour_seen": 1, "email": 1, "role": 1, "password_hash": 1, "google_auth": 1})
     user["tutorial_seen"] = bool((doc or {}).get("tutorial_seen", False))
     user["ai_admin_tour_seen"] = bool((doc or {}).get("ai_admin_tour_seen", False))
+    # `has_password` lets frontend show "Backup password" button only for Google-only accounts
+    user["has_password"] = bool((doc or {}).get("password_hash"))
+    user["google_auth"] = bool((doc or {}).get("google_auth"))
     # Enforce admin whitelist on every /me call to catch direct DB tampering or stale tokens.
     if doc:
         fresh = {"_id": doc["_id"], "email": doc.get("email"), "role": doc.get("role")}
@@ -186,6 +189,65 @@ async def me(user: dict = Depends(get_current_user)):
         user["role"] = fresh["role"]
     # `impersonation` field is already injected by get_current_user when applicable.
     return user
+
+
+@router.post("/auth/password/send-backup")
+async def send_backup_password(user: dict = Depends(get_current_user)):
+    """Generate a temporary password, set it on the account, and email it to the user.
+    Designed for users logged-in via Google OAuth who have no password and need a
+    backup login method (e.g. when SSO is down or on a different device).
+    """
+    block_in_impersonation(user, "generarea parolei de backup")
+    db_user = await db.users.find_one({"_id": ObjectId(user["id"])})
+    if not db_user:
+        raise HTTPException(404, "Utilizator inexistent.")
+
+    # Generate a strong, human-readable temp password
+    temp_pw = secrets.token_urlsafe(9)  # 12-char base64 (e.g. "Vh3K8L_4mPq")
+    await db.users.update_one(
+        {"_id": db_user["_id"]},
+        {"$set": {
+            "password_hash": hash_password(temp_pw),
+            "password_temp_issued_at": datetime.now(timezone.utc).isoformat(),
+        }}
+    )
+
+    # Send email with the temp password (we never log it server-side)
+    email = db_user.get("email")
+    name = db_user.get("name") or "utilizator"
+    front_url = os.environ.get("FRONTEND_URL", "https://propmanage.ro")
+    html = (
+        f"<div style='font-family: Inter, sans-serif; max-width:560px; margin:0 auto; "
+        f"background:#0a0a0b; color:#fafaf9; padding:24px; border-radius:12px;'>"
+        f"<h2 style='font-family: Georgia, serif; color:#d4ff3a;'>Parola ta de backup PropManage</h2>"
+        f"<p>Salut {name},</p>"
+        f"<p>Ai cerut o parolă de backup pentru contul <strong>{email}</strong>.</p>"
+        f"<p>Folosește această parolă pentru a te loga la "
+        f"<a href='{front_url}/login' style='color:#d4ff3a;'>{front_url}/login</a> "
+        f"când Google OAuth nu este disponibil:</p>"
+        f"<div style='background:#fff; color:#0a0a0b; font-family: monospace; font-size:18px; "
+        f"font-weight:bold; padding:12px 16px; border-radius:8px; letter-spacing:1px; text-align:center; margin:16px 0;'>"
+        f"{temp_pw}"
+        f"</div>"
+        f"<p style='color:#a8a29e; font-size:13px;'>⚠ Această parolă <strong>înlocuiește</strong> orice "
+        f"parolă veche de pe contul tău. Recomandăm să o schimbi imediat după login (Profil → Setări → Parolă).</p>"
+        f"<p style='color:#a8a29e; font-size:13px;'>Dacă NU ai cerut tu această parolă, contul tău poate fi "
+        f"compromis. Loghează-te imediat și schimbă-o, sau scrie la "
+        f"<a href='mailto:contact@propmanage.ro' style='color:#d4ff3a;'>contact@propmanage.ro</a>.</p>"
+        f"<hr style='border:none;border-top:1px solid #292524; margin:24px 0;'/>"
+        f"<p style='color:#78716c; font-size:11px; text-align:center;'>"
+        f"PropManage SRL · {front_url}</p>"
+        f"</div>"
+    )
+    try:
+        await send_email(email, "Parola ta de backup PropManage", html)
+    except Exception as e:
+        logger.warning(f"Failed to send backup password email to {email}: {e}")
+        # Don't reveal email-send failure to the user beyond a generic message;
+        # the password IS set in DB regardless, so future logins work.
+        raise HTTPException(502, "Parola a fost generată dar email-ul nu a putut fi trimis. Contactează support.")
+
+    return {"ok": True, "email_to": email, "expires_note": "Parola nu expiră — schimb-o din Setări după login."}
 
 
 @router.post("/auth/tutorial-seen")
