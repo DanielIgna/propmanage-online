@@ -29,6 +29,7 @@ import { TrustStrip } from "./components/TrustStrip";
 import DigitalTwinPage from "./pages/DigitalTwinPage";
 import ReportApprovalPage from "./pages/ReportApprovalPage";
 import { ImpersonationBanner } from "./components/ImpersonationBanner";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./App.css";
 
 // ============= NAV =============
@@ -1444,8 +1445,9 @@ function App() {
       <I18nProvider>
         <AuthProvider>
           <BrowserRouter>
-            <ImpersonationBanner />
-            <Routes>
+            <ErrorBoundary>
+              <ImpersonationBanner />
+              <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/privacy/notices" element={<PrivacyNoticesPage />} />
@@ -1468,6 +1470,7 @@ function App() {
             </Routes>
             <TutorialOverlay />
             <AIConciergeBubble />
+            </ErrorBoundary>
           </BrowserRouter>
         </AuthProvider>
       </I18nProvider>

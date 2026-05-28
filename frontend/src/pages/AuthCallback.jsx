@@ -44,20 +44,55 @@ export const AuthCallback = () => {
         }
         navigate(`/${data.role || "client"}`, { replace: true });
       } catch (e) {
+        const status = e?.response?.status;
         const detail = e?.response?.data?.detail || e.message || "Autentificare eșuată";
-        setError(detail);
-        // Log for debug
-        console.error("[GoogleOAuth] Failed:", e?.response?.status, detail, e);
-        setTimeout(() => navigate("/login"), 3500);
+        setError(`[${status || "network"}] ${detail}`);
+        console.error("[GoogleOAuth] Failed:", status, detail, e);
+        // No auto-redirect — let user see the actual error and choose what to do.
       }
     })();
   }, [navigate, refreshUser]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0b] text-stone-100">
-      <div className="text-center">
-        <div className="inline-block w-12 h-12 border-2 border-[#d4ff3a] border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="text-sm text-stone-400">{error || "Se finalizează autentificarea..."}</p>
+    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0b] text-stone-100 px-6">
+      <div className="max-w-md w-full text-center space-y-4">
+        {!error ? (
+          <>
+            <div className="inline-block w-12 h-12 border-2 border-[#d4ff3a] border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-sm text-stone-400">Se finalizează autentificarea...</p>
+          </>
+        ) : (
+          <>
+            <div className="text-5xl">🔐</div>
+            <h1 className="text-2xl font-serif">Autentificare Google eșuată</h1>
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-left text-xs text-red-300 font-mono break-words" data-testid="oauth-error-detail">
+              {error}
+            </div>
+            <div className="text-xs text-stone-400 space-y-2 text-left bg-white/[0.03] rounded-lg p-3">
+              <p className="font-semibold text-stone-300">Ce poți încerca:</p>
+              <ol className="list-decimal pl-5 space-y-1">
+                <li>Activează cookies third-party pentru <code>emergent.host</code> în setările browser-ului</li>
+                <li>Șterge cookies pentru <strong>propmanage.ro</strong> + <strong>emergent.host</strong> și încearcă din nou</li>
+                <li>Folosește email + parolă în loc de Google (mai sigur cross-site)</li>
+              </ol>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => navigate("/login")}
+                className="flex-1 px-4 py-2 rounded-lg bg-[#d4ff3a] text-stone-950 text-sm font-semibold"
+                data-testid="oauth-error-back"
+              >
+                Înapoi la login
+              </button>
+              <button
+                onClick={() => window.location.href = "mailto:contact@propmanage.ro?subject=Problema Google OAuth pe propmanage.ro&body=" + encodeURIComponent("Eroare: " + error)}
+                className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-stone-300 text-xs"
+              >
+                Raportează
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

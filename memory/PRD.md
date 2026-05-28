@@ -554,6 +554,12 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - CORS_ORIGINS lockdown (currently "*" with credentials)
 - Pytest fixture leakage cleanup (BLOCKED: tests pass individually, fail as full suite)
 
+## Changelog — 2026-03-06 — Black screen fix + OAuth diagnostic page + ErrorBoundary
+- **FIX pagină neagră pe laptop**: AdminConsole afișa loading invisibil (text gri-slate-500 pe body #0a0a0b). Acum: spinner verde lime + text vizibil „Se încarcă consola admin...". User-ul neautentificat e redirectat la /login imediat ce `user` devine `false`.
+- **NEW: ErrorBoundary global** (`/app/frontend/src/components/ErrorBoundary.jsx`) — wrap-uiește tot app-ul în BrowserRouter. Orice eroare neașteptată în React afișează acum un ecran cu mesaj clar + buton „Reîncarcă" / „Înapoi acasă" în loc de blank screen. data-testid: errorboundary-reload, errorboundary-home.
+- **NEW: OAuth error diagnostic page**: AuthCallback.jsx îmbunătățit — la eroare arată detaliul exact (status + detail), pași de remediere (activează cookies third-party, șterge cookies, folosește email+parolă), și buton „Raportează" care deschide email pre-completat la `contact@propmanage.ro`. Fără auto-redirect care ascunde mesajul.
+- Google OAuth pe propmanage.ro: cookie SameSite=None deja deployed, suspectul rămas e whitelist-ul OAuth Emergent. Recomandare către user: email la support@emergent.sh cu Job ID + screenshot eroare diagnostic.
+
 ## Changelog — 2026-03-06 — Beta Testers admin page + Google OAuth resilience
 - **NEW: Beta Testers admin page** (`/admin` → sidebar USERI → „Beta Testers")
   - Backend: `GET /api/admin/beta-testers?days=30&role=client` returnează users înregistrați în ultimele N zile (excluzând conturile demo + admins) cu counters (total, by_role, by_provenance, with_requests, verified) + last_seen + requests_count batched.
