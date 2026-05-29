@@ -201,9 +201,10 @@ async def logout(response: Response):
 @router.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
     # Load tutorial seen flag fresh from DB so it reflects across sessions
-    doc = await db.users.find_one({"_id": ObjectId(user["id"])}, {"tutorial_seen": 1, "ai_admin_tour_seen": 1, "email": 1, "role": 1, "password_hash": 1, "google_auth": 1})
+    doc = await db.users.find_one({"_id": ObjectId(user["id"])}, {"tutorial_seen": 1, "ai_admin_tour_seen": 1, "dashboard_tour_completed": 1, "email": 1, "role": 1, "password_hash": 1, "google_auth": 1})
     user["tutorial_seen"] = bool((doc or {}).get("tutorial_seen", False))
     user["ai_admin_tour_seen"] = bool((doc or {}).get("ai_admin_tour_seen", False))
+    user["dashboard_tour_completed"] = bool((doc or {}).get("dashboard_tour_completed", False))
     # `has_password` lets frontend show "Backup password" button only for Google-only accounts
     user["has_password"] = bool((doc or {}).get("password_hash"))
     user["google_auth"] = bool((doc or {}).get("google_auth"))
@@ -385,7 +386,17 @@ async def reset_tutorial(user: dict = Depends(get_current_user)):
     """Allow user to re-trigger the tutorial."""
     await db.users.update_one(
         {"_id": ObjectId(user["id"])},
-        {"$unset": {"tutorial_seen": "", "tutorial_seen_at": ""}}
+        {"$unset": {"tutorial_seen": "", "tutorial_seen_at": "", "dashboard_tour_completed": "", "dashboard_tour_completed_at": ""}}
+    )
+    return {"ok": True}
+
+
+@router.post("/auth/dashboard-tour-done")
+async def mark_dashboard_tour_done(user: dict = Depends(get_current_user)):
+    """Mark the role-specific Driver.js dashboard tour as completed/dismissed."""
+    await db.users.update_one(
+        {"_id": ObjectId(user["id"])},
+        {"$set": {"dashboard_tour_completed": True, "dashboard_tour_completed_at": datetime.now(timezone.utc).isoformat()}}
     )
     return {"ok": True}
 

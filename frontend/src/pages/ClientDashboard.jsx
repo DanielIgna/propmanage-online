@@ -202,7 +202,7 @@ const QUICK_SERVICES = [
 const QuickServicesGrid = ({ twinUnlocked, twinStatus, onPick, onDesignPick, onRequestTwin }) => {
   const [lockMsgFor, setLockMsgFor] = useState(null);
   return (
-    <div className="glass-strong rounded-3xl p-5 sm:p-6 mb-6 relative" data-testid="quick-services-grid">
+    <div className="glass-strong rounded-3xl p-5 sm:p-6 mb-6 relative" data-testid="quick-services-grid" data-tour="client-marketplace">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div>
           <div className="text-[10px] uppercase tracking-[0.2em] text-stone-500 mb-1">Servicii rapide</div>
@@ -361,6 +361,7 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setP
             onClick={() => setShowNewReq(true)}
             className="btn-accent px-6 py-3 rounded-full text-sm font-medium flex items-center gap-2"
             data-testid="new-request-cta"
+            data-tour="client-new-request"
           >
             <Plus className="w-4 h-4" />Solicită serviciu
           </button>
@@ -377,7 +378,7 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setP
       />
 
       {/* Digital Twin Card */}
-      <div className="glass-strong rounded-3xl p-6 sm:p-8">
+      <div className="glass-strong rounded-3xl p-6 sm:p-8" data-tour="client-property-card">
         <div className="flex justify-between items-start mb-6 flex-wrap gap-3">
           <div>
             <div className="text-xs uppercase tracking-wider text-stone-400 mb-1">Digital Twin</div>
@@ -535,7 +536,7 @@ const CyclePreview = ({ activeStep }) => {
     { n: 4, t: "Escrow & Tokens", d: "Plată sigură + recompense", icon: Sparkles },
   ];
   return (
-    <div className="glass rounded-2xl p-4 mb-2" data-testid="cycle-preview">
+    <div className="glass rounded-2xl p-4 mb-2" data-testid="cycle-preview" data-tour="client-escrow-info">
       <div className="text-[10px] uppercase tracking-[0.2em] text-stone-500 mb-3">Ciclul tău complet</div>
       <div className="grid grid-cols-4 gap-2 sm:gap-4">
         {steps.map((s) => {

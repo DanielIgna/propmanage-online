@@ -302,6 +302,17 @@ async def _run_browser_test(test_body: str, target_url: str) -> dict:
                     return json.loads(line[len("__PM_RESULT__"):])
                 except Exception:
                     pass
+        # Detect missing chromium binary → mark as skip (env limitation, not a real fail)
+        haystack = err + out
+        if (
+            "Executable doesn't exist" in haystack
+            or "playwright install" in haystack.lower()
+            or "BrowserType.launch" in haystack and "Executable" in haystack
+        ):
+            return {
+                "status": "skip",
+                "note": "Chromium binary not installed in this environment. Run `playwright install chromium` on the host to enable.",
+            }
         return {"status": "fail", "note": f"No marker. stdout[-400]:{out[-400:]} stderr[-400]:{err[-400:]}"}
     finally:
         try:
@@ -590,6 +601,347 @@ async def term_audit_overall_score() -> dict:
 
 
 # ============================================================================
+# E2E Full-flow helpers (ESCROW / DISPUTE / FILE / CHAT / QUOTE / GDPR)
+# ============================================================================
+
+async def _register_and_login(role: str, prefix: str, *, extra: Optional[dict] = None) -> tuple[httpx.AsyncClient, str, str]:
+    """Register a fresh user + login. Returns (client_with_cookies, email, user_id_via_me)."""
+    email = f"{prefix}_{int(time.time())}_{uuid.uuid4().hex[:6]}@test.com"
+    payload = {
+        "email": email, "password": "Test1234!", "name": f"E2E {role}",
+        "role": role, "phone": "0712000000",
+    }
+    if role == "specialist":
+        payload.update({"service_categories": ["electric"], "coverage_zones": ["Bucuresti"]})
+    elif role == "client":
+        payload["zone"] = "Bucuresti"
+    if extra:
+        payload.update(extra)
+    c = httpx.AsyncClient(base_url=BACKEND_URL, timeout=20.0, follow_redirects=False)
+    r = await c.post("/api/auth/register", json=payload)
+    if r.status_code != 200:
+        await c.aclose()
+        raise RuntimeError(f"register {role} failed {r.status_code}: {r.text[:200]}")
+    # Get id via /me
+    me = await c.get("/api/auth/me")
+    uid = (me.json() or {}).get("id") or ""
+    return c, email, uid
+
+
+async def _admin_client() -> httpx.AsyncClient:
+    """Login as the seeded admin account and return the authenticated httpx client."""
+    c = httpx.AsyncClient(base_url=BACKEND_URL, timeout=20.0, follow_redirects=False)
+    r = await c.post("/api/auth/login", json={"email": "admin@propmanage.io", "password": "Admin123!"})
+    if r.status_code != 200:
+        await c.aclose()
+        raise RuntimeError(f"admin login failed {r.status_code}")
+    return c
+
+
+async def _seed_active_job(escrow_amount: float = 1000.0) -> dict:
+    """Create a client + specialist + property + request fully assigned with escrow held.
+
+    Returns dict with: client_email, specialist_email, request_id, property_id, client_id, specialist_id.
+    All clients are closed by caller via the returned cookies' close (we keep cookies until tests are done).
+    """
+    client_c, c_email, c_id = await _register_and_login("client", "e2e_c")
+    spec_c, s_email, s_id = await _register_and_login("specialist", "e2e_s")
+    # Top-up specialist wallet so they can pay the 45 RON lead fee
+    await db.users.update_one({"email": s_email}, {"$inc": {"wallet_balance": 200.0}})
+
+    # Client creates a property
+    pr = await client_c.post("/api/properties", json={
+        "name": "E2E Apt", "address": "Str Test 1", "type": "apartment", "surface": 60.0, "rooms": 2,
+    })
+    if pr.status_code != 200:
+        await client_c.aclose()
+        await spec_c.aclose()
+        raise RuntimeError(f"property create failed {pr.status_code}: {pr.text[:200]}")
+    pid = (pr.json() or {}).get("id") or ""
+
+    # Client creates a request
+    rq = await client_c.post("/api/requests", json={
+        "property_id": pid, "title": "Înlocuire priză E2E", "category": "electric",
+        "priority": "normal", "budget_estimate": int(escrow_amount), "description": "Test",
+    })
+    if rq.status_code != 200:
+        await client_c.aclose()
+        await spec_c.aclose()
+        raise RuntimeError(f"request create failed {rq.status_code}: {rq.text[:300]}")
+    req_id = (rq.json() or {}).get("id") or ""
+
+    # Specialist accepts (pays 45 RON lead fee)
+    ac = await spec_c.post(f"/api/requests/{req_id}/accept", json={})
+    if ac.status_code != 200:
+        await client_c.aclose()
+        await spec_c.aclose()
+        raise RuntimeError(f"specialist accept failed {ac.status_code}: {ac.text[:200]}")
+
+    # Client places escrow
+    esc = await client_c.post(f"/api/requests/{req_id}/escrow?amount={escrow_amount}")
+    if esc.status_code != 200:
+        await client_c.aclose()
+        await spec_c.aclose()
+        raise RuntimeError(f"escrow place failed {esc.status_code}: {esc.text[:200]}")
+
+    return {
+        "client_c": client_c, "spec_c": spec_c,
+        "client_email": c_email, "specialist_email": s_email,
+        "client_id": c_id, "specialist_id": s_id,
+        "request_id": req_id, "property_id": pid,
+        "escrow_amount": escrow_amount,
+    }
+
+
+async def _cleanup_e2e(env: dict):
+    """Best-effort cleanup of E2E artefacts."""
+    try:
+        await env["client_c"].aclose()
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        await env["spec_c"].aclose()
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        await db.requests.delete_one({"_id": ObjectId(env["request_id"])}) if env.get("request_id") else None
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        await db.properties.delete_one({"_id": ObjectId(env["property_id"])}) if env.get("property_id") else None
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        await db.users.delete_one({"email": env["client_email"]})
+        await db.users.delete_one({"email": env["specialist_email"]})
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        await db.disputes.delete_many({"request_id": env.get("request_id")})
+        await db.transactions.delete_many({"request_id": env.get("request_id")})
+        await db.onboarding_emails.delete_many({"email": env["specialist_email"]})
+    except Exception:  # noqa: BLE001
+        pass
+
+
+# Need ObjectId for cleanup
+from bson import ObjectId  # noqa: E402
+
+
+async def e2e_escrow_funded_status_held() -> dict:
+    """ESCROW-01: Client postează cerere → specialist acceptă → client alimentează escrow → status='held'."""
+    env = await _seed_active_job(800.0)
+    try:
+        req = await db.requests.find_one({"_id": ObjectId(env["request_id"])})
+        amt = req.get("escrow_amount")
+        st = req.get("escrow_status")
+        if st == "held" and amt == 800.0:
+            return _ok(f"OK — escrow_status=held, amount=800.0 RON (req={env['request_id'][:8]})")
+        return _ko(f"escrow not held: status={st}, amount={amt}")
+    finally:
+        await _cleanup_e2e(env)
+
+
+async def e2e_escrow_full_confirm_releases_split() -> dict:
+    """ESCROW-02: După confirmare, specialistul primește 95%, platforma 5%."""
+    env = await _seed_active_job(1000.0)
+    try:
+        # Specialist starts + completes
+        await env["spec_c"].post(f"/api/requests/{env['request_id']}/start")
+        await env["spec_c"].post(f"/api/requests/{env['request_id']}/complete")
+        # Snapshot specialist wallet
+        spec_before = await db.users.find_one({"email": env["specialist_email"]})
+        bal_before = float(spec_before.get("wallet_balance") or 0)
+        # Client confirms
+        cf = await env["client_c"].post(f"/api/requests/{env['request_id']}/confirm")
+        if cf.status_code != 200:
+            return _ko(f"confirm failed {cf.status_code}: {cf.text[:200]}")
+        spec_after = await db.users.find_one({"email": env["specialist_email"]})
+        bal_after = float(spec_after.get("wallet_balance") or 0)
+        delta = round(bal_after - bal_before, 2)
+        if abs(delta - 950.0) < 1.0:
+            return _ok(f"OK — specialist primit {delta} RON (95% din 1000 = 950)")
+        return _ko(f"Specialist a primit {delta} RON, așteptam 950 (95% split)")
+    finally:
+        await _cleanup_e2e(env)
+
+
+async def e2e_dispute_opens_freezes_escrow() -> dict:
+    """DISPUTE-01: Client deschide dispută pe job activ → escrow_status='frozen'."""
+    env = await _seed_active_job(500.0)
+    try:
+        # Specialist starts work (otherwise dispute not allowed)
+        await env["spec_c"].post(f"/api/requests/{env['request_id']}/start")
+        # Client opens dispute
+        dp = await env["client_c"].post(f"/api/requests/{env['request_id']}/dispute", json={
+            "reason": "E2E test — lucrarea nu a început în termen",
+        })
+        if dp.status_code != 200:
+            return _ko(f"open dispute failed {dp.status_code}: {dp.text[:200]}")
+        req = await db.requests.find_one({"_id": ObjectId(env["request_id"])})
+        if req.get("escrow_status") == "frozen" and req.get("disputed") is True:
+            return _ok(f"OK — escrow frozen, disputed=True (dispute_id={dp.json().get('id','?')[:12]})")
+        return _ko(f"escrow not frozen: status={req.get('escrow_status')}, disputed={req.get('disputed')}")
+    finally:
+        await _cleanup_e2e(env)
+
+
+async def e2e_dispute_resolves_refund_client() -> dict:
+    """DISPUTE-02: Admin rezolvă cu refund_client → wallet client crește cu suma escrow."""
+    env = await _seed_active_job(600.0)
+    admin_c = None
+    try:
+        await env["spec_c"].post(f"/api/requests/{env['request_id']}/start")
+        dp = await env["client_c"].post(f"/api/requests/{env['request_id']}/dispute", json={"reason": "E2E test dispută refund client"})
+        dispute_id = (dp.json() or {}).get("id")
+        if not dispute_id:
+            return _ko(f"no dispute id: {dp.text[:200]}")
+        # Admin resolves
+        admin_c = await _admin_client()
+        client_before = await db.users.find_one({"email": env["client_email"]})
+        bal_b = float(client_before.get("wallet_balance") or 0)
+        rs = await admin_c.post(f"/api/admin/disputes/{dispute_id}/resolve", json={
+            "resolution": "refund_client", "notes": "E2E test refund",
+        })
+        if rs.status_code != 200:
+            return _ko(f"resolve failed {rs.status_code}: {rs.text[:200]}")
+        client_after = await db.users.find_one({"email": env["client_email"]})
+        delta = round(float(client_after.get("wallet_balance") or 0) - bal_b, 2)
+        if abs(delta - 600.0) < 1.0:
+            return _ok(f"OK — client rambursat {delta} RON din escrow")
+        return _ko(f"Client a primit {delta} RON, așteptam 600")
+    finally:
+        if admin_c:
+            await admin_c.aclose()
+        await _cleanup_e2e(env)
+
+
+async def e2e_quote_specialist_accept_charges_lead_fee() -> dict:
+    """QUOTE-01: Specialistul acceptă lead-ul → 45 RON lead_fee dedus din wallet, status='assigned'."""
+    client_c, c_email, _ = await _register_and_login("client", "qf_c")
+    spec_c, s_email, _ = await _register_and_login("specialist", "qf_s")
+    pid = req_id = ""
+    try:
+        await db.users.update_one({"email": s_email}, {"$inc": {"wallet_balance": 200.0}})
+        pr = await client_c.post("/api/properties", json={
+            "name": "Q Apt", "address": "Str Q 1", "type": "apartment", "surface": 50.0, "rooms": 2,
+        })
+        pid = (pr.json() or {}).get("id") or ""
+        rq = await client_c.post("/api/requests", json={
+            "property_id": pid, "title": "Lead test", "category": "electric",
+            "priority": "normal", "budget_estimate": 500, "description": "Q",
+        })
+        req_id = (rq.json() or {}).get("id") or ""
+        before = await db.users.find_one({"email": s_email})
+        bal_b = float(before.get("wallet_balance") or 0)
+        ac = await spec_c.post(f"/api/requests/{req_id}/accept", json={})
+        if ac.status_code != 200:
+            return _ko(f"accept failed {ac.status_code}: {ac.text[:200]}")
+        after = await db.users.find_one({"email": s_email})
+        delta = round(bal_b - float(after.get("wallet_balance") or 0), 2)
+        req = await db.requests.find_one({"_id": ObjectId(req_id)})
+        if abs(delta - 45.0) < 0.01 and req.get("status") == "assigned":
+            return _ok(f"OK — lead fee 45 RON dedus, status='assigned' (specialist={s_email[:18]}...)")
+        return _ko(f"delta={delta} RON (await 45), status={req.get('status')} (await assigned)")
+    finally:
+        await client_c.aclose()
+        await spec_c.aclose()
+        try:
+            if req_id:
+                await db.requests.delete_one({"_id": ObjectId(req_id)})
+                await db.transactions.delete_many({"request_id": req_id})
+            if pid:
+                await db.properties.delete_one({"_id": ObjectId(pid)})
+            await db.users.delete_one({"email": c_email})
+            await db.users.delete_one({"email": s_email})
+            await db.onboarding_emails.delete_many({"email": s_email})
+        except Exception:  # noqa: BLE001
+            pass
+
+
+async def e2e_specialist_kyc_upload_pending() -> dict:
+    """FILE-01: Specialist încarcă document KYC → apare în users.documents cu status='pending'."""
+    spec_c, s_email, _ = await _register_and_login("specialist", "kyc_s")
+    try:
+        # Tiny base64 payload simulating a PDF
+        tiny_b64 = "data:application/pdf;base64,JVBERi0xLjQKJfbk/N8KMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PgplbmRvYmoKMiAwIG9iago8PC9UeXBlL1BhZ2VzL0NvdW50IDA+PgplbmRvYmoKdHJhaWxlcjw8L1Jvb3QgMSAwIFI+PgolJUVPRgo="
+        up = await spec_c.post("/api/specialist/documents", json={
+            "type": "id_card", "name": "buletin_e2e.pdf", "url": tiny_b64,
+        })
+        if up.status_code != 200:
+            return _ko(f"upload failed {up.status_code}: {up.text[:200]}")
+        spec = await db.users.find_one({"email": s_email})
+        docs = spec.get("documents") or []
+        match = [d for d in docs if d.get("name") == "buletin_e2e.pdf" and d.get("status") == "pending"]
+        if match:
+            return _ok(f"OK — document KYC încărcat, status=pending, id={match[0]['id'][:8]}")
+        return _ko(f"document not found pending. docs={[(d.get('name'), d.get('status')) for d in docs]}")
+    finally:
+        await spec_c.aclose()
+        try:
+            await db.users.delete_one({"email": s_email})
+            await db.onboarding_emails.delete_many({"email": s_email})
+        except Exception:  # noqa: BLE001
+            pass
+
+
+async def e2e_chat_history_endpoint_returns_messages() -> dict:
+    """CHAT-01: Client poate citi /api/chat/{req_id}/messages pe job-ul propriu (return list, fie și gol)."""
+    env = await _seed_active_job(400.0)
+    try:
+        r = await env["client_c"].get(f"/api/chat/{env['request_id']}/messages")
+        if r.status_code != 200:
+            return _ko(f"chat history failed {r.status_code}: {r.text[:200]}")
+        body = r.json()
+        if isinstance(body, list):
+            return _ok(f"OK — chat history accesibil clientului, {len(body)} mesaje (lista validă)")
+        return _ko(f"unexpected body type: {type(body).__name__}")
+    finally:
+        await _cleanup_e2e(env)
+
+
+async def e2e_gdpr_dsar_export_returns_account_data() -> dict:
+    """GDPR-01: Authenticated user obține export DSAR (Art. 15) cu account + rights_summary."""
+    client_c, c_email, _ = await _register_and_login("client", "gdpr_c")
+    try:
+        r = await client_c.get("/api/gdpr/me/export")
+        if r.status_code != 200:
+            return _ko(f"export failed {r.status_code}: {r.text[:200]}")
+        body = r.json() or {}
+        if (body.get("account") or {}).get("email") == c_email and body.get("rights_summary"):
+            return _ok(f"OK — DSAR export valid: account+rights_summary present pentru {c_email[:24]}")
+        return _ko(f"export missing fields: keys={list(body.keys())}")
+    finally:
+        await client_c.aclose()
+        try:
+            await db.users.delete_one({"email": c_email})
+        except Exception:  # noqa: BLE001
+            pass
+
+
+async def e2e_gdpr_erasure_request_creates_dsar_row() -> dict:
+    """GDPR-02: POST /me/erasure-request creează rând în dsar_requests cu sla_due_at +30d."""
+    client_c, c_email, c_id = await _register_and_login("client", "gdpr_e")
+    try:
+        r = await client_c.post("/api/gdpr/me/erasure-request", json={"confirm": True, "reason": "E2E test"})
+        if r.status_code != 200:
+            return _ko(f"erasure failed {r.status_code}: {r.text[:200]}")
+        row = await db.dsar_requests.find_one({"user_email": c_email, "type": "erasure"})
+        if not row:
+            return _ko("no dsar_requests row created")
+        if row.get("status") != "new" or not row.get("sla_due_at"):
+            return _ko(f"row malformed: status={row.get('status')}, sla={row.get('sla_due_at')}")
+        return _ok(f"OK — erasure DSAR creat, status=new, SLA={row['sla_due_at'][:10]} (30 zile)")
+    finally:
+        await client_c.aclose()
+        try:
+            await db.dsar_requests.delete_many({"user_email": c_email})
+            await db.users.delete_one({"email": c_email})
+        except Exception:  # noqa: BLE001
+            pass
+
+
+# ============================================================================
 # Registry
 # ============================================================================
 
@@ -833,6 +1185,79 @@ AUTOMATED_TESTS: dict[str, dict] = {
         "priority": "P1",
         "runner": term_audit_overall_score,
     },
+    # ---- E2E full-flow (9) ----
+    "ESCROW-01": {
+        "code": "ESCROW-01",
+        "title": "Client alimentează escrow → status='held'",
+        "kind": "http",
+        "category": "E2E",
+        "priority": "P0",
+        "runner": e2e_escrow_funded_status_held,
+    },
+    "ESCROW-02": {
+        "code": "ESCROW-02",
+        "title": "Confirmare → specialist primește 95% (split corect)",
+        "kind": "http",
+        "category": "E2E",
+        "priority": "P0",
+        "runner": e2e_escrow_full_confirm_releases_split,
+    },
+    "DISPUTE-01": {
+        "code": "DISPUTE-01",
+        "title": "Deschidere dispută → escrow_status='frozen'",
+        "kind": "http",
+        "category": "E2E",
+        "priority": "P0",
+        "runner": e2e_dispute_opens_freezes_escrow,
+    },
+    "DISPUTE-02": {
+        "code": "DISPUTE-02",
+        "title": "Admin rezolvă refund_client → wallet client crește cu suma",
+        "kind": "http",
+        "category": "E2E",
+        "priority": "P0",
+        "runner": e2e_dispute_resolves_refund_client,
+    },
+    "QUOTE-01": {
+        "code": "QUOTE-01",
+        "title": "Specialist acceptă lead → 45 RON lead_fee dedus, status='assigned'",
+        "kind": "http",
+        "category": "E2E",
+        "priority": "P0",
+        "runner": e2e_quote_specialist_accept_charges_lead_fee,
+    },
+    "FILE-01": {
+        "code": "FILE-01",
+        "title": "Specialist încarcă KYC PDF → status='pending'",
+        "kind": "http",
+        "category": "E2E",
+        "priority": "P1",
+        "runner": e2e_specialist_kyc_upload_pending,
+    },
+    "CHAT-01": {
+        "code": "CHAT-01",
+        "title": "Client citește istoric chat pe job-ul propriu",
+        "kind": "http",
+        "category": "E2E",
+        "priority": "P1",
+        "runner": e2e_chat_history_endpoint_returns_messages,
+    },
+    "GDPR-01": {
+        "code": "GDPR-01",
+        "title": "DSAR export (Art. 15) returnează account + rights_summary",
+        "kind": "http",
+        "category": "E2E",
+        "priority": "P0",
+        "runner": e2e_gdpr_dsar_export_returns_account_data,
+    },
+    "GDPR-02": {
+        "code": "GDPR-02",
+        "title": "Erasure request (Art. 17) creează dsar_requests cu SLA 30 zile",
+        "kind": "http",
+        "category": "E2E",
+        "priority": "P0",
+        "runner": e2e_gdpr_erasure_request_creates_dsar_row,
+    },
 }
 
 
@@ -934,6 +1359,76 @@ async def execute_tests(test_codes: list[str], run_id: Optional[str] = None) -> 
 # Release Gate — run ALL automated tests, persist, email admins
 # ============================================================================
 
+async def _post_release_gate_webhook(payload: dict) -> Optional[dict]:
+    """Send release gate verdict to Slack and/or Discord webhooks.
+
+    Reads `RELEASE_GATE_SLACK_WEBHOOK_URL`, `RELEASE_GATE_DISCORD_WEBHOOK_URL`, or
+    generic `RELEASE_GATE_WEBHOOK_URL` (auto-detects format from URL). On weekly
+    cron runs, posts ONLY when P0 fail (silent on green) — manual runs always post.
+    Returns dict with status, or None if no webhook configured.
+    """
+    slack_url = os.environ.get("RELEASE_GATE_SLACK_WEBHOOK_URL", "").strip()
+    discord_url = os.environ.get("RELEASE_GATE_DISCORD_WEBHOOK_URL", "").strip()
+    generic_url = os.environ.get("RELEASE_GATE_WEBHOOK_URL", "").strip()
+
+    if generic_url and not slack_url and not discord_url:
+        if "hooks.slack.com" in generic_url:
+            slack_url = generic_url
+        elif "discord.com/api/webhooks" in generic_url or "discordapp.com/api/webhooks" in generic_url:
+            discord_url = generic_url
+        else:
+            slack_url = generic_url  # assume Slack-compatible
+
+    if not slack_url and not discord_url:
+        return None
+
+    summary = payload["summary"]
+    blocked = summary.get("blocked", False)
+    triggered_by = payload.get("triggered_by") or "manual"
+    if triggered_by == "weekly-cron" and not blocked:
+        return {"sent": False, "channels": [], "error": "weekly-cron green — webhook suppressed"}
+
+    verdict_emoji = ":red_circle:" if blocked else ":large_green_circle:"
+    verdict_label = "RELEASE BLOCKED" if blocked else "RELEASE READY"
+    line = (
+        f"{verdict_emoji} *{verdict_label}* — {summary.get('pass')}/{summary.get('total')} pass · "
+        f"{summary.get('fail')} fail · {summary.get('skip', 0)} skip · "
+        f"P0 fail: {summary.get('p0_fail')} · P1 fail: {summary.get('p1_fail')}"
+    )
+    fails = [r for r in payload.get("results", []) if r["status"] == "fail"]
+    fail_lines = "\n".join([f"  • `{r['code']}` [{r['priority']}] {r['note'][:120]}" for r in fails[:8]])
+    if len(fails) > 8:
+        fail_lines += f"\n  • _…{len(fails) - 8} more failures…_"
+    body = line + (("\n*Failed checks:*\n" + fail_lines) if fail_lines else "")
+    body += f"\n_Triggered by:_ `{triggered_by}` · _Duration:_ {payload.get('duration_ms', 0) // 1000}s · _Gate id:_ `{payload.get('gate_id')}`"
+
+    channels: list[str] = []
+    last_error: Optional[str] = None
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        if slack_url:
+            try:
+                r = await client.post(slack_url, json={"text": body, "mrkdwn": True})
+                if r.status_code < 400:
+                    channels.append("slack")
+                else:
+                    last_error = f"slack {r.status_code}: {r.text[:120]}"
+            except Exception as e:  # noqa: BLE001
+                last_error = f"slack {type(e).__name__}: {str(e)[:120]}"
+        if discord_url:
+            try:
+                content = body.replace("*", "**")
+                r = await client.post(discord_url, json={"content": content[:1900]})
+                if r.status_code < 400:
+                    channels.append("discord")
+                else:
+                    last_error = f"discord {r.status_code}: {r.text[:120]}"
+            except Exception as e:  # noqa: BLE001
+                last_error = f"discord {type(e).__name__}: {str(e)[:120]}"
+
+    return {"sent": len(channels) > 0, "channels": channels, "error": last_error if not channels else None}
+
+
+
 def _gate_email_html(payload: dict) -> dict:
     """Build a branded HTML email with the gate verdict + per-test rows."""
     from email_service import _layout, APP_URL  # local import to avoid cycle
@@ -1030,6 +1525,7 @@ async def run_release_gate(triggered_by: str = "manual", email_admins: bool = Tr
         "summary": summary,
         "results": exec_res["results"],
         "email": {"sent": False, "recipients": [], "error": None},
+        "webhook": {"sent": False, "channels": [], "error": None},
     }
 
     # Persist gate (keep last 100 only)
@@ -1041,6 +1537,15 @@ async def run_release_gate(triggered_by: str = "manual", email_admins: bool = Tr
             await db.release_gates.delete_many({"_id": {"$in": old_ids}})
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[ReleaseGate] persist failed: {e}")
+
+    # Post webhook (Slack/Discord/generic) — only if configured
+    try:
+        wh_res = await _post_release_gate_webhook(payload)
+        if wh_res:
+            payload["webhook"] = wh_res
+    except Exception as e:  # noqa: BLE001
+        payload["webhook"]["error"] = f"{type(e).__name__}: {str(e)[:200]}"
+        logger.warning(f"[ReleaseGate] webhook send failed: {e}")
 
     # Send email
     if email_admins:

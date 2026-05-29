@@ -1,0 +1,58 @@
+{
+  "summary": "Phase 41 — Release Gate (38/38), 9 new E2E test runners, dashboard tour endpoints, and Driver.js Role Tour fully tested. Backend: 5/5 pytest pass. Frontend: Driver.js tour confirmed visually for fresh client user — popover title 'Tur ghidat · Client', Romanian buttons 'Mai departe →' / '← Înapoi', dismiss persists flag, no reappear on reload. One real bug found: ReplayTourButton component is exported but NEVER imported/mounted anywhere in the app.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/admin/qa/automation/release-gate",
+        "issue": "Response does not include a top-level 'verdict' string ('READY'/'BLOCKED') as suggested by the review request. The implementation exposes only summary.blocked (bool). Functionality is correct (summary.pass=38, summary.fail=0, summary.blocked=False) but the public contract differs from what the review claims. Consider adding `verdict: 'READY'|'BLOCKED'` to the response for consumer clarity (email body & webhook already use the READY/BLOCKED labels internally)."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "ReplayTourButton (/app/frontend/src/pages/RoleTour.jsx:249)",
+        "issue": "Component is exported but NEVER imported nor mounted anywhere in the codebase (grep across /app/frontend/src returns only the definition). Acceptance criteria 'ReplayTourButton (data-testid=replay-tour-btn) resetează flag-urile și retrigger-uiește tour' is NOT met from the user POV — the button is not reachable in the UI.",
+        "selector": "[data-testid='replay-tour-btn']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "ClientDashboard empty state DOM anchors",
+        "issue": "In the new-client empty state, only 2 of the 5 declared client tour steps have matching anchors mounted: client-escrow-info (CyclePreview) + notifications-bell. As a result the tour shows '2/3' steps (intro + 2 anchors) instead of '5/6'. The Driver `tryLaunch` filter intentionally skips missing anchors, but UX-wise a new client gets a much shorter tour than the spec intends. Consider mounting `client-new-request` and `client-marketplace` placeholders even in empty state, or move them to a CTA card always visible.",
+        "selector": "[data-tour='client-property-card'], [data-tour='client-new-request'], [data-tour='client-marketplace']",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase41_tour_release_gate.py",
+    "/app/test_reports/pytest/phase41_results.xml"
+  ],
+  "action_items": [
+    "Mount <ReplayTourButton /> in at least one user-visible location (e.g. ClientDashboard 'Setări' section, profile dropdown, or footer) so the data-testid='replay-tour-btn' button is actually reachable — the feature is implemented but not wired into any page.",
+    "Optional: Add 'verdict' (READY/BLOCKED) string to /api/admin/qa/automation/release-gate response body to match the documented contract; current consumers must derive it from `summary.blocked`.",
+    "Optional UX: Ensure client-new-request and client-marketplace data-tour anchors are present in the empty/new-account dashboard state — currently the tour collapses from 5 steps to 2 visible anchors for a fresh user."
+  ],
+  "critical_code_review_comments": [
+    "RoleTour.jsx (273 lines) — well-bounded; polling loop is correctly bounded (20×500ms) and cleanup uses cancelled flag in cleanup return. No issues.",
+    "ReplayTourButton calls /auth/tutorial-reset then window.location.reload() — works, but reload() is heavy; could just clear local state and trigger startedRef.current=false + force re-render.",
+    "release-gate handler requires a body (ReleaseGateIn) even though the only field has a default — consider making the body optional (Body(None)) so callers can POST without a body and still get email_admins=True default. Currently a bare POST returns 422.",
+    "qa_automation.py is over 1500 lines — split E2E runners (ESCROW/DISPUTE/FILE/CHAT/QUOTE/GDPR) into a dedicated module for maintainability."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase41_tour_release_gate.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (5/5 pytest pass — release-gate 38/38 blocked=False, 9 new E2E codes all 'pass', /auth/me has dashboard_tour_completed, POST /auth/dashboard-tour-done sets flag + auth-required)",
+    "frontend": "85% (Driver.js tour appears, RO i18n correct, dismiss persists, no reappear; ReplayTourButton fails — not mounted)"
+  },
+  "test_credentials": "admin@propmanage.io / Admin123!  ;  client@propmanage.io / Client123!  ;  per-test new client created via /api/auth/register (timestamped emails). Sourced from /app/memory/test_credentials.md.",
+  "seed_data_creation": "Created one fresh test client per Playwright run (tour_tester_<ts>@propmanage.io / Tester123!). No cleanup attempted — these accounts persist but are harmless.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend all green. To re-test frontend after main agent mounts <ReplayTourButton/>: (1) login as any user with dashboard_tour_completed=true (or POST /api/auth/tutorial-seen on a brand-new account first), (2) navigate to the page where the button is mounted, (3) verify data-testid='replay-tour-btn' is visible & click → tour should re-appear within ~5s. Driver.js popovers use class .driver-popover (NOT .propmanage-driver-popover even though that class is configured via popoverClass — it's added in addition).",
+  "rca of the issue": "ReplayTourButton root cause: the component is defined and exported in /app/frontend/src/pages/RoleTour.jsx:249 but `grep -rn ReplayTourButton /app/frontend/src` returns ONLY the definition line — no import statement anywhere. Therefore no JSX ever renders it. Mitigation: import { ReplayTourButton } from './RoleTour' in a layout/header/settings page and render <ReplayTourButton />."
+}

@@ -63,9 +63,9 @@ export const OperatorDashboard = () => {
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <Stat icon={Building} label="Twins activi" value={approvedTwins.length} sub="Aprobate" color="emerald" tid="op-approved" />
-            <Stat icon={Clock} label="În validare" value={pendingTwins.length} sub="Acțiune" color="amber" tid="op-pending-twins" />
+            <Stat icon={Clock} label="În validare" value={pendingTwins.length} sub="Acțiune" color="amber" tid="op-pending-twins" data-tour="operator-twin-queue" />
             <Stat icon={AlertTriangle} label="Revizie cerută" value={revisionTwins.length} sub="Așteptare client" color="red" tid="op-revision" />
-            <Stat icon={FileCheck} label="Logs mentenanță" value={queue.length} sub="În coadă" tid="op-logs" />
+            <Stat icon={FileCheck} label="Logs mentenanță" value={queue.length} sub="În coadă" tid="op-logs" data-tour="operator-kyc-queue" />
           </div>
 
           {/* Digital Twin Pro shortcut card (dublat — accesibil și aici și în tab-ul propriu) */}

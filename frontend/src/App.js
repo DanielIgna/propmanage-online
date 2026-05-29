@@ -23,6 +23,7 @@ import { HelpPage } from "./pages/HelpPage";
 import { ProjectWorkspace } from "./pages/ProjectWorkspace";
 import { PaymentSuccess } from "./pages/PaymentSuccess";
 import { TutorialOverlay } from "./pages/TutorialOverlay";
+import { RoleTour } from "./pages/RoleTour";
 import { AIConciergeBubble } from "./components/AIConciergeBubble";
 import { BookDemoModal } from "./pages/BookDemoModal";
 import { PrivacyPage, TermsPage, CookiePolicyPage } from "./pages/LegalPages";
@@ -1479,6 +1480,7 @@ function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
             <TutorialOverlay />
+            <RoleTour />
             <AIConciergeBubble />
             </ErrorBoundary>
           </BrowserRouter>

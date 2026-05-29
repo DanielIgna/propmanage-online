@@ -101,7 +101,7 @@ export const NotificationsBell = () => {
   };
 
   return (
-    <div className="relative">
+    <div className="relative" data-tour="notifications-bell">
       <button onClick={() => setOpen(!open)} className="relative p-2 hover:bg-white/5 rounded-lg" data-testid="notif-bell">
         <Bell className="w-4 h-4 text-stone-400" />
         {unread > 0 && (
@@ -224,8 +224,8 @@ export const DashLayout = ({ children, role, title, bottomNav }) => {
 };
 
 // ============= STAT CARD =============
-export const Stat = ({ icon: Icon, label, value, sub, color = "lime", tid }) => (
-  <div className="glass-strong rounded-2xl p-6" data-testid={tid}>
+export const Stat = ({ icon: Icon, label, value, sub, color = "lime", tid, ...rest }) => (
+  <div className="glass-strong rounded-2xl p-6" data-testid={tid} {...rest}>
     <div className="flex items-center justify-between mb-4">
       <div className={`w-10 h-10 rounded-xl bg-${color}-500/15 border border-${color}-500/30 flex items-center justify-center`}>
         <Icon className={`w-4 h-4 text-${color}-400`} />

@@ -348,6 +348,13 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
                     }`}
                     style={isActive ? { backgroundColor: dark ? "rgba(59,130,246,0.1)" : "#eff6ff", color: dark ? "#60a5fa" : "#2563eb" } : {}}
                     data-testid={`admin-nav-${it.id}`}
+                    data-tour={
+                      it.id === "ai" ? "admin-ai-health"
+                      : it.id === "qa_playbook" ? "admin-qa-playbook"
+                      : it.id === "overview" ? "admin-analytics"
+                      : it.id === "cms" ? "admin-content-tools"
+                      : undefined
+                    }
                   >
                     <ActiveIcon className="w-4 h-4 shrink-0" />
                     <span className="truncate">{it.label}</span>

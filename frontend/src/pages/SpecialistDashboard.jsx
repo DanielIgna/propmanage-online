@@ -87,13 +87,13 @@ export const SpecialistDashboard = () => {
       {tab === "opportunities" && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <Stat icon={Wallet} label="Sold lead-uri" value={`${user?.wallet_balance?.toFixed(0) || 0}`} sub="RON" color="emerald" tid="spec-stat-wallet" />
-            <Stat icon={Star} label="Rating" value={user?.rating || "—"} sub={`${user?.reviews_count || 0} reviews`} color="amber" tid="spec-stat-rating" />
+            <Stat icon={Wallet} label="Sold lead-uri" value={`${user?.wallet_balance?.toFixed(0) || 0}`} sub="RON" color="emerald" tid="spec-stat-wallet" data-tour="specialist-wallet" />
+            <Stat icon={Star} label="Rating" value={user?.rating || "—"} sub={`${user?.reviews_count || 0} reviews`} color="amber" tid="spec-stat-rating" data-tour="specialist-trust-score" />
             <Stat icon={Briefcase} label="Active" value={mine.filter(r => r.status !== "confirmed").length} sub="In progress" color="cyan" tid="spec-stat-active" />
             <Stat icon={Award} label="Tier" value={user?.tier || "ENTRY"} sub={user?.verified ? "Verified" : "Pending"} tid="spec-stat-tier" />
           </div>
           <FilterBar searchQ={searchQ} setSearchQ={setSearchQ} />
-          <div className="space-y-3 mt-4 max-w-3xl mx-auto">
+          <div className="space-y-3 mt-4 max-w-3xl mx-auto" data-tour="specialist-leads">
             <div className="text-xs uppercase tracking-wider text-stone-500 px-1">{filtered(open).length} oportunități</div>
             {filtered(open).length === 0 && (
               <div className="text-center py-16">
@@ -136,7 +136,7 @@ export const SpecialistDashboard = () => {
               <button onClick={() => setShowPortfolio(true)} className="px-4 py-2 bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 rounded-full text-xs flex items-center gap-2" data-testid="manage-portfolio-btn">
                 <ImageIcon className="w-3.5 h-3.5" />Portofoliu
               </button>
-              <button onClick={() => setShowDocs(true)} className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full text-xs flex items-center gap-2" data-testid="manage-docs-btn">
+              <button onClick={() => setShowDocs(true)} className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full text-xs flex items-center gap-2" data-testid="manage-docs-btn" data-tour="specialist-kyc">
                 <FileCheck className="w-3.5 h-3.5" />Documentele mele
               </button>
             </div>
