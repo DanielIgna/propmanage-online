@@ -93,11 +93,14 @@ def _pdf_styles():
 
 
 def _md_to_html(text: str) -> str:
-    """Tiny markdown-ish to HTML for reportlab Paragraph (bold + italic + br)."""
+    """Tiny markdown-ish to HTML for reportlab Paragraph (bold + italic + br).
+    Italic uses _text_ but only at word boundaries (so identifiers like
+    `twin_pins` are NOT mangled)."""
     import re
     text = (text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     text = re.sub(r"\*\*([^*]+)\*\*", r"<b>\1</b>", text)
-    text = re.sub(r"_([^_]+)_", r"<i>\1</i>", text)
+    # Italic: underscore must be at start/end-of-string OR adjacent to whitespace/punctuation
+    text = re.sub(r"(^|[\s(>])_([^_\n]+)_(?=[\s).,;:!?<]|$)", r"\1<i>\2</i>", text)
     text = text.replace("\n", "<br/>")
     return text
 

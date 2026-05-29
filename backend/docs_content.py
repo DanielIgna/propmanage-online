@@ -318,6 +318,207 @@ QA_DOC = {
 
 
 # ============================================================================
+# 6) ARCHITECTURE — Technical reference (Frontend + Backend + Infrastructure)
+# ============================================================================
+ARCHITECTURE_DOC = {
+    "slug": "architecture",
+    "role": "admin",
+    "title": "Arhitectură Platformă — Referință Tehnică",
+    "subtitle": "Documentație Frontend + Backend + Infrastructure + Securitate. Pentru developeri, admini tehnici și auditori.",
+    "version": "1.0",
+    "updated_at": UPDATED,
+    "email_intro": "Acesta este documentul tehnic oficial al platformei PropManage — arhitectură, stack, convenții, integrări.",
+    "sections": [
+        {
+            "heading": "1. Stack-ul tehnologic",
+            "body": [
+                {"type": "list", "items": [
+                    "**Frontend**: React 19 + React Router 7 + Tailwind CSS + shadcn/ui + Framer Motion + axios",
+                    "**Backend**: FastAPI (Python 3.11) + Motor (MongoDB async driver) + APScheduler + reportlab",
+                    "**Database**: MongoDB 7 (single replica set, segregated escrow collection)",
+                    "**Auth**: JWT (HS256) cu refresh tokens + Google OAuth (Emergent-managed) + cookie SameSite=None;Secure pentru cross-domain",
+                    "**LLM**: Claude Sonnet 4.5 via Emergent Universal Key (emergentintegrations library)",
+                    "**Payments**: Stripe (test key în preview, requires sk_live_... în producție)",
+                    "**Email**: Resend (HTML + atașamente PDF/tar.gz)",
+                    "**Hosting**: Emergent Kubernetes (preview + custom domain `propmanage.ro`)",
+                    "**Push**: VAPID Web Push (browsers desktop + mobile)",
+                ]},
+                {"type": "callout", "variant": "info", "title": "Stack-ul real (verificat)",
+                 "body": "Versiunile exacte sunt în `frontend/package.json` și `backend/requirements.txt`. Nu rescrie aceste fișiere — folosește `yarn add` și `pip freeze`."},
+            ],
+        },
+        {
+            "heading": "2. Structura proiectului (/app)",
+            "body": [
+                {"type": "code", "text": "/app/\n├── backend/\n│   ├── server.py            # FastAPI app + lifecycle + scheduler wiring\n│   ├── db.py                # Motor client (singleton)\n│   ├── deps.py              # require_role, auth dependencies\n│   ├── models.py            # Pydantic + PyObjectId base\n│   ├── auth.py              # JWT + password hashing + OAuth\n│   ├── services.py          # send_email + VAPID + shared helpers\n│   ├── email_service.py     # Resend integration + branded layout\n│   ├── docs_content.py      # Knowledge Base content (this lives here!)\n│   ├── docs_service.py      # PDF render + tokenized share\n│   ├── docs_search.py       # Markdown export + FT search\n│   ├── backup_service.py    # MongoDB daily backup → email\n│   ├── admin_briefing_digest.py  # Morning Briefing aggregator + cron\n│   ├── seo_slugs.py         # SEO landing-page slug maps\n│   ├── routes/              # All API endpoints (~30 routers)\n│   │   ├── auth.py, marketplace.py, public.py\n│   │   ├── escrow.py, disputes.py, twin.py\n│   │   ├── admin_*.py       # 15+ admin consoles\n│   │   ├── docs_routes.py   # /admin/docs/* + /help/{token}\n│   │   ├── admin_smoketest.py, admin_healthcheck.py\n│   │   ├── admin_data_integrity.py, admin_backups.py\n│   │   └── incidents.py     # Public status page\n│   └── requirements.txt\n│\n├── frontend/\n│   ├── src/\n│   │   ├── App.js           # Router + global providers\n│   │   ├── auth.jsx         # useAuth() + AuthProvider\n│   │   ├── hooks/useSEO.js  # Dynamic <head> per route\n│   │   ├── utils/seoSlugs.js\n│   │   ├── components/\n│   │   │   ├── ui/          # shadcn/ui primitives\n│   │   │   ├── DocViewer.jsx  # Shared doc renderer\n│   │   │   └── ... (~60 components)\n│   │   ├── pages/\n│   │   │   ├── Dashboards.jsx, Marketplace.jsx\n│   │   │   ├── MarketplaceLanding.jsx  # /marketplace/:slug SEO\n│   │   │   ├── GhiduriIndex.jsx, GhidPage.jsx  # blog\n│   │   │   ├── HelpPage.jsx  # /help/:token (public docs)\n│   │   │   └── admin/        # 20+ admin panels\n│   │   │       ├── AdminConsole.jsx  # router\n│   │   │       ├── AdminLayoutMetronic.jsx  # sidebar + topbar\n│   │   │       ├── AdminDocs.jsx  # docs management\n│   │   │       ├── MorningBriefing.jsx\n│   │   │       └── ...\n│   │   ├── data/ghiduri.js  # blog articles\n│   │   └── index.css        # Tailwind + custom\n│   └── package.json\n│\n└── memory/\n    ├── PRD.md               # Product spec + changelog\n    └── test_credentials.md  # Test accounts"},
+            ],
+        },
+        {
+            "heading": "3. Backend — convenții API",
+            "body": [
+                {"type": "list", "items": [
+                    "**Toate rutele backend trebuie prefixate cu `/api`** (Kubernetes ingress routează `/api/*` → port 8001).",
+                    "**Auth dependency**: `Depends(require_role(\"admin\"))` sau `require_role(\"client\")`. Multi-role: `require_any_role(\"admin\", \"operator\")`.",
+                    "**Env vars**: doar prin `os.environ.get(\"KEY\")` — fără default values (fail fast la deploy).",
+                    "**MongoDB**: NU returna documente raw. Folosește `BaseDocument.from_mongo(doc)` / `instance.to_mongo()`. ObjectId → `PyObjectId` annotated type.",
+                    "**Datetime**: `datetime.now(timezone.utc)`, NEVER `datetime.utcnow()`.",
+                    "**Erori**: `raise HTTPException(status_code, \"Message in Romanian\")`. Mesajele user-facing sunt în RO.",
+                    "**Logging**: `logging.getLogger(\"propmanage.<module>\")`. Nu folosi `print()`.",
+                    "**Async**: toate handler-ele FastAPI sunt `async def`. I/O folosește `await` (Motor, httpx).",
+                    "**Background jobs**: APScheduler (Bucharest TZ). Toate joburile au try/except wrapping — never raise.",
+                ]},
+                {"type": "h3", "text": "Schedulers active"},
+                {"type": "list", "items": [
+                    "`smoke_test_monitor` — la fiecare 30 min, testează flow E2E multi-rol, alertează la FAIL",
+                    "`morning_briefing_digest` — zilnic 09:00, email digest dacă overall != ok",
+                    "`daily_mongodb_backup` — zilnic 03:30, backup tar.gz → email admini cu PDF attached",
+                ]},
+            ],
+        },
+        {
+            "heading": "4. Frontend — convenții React",
+            "body": [
+                {"type": "list", "items": [
+                    "**Routing**: React Router 7 cu `<Routes>` și `<Route>` în `App.js`. Public routes (marketplace, ghiduri, help) NU au require-auth wrapper.",
+                    "**State global**: `useAuth()` din `auth.jsx`. State local: `useState`. Cross-component: `window.dispatchEvent(new CustomEvent('propmanage:...'))`.",
+                    "**API calls**: `axios.get(`${API}/admin/...`)` cu cookies automate (`withCredentials=true` global). `API = ${REACT_APP_BACKEND_URL}/api`.",
+                    "**SEO**: `useSEO({title, description, canonical, jsonLd, noindex})` din `hooks/useSEO.js`. Setează `<head>` dinamic.",
+                    "**Data test IDs**: TOATE elementele interactive au `data-testid=\"kebab-case-name\"`.",
+                    "**UI primitives**: doar din `components/ui/` (shadcn). NU instala alte component libraries.",
+                    "**Toasts**: `import { toast } from \"sonner\"; toast.success/error(...)`.",
+                    "**Animations**: Framer Motion pentru transitions. Tailwind animate classes pentru CSS. Lottie via CDN lazy load.",
+                    "**Componente**: <50 linii ideal. Export named pentru componente, default pentru pagini.",
+                ]},
+                {"type": "h3", "text": "Pattern: Admin panel nou"},
+                "Adaugi în `AdminLayoutMetronic.jsx` la `MENU_SECTIONS` un item, în `AdminConsole.jsx` mapezi `active === \"newtab\"` la componenta ta, creezi `pages/admin/AdminNew.jsx` care exportă `AdminNew` și folosește `<AdminCard>` wrapper.",
+            ],
+        },
+        {
+            "heading": "5. Database — colecții MongoDB",
+            "body": [
+                {"type": "h3", "text": "Core entities"},
+                {"type": "list", "items": [
+                    "**users** — `{role, email, password_hash, name, phone, verified, tier, rating, reviews_count, coverage_zones, service_categories, deleted, created_at}`. Index unique pe `email`.",
+                    "**properties** — proprietățile clienților (`owner_id, address, city, type, area_sqm`)",
+                    "**requests** — cererile postate (`client_id, category, description, photos, urgency, status`)",
+                    "**proposals** — ofertele specialiștilor pe cereri",
+                    "**jobs** — lucrările active (status: pending|in_progress|completed|disputed|refunded)",
+                    "**escrow** — tranzacțiile cu stare bani (segregated account, Stripe payment intent)",
+                    "**disputes** — `{job_id, opened_by, reason, evidence_urls, resolution, mediator_id}`",
+                    "**reviews** — `{job_id, author_id, target_id, rating, text, editable_until}`",
+                ]},
+                {"type": "h3", "text": "Digital Twin + Operational"},
+                {"type": "list", "items": [
+                    "**twins**, **twin_pins**, **twin_reports** — modulul 3D",
+                    "**smoke_test_runs**, **data_integrity_runs**, **backup_runs** — monitoring",
+                    "**incidents** — public status page",
+                    "**admin_ai_findings** — AI Investigator",
+                    "**docs_share_tokens**, **docs_send_events** — Knowledge Base",
+                    "**audit_log** — GDPR compliance",
+                ]},
+                {"type": "callout", "variant": "warn", "title": "MongoDB rules",
+                 "body": "Nu adăuga câmpuri direct din endpoint fără validare. Folosește Pydantic models. ObjectId NU e JSON-serializable raw — folosește `PyObjectId` + `BaseDocument`."},
+            ],
+        },
+        {
+            "heading": "6. Integrări externe",
+            "body": [
+                {"type": "list", "items": [
+                    "**Resend** (email) — `RESEND_API_KEY`. Tranzacționale + digest-uri admin + docs sending. Limită attachment ~20MB (cap intern 15MB).",
+                    "**Stripe** (plăți) — `STRIPE_API_KEY`. Test în preview, live în prod când `sk_live_*` setat. Plăți prin escrow segregat.",
+                    "**Emergent LLM Key** (Claude Sonnet 4.5) — `EMERGENT_LLM_KEY`. AI Concierge + AI Investigator + Smart Match.",
+                    "**Google OAuth** (Emergent-managed) — `GOOGLE_OAUTH_*`. Redirect → `/auth/google/callback` → JWT.",
+                    "**VAPID Web Push** — `VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY`. Push browser.",
+                ]},
+            ],
+        },
+        {
+            "heading": "7. Securitate",
+            "body": [
+                {"type": "list", "items": [
+                    "**Cookie auth**: `HttpOnly + Secure + SameSite=None`. Refresh rotation la 12h.",
+                    "**Password**: bcrypt cost 12. Reset tokens 60 min, one-time use.",
+                    "**Rate limiting**: login 8/min per IP. Lockout 15 min după 10 fail consecutive.",
+                    "**2FA**: TOTP (Google Authenticator) opțional general, obligatoriu admin.",
+                    "**GDPR**: consent banner, DSAR endpoints, impersonation log, audit complet.",
+                    "**Path traversal**: backup downloads validează prefix + safe chars.",
+                    "**Prompt injection**: AI Concierge guard input + output filtering.",
+                    "**Disallow paths**: `/admin/*`, `/api/admin/*`, callbacks blocate în robots.txt.",
+                ]},
+            ],
+        },
+        {
+            "heading": "8. Environment & Deploy",
+            "body": [
+                {"type": "h3", "text": "Env vars critice"},
+                {"type": "list", "items": [
+                    "**Backend** (`/app/backend/.env`): `MONGO_URL`, `DB_NAME`, `JWT_SECRET`, `RESEND_API_KEY`, `STRIPE_API_KEY`, `EMERGENT_LLM_KEY`, `GOOGLE_OAUTH_*`, `VAPID_*`, `ADMIN_EMAILS`, `APP_PUBLIC_URL`, `SENDER_EMAIL`",
+                    "**Frontend** (`/app/frontend/.env`): `REACT_APP_BACKEND_URL`",
+                ]},
+                {"type": "h3", "text": "Restart servicii"},
+                {"type": "code", "text": "sudo supervisorctl restart backend\nsudo supervisorctl restart frontend\n# Hot reload activ — restart doar pentru .env/dependency installs"},
+                {"type": "h3", "text": "Logs"},
+                {"type": "code", "text": "tail -n 100 /var/log/supervisor/backend.err.log"},
+                {"type": "callout", "variant": "warn", "title": "Producție vs Preview",
+                 "body": "Variabilele env din preview sunt SEPARATE de producție. `RESEND_API_KEY`, `STRIPE_API_KEY`, `JWT_SECRET` se setează în Emergent Deployment Secrets, nu în `.env` din repo."},
+            ],
+        },
+        {
+            "heading": "9. SEO & Marketing",
+            "body": [
+                {"type": "list", "items": [
+                    "**Sitemap dinamic**: `GET /api/public/sitemap.xml` → 229 URL-uri (statice + ghiduri + 198 city landings + verified specialists).",
+                    "**robots.txt**: sitemap link + Disallow paths private.",
+                    "**JSON-LD global**: Organization + WebSite + Service în `index.html`.",
+                    "**JSON-LD per pagină**: Article/Service/Person/AggregateRating/BreadcrumbList via `useSEO`.",
+                    "**Internal linking**: marketplace landings cross-link + către ghiduri. Ghiduri linkează către marketplace.",
+                    "**Romanian-first**: `<html lang=\"ro\">`, `og:locale=ro_RO`, geo.region=RO.",
+                ]},
+            ],
+        },
+        {
+            "heading": "10. Monitorizare & Observability",
+            "body": [
+                {"type": "list", "items": [
+                    "**Morning Briefing** (top admin dashboard) — 6 tile-uri (healthcheck, smoke test, data integrity, incidents, AI findings, backup).",
+                    "**Smoke Test** — E2E flow multi-rol, la 30 min, alert email pe fail.",
+                    "**Healthcheck** — probes: Mongo, LLM, Resend, Stripe, OAuth, VAPID, admin emails.",
+                    "**Data Integrity Scanner** — orphan twins, escrow mismatches, missing payments.",
+                    "**Public Status Page** — `/status` (live healthcheck + incident history 30 zile).",
+                    "**Audit Log** — toate acțiunile admin (GDPR).",
+                ]},
+                {"type": "callout", "variant": "success", "title": "Proactive mode",
+                 "body": "Sistemul alertează pe email DOAR când e ceva în neregulă — briefing zilnic 09:00, instant pe smoke test failure. Inbox curat în zilele bune."},
+            ],
+        },
+        {
+            "heading": "11. Knowledge Base intern (acest sistem)",
+            "body": [
+                {"type": "list", "items": [
+                    "**Content**: Python dict în `backend/docs_content.py` — single source, fără DB migrări.",
+                    "**Schema bloc**: paragraph, list, callout, steps, code, h3, image_placeholder, screencast, lottie.",
+                    "**Render**: PDF (reportlab), Markdown (custom converter), HTML (DocViewer.jsx).",
+                    "**Distribuție**: email cu PDF + link tokenizat 30 zile, auto-onboarding, bulk send pe rol.",
+                    "**Search**: full-text local cu diacritic normalization, `Cmd+K` în admin docs panel.",
+                ]},
+                {"type": "h3", "text": "Cum adaugi un doc nou"},
+                {"type": "code", "text": "# 1. Editezi backend/docs_content.py — adaugi un dict NEW_DOC\nNEW_DOC = {\n    \"slug\": \"my-new-doc\",\n    \"role\": \"admin\",\n    \"title\": \"...\",\n    \"subtitle\": \"...\",\n    \"version\": \"1.0\",\n    \"updated_at\": \"2026-XX-XX\",\n    \"sections\": [{\"heading\": \"...\", \"body\": [...]}],\n    \"faq\": [{\"q\": \"...\", \"a\": \"...\"}],\n}\n\n# 2. Înregistrezi în DOCS_CONTENT\nDOCS_CONTENT[\"my-new-doc\"] = NEW_DOC\n\n# 3. Hot reload — apare automat în Admin → Documentație & Training"},
+            ],
+        },
+    ],
+    "faq": [
+        {"q": "Cum schimb conținutul unui doc existent?", "a": "Editezi direct `backend/docs_content.py` și salvezi. Hot reload preia în 2-3 secunde. Nu necesită restart backend pentru schimbări de dict-uri."},
+        {"q": "Cum adaug imagini/animații?", "a": "**CSS pulse** — `{\"type\": \"image_placeholder\", \"caption\": \"...\", \"src\": \"identifier\"}`. **MP4/GIF** — fișier în `/app/frontend/public/animations/`, referință `{\"type\": \"screencast\", \"src\": \"/animations/my.mp4\"}`. **Lottie** — creezi pe lottiefiles.com, descarci JSON, `{\"type\": \"lottie\", \"src\": \"/animations/my.json\"}`."},
+        {"q": "Cum debugez o eroare 500 din producție?", "a": "1. Reproduce în preview. 2. `tail -n 200 /var/log/supervisor/backend.err.log` în preview. 3. Dacă apare doar în prod (env-related), verifică Emergent Deployment Secrets. 4. Pentru DNS/SSL issues, contactează Emergent Support."},
+        {"q": "Cum adaug un endpoint nou?", "a": "1. Router în `routes/my_module.py` cu `prefix=\"/api/my-prefix\"`. 2. Importi în `server.py`, `app.include_router(...)`. 3. `Depends(require_role(\"admin\"))` pentru protecție. 4. Testezi cu `curl -b /tmp/cookies.txt ${API_URL}/api/my-prefix/...`."},
+        {"q": "Care e diferența între preview și producție?", "a": "**Preview** = dev environment (URL `*.emergentagent.com`). Modificările instant. **Producție** = `https://propmanage.ro`. Cod actualizat doar la redeploy. Env vars în 2 locuri (Emergent Deployment Secrets vs `.env`). DB separat."},
+        {"q": "Cum fac rollback la o versiune anterioară?", "a": "Emergent are funcția **Rollback** în UI care nu costă credite. Folosește-o, nu rula `git reset` manual (păstrează `.git` și `.emergent` intacte)."},
+        {"q": "De ce documentația e în Python, nu în .md?", "a": "Pentru că (1) e single-source pentru PDF/HTML/MD, (2) versionarea în cod, (3) Pydantic-like validare schema, (4) hot reload instant, (5) search structural (heading vs body vs FAQ)."},
+    ],
+}
+
+
+# ============================================================================
 # REGISTRY
 # ============================================================================
 DOCS_CONTENT = {
@@ -326,6 +527,7 @@ DOCS_CONTENT = {
     "operator": OPERATOR_DOC,
     "admin": ADMIN_DOC,
     "qa-testing": QA_DOC,
+    "architecture": ARCHITECTURE_DOC,
 }
 
 

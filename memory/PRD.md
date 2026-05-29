@@ -1204,3 +1204,17 @@ onboarding tour on first login per role.
   - `q=escrow` → 13 hits across heading/body/faq.
   - `q=dispute` → 7 hits. Diacritic normalization works.
 
+
+## Changelog — 2026-02-29 — Architecture Doc (technical reference, role=admin)
+- New doc `architecture` v1.0 in `docs_content.py` — 11 sections + 7 FAQ:
+  Stack tehnologic, structură proiect (/app), convenții backend, convenții
+  frontend, schema MongoDB, integrări externe, securitate, env vars & deploy,
+  SEO & marketing, monitoring & observability, Knowledge Base intern.
+- Bug fix in `docs_service._md_to_html`: italic regex `_text_` was matching
+  underscores inside identifiers like `twin_pins` → broke PDF render.
+  Fixed with word-boundary check (start/end-of-string OR adjacent to
+  whitespace/punctuation). Verified: arch PDF 18.4KB OK, client PDF
+  regression OK (italics still work).
+- Auto-available in Admin → Documentație & Training (preview + PDF + MD + send
+  + Cmd+K search). 13 hits for query "backend".
+
