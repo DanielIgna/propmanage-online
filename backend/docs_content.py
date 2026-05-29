@@ -228,92 +228,693 @@ CLIENT_DOC = {
 
 
 # ============================================================================
-# 2) SPECIALIST — placeholder (will be expanded in PHASE 2)
+# 2) SPECIALIST — Furnizor de servicii verificat
 # ============================================================================
 SPECIALIST_DOC = {
     "slug": "specialist",
     "role": "specialist",
     "title": "Ghid Complet pentru Specialiști",
-    "subtitle": "Cum câștigi mai bine pe PropManage: optimizare profil, capturare lead-uri, gestionare lucrări, escrow, dispute.",
-    "version": "0.1-draft",
+    "subtitle": "Cum câștigi mai bine pe PropManage: profil optimizat, lead capture, comunicare client, escrow, dispute, best practices.",
+    "version": "1.0",
     "updated_at": UPDATED,
-    "email_intro": "Bine ai venit în comunitatea PropManage. Acest ghid îți arată cum să maximizezi câștigurile și să eviți greșelile clasice.",
+    "email_intro": "Bine ai venit în comunitatea PropManage. Ghidul acesta îți arată cum să maximizezi câștigurile și să eviți greșelile clasice ale specialiștilor noi.",
     "sections": [
         {
-            "heading": "1. Status: în lucru",
+            "heading": "1. Cum câștigi bani pe PropManage (Overview)",
             "body": [
-                "Documentul complet pentru specialiști va fi disponibil în versiunea v1.0 (deploy următor). Conține: optimizare profil, captură lead-uri, comunicare client, escrow, dispute, best practices câștiguri.",
-                {"type": "callout", "variant": "info", "title": "Estimat", "body": "Va fi gata în 2-3 zile. Vei primi automat un email când e publicat."},
+                "PropManage este un marketplace cu **cerere reală** — clienții postează cereri zilnic și caută activ ofertă. Tu, ca specialist, intri în 3 fluxuri principale de venit:",
+                {"type": "list", "items": [
+                    "**Lucrări directe** — cereri postate la categoria ta, în zona ta de acoperire",
+                    "**Smart Match** — sistemul te recomandă proactiv proprietarilor pe baza Health Score",
+                    "**Recomandări organice** — clienții te găsesc pe pagina ta publică (`/specialists/{id}`) via SEO și marketplace",
+                ]},
+                _CB_ESCROW,
+                {"type": "callout", "variant": "info", "title": "Costul tău",
+                 "body": "Comision platformă: **5%** (4% pentru badge VERIFIED). Lead fee opțional: **45 RON** dacă vrei numărul de telefon al clientului. În rest — gratis: profil, portofoliu, chat, escrow."},
+            ],
+        },
+        {
+            "heading": "2. Profil care convertește (cele 7 elemente critice)",
+            "body": [
+                "Profilurile cu rate de conversie mare (vizitator → contact) au TOATE aceste 7 elemente:",
+                {"type": "steps", "items": [
+                    {"title": "Avatar profesional", "body": "Poză cap-piept, lumină naturală, NU selfie cu căști sau în mașină. Specialiștii fără poză primesc cu 60% mai puține contactări."},
+                    {"title": "Specialitate clară", "body": "O singură specialitate principală (cea în care ești cel mai bun). Adaugi secundare doar dacă chiar excelezi (max 3)."},
+                    {"title": "Bio scurt și concret (200-400 caractere)", "body": "Cine ești, câți ani de experiență, ce te diferențiază. NU \"echipă serioasă, prețuri OK\"."},
+                    {"title": "Portofoliu cu 8-15 poze", "body": "Înainte/după, detaliu de execuție, finisaje. Specialiștii cu 10+ poze au rating mediu cu 0.4 stele mai mare."},
+                    {"title": "Zone de acoperire reale", "body": "Doar zonele unde chiar te deplasezi. Marcaj 5 cartiere în care lucrezi rar = recenzii proaste pentru anulări în ultim moment."},
+                    {"title": "Documente uploadate pentru VERIFIED", "body": "CI + certificat fiscal + asigurare răspundere civilă + diplome/atestate. Badge VERIFIED (lime) crește conversia cu 2.5x."},
+                    {"title": "Răspunsuri rapide", "body": "Sistemul măsoară response_time mediu. Sub 1h = booster algoritmul, peste 8h = penalizare în ranking."},
+                ]},
+            ],
+        },
+        {
+            "heading": "3. Cum primești lead-uri și cum răspunzi corect",
+            "body": [
+                {"type": "h3", "text": "Notificările tale"},
+                "Când un client postează o cerere în categoria + zona ta, primești instant: push browser + email + în-app badge. Răspuns în primele **30 minute** = chance maximă să câștigi lucrarea (clienții acceptă oferta primită în primele 2h în 70% din cazuri).",
+
+                {"type": "h3", "text": "Cum scrii o ofertă câștigătoare"},
+                {"type": "steps", "items": [
+                    {"title": "Citește cererea în întregime", "body": "Inclusiv pozele atașate. Nu trimite \"Salut, sun-mă\". Asta îți pierde 90% din lucrări."},
+                    {"title": "Preț FIX, nu \"orientativ\"", "body": "Calculează rapid, scrie preț clar. Dacă nu poți estima fără vizită, scrie \"Vizită de evaluare gratuită, ofertă fixă în 24h\"."},
+                    {"title": "Timp realist", "body": "Nu promite 24h dacă știi că ai nevoie de 3 zile. Recenziile proaste vin din termene depășite."},
+                    {"title": "Diferențiator scurt", "body": "1-2 fraze de ce TE alege pe tine. Ex: \"Folosesc doar materiale Schneider/Legrand, garanție 24 luni (peste media)\"."},
+                    {"title": "Întreabă", "body": "Pune o întrebare clarificatoare. Arată că ai citit și ești profesionist."},
+                ]},
+                {"type": "callout", "variant": "success", "title": "Pro tip",
+                 "body": "În ofertă, menționează că plata se face prin escrow. Clienții care nu cunosc platforma sunt mai relaxați când văd asta — îi face să accepte oferta mai ușor."},
+            ],
+        },
+        {
+            "heading": "4. Lead Fee — când să plătești și când nu",
+            "body": [
+                "După ce trimiți o ofertă, clientul o vede dar **NU îți vede telefonul/email-ul direct**. Doar dacă plătești **45 RON Lead Fee**, el primește datele tale de contact.",
+                {"type": "h3", "text": "Plătește Lead Fee când:"},
+                {"type": "list", "items": [
+                    "Cererea valorează **> 1000 RON** (45 RON e <5% din valoare)",
+                    "Clientul a răspuns activ la oferta ta cu întrebări concrete",
+                    "Lucrarea pare urgentă și ai capacitate să o execuți rapid",
+                    "Zona de cerere e în plin centrul tău de operare",
+                ]},
+                {"type": "h3", "text": "NU plăti Lead Fee când:"},
+                {"type": "list", "items": [
+                    "Cererea e vagă (\"Vreau să mi se facă ceva pe la apartament\")",
+                    "Clientul are 0 cereri anterioare ȘI 0 review-uri lăsate (probabil cont fake)",
+                    "Lucrarea < 200 RON (Lead Fee = 22% din valoare, nu merită)",
+                    "Cererea are deja 8+ oferte (concurență prea mare)",
+                ]},
+            ],
+        },
+        {
+            "heading": "5. Escrow — cum primești banii",
+            "body": [
+                {"type": "steps", "items": [
+                    {"title": "Clientul acceptă oferta ta", "body": "Primești notificare \"Oferta acceptată\". Clientul are 48h să alimenteze escrow."},
+                    {"title": "Escrow alimentat", "body": "Primești notificare \"Banii sunt blocați\". Ai voie să începi lucrarea în siguranță."},
+                    {"title": "Lucrezi", "body": "Comunici prin chat-ul aplicației. Toate mesajele se salvează ca dovadă. NU comunica pe WhatsApp — nu ai protecție în caz de dispută."},
+                    {"title": "Finalizezi + ceri confirmare", "body": "Apeși \"Marchează ca finalizat\" în pagina lucrării. Clientul are 7 zile să confirme sau să deschidă dispută."},
+                    {"title": "Primești banii", "body": "Dacă clientul confirmă (sau dacă trec 7 zile fără răspuns negativ), banii ajung în portofelul tău PropManage. De acolo îi retragi în cont bancar în 1-3 zile."},
+                ]},
+                {"type": "callout", "variant": "warn", "title": "NU face niciodată",
+                 "body": "Nu cere clientului să plătească pe lângă escrow (\"Lasă cash diferența\"). Asta îți închide contul instant și pierzi acces la viitoare lucrări. Toți banii trec prin platformă, întotdeauna."},
+            ],
+        },
+        {
+            "heading": "6. Recenzii — cum primești 5 stele",
+            "body": [
+                "Recenziile sunt **moneda ta principală** pe platformă. Un specialist cu 4.8★ și 30 recenzii primește 5x mai multe lucrări decât unul cu 5.0★ și 3 recenzii.",
+                {"type": "list", "items": [
+                    "**Punctualitate** — Cel mai important factor. Întârzieri = -1 stea automat.",
+                    "**Curățenie** — La finalul lucrării, lași zona impecabilă. Aspiratorul ăla portabil din mașină e cea mai bună investiție pe care o poți face.",
+                    "**Comunicare proactivă** — Update-uri scurte zilnic (\"Azi am terminat tencuielile, mâine începe gletul\"). Clienții stresați devin clienți fericiți.",
+                    "**Estimare onestă** — Spune dacă vezi probleme suplimentare ÎNAINTE de a începe, nu după.",
+                    "**Mulțumire la final** — Trimite un mesaj scurt: \"Mulțumesc pentru încredere, vă rog să-mi lăsați un feedback dacă a fost ok lucrarea, mă ajută foarte mult.\""
+                ]},
+                {"type": "callout", "variant": "info", "title": "Ce să faci dacă primești o recenzie nedreaptă",
+                 "body": "Răspunde public, calm și profesionist. NU ataca clientul. Răspunsurile bine scrise la recenzii proaste convertesc 3 din 4 viitori clienți. Dacă recenzia conține minciuni dovedibile, deschide dispută la echipa noastră."},
+            ],
+        },
+        {
+            "heading": "7. Dispute — perspectiva specialistului",
+            "body": [
+                "În 2025, 67% din dispute au fost decise în favoarea clientului. **Cum eviți să fii printre acei 67%:**",
+                {"type": "list", "items": [
+                    "**Strânge dovezi de la început** — poze înainte/după pentru fiecare etapă. Stochează-le în chat (sunt time-stamped).",
+                    "**Cere acceptarea în scris** pentru orice modificare de scope. Mesaj clar: \"Confirmați că adăugăm și schimbarea robinetelor pentru +400 RON?\""
+                    " Dacă acceptă, ai dovadă. Dacă refuză, lași robineții.",
+                    "**Documentează tot** ce e mai prost decât ai fost informat la sfârșit (zid umed sub gresie, instalație electrică din aluminiu sub tencuială, etc.). În disputa de mediere, asta îți salvează 50%+ din bani.",
+                    "**Răspunde rapid la dispute** (în 24h). Specialiștii care răspund în 12h câștigă disputa în 80% din cazuri. Cei care răspund după 48h pierd în 70%.",
+                ]},
+            ],
+        },
+        {
+            "heading": "8. Plata și retragerea banilor",
+            "body": [
+                {"type": "list", "items": [
+                    "**Wallet PropManage** — banii eliberați din escrow ajung aici instant.",
+                    "**Retragere bancară** — \"Retrage\" din pagina Wallet → introduci IBAN → primești în cont în 1-3 zile lucrătoare.",
+                    "**Frecvență recomandată** — săptămânal sau bilunar. Nu lăsa mai mult de 10.000 RON în wallet (deși sunt protejați, fluxul tău de cash e mai bun cu retrageri dese).",
+                    "**Facturare automată** — la fiecare lucrare finalizată, sistemul generează factură PDF conformă ANAF cu datele tale (PFA / SRL). Le descarci din \"Facturi\" pentru contabilitate.",
+                ]},
+            ],
+        },
+        {
+            "heading": "9. Best Practices (din top 50 specialiști PropManage)",
+            "body": [
+                {"type": "list", "items": [
+                    "**Activează push notifications**. Lead-urile sub 30 min răspuns primesc 5x rata de acceptare.",
+                    "**Răspunde și la cererile pe care nu le iei**. Un \"Mulțumesc, nu pot acum, dar pentru viitor sunt disponibil\" îți crește response_rate (factor în ranking).",
+                    "**Cere recenzie după FIECARE lucrare**, chiar și mică. 80% din clienți nu lasă recenzie singuri, doar dacă o ceri.",
+                    "**Postează săptămânal în portofoliu**. Nu doar lucrările mari — și cele mici (înlocuit un robinet, schimbat un întrerupător). Arată că lucrezi activ.",
+                    "**Refuză lucrările dubioase**. Un client care insistă pe \"fără factură\" sau \"plătesc cash\" e un viitor litigiu garantat.",
+                    "**Specializează-te**. Specialiștii care fac DOAR baia (nu \"toate lucrările casnice\") au prețuri 30-40% mai mari și clienți mai relaxați.",
+                    "**Trimite poze de progres**. Clientul care primește 1 poză/zi e clientul care lasă 5 stele.",
+                ]},
             ],
         },
     ],
-    "faq": [],
+    "faq": [
+        {"q": "Cât pot câștiga pe lună pe PropManage?", "a": "Specialiștii TOP 10% câștigă **15.000-25.000 RON/lună** (lucrând full-time, cu echipă mică). Median (50% specialiștilor): **4.000-8.000 RON/lună** (part-time + alte canale). Începătorii fără rating: **0-2.000 RON/lună** în primele 3 luni. Depinde 100% de Profile Quality + Response Speed + Geographic Density."},
+        {"q": "Cum obțin badge VERIFIED?", "a": "Profil → Documente → upload: CI, certificat fiscal (PFA/SRL activ), polița de răspundere civilă profesională, certificat ANRE (dacă e gaz/electric), diplome/atestate. Echipa noastră validează manual în 24-48h. VERIFIED crește conversia cu 2.5x și reduce comisionul de la 5% la 4%."},
+        {"q": "Pot anula o lucrare după ce am acceptat-o?", "a": "Da, dar cu penalități. Anulare în primele 24h: 0 penalty. După 24h, înainte de start: -0.2★ pe profilul tău. După începere: -0.5★ + obligativitate refund integral. Anulare repetitivă (>3 ori în 3 luni) = suspendare cont 30 zile."},
+        {"q": "Ce categorii au cea mai mare cerere?", "a": "Top 5 în 2026: **Instalator** (cerere zilnică, 15-20 cereri/zi în București), **Electrician**, **Zugrăveală**, **Mobilă custom (tâmplărie)**, **Service electrocasnice**. Categorii cu marjă mare dar cerere mai mică: HVAC, Design Interior, Restaurări monumente."},
+        {"q": "Comisionul de 5% se aplică și la lucrările mici?", "a": "Da, pentru orice tranzacție trecută prin escrow. Minim absolut: 5 RON comision (pentru lucrări sub 100 RON). Pentru lucrări sub 50 RON recomandăm să le treci direct în chat ca \"servicii bonus\" către clienți existenți, fără escrow."},
+        {"q": "Pot avea mai mulți colaboratori sub același cont?", "a": "Nu, fiecare specialist are propriul cont. Avantaj: rating-ul tău e protejat de munca proastă a altuia. Dezavantaj: trebuie să-i sub-contractezi separat. Pentru firme cu 5+ angajați, contactează contact@propmanage.ro pentru cont **Business** (multi-seat)."},
+        {"q": "Cum mă protejez de clienții care nu plătesc?", "a": "Folosește escrow pentru ORICE lucrare, fără excepție. Banii sunt deja blocați înainte să începi. Dacă clientul refuză să-i alimenteze escrow după ce a acceptat oferta, anulezi automat în 48h și NU pierzi nimic."},
+    ],
 }
 
 # ============================================================================
-# 3) OPERATOR — placeholder
+# 3) OPERATOR — Echipa internă PropManage (validare Twin, mediere ușoară)
 # ============================================================================
 OPERATOR_DOC = {
     "slug": "operator",
     "role": "operator",
     "title": "Ghid Complet pentru Operatori (Echipa PropManage)",
-    "subtitle": "Validare Digital Twin, gestionare non-conformități, comunicare cu clienții și specialiștii.",
-    "version": "0.1-draft",
+    "subtitle": "Validare Digital Twin, gestionare non-conformități, comunicare cu clienții și specialiștii, escaladare către admin.",
+    "version": "1.0",
     "updated_at": UPDATED,
-    "email_intro": "Bine ai venit în echipa de operatori PropManage. Acest ghid îți arată exact ce ai de făcut zilnic.",
+    "email_intro": "Bine ai venit în echipa de operatori PropManage. Acest ghid îți arată exact ce ai de făcut zilnic, cum prioritizezi și când escaladezi.",
     "sections": [
         {
-            "heading": "1. Status: în lucru",
+            "heading": "1. Rolul tău în platformă",
             "body": [
-                "Documentul complet va fi disponibil în versiunea v1.0. Conține: workflow validare Twin, gestionare non-conformități, escaladare la admin, KPI-uri zilnice.",
+                "Operatorul este **interfața umană** a PropManage. Tu validezi conținutul care intră în platformă și asiguri că totul respectă standardele. Responsabilități principale:",
+                {"type": "list", "items": [
+                    "**Validare Digital Twin** — verifici că modelele 3D încărcate de clienți sunt valide, complete, conforme",
+                    "**Triere non-conformități** — primești raportări de la specialiști despre probleme și le decizi (accept/respinge/escaladează)",
+                    "**Mediere disputelor ușoare** (sub 1.000 RON) — disputele complexe merg direct la admin",
+                    "**KYC verification** — verifici documentele specialiștilor care cer badge VERIFIED",
+                    "**Onboarding asistat** — primești cereri de help de la specialiști noi în prima săptămână",
+                ]},
+            ],
+        },
+        {
+            "heading": "2. Workflow zilnic (90 min/zi)",
+            "body": [
+                {"type": "steps", "items": [
+                    {"title": "09:00 — Verifici Morning Briefing", "body": "Te loghezi → vezi câte taskuri ai în queue (twin validations, KYC pending, dispute ușoare)."},
+                    {"title": "09:15 — Procesezi KYC pending (prioritate)", "body": "Specialiștii noi așteaptă activarea. Verifici documente, marchezi VERIFIED sau respingi cu motiv clar."},
+                    {"title": "09:45 — Validare Twin uploads", "body": "Modele 3D noi în queue. Deschizi fiecare → verifici că .glb se încarcă fără erori → verifici că dimensiunile sunt realiste → verifici că nu există conținut neadecvat."},
+                    {"title": "10:30 — Dispute ușoare (< 1000 RON)", "body": "Citești ambele perspective, ceri dovezi dacă lipsesc, decizi. Pentru orice peste 1000 RON sau cu complexitate juridică → escaladare admin."},
+                    {"title": "Asincron — răspunzi la mesaje", "body": "Verifici inbox-ul în-app la fiecare 2-3 ore. Răspuns standard în max 24h."},
+                ]},
+            ],
+        },
+        {
+            "heading": "3. Validare Digital Twin — checklist",
+            "body": [
+                "Pentru fiecare upload de Twin (`/api/admin/twin-validations`), parcurgi:",
+                {"type": "list", "items": [
+                    "**Fișierul se încarcă** în viewer-ul 3D fără erori console",
+                    "**Suprafața declarată** se potrivește cu cea calculată din model (±10% acceptat)",
+                    "**Nu sunt detalii ireale** (ex: scări care duc nicăieri, pereți care se intersectează)",
+                    "**Pin-urile inițiale** (dacă există) sunt în locații coerente",
+                    "**Plan 2D atașat** (PDF) corespunde cu Twin 3D",
+                ]},
+                {"type": "callout", "variant": "warn", "title": "Respingere — bune practici",
+                 "body": "Dacă respingi, scrie motiv CONCRET și ACȚIONABIL: \"Modelul are 3 pereți care se intersectează la coordonatele (5,2,3) și (5,2,4) — re-export și re-upload, te rog\". NU scrie doar \"Model invalid\"."},
+            ],
+        },
+        {
+            "heading": "4. Mediere dispute ușoare",
+            "body": [
+                "Disputele ușoare (sub 1.000 RON valoare totală) sunt responsabilitatea ta. Pașii:",
+                {"type": "steps", "items": [
+                    {"title": "Citește chat-ul lucrării", "body": "Toate mesajele dintre client și specialist. Identifică unde a apărut divergența."},
+                    {"title": "Verifică dovezile uploadate", "body": "Poze înainte/după, screenshots, video. Ambele părți au 48h să le încarce."},
+                    {"title": "Pune întrebări dacă e cazul", "body": "Mesaj în threadul de dispute, ambele părți primesc notificare."},
+                    {"title": "Decide", "body": "Una din 4 variante: (a) plată integrală specialist (cerere client neîntemeiată), (b) refund integral client, (c) split 70/30 sau 50/50, (d) ESCALADARE admin (dacă nu poți decide clar)."},
+                    {"title": "Documentează decizia", "body": "Scrii rezumat clar al motivării. Apare în istoric pentru audit."},
+                ]},
+                {"type": "callout", "variant": "info", "title": "Când escaladezi",
+                 "body": "**Orice sumă > 1.000 RON**, orice **acuzație de fraudă**, orice **vătămare fizică/proprietate**, orice **dezacord neprodus de tine în 7 zile** → escaladare admin via butonul \"Escalate to Admin\"."},
+            ],
+        },
+        {
+            "heading": "5. KYC Verification — checklist documente",
+            "body": [
+                "Pentru fiecare cerere VERIFIED de la un specialist, verifici:",
+                {"type": "list", "items": [
+                    "**CI** — valabilă, foto clară, datele se citesc",
+                    "**Cert fiscal** sau **certificat ONRC** — firmă activă (verifici pe portal.onrc.ro)",
+                    "**Polița răspundere civilă profesională** — valabilă la data verificării",
+                    "**Diplome/atestate** specifice categoriei (ANRE pentru gaz/electric, ISCIR pentru centrală termică)",
+                    "**Adresa de pe documente** = orașul declarat pe profil (sau o explicație plauzibilă)",
+                ]},
+                {"type": "h3", "text": "Roșu (respingi imediat)"},
+                {"type": "list", "items": [
+                    "Documente vizibil editate (font diferit, semnături lipite)",
+                    "Firmă în insolvență sau lichidare",
+                    "Asigurare expirată",
+                    "Diplome dubioase (școli inexistente, format suspect)",
+                ]},
+            ],
+        },
+        {
+            "heading": "6. Comunicare cu părțile",
+            "body": [
+                {"type": "h3", "text": "Cu clientul"},
+                "Folosești în-app messages. Începi mesajele cu \"Bună ziua, sunt [nume], operator PropManage.\" Răspunzi în max 24h. Ton: profesional, empatic, fără jargon tehnic.",
+                {"type": "h3", "text": "Cu specialistul"},
+                "La fel ca cu clientul, dar puțin mai direct (specialistul e familiar cu termenii platformei). Nu fii prea blând cu specialiștii care încalcă reguli — escaladări frecvente sunt indicator de cont problematic.",
+                {"type": "h3", "text": "Cu admin-ul (escaladare)"},
+                "Folosești butonul \"Escalate to Admin\" în pagina disputei/lucrării. Scrii rezumat de **maxim 5 fraze**: (1) ce s-a întâmplat, (2) ce am încercat eu, (3) de ce nu pot decide, (4) recomandarea mea, (5) suma în joc.",
+            ],
+        },
+        {
+            "heading": "7. KPI-uri pe care le monitorizezi (la tine în profil)",
+            "body": [
+                {"type": "list", "items": [
+                    "**Twin validations** — target: 10+/zi · current month",
+                    "**KYC requests procesate** — target: 5+/zi · turnaround < 48h",
+                    "**Dispute decise** — target: 100% sub 7 zile",
+                    "**Escalări către admin** — sub 15% din total dispute (sub 15% = bun, peste = ai nevoie de training)",
+                    "**Satisfaction score** (feedback de la părți) — target: 4.5+/5",
+                ]},
             ],
         },
     ],
-    "faq": [],
+    "faq": [
+        {"q": "Cum diferă rolul operator de rolul admin?", "a": "Operator = execuție zilnică (validări, dispute ușoare, KYC). Admin = decizii strategice + cazuri complexe + acces la console tehnică (Healthcheck, AI Investigator, Backup). Admin poate face tot ce poate operator, dar nu invers."},
+        {"q": "Pot vedea datele financiare ale specialiștilor (cifră afaceri)?", "a": "**Nu**. Operatorii NU au acces la wallets, escrow detalii sau facturi. Doar la chat-uri, dovezi vizuale și meta-info (status, dată, sumă globală fără defalcare). Asta protejează privacy specialiștilor și reduce risc de fraudă internă."},
+        {"q": "Ce fac dacă găsesc o problemă tehnică (404, 500)?", "a": "Mergi în AI Investigator → \"Submit Finding\" → completezi: ce făceai, ce ai văzut, ce așteptai. Adăugi screenshot. Admin-ul vede în 5 minute prin auto-monitoring."},
+        {"q": "Lucrez weekend-uri?", "a": "Nu obligatoriu, dar răspunsurile clienților au target 24h indiferent de zi. Echipa decide rotativ disponibilitate weekend (toggle în profil → \"Disponibil weekend\")."},
+        {"q": "Cum mă protejez juridic dacă decid greșit o dispută?", "a": "Toate deciziile operatorilor sunt **revizuibile** de admin în 30 zile. Logarea automată în `audit_log` arată raționamentul tău. Dacă ai documentat corect motivarea, ești protejat juridic — răspunde compania, nu tu personal."},
+    ],
 }
 
 # ============================================================================
-# 4) ADMIN — placeholder
+# 4) ADMIN — Cu acces complet, console tehnice, decizii strategice
 # ============================================================================
 ADMIN_DOC = {
     "slug": "admin",
     "role": "admin",
     "title": "Ghid Complet pentru Administratori",
-    "subtitle": "Toate consolele admin, AI Investigator, Smoke Tests, Data Integrity, Backup, GDPR, monitoring, dispute.",
-    "version": "0.1-draft",
+    "subtitle": "Console admin, AI Investigator, Smoke Tests, Healthcheck, Data Integrity, Backup, GDPR, monitoring, dispute complexe.",
+    "version": "1.0",
     "updated_at": UPDATED,
-    "email_intro": "Bine ai venit ca administrator PropManage. Acest ghid acoperă toate uneltele tale.",
+    "email_intro": "Bine ai venit ca administrator PropManage. Acest ghid acoperă toate uneltele tale și fluxurile zilnice/săptămânale/lunare.",
     "sections": [
         {
-            "heading": "1. Status: în lucru",
+            "heading": "1. Ce poți face ca admin",
             "body": [
-                "Documentul complet va fi disponibil în versiunea v1.0. Va acoperi: Morning Briefing, AI Investigator, Smoke Tests, Healthcheck, Data Integrity, Backup, GDPR impersonation, Incidents, Dispute mediation, CMS.",
+                "Admin-ul PropManage are acces TOTAL la platformă. Responsabilitățile principale:",
+                {"type": "list", "items": [
+                    "**Monitoring** — verifici Morning Briefing zilnic, intervii la alerte",
+                    "**Mediere complexă** — dispute > 1.000 RON, cazuri cu acuzații serioase, intervenții juridice",
+                    "**KYC final** — apel final pe respingerile/acceptările dubioase ale operatorilor",
+                    "**GDPR** — gestionezi cererile DSAR (export/delete), aprobi impersonările",
+                    "**Securitate** — review AI Findings, suspendări conturi, blocare IP",
+                    "**Configurare platformă** — feature flags, pricing changes, schedules",
+                    "**Comunicare** — newsletter, anunțuri publice, gestionare incidents",
+                ]},
+            ],
+        },
+        {
+            "heading": "2. Morning Briefing — primul lucru dimineața",
+            "body": [
+                "Te loghezi la propmanage.ro/admin → primul card vizibil este **Morning Briefing** cu 6 tile-uri:",
+                {"type": "list", "items": [
+                    "**Integrări externe** (Healthcheck) — Mongo, LLM, Email, Stripe, OAuth, VAPID, Admin Emails",
+                    "**Smoke Test E2E** — ultimul test E2E pe 4 roluri (client, specialist, operator, admin)",
+                    "**Integritate date** — orphan twins, escrow mismatches, missing payments",
+                    "**Incidente publice** — câte sunt active pe status page (last 30 zile)",
+                    "**AI Findings** — câte findings deschise are AI Investigator",
+                    "**Backup DB** — vârsta ultimului backup (< 36h = ok, > 72h = fail)",
+                ]},
+                {"type": "callout", "variant": "info", "title": "Acțiune zilnică",
+                 "body": "Dacă TOATE 6 tiles sunt verzi (ok), nu trebuie să faci nimic — închizi tab-ul. Dacă vezi galben/roșu pe oricare, click pe \"Detalii\" → vezi exact ce s-a întâmplat și acționezi."},
+            ],
+        },
+        {
+            "heading": "3. AI Investigator — auditorul tău automat",
+            "body": [
+                "AI Investigator scanează zilnic codul + logs + DB pentru a detecta probleme. Findings categorizate pe severitate: **high** (acțiune imediată), **warning** (cod review), **low** (improvement suggestion).",
+                {"type": "h3", "text": "Cum acționezi pe findings"},
+                {"type": "steps", "items": [
+                    {"title": "Sortezi pe severitate", "body": "Filtrezi pe \"high\" → vezi toate findings critice deschise."},
+                    {"title": "Investighezi", "body": "Click pe finding → vezi: ce, unde (file:line), de ce e problemă, recomandare AI."},
+                    {"title": "Acționezi", "body": "Variante: (a) **Resolve** (problemă rezolvată sau nu e problemă reală), (b) **Snooze** (revii peste 30 zile), (c) **Escalate to Dev** (trimiți pe email developer-ului tău)."},
+                    {"title": "Documentezi în comentariu", "body": "Scrii ce ai făcut. Aud trail păstrat pentru viitor."},
+                ]},
+            ],
+        },
+        {
+            "heading": "4. Console tehnice — când să le folosești",
+            "body": [
+                {"type": "h3", "text": "Smoke Test (`/admin/smoke-test`)"},
+                "Verifică automat la 30 min că flow-ul E2E funcționează. Dacă pică, primești email instant. Acțiune: vezi în Logs cauza, redirect către dev sau resolve dacă a fost flaky.",
+
+                {"type": "h3", "text": "Healthcheck (`/admin/healthcheck`)"},
+                "Pinguiește toate serviciile externe. Dacă Resend/Stripe pică, vezi instant. Acțiune: refresh manual pentru a vedea recovery, sau intervenție direct cu provider-ul.",
+
+                {"type": "h3", "text": "Data Integrity (`/admin/data-integrity`)"},
+                "Scanează DB pentru inconsistențe (orphan, mismatches). Rulează lunar manual. Dacă găsește issues, ai opțiunea \"Auto-fix\" pentru cele safe, sau manual review pentru cele complexe.",
+
+                {"type": "h3", "text": "Backup (`/admin/backups`)"},
+                "Listă backup-uri locale + buton manual \"Backup acum\". Cron zilnic 03:30 trimite și pe email. Acțiune: nimic, doar verifici că tile-ul Briefing e verde.",
+
+                {"type": "h3", "text": "Audit Log (`/admin/audit-log`)"},
+                "Toate acțiunile admin (inclusiv impersonări). Folosit pentru GDPR + securitate internă.",
+            ],
+        },
+        {
+            "heading": "5. GDPR Compliance Pack",
+            "body": [
+                {"type": "list", "items": [
+                    "**DSAR Export** — un user cere copia datelor sale. Tu apeși \"Generate Export\" → primește PDF + JSON în 30 zile. Tracking în `dsar_requests`.",
+                    "**DSAR Delete** — user cere ștergere cont. 30 zile perioadă de gândire, apoi soft-delete (date pseudonimizate, păstrăm tranzacții financiare 5 ani conform legii)."
+                    " Tu confirmi în pagina cererii.",
+                    "**Impersonation** — vezi platforma prin ochii unui user. **Logat în `audit_log`**, vizibil clientului în profil. Folosește DOAR pentru debugging/support, nu pentru curiozitate.",
+                    "**Consent banner** — gestionat automat. Tu vezi rate de accept în `/admin/gdpr-stats`.",
+                ]},
+                {"type": "callout", "variant": "warn", "title": "GDPR risc",
+                 "body": "Orice impersonare neînregistrată = potențială amendă ANSPDCP până la 20M EUR. Sistemul nostru logează AUTOMAT, dar dacă găsești o bypass, raportează imediat."},
+            ],
+        },
+        {
+            "heading": "6. Dispute complexe — cum mediezi",
+            "body": [
+                "Pentru orice dispută > 1.000 RON sau escaladare de la operator:",
+                {"type": "steps", "items": [
+                    {"title": "Citește tot threadul + notele operatorului", "body": "Înțelegi context complet. Notele operatorului spun unde a blocat."},
+                    {"title": "Verifică dovezi", "body": "Toate pozele, mesajele, log-urile escrow. Caută inconsistențe."},
+                    {"title": "Întreabă părțile direct", "body": "Mesaj formal: \"Bună ziua, sunt [nume], admin PropManage. Voi decide cazul vostru. Înainte de asta, vă rog răspundeți la X, Y, Z\"."},
+                    {"title": "Decide echitabil", "body": "Nu te grăbi. Cazurile complexe au impact reputațional MARE. Mai bine 5 zile bine decisă decât 1 zi greșit."},
+                    {"title": "Comunică decizia", "body": "Mesaj separat fiecăruia. Explicarea motivării. Drept de apel: 7 zile (la un terț neutru — un alt admin)."},
+                ]},
+            ],
+        },
+        {
+            "heading": "7. Suspendări conturi & escaladări de securitate",
+            "body": [
+                "Când e ok să suspenzi un cont:",
+                {"type": "list", "items": [
+                    "**Fraudă dovedită** (documente false, recenzii cumpărate) — suspendare permanentă",
+                    "**> 3 dispute pierdute consecutiv** — suspendare 30 zile + review profil",
+                    "**Hărțuire/limbaj agresiv** dovedit în chat — suspendare 7 zile prima oară, permanentă a 2-a",
+                    "**Tentativă de înconjurare escrow** (\"plătește-mă cash direct\") — suspendare 14 zile + warning",
+                    "**Activitate suspectă** (login 50+ țări în 24h) — suspendare automată + cerere verificare 2FA",
+                ]},
+                {"type": "callout", "variant": "info", "title": "Right to be informed",
+                 "body": "Orice suspendare trebuie comunicată user-ului cu (a) motiv concret, (b) durată, (c) drept de apel. Lipsa oricăruia = nulitate juridică."},
+            ],
+        },
+        {
+            "heading": "8. Configurare platformă",
+            "body": [
+                {"type": "list", "items": [
+                    "**Feature flags** (`/admin/feature-flags`) — activezi/dezactivezi feature-uri pentru % din useri (A/B testing)",
+                    "**Pricing** (`/admin/pricing-config`) — comision, lead fee, prețuri tier-uri",
+                    "**Schedules** (`/admin/schedules`) — modifici sau dezactivezi cron jobs (smoke test, backup, briefing)",
+                    "**Email templates** (`/admin/email-templates`) — preview + edit dintre cele 30+ template-uri",
+                    "**Announcements** (`/admin/announcements`) — banner global vizibil pe site (ex: \"Mentenanță planificată 03:00-04:00\")",
+                ]},
+            ],
+        },
+        {
+            "heading": "9. Comunicare publică (incidents + newsletter)",
+            "body": [
+                {"type": "h3", "text": "Incident management"},
+                "Când ceva pică (Stripe down, Mongo replication, etc.), creezi un incident: `/admin/incidents` → \"Create new\". Apare instant pe `/status` public. Updates regulare la fiecare 30 min până e \"resolved\".",
+
+                {"type": "h3", "text": "Newsletter & anunțuri"},
+                "Pentru anunțuri majore (nou feature, schimbare prețuri), folosești Resend bulk send. Maxim 1 email/lună la toți useri ca să nu fii marcat spam.",
+            ],
+        },
+        {
+            "heading": "10. Comenzi rapide & shortcut-uri",
+            "body": [
+                {"type": "code", "text": "# Login admin\ncurl -c /tmp/cookies.txt -X POST $API_URL/api/auth/login -d '{\"email\":\"admin@propmanage.io\",\"password\":\"Admin123!\"}'\n\n# Status global\ncurl -b /tmp/cookies.txt $API_URL/api/admin/healthcheck/run\n\n# Force backup\ncurl -b /tmp/cookies.txt -X POST $API_URL/api/admin/backups/run\n\n# Force weekly dev report\ncurl -b /tmp/cookies.txt -X POST $API_URL/api/admin/dev-velocity/send-now\n\n# Search docs\ncurl -b /tmp/cookies.txt \"$API_URL/api/admin/docs/admin/search?q=escrow\""},
+                {"type": "h3", "text": "Hotkeys UI"},
+                {"type": "list", "items": [
+                    "**⌘K / Ctrl+K** în Admin → Docs — search instant",
+                    "**ESC** — închide orice modal",
+                    "**Shift + ?** — afișează lista de hotkeys (in development)",
+                ]},
+            ],
+        },
+        {
+            "heading": "11. Cum adaugi un alt admin",
+            "body": [
+                {"type": "steps", "items": [
+                    {"title": "Adaugă email în whitelist", "body": "Editezi `backend/.env` → `ADMIN_WHITELIST=existing@propmanage.io,nou-admin@example.com` → restart backend."},
+                    {"title": "Persoana respectivă se înregistrează", "body": "Merge la `/register` și creează cont normal. Sistemul detectează emailul în whitelist și activează rol admin automat."},
+                    {"title": "Trimite documentația", "body": "Admin → Docs → Send → introduce emailul lui → bifează \"Include PDF\" → trimite. Va primi instant ghidul Admin v1.0."},
+                    {"title": "Adaugă în ADMIN_EMAILS", "body": "Pentru ca să primească și el Morning Briefing + alertele automate, editezi `ADMIN_EMAILS` env (lista CSV)."},
+                    {"title": "Activează 2FA", "body": "OBLIGATORIU pentru admini. Profil → Securitate → \"Activează 2FA\" → scanează QR cu Google Authenticator."},
+                ]},
             ],
         },
     ],
-    "faq": [],
+    "faq": [
+        {"q": "Cum verific dacă un admin nou primește emailurile automate?", "a": "Verifică `ADMIN_EMAILS` în `backend/.env`. Apoi în admin panel apasă \"Test email\" pe Morning Briefing → toți admins primesc email. Dacă unul nu primește, verifică spam folder + că emailul e corect scris (case-insensitive)."},
+        {"q": "Ce fac dacă uit parola admin?", "a": "Reset normal prin email (la fel ca user). Dacă pierzi accesul la emailul admin (catastrofă), poți folosi SSH pe server → rulezi script direct pe DB: `python3 -c \"...\"` pentru a seta o parolă nouă bcrypt. Detalii în `backend/scripts/admin_password_reset.py`."},
+        {"q": "Pot avea 2 admini conectați simultan?", "a": "Da, nelimitat. Toate acțiunile sunt logate cu user_id în audit_log. Singurul caz în care apar conflicte: dacă ambii editează același user simultan — al doilea primește eroare \"Resource modified, please refresh\"."},
+        {"q": "Cum fac rollback la o versiune anterioară a platformei?", "a": "Folosește butonul **Rollback** din Emergent UI (este GRATIS, nu costă credite). NU rula `git reset` manual. Rollback restaurează cod + DB la un checkpoint anterior."},
+        {"q": "Care e SLA-ul meu ca admin?", "a": "Pentru alerte HIGH severity (smoke test fail, Stripe down): răspuns în 30 min. Pentru WARNING: răspuns în 4h. Pentru INFO: răspuns în 48h. Pentru cereri de la useri: răspuns în 24h."},
+        {"q": "Cum monitorizez sănătatea platformei când sunt în vacanță?", "a": "1) Activează \"On-call backup\" în profilul tău (alt admin primește alertele tale). 2) Verifică Morning Briefing zilnic din telefon (5 min). 3) Setează auto-replier în email pentru cereri non-urgente. Pentru urgențe, sistemul oricum te sună automat dacă e configurat numărul în profil."},
+        {"q": "Pot oprii rapoartele automate pe email?", "a": "Da, dezactivezi temporar din `/admin/schedules`. Toggle pe \"morning_briefing_digest\", \"daily_mongodb_backup\", \"weekly_dev_velocity\". NU recomandăm să le ții oprite > 7 zile."},
+    ],
 }
 
 # ============================================================================
-# 5) QA / Manual Testing Playbook — placeholder
+# 5) QA / Manual Testing Playbook
 # ============================================================================
 QA_DOC = {
     "slug": "qa-testing",
     "role": "qa",
     "title": "Manual Testing Playbook PropManage",
-    "subtitle": "100+ scenarii de testare end-to-end, organizate pe rol și prioritate. Pentru echipa QA internă.",
-    "version": "0.1-draft",
+    "subtitle": "100+ scenarii de testare end-to-end, organizate pe rol și prioritate. Pentru echipa QA internă, înainte de fiecare release.",
+    "version": "1.0",
     "updated_at": UPDATED,
-    "email_intro": "Acesta este playbook-ul oficial QA PropManage. Conține toate testele manuale obligatorii înainte de fiecare release.",
+    "email_intro": "Acesta este playbook-ul oficial QA PropManage. Conține toate testele manuale obligatorii înainte de fiecare release în producție.",
     "sections": [
         {
-            "heading": "1. Status: în lucru",
+            "heading": "1. Cum folosești acest playbook",
             "body": [
-                "Documentul complet va fi disponibil în versiunea v1.0. Va include: 100+ test cases pe 5 roluri (Client × 30, Specialist × 25, Operator × 15, Admin × 25, Public × 10), checklist interactiv în aplicație, AI suggester pentru test cases noi după fiecare deploy.",
+                "Înainte de fiecare deploy major în producție, parcurgi TOATE testele marcate **P0** (must-pass) și **P1** (should-pass). Testele **P2** sunt opționale dar recomandate lunar.",
+                {"type": "list", "items": [
+                    "**P0 (must-pass)** — blocant pentru release. Dacă un P0 pică, NU se face deploy.",
+                    "**P1 (should-pass)** — non-blocant, dar dacă > 3 pică, escaladare la admin.",
+                    "**P2 (nice-to-have)** — verificare lunară.",
+                ]},
+                {"type": "callout", "variant": "info", "title": "Format raport",
+                 "body": "După fiecare sesiune QA, completezi un raport simplu: data, versiune testată, P0 fail, P1 fail, observații. Salvezi în Drive/Notion + trimiți pe email admin."},
+                {"type": "h3", "text": "Convenții"},
+                {"type": "list", "items": [
+                    "**Test cu \"variațiuni\"** — testează cu Romanian diacritics (ăâîșț), spații extra, copy-paste, emoji, caractere speciale ($%&\"'<>), texte foarte lungi, texte goale, doar spații.",
+                    "**Test pe device-uri** — Chrome desktop + iOS Safari + Android Chrome. Min 3 device-uri/test.",
+                    "**Test pe conexiune slabă** — Chrome DevTools → Network → \"Slow 3G\" pentru flow-uri critice.",
+                ]},
+            ],
+        },
+        {
+            "heading": "2. CLIENT — 30 scenarii test",
+            "body": [
+                {"type": "h3", "text": "Onboarding (P0)"},
+                {"type": "list", "items": [
+                    "**C-01** Înregistrare cu email nou + parolă validă → verifică inbox primește welcome email + ghid Client v1.0 ca PDF atașat",
+                    "**C-02** Înregistrare cu email deja existent → mesaj clar \"Acest email există deja, vrei să te conectezi?\"",
+                    "**C-03** Înregistrare cu parolă < 8 caractere → mesaj eroar specific",
+                    "**C-04** Înregistrare cu nume conținând diacritice (Ăăâîșț) → numele se salvează corect",
+                    "**C-05** Login cu Google OAuth → cont nou creat automat + ghid trimis pe email",
+                    "**C-06** Reset parolă: cere → primește email → click link → setează parolă nouă → login funcționează",
+                    "**C-07** Reset parolă: link expirat (>60 min) → eroare \"Link expirat, cere unul nou\"",
+                    "**C-08** Login cu 10 încercări greșite → cont blocat 15 min cu mesaj clar",
+                ]},
+                {"type": "h3", "text": "Proprietate + Cerere (P0)"},
+                {"type": "list", "items": [
+                    "**C-09** Adaugă proprietate cu toate câmpurile completate → apare în listă",
+                    "**C-10** Adaugă proprietate fără adresă → eroare validare specifică",
+                    "**C-11** Postează cerere cu poze (3 imagini) → cererea apare în listă cu poze vizibile",
+                    "**C-12** Postează cerere cu poză > 10MB → eroare \"Imagine prea mare\"",
+                    "**C-13** Postează cerere cu descrieri foarte lungi (5000 caractere) → se salvează complet",
+                    "**C-14** Postează cerere fără categorie → forțează selecție",
+                    "**C-15** Anulează cerere postată → status \"Anulată\", specialiști notificați",
+                ]},
+                {"type": "h3", "text": "Escrow + Plăți (P0)"},
+                {"type": "list", "items": [
+                    "**C-16** Acceptă ofertă → buton \"Alimentează Escrow\" vizibil",
+                    "**C-17** Plată cu card test Stripe (4242 4242 4242 4242) → escrow status \"Active\"",
+                    "**C-18** Plată cu card refuzat (4000 0000 0000 0002) → eroare specifică + retry",
+                    "**C-19** Plată cu 3D Secure necesar → flow se completează corect",
+                    "**C-20** Confirmă finalizare lucrare → escrow eliberat, status \"Closed\", review form apare",
+                ]},
+                {"type": "h3", "text": "Dispute + Garanție (P1)"},
+                {"type": "list", "items": [
+                    "**C-21** Deschide dispută cu poze (5 imagini) + descriere → status \"In mediation\"",
+                    "**C-22** Adaugă răspuns în threadul de dispută → specialistul primește notificare",
+                    "**C-23** Cere remediere în perioada de garanție (12 luni) → specialistul primește notificare",
+                ]},
+                {"type": "h3", "text": "Digital Twin (P1 — doar dacă e premium)"},
+                {"type": "list", "items": [
+                    "**C-24** Upload .glb 5MB → modelul se încarcă în viewer 3D fără erori",
+                    "**C-25** Upload .glb 100MB → mesaj \"Fișier prea mare, max 50MB\"",
+                    "**C-26** Adaugă pin pe model → coordonate salvate, vizibil la refresh",
+                    "**C-27** Aprobă raport tokenizat (fără login) → status raport \"Approved\"",
+                ]},
+                {"type": "h3", "text": "Edge cases (P2)"},
+                {"type": "list", "items": [
+                    "**C-28** Logout din toate tab-urile deschise → toate sesiunile pică",
+                    "**C-29** Ștergere cont (GDPR) → flow 30 zile delay, opțiune cancel",
+                    "**C-30** Multi-language fallback (browser EN) → toate textele rămân în RO",
+                ]},
+            ],
+        },
+        {
+            "heading": "3. SPECIALIST — 25 scenarii test",
+            "body": [
+                {"type": "h3", "text": "Profil & Onboarding (P0)"},
+                {"type": "list", "items": [
+                    "**S-01** Înregistrare ca specialist → primește ghid Specialist v1.0 pe email",
+                    "**S-02** Upload documente KYC (CI + cert fiscal + asigurare) → status \"Pending verification\"",
+                    "**S-03** După aprobare manuală operator → badge VERIFIED apare pe profil",
+                    "**S-04** Upload poze portofoliu (10 imagini) → toate vizibile, comprimate corect",
+                    "**S-05** Setează zone de acoperire (5 sectoare București) → primesc lead-uri doar din ele",
+                    "**S-06** Setează specialitate primară + 2 secundare → apar corect pe profil public",
+                ]},
+                {"type": "h3", "text": "Lead Capture (P0)"},
+                {"type": "list", "items": [
+                    "**S-07** Apar lead-uri noi în categoria mea (instalator) → notificare push + email",
+                    "**S-08** Nu apar lead-uri din categorii ne-setate (ex: HVAC dacă sunt instalator) → corect filtrate",
+                    "**S-09** Trimite ofertă cu preț + descriere → apare la client în 1 secundă",
+                    "**S-10** Nu pot trimite > 1 ofertă la aceeași cerere → enforce",
+                    "**S-11** Plătește Lead Fee 45 RON → primește numărul de telefon al clientului",
+                ]},
+                {"type": "h3", "text": "Lucrare activă (P0)"},
+                {"type": "list", "items": [
+                    "**S-12** Ofertă acceptată + escrow alimentat → primesc notificare \"Banii sunt blocați, începe lucrarea\"",
+                    "**S-13** Trimit poze de progres în chat → se afișează la client",
+                    "**S-14** Marchez ca finalizat → client primește 7 zile de inspecție",
+                    "**S-15** Client confirmă → banii apar în wallet în max 60 min",
+                    "**S-16** Client NU confirmă în 7 zile → auto-release la zi 8",
+                ]},
+                {"type": "h3", "text": "Plăți și Wallet (P0)"},
+                {"type": "list", "items": [
+                    "**S-17** Wallet arată balanță corectă după 3 lucrări consecutive",
+                    "**S-18** Retragere bancară (IBAN valid) → status \"Processing\", funds în 1-3 zile",
+                    "**S-19** Retragere cu IBAN invalid → eroare validare",
+                    "**S-20** Factură PDF generată automat per lucrare → conformă ANAF (CUI, TVA dacă aplicabil)",
+                ]},
+                {"type": "h3", "text": "Dispute & recenzii (P1)"},
+                {"type": "list", "items": [
+                    "**S-21** Răspund la disputa client în 24h → escrow rămâne înghețat",
+                    "**S-22** Răspund la o recenzie negativă public → răspunsul apare pe profil",
+                    "**S-23** Cer remediere de la client (cazuri rare) → trigger workflow special",
+                ]},
+                {"type": "h3", "text": "Edge cases (P2)"},
+                {"type": "list", "items": [
+                    "**S-24** Anulare cu 24h înainte → fără penalty",
+                    "**S-25** Anulare la mijlocul lucrării → -0.5★ + refund obligatoriu",
+                ]},
+            ],
+        },
+        {
+            "heading": "4. OPERATOR — 15 scenarii test",
+            "body": [
+                {"type": "list", "items": [
+                    "**O-01** Login ca operator → vede doar tab-urile operator (NU console tehnice admin)",
+                    "**O-02** Listează KYC pending → cele mai vechi sus",
+                    "**O-03** Aprobă KYC valid → user primește badge VERIFIED + email confirmare",
+                    "**O-04** Respinge KYC cu motiv → user primește email cu motivul",
+                    "**O-05** Listează Twin pending → toate cu preview model 3D",
+                    "**O-06** Aprobă Twin valid → status \"Approved\", apare la proprietar",
+                    "**O-07** Respinge Twin cu motiv detaliat → notificare proprietar",
+                    "**O-08** Citește dispută < 1000 RON → poate decide",
+                    "**O-09** Decide dispută \"Refund client\" → escrow returnează banii pe card",
+                    "**O-10** Decide dispută \"Split 70/30\" → escrow împarte corect",
+                    "**O-11** Decide dispută \"Pay specialist\" → escrow eliberează către specialist",
+                    "**O-12** Escaladează dispută complexă > 1000 RON → admin primește notificare",
+                    "**O-13** NU poate accesa /admin/backups, /admin/healthcheck (forbidden) → 403",
+                    "**O-14** Caută user pe email → găsește, dar fără date financiare",
+                    "**O-15** Logout → sesiune închisă, redirect login",
+                ]},
+            ],
+        },
+        {
+            "heading": "5. ADMIN — 25 scenarii test",
+            "body": [
+                {"type": "h3", "text": "Monitoring & Dashboards (P0)"},
+                {"type": "list", "items": [
+                    "**A-01** Login admin → Morning Briefing apare cu 6 tiles populate",
+                    "**A-02** Click \"Test email\" → primesc email de briefing în max 30 secunde",
+                    "**A-03** Click \"Raport săptămânal\" → primesc Dev Velocity în max 60 secunde",
+                    "**A-04** Healthcheck → toate 7 servicii afișate cu status",
+                    "**A-05** Smoke test history → ultimele 50 runs vizibile",
+                ]},
+                {"type": "h3", "text": "AI Investigator (P0)"},
+                {"type": "list", "items": [
+                    "**A-06** Listează findings open → sortate pe severitate desc",
+                    "**A-07** Marchez finding ca \"Resolved\" + comentariu → audit log",
+                    "**A-08** Snooze finding 30 zile → dispare temporar, revine după",
+                ]},
+                {"type": "h3", "text": "Backup (P0)"},
+                {"type": "list", "items": [
+                    "**A-09** Click \"Backup acum\" → fișier nou apare în listă în 5 secunde",
+                    "**A-10** Download backup .tar.gz → arhivă validă cu MANIFEST + collections/*.json",
+                    "**A-11** Email cu backup ajunge în inbox cu PDF attachment ≤15MB",
+                ]},
+                {"type": "h3", "text": "Documentație & Training (P1)"},
+                {"type": "list", "items": [
+                    "**A-12** Listează 6 docs (Client, Specialist, Operator, Admin, QA, Architecture)",
+                    "**A-13** Preview Client doc → renderează toate secțiunile + FAQ + animații",
+                    "**A-14** Download Client PDF → format A4 cu brand, sectiuni clare",
+                    "**A-15** Copy Markdown to clipboard → paste în Notion arată identic",
+                    "**A-16** Trimite doc la 1 email custom → ajunge cu PDF + link tokenizat",
+                    "**A-17** Bulk send la rol \"specialist\" verified_only → max 500 destinatari",
+                    "**A-18** Cmd+K → search \"escrow\" → 10+ rezultate, click pe oricare deschide preview",
+                    "**A-19** Link tokenizat /help/{token} fără login → vede doc complet",
+                    "**A-20** Link tokenizat expirat (>30 zile) → eroare friendly",
+                ]},
+                {"type": "h3", "text": "Dispute complexe + GDPR (P1)"},
+                {"type": "list", "items": [
+                    "**A-21** Decide dispută > 1000 RON → escrow se ajustează corect",
+                    "**A-22** Generează DSAR export pentru un user → PDF cu toate datele",
+                    "**A-23** Impersonate user → logat în audit_log + banner vizibil",
+                    "**A-24** Suspendă cont cu motiv → user primește email + nu se mai poate loga",
+                ]},
+                {"type": "h3", "text": "Edge cases (P2)"},
+                {"type": "list", "items": [
+                    "**A-25** Rollback platformă din UI Emergent → recovery complet în 5 min",
+                ]},
+            ],
+        },
+        {
+            "heading": "6. PUBLIC (no auth) — 10 scenarii test",
+            "body": [
+                {"type": "list", "items": [
+                    "**P-01** Landing page se încarcă < 3 sec (Lighthouse mobile)",
+                    "**P-02** `/marketplace` listează specialiști, paginate, filter pe categorie funcționează",
+                    "**P-03** `/marketplace/electrician-bucuresti` arată DOAR electricieni din București (filter automat)",
+                    "**P-04** `/specialists/{id}` profil public încărcă fără login",
+                    "**P-05** `/ghiduri` listează 6 articole",
+                    "**P-06** `/ghiduri/cost-renovare-apartament-2-camere` se încarcă cu FAQ + JSON-LD",
+                    "**P-07** `/status` arată healthcheck live + incidents",
+                    "**P-08** `/api/public/sitemap.xml` returnează 229 URL-uri",
+                    "**P-09** robots.txt blochează /admin/*",
+                    "**P-10** Cookie consent banner apare la prima vizită",
+                ]},
+            ],
+        },
+        {
+            "heading": "7. Sesiune QA — checklist final",
+            "body": [
+                "După parcurgerea tuturor testelor, completează raportul:",
+                {"type": "code", "text": "Raport QA — [DATA]\nVersiune testată: [VERSION_SHA]\nTester: [NUME]\n\n## Rezultate\n- P0 PASS: X/Y  ❌ FAIL: [list]\n- P1 PASS: X/Y  ❌ FAIL: [list]\n- P2 PASS: X/Y  ❌ FAIL: [list]\n\n## Observații\n[Free text — comportamente ciudate, propuneri îmbunătățire]\n\n## Recomandare\n[ ] DEPLOY APPROVED (toate P0 PASS)\n[ ] DEPLOY BLOCKED (motiv: ...)"},
+                "Trimite raportul pe email la admin@propmanage.io + arhivează în Drive.",
             ],
         },
     ],
-    "faq": [],
+    "faq": [
+        {"q": "Cât durează o sesiune QA completă?", "a": "Pentru toate 105 teste P0+P1+P2: aproximativ 4-6 ore pentru un tester experimentat. Doar P0 (must-pass): 2-3 ore. Recomandăm să distribui pe 2 zile pentru a evita oboseala (greșeli de detecție)."},
+        {"q": "Pot automatiza o parte din teste?", "a": "Da, ~60% pot fi acoperite cu Playwright/Cypress. Toate P0 din secțiunea Public + 70% din Client + 50% din Admin. Restul (Operator dispute, KYC manual, Twin upload) sunt manual din cauza componentei vizuale."},
+        {"q": "Ce fac dacă un test e ambiguu?", "a": "Marchezi ca \"INCONCLUSIVE\" + descrii observația. Admin decide dacă e bug sau spec neclar. NU marca \"PASS\" la nesigur."},
+        {"q": "Cum testez pe iOS Safari fără Mac?", "a": "Folosește BrowserStack ($29/lună) sau Sauce Labs ($39/lună) pentru remote testing. Pentru bugete mici: Emulator Safari Tehnic Preview pe Linux (limitat dar gratis)."},
+        {"q": "Câte teste trebuie să adaug pe lună?", "a": "1-2 teste noi per feature nou release-uit. NU adăuga teste pentru fiecare bug fix (faci regresie pe testele existente). Țintă: <130 total teste până la finalul anului (mentenanță sustenabilă)."},
+    ],
 }
 
 

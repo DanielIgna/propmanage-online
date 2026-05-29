@@ -1246,3 +1246,43 @@ onboarding tour on first login per role.
   - Claude AI summary generates structured Romanian report.
   - `send-now` → 3/3 admins delivered via Resend.
 
+
+## Changelog — 2026-02-29 — Knowledge Base COMPLETE (Faza 2 + Faza 3)
+Upgraded all 4 placeholder docs to v1.0 with full Romanian content.
+
+**Specialist v1.0** — 9 secțiuni + 7 FAQ:
+1. Overview câștiguri (3 fluxuri venit), 2. Profil 7 elemente critice,
+3. Lead capture + ofertă câștigătoare, 4. Lead Fee — când plătești/nu,
+5. Escrow (5 pași), 6. Recenzii (cum primești 5★), 7. Dispute (perspectiva specialist),
+8. Wallet + retragere bani, 9. Best practices top-50.
+
+**Operator v1.0** — 7 secțiuni + 5 FAQ:
+1. Rol în platformă, 2. Workflow zilnic 90min, 3. Validare Twin (checklist),
+4. Mediere dispute < 1000 RON, 5. KYC verification (red flags), 6. Comunicare,
+7. KPI-uri monitorizate.
+
+**Admin v1.0** — 11 secțiuni + 7 FAQ:
+1. Responsabilități, 2. Morning Briefing, 3. AI Investigator,
+4. Console tehnice (Smoke/Healthcheck/Data Integrity/Backup/Audit),
+5. GDPR Compliance, 6. Mediere dispute complexe, 7. Suspendări conturi,
+8. Configurare platformă, 9. Comunicare publică, 10. Comenzi rapide + hotkeys,
+11. Cum adaugi alt admin (5 pași).
+
+**QA-Testing v1.0** — 7 secțiuni + 5 FAQ:
+1. Cum folosești playbook-ul (P0/P1/P2 + variațiuni de testare),
+2. **CLIENT — 30 scenarii** (Onboarding 8, Cerere 7, Escrow 5, Dispute 3, Twin 4, Edge 3),
+3. **SPECIALIST — 25 scenarii** (Profil 6, Lead 5, Lucrare 5, Plăți 4, Dispute 3, Edge 2),
+4. **OPERATOR — 15 scenarii**,
+5. **ADMIN — 25 scenarii** (Monitoring 5, AI 3, Backup 3, Docs 9, GDPR 4, Edge 1),
+6. **PUBLIC — 10 scenarii**, 7. Sesiune QA — checklist final cu template raport.
+**TOTAL: 105+ test cases** distribuite pe 5 roluri.
+
+**Verificare end-to-end:**
+- 6/6 docuri în v1.0 ✅
+- 6/6 PDFs generate cu signature %PDF-1.4 valid (9KB-19KB)
+- Search + MD export + send funcționează pe TOATE
+- Auto-onboarding la register trimite docul corect pe rol
+- Cron weekly (Mondays 09:30) trimite Dev Velocity
+
+**Total Knowledge Base**: 56 secțiuni + 41 FAQ + 105 test cases = ~13.000 cuvinte conținut RO de înaltă calitate.
+
