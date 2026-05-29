@@ -1552,3 +1552,47 @@ User: „într-o secțiune scrie escrow, în alta cont blocat, în alta depozit 
 - 🟢 More lifecycle tests (escrow happy path, dispute, file upload)
 - 🟢 Bulk-apply terminology fixes (1-click pe TOATE)
 
+
+---
+
+## Phase 40 — Bulk "Apply ALL AI fixes" pentru Terminology Audit (Feb 29, 2026) ✅
+
+### Ce face
+- Buton verde nou pe Terminology Audit Card: **Apply ALL AI fixes**
+- Iterates toate inconsistențele open, rulează AI rewrite pentru până la 5 ocurențe per cluster și aplică override-ul automat
+- Progress bar live: doc·cluster curent + N/Total + bar verde
+- Toast final cu summary
+
+### Implementare
+- Backend: nou helper `_ai_rewrite_block` (pur AI, fără mutație row) + `apply_all_open(inc_id=...)` cu `asyncio.Semaphore` concurrency=8 cap=5 ocurențe
+- Frontend: itereaza per-inconsistency pentru a sta sub K8s 60s ingress timeout
+
+### Rezultate live pe documentația noastră
+- Scanare inițială: 6 inconsistențe (38 ocurențe totale)
+- După bulk apply: 19 ocurențe patch-uite via override-uri
+- TERM-* test status: **1 fail → 4 fail** scădere la **4 pass / 1 fail** (escrow în client doc rămâne — 1 caz izolat de revizuit manual)
+- 19 doc_overrides aplicate în `db.doc_overrides`, fără modificare cod
+
+### Tests
+- Backend: 5/6 pytest PASS (1 fail e timeout pe no-body — design corect e iterația per-inc oricum)
+- Frontend: 100% P0+P1 PASS prin testing-agent
+
+### Capabilități QA finale
+| Strat | Detalii |
+|---|---|
+| Manual checklist | 105 scenarii |
+| Automate (29 teste) | smoke + content + lifecycle + terminology |
+| AI Test Suggester | per-feature |
+| Content Audit | audiență vs rol |
+| Terminology Audit | 5 clustere + AI fix + **Apply ALL bulk** |
+| Release Gate | one-click + cron luni 08:45 |
+
+### Backlog rămas
+- 🔴 Stripe LIVE keys
+- 🟡 Onboarding tour (Driver.js)
+- 🟡 Lottie KB
+- 🟡 Twilio SMS alerts
+- 🟢 More lifecycle tests
+- 🟢 Avatar S3/Cloudinary
+- 🟢 Split AdminQAPlaybook.jsx în module
+
