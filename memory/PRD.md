@@ -1286,3 +1286,39 @@ Upgraded all 4 placeholder docs to v1.0 with full Romanian content.
 
 **Total Knowledge Base**: 56 secțiuni + 41 FAQ + 105 test cases = ~13.000 cuvinte conținut RO de înaltă calitate.
 
+
+
+---
+
+## Phase 34 — Onboarding Drip, Interactive QA Playbook, Cookie Policy (Feb 29, 2026) ✅
+
+### 1) Specialist Onboarding Email Drip (Resend, 3 emails / 7 zile)
+- **/app/backend/onboarding_emails.py** — drip engine + 3 RO templates (Day 1 profile completion, Day 3 first-lead playbook, Day 7 Trust Score / tier ELITE).
+- **MongoDB collection**: `onboarding_emails` { user_id, email, name, step_key, day_offset, due_at, sent, attempts, sent_at }. Max 3 retries.
+- **Hook**: `routes/auth.py` register → `enqueue_specialist_onboarding(uid, email, name)` (idempotent).
+- **Dispatcher**: APScheduler cron `*/15 min` (Europe/Bucharest) runs `dispatch_due_onboarding_emails`. Cancels if user deleted/unsubscribed.
+- **Admin endpoints**: `GET /api/admin/onboarding/queue`, `POST /dispatch-now`, `POST /cancel/{uid}`, `POST /enqueue/{uid}`.
+
+### 2) Interactive QA Playbook + AI Test Suggester
+- **/app/backend/qa_playbook.py** — parses QA_DOC into 105 structured test items (CLIENT 30 / SPECIALIST 25 / OPERATOR 15 / ADMIN 25 / PUBLIC 10). Persists test runs in `db.qa_runs` with pass/fail/skip/note per check.
+- **AI Suggester**: `ai_suggest_tests(feature, context)` calls **Claude Sonnet 4.5** via Emergent LLM Key, returns 8-12 prioritized cases (P0/P1/P2) in strict JSON.
+- **Endpoints under /api/admin/qa**: `checklist/template`, `runs` (GET/POST), `runs/{id}` (GET), `runs/{id}/check/{cid}` (PATCH), `runs/{id}/close` (POST), `runs/{id}/markdown` (GET), `ai-suggest` (POST).
+- **/app/frontend/src/pages/admin/AdminQAPlaybook.jsx** — full UI: progress ring, P0/P1/P2 badges, category accordions, status pills, notes, status & priority filters, search box, Markdown export, RELEASE BLOCKED badge when any P0 fails, AI suggester sidebar with copy-to-MD.
+- **Wired**: nav under "TRAINING" → "QA Playbook" in AdminLayoutMetronic + AdminConsole routes.
+
+### 3) Cookie Policy page (GDPR / ePrivacy / Law 506/2004)
+- **/app/frontend/src/pages/LegalPages.jsx** — new `CookiePolicyPage` export, listed cookies (`access_token`, `refresh_token`, `csrf_token`, `theme`/`locale`, `onboarding_seen`), third-party sub-processors (Stripe, Cloudflare), rationale why no consent banner (only strict-necessary + functional cookies), localStorage explanation, DPO contact.
+- **Route**: `/cookies` registered in App.js. Footer link `data-testid='footer-cookies'`.
+
+### Tests
+- Backend: pytest **20/20 PASS** — `/app/backend/tests/test_phase33_new_features.py` (cumulative regression).
+- Frontend: testing-agent **11/11 PASS** — full E2E flow incl. AI Suggester via Claude Sonnet 4.5.
+
+### P1 / P2 backlog (remaining)
+- 🔴 **Stripe LIVE keys** — waiting on user's Stripe business verification.
+- 🟡 Onboarding tour (Driver.js) at first login (P2).
+- 🟡 Lottie animations in Knowledge Base (P2).
+- 🟡 Twilio SMS alerts for critical nighttime failures (P2).
+- 🟢 Trend comparison week-vs-week on Dev Velocity (P3).
+- 🟢 Avatar upload migration base64 → S3/Cloudinary (P3).
+

@@ -193,11 +193,12 @@ const CategoryGroup = ({ category, checks, onUpdate }) => {
 };
 
 
-const AISuggester = ({ }) => {
+const AISuggester = ({ runId, onCheckAdded }) => {
   const [feature, setFeature] = useState("");
   const [context, setContext] = useState("");
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState([]);
+  const [addedCodes, setAddedCodes] = useState(new Set());
   const [err, setErr] = useState("");
 
   const run = async () => {
@@ -208,6 +209,7 @@ const AISuggester = ({ }) => {
     setLoading(true);
     setErr("");
     setItems([]);
+    setAddedCodes(new Set());
     try {
       const { data } = await axios.post(`${API}/admin/qa/ai-suggest`, { feature, context });
       if (data.error) setErr(data.error);
@@ -231,9 +233,40 @@ const AISuggester = ({ }) => {
     toast.success("Markdown copiat în clipboard");
   };
 
+  const addToRun = async (it) => {
+    if (!runId) return;
+    try {
+      const { data } = await axios.post(`${API}/admin/qa/runs/${runId}/add-check`, {
+        code: it.code, priority: it.priority, category: it.category, description: it.description,
+      });
+      setAddedCodes((s) => new Set([...s, it.code]));
+      onCheckAdded && onCheckAdded(data);
+      toast.success(`${it.code} adăugat în run`);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Eroare la adăugare");
+    }
+  };
+
+  const addAllToRun = async () => {
+    if (!runId || items.length === 0) return;
+    let added = 0;
+    for (const it of items) {
+      if (addedCodes.has(it.code)) continue;
+      try {
+        const { data } = await axios.post(`${API}/admin/qa/runs/${runId}/add-check`, {
+          code: it.code, priority: it.priority, category: it.category, description: it.description,
+        });
+        onCheckAdded && onCheckAdded(data);
+        added++;
+      } catch {}
+    }
+    setAddedCodes(new Set(items.map((i) => i.code)));
+    toast.success(`${added} teste adăugate în run`);
+  };
+
   return (
     <AdminCard title={<span className="inline-flex items-center gap-2"><Bot className="w-4 h-4" /> AI Test Suggester · Claude Sonnet 4.5</span>} testid="qa-ai-suggester">
-      <p className="text-xs text-slate-500 mb-3">Descrie un feature sau un flow. AI va genera 8-12 cazuri de test prioritizate (P0/P1/P2) pentru execuție manuală.</p>
+      <p className="text-xs text-slate-500 mb-3">Descrie un feature sau un flow. AI va genera 8-12 cazuri de test prioritizate (P0/P1/P2). {runId ? "Apasă ➕ pentru a le adăuga direct în runul curent." : "Pentru a le adăuga într-un run, deschide un run mai întâi."}</p>
       <div className="space-y-2">
         <input
           value={feature}
@@ -250,33 +283,144 @@ const AISuggester = ({ }) => {
           className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
           data-testid="qa-ai-context-input"
         />
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <AdminBtn variant="primary" onClick={run} disabled={loading} data-testid="qa-ai-suggest-btn">
             {loading ? (<><Loader2 className="w-3.5 h-3.5 inline mr-1 animate-spin" /> Generează...</>) : (<><Sparkles className="w-3.5 h-3.5 inline mr-1" /> Sugerează teste</>)}
           </AdminBtn>
           {items.length > 0 && (
             <AdminBtn variant="secondary" onClick={copyMarkdown} data-testid="qa-ai-copy-md">Copiază MD</AdminBtn>
           )}
+          {runId && items.length > 0 && (
+            <AdminBtn variant="success" onClick={addAllToRun} data-testid="qa-ai-add-all">
+              <Plus className="w-3.5 h-3.5 inline mr-1" /> Adaugă tot în run
+            </AdminBtn>
+          )}
         </div>
       </div>
       {err && <div className="mt-3 text-xs p-2 rounded bg-red-500/10 text-red-700 dark:text-red-300">{err}</div>}
       {items.length > 0 && (
         <div className="mt-4 space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
-          {items.map((it, idx) => (
-            <div key={idx} className="text-xs p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40">
-              <div className="flex items-center gap-2 flex-wrap">
-                <code className="font-mono font-semibold text-slate-900 dark:text-slate-100">{it.code}</code>
-                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${PRIO_BADGE[it.priority] || ""}`}>{it.priority}</span>
-                <span className="text-[10px] uppercase tracking-wider text-slate-500">{it.category}</span>
+          {items.map((it, idx) => {
+            const added = addedCodes.has(it.code);
+            return (
+              <div key={idx} className="text-xs p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40" data-testid={`qa-ai-item-${it.code}`}>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <code className="font-mono font-semibold text-slate-900 dark:text-slate-100">{it.code}</code>
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${PRIO_BADGE[it.priority] || ""}`}>{it.priority}</span>
+                  <span className="text-[10px] uppercase tracking-wider text-slate-500">{it.category}</span>
+                  {runId && (
+                    <button
+                      onClick={() => addToRun(it)}
+                      disabled={added}
+                      className={`ml-auto text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${added ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"}`}
+                      data-testid={`qa-ai-add-${it.code}`}
+                    >
+                      {added ? <><CheckCircle2 className="w-3 h-3" /> adăugat</> : <><Plus className="w-3 h-3" /> Adaugă în run</>}
+                    </button>
+                  )}
+                </div>
+                <p className="mt-0.5 text-slate-700 dark:text-slate-200">{it.description}</p>
               </div>
-              <p className="mt-0.5 text-slate-700 dark:text-slate-200">{it.description}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </AdminCard>
   );
 };
+
+
+// ----------------------------------------------------------------------------
+// Automation Panel — execute predefined automated tests; results write into the run.
+// ----------------------------------------------------------------------------
+
+const AutomationPanel = ({ runId, onAfterRun }) => {
+  const [catalog, setCatalog] = useState([]);
+  const [selected, setSelected] = useState(new Set());
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState(null);
+
+  useEffect(() => {
+    axios.get(`${API}/admin/qa/automation/tests`).then(({ data }) => setCatalog(data.tests || [])).catch(() => {});
+  }, []);
+
+  const toggle = (code) => {
+    setSelected((s) => {
+      const next = new Set(s);
+      next.has(code) ? next.delete(code) : next.add(code);
+      return next;
+    });
+  };
+  const selectAll = () => setSelected(new Set(catalog.map((t) => t.code)));
+  const clearAll = () => setSelected(new Set());
+
+  const execute = async () => {
+    const codes = [...selected];
+    if (codes.length === 0) {
+      toast.error("Selectează cel puțin un test");
+      return;
+    }
+    setLoading(true);
+    setResults(null);
+    try {
+      const { data } = await axios.post(`${API}/admin/qa/automation/execute`, { test_codes: codes, run_id: runId || null });
+      setResults(data);
+      toast.success(`${data.summary.pass}/${data.summary.total} PASS · ${data.summary.fail} FAIL` + (data.summary.written_to_run ? ` · ${data.summary.written_to_run} scrise în run` : ""));
+      onAfterRun && onAfterRun();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Eroare la execuție");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <AdminCard title={<span className="inline-flex items-center gap-2"><Play className="w-4 h-4" /> Automation Engine · {catalog.length} teste pre-definite</span>} testid="qa-automation-panel">
+      <p className="text-xs text-slate-500 mb-3">
+        Teste care rulează singure (HTTP API + Playwright browser). Selectezi câteva, apeși <strong>Execută</strong> și rezultatele se scriu direct în run-ul curent (dacă există) ca scenarii automate marcate cu badge ⚙️.
+      </p>
+      <div className="flex gap-2 mb-3 flex-wrap">
+        <AdminBtn variant="secondary" onClick={selectAll} data-testid="qa-auto-select-all">Selectează tot ({catalog.length})</AdminBtn>
+        <AdminBtn variant="ghost" onClick={clearAll} data-testid="qa-auto-clear">Golește selecția</AdminBtn>
+        <AdminBtn variant="primary" onClick={execute} disabled={loading || selected.size === 0} data-testid="qa-auto-execute">
+          {loading ? <><Loader2 className="w-3.5 h-3.5 inline mr-1 animate-spin" /> Rulează {selected.size}...</> : <><Play className="w-3.5 h-3.5 inline mr-1" /> Execută ({selected.size})</>}
+        </AdminBtn>
+      </div>
+      <div className="space-y-1.5 max-h-[380px] overflow-y-auto pr-1">
+        {catalog.map((t) => {
+          const checked = selected.has(t.code);
+          const resForCode = results?.results?.find((r) => r.code === t.code);
+          const resIcon = resForCode ? (resForCode.status === "pass" ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <XCircle className="w-3.5 h-3.5 text-red-600" />) : null;
+          return (
+            <label key={t.code} className={`block text-xs p-2 rounded-lg border cursor-pointer transition ${checked ? "border-blue-400 bg-blue-50 dark:bg-blue-900/20" : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40"}`} data-testid={`qa-auto-row-${t.code}`}>
+              <div className="flex items-start gap-2">
+                <input type="checkbox" checked={checked} onChange={() => toggle(t.code)} className="mt-0.5" data-testid={`qa-auto-cb-${t.code}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <code className="font-mono font-semibold text-slate-900 dark:text-slate-100">{t.code}</code>
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${PRIO_BADGE[t.priority] || ""}`}>{t.priority}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-slate-500">{t.kind === "browser" ? "🌐 browser" : "⚡ http"}</span>
+                    <span className="text-[10px] text-slate-500">{t.category}</span>
+                    {resIcon && <span className="ml-auto inline-flex items-center gap-1 text-[10px]">{resIcon} {resForCode.duration_ms}ms</span>}
+                  </div>
+                  <div className="text-slate-700 dark:text-slate-200 mt-0.5">{t.title}</div>
+                  {resForCode && <div className={`text-[10px] mt-1 italic ${resForCode.status === "pass" ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}`}>📋 {resForCode.note}</div>}
+                </div>
+              </div>
+            </label>
+          );
+        })}
+      </div>
+      {results && (
+        <div className="mt-3 text-xs p-3 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200" data-testid="qa-auto-summary">
+          <strong>Sumar:</strong> {results.summary.pass} pass / {results.summary.fail} fail / {results.summary.total} total
+          {results.summary.written_to_run > 0 && <> · <strong>{results.summary.written_to_run}</strong> scrise în run</>}
+        </div>
+      )}
+    </AdminCard>
+  );
+};
+
 
 
 const RunsList = ({ onPick, onCreate }) => {
@@ -452,7 +596,8 @@ export const AdminQAPlaybook = () => {
           </div>
         </AdminCard>
         <RunsList onPick={loadRun} onCreate={loadRun} />
-        <AISuggester />
+        <AISuggester runId={null} />
+        <AutomationPanel runId={null} />
       </div>
     );
   }
@@ -511,7 +656,14 @@ export const AdminQAPlaybook = () => {
         </div>
 
         <div className="space-y-4">
-          <AISuggester />
+          <AISuggester
+            runId={runId}
+            onCheckAdded={(payload) => {
+              if (payload?.run) setRun(payload.run);
+              if (payload?.summary) setSummary(payload.summary);
+            }}
+          />
+          <AutomationPanel runId={runId} onAfterRun={() => loadRun(runId)} />
         </div>
       </div>
     </div>

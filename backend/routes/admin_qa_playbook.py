@@ -9,6 +9,7 @@ from qa_playbook import (
     checklist_stats,
     create_run,
     list_runs,
+    add_adhoc_check,
     get_run,
     update_check,
     close_run,
@@ -16,6 +17,7 @@ from qa_playbook import (
     ai_suggest_tests,
     render_run_markdown,
 )
+from qa_automation import list_automated_tests, execute_tests
 
 router = APIRouter(prefix="/api/admin/qa", tags=["admin-qa"])
 
@@ -34,6 +36,14 @@ class UpdateCheckIn(BaseModel):
 class AISuggestIn(BaseModel):
     feature: str
     context: Optional[str] = None
+
+
+class AddAdhocCheckIn(BaseModel):
+    code: str
+    priority: str = "P1"
+    category: str = "AD-HOC"
+    description: str
+    subcategory: Optional[str] = "ad-hoc / AI"
 
 
 # ---- Routes ----
@@ -86,6 +96,24 @@ async def close_run_ep(run_id: str, admin=Depends(require_role("admin"))):
     return {"run": run, "summary": run_summary(run)}
 
 
+@router.post("/runs/{run_id}/add-check")
+async def add_check_ep(run_id: str, payload: AddAdhocCheckIn, admin=Depends(require_role("admin"))):
+    try:
+        run = await add_adhoc_check(
+            run_id,
+            code=payload.code,
+            priority=payload.priority,
+            category=payload.category,
+            description=payload.description,
+            subcategory=payload.subcategory or "ad-hoc / AI",
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if not run:
+        raise HTTPException(404, "Run not found")
+    return {"run": run, "summary": run_summary(run)}
+
+
 @router.get("/runs/{run_id}/markdown")
 async def markdown_export(run_id: str, admin=Depends(require_role("admin"))):
     run = await get_run(run_id)
@@ -102,4 +130,22 @@ async def markdown_export(run_id: str, admin=Depends(require_role("admin"))):
 @router.post("/ai-suggest")
 async def ai_suggest(payload: AISuggestIn, admin=Depends(require_role("admin"))):
     result = await ai_suggest_tests(payload.feature, payload.context)
+    return result
+
+
+class AutomateRunIn(BaseModel):
+    test_codes: list[str]
+    run_id: Optional[str] = None
+
+
+@router.get("/automation/tests")
+async def automation_catalog(admin=Depends(require_role("admin"))):
+    return {"tests": list_automated_tests()}
+
+
+@router.post("/automation/execute")
+async def automation_execute(payload: AutomateRunIn, admin=Depends(require_role("admin"))):
+    if not payload.test_codes:
+        raise HTTPException(400, "test_codes required")
+    result = await execute_tests(payload.test_codes, run_id=payload.run_id)
     return result

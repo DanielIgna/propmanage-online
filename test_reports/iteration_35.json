@@ -1,0 +1,48 @@
+{
+  "summary": "Phase-34 (Automation Engine + Add-to-run) fully validated end-to-end. All 7 backend pytest cases PASS in 7s (catalog of 14 items, execute without/with run_id writes correctly, add-check idempotency, 3 Playwright browser tests pass, RBAC blocks client with 403). Frontend e2e flow PASS on preview URL: admin login → sidebar QA Playbook → landing shows qa-ai-suggester + qa-automation-panel (14 checkboxes) → create run 'TEST_UI Add Test' → AI Suggester returned 12 cards for 'Health check endpoint' (HC-01..HC-05 etc.) → clicked qa-ai-add-HC-01 → button text='adăugat' & disabled, check appended → Automation panel in sidebar → Selectează tot (14) → Execută → 'Sumar: 14 pass / 0 fail / 14 total · 14 scrise în run' rendered in qa-auto-summary → backend run state confirmed: total_checks=120 (=105 default + 14 automated + 1 AI), pass=14, automated=14, ai_added=1.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase34_automation.py",
+    "/app/test_reports/pytest/phase34_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdminQAPlaybook.jsx is 674 lines — still warrants splitting (AISuggester + AutomationPanel + RunView) per iteration_34 advice. Not blocking.",
+    "qa_automation.py inlines large multi-line Playwright templates as f-strings; consider moving these to /app/backend/qa_automation_browser_templates.py for clarity (minor).",
+    "execute_tests writes results to run with separate find_one + update_one calls per result; could be batched but parallel safety is preserved by checking existing each time. Not blocking."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase34_automation.py (new)"
+  ],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% (P0 flows all green)"},
+  "test_credentials": "admin@propmanage.io / Admin123!  |  client@propmanage.io / Client123!  (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created 2 QA runs during testing ('TEST_phase34_auto' & 'TEST_UI Add Test') — both deleted from propmanage_db.qa_runs at end of run.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Preview URL: https://phased-document.preview.emergentagent.com. Sidebar to QA Playbook is the button text='QA Playbook' (no direct /admin/qa-playbook route — it is a tab inside /admin AdminConsole). The run-creation input testid is qa-new-run-name (NOT qa-run-create-name) and submit is qa-create-run-btn. Automation Engine fully functional — 14 tests pass in ~5s wall-time (parallel httpx + 3 Playwright subprocesses). Default checklist seeds 105 items; after one AI add + 14 automation runs the run holds 120 checks (105 + 14 automated + 1 ai_added). qa-auto-summary text format is 'Sumar: X pass / Y fail / N total · M scrise în run'. add-check is idempotent on (run_id, code).",
+  "verified_endpoints": {
+    "GET /api/admin/qa/automation/tests": "200 (14 tests)",
+    "POST /api/admin/qa/automation/execute (no run)": "200, 3/3 pass, <20s",
+    "POST /api/admin/qa/automation/execute (with run + AUTO-AUTH-01)": "200, written_to_run=1, check appended status=pass, automated=true",
+    "POST /api/admin/qa/runs/{id}/add-check (CUSTOM-01)": "200, ai_added=true, idempotent (no dup on 2nd call)",
+    "POST /api/admin/qa/automation/execute browser tests (AUTO-UI-01/02/03)": "200, 3/3 pass in <90s",
+    "GET /api/admin/qa/automation/tests as client": "403",
+    "POST /api/admin/qa/automation/execute as client": "403"
+  },
+  "verified_ui_flows": [
+    "P0 admin login → /admin",
+    "P0 sidebar 'QA Playbook' click → landing renders qa-ai-suggester + qa-automation-panel + 14 qa-auto-cb-* checkboxes",
+    "P0 create run TEST_UI Add Test → run view qa-run-name visible",
+    "P0 AI suggester for 'Health check endpoint' → returned HC-01..HC-05+ cards each with qa-ai-add-{CODE} + header qa-ai-add-all",
+    "P0 click qa-ai-add-HC-01 → button becomes 'adăugat' + disabled + run-check count increases",
+    "P0 Automation panel visible in run view sidebar with 14 checkboxes",
+    "P0 qa-auto-select-all → all 14 checked → qa-auto-execute → qa-auto-summary='Sumar: 14 pass / 0 fail / 14 total · 14 scrise în run'",
+    "P0 progress counters update: backend reports pass=14, automated=14, ai_added=1, total=120"
+  ],
+  "rca of the issue": "N/A — no bugs found."
+}

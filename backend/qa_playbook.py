@@ -137,6 +137,43 @@ async def list_runs(limit: int = 30) -> list[dict]:
     return out
 
 
+async def add_adhoc_check(run_id: str, *, code: str, priority: str, category: str, description: str, subcategory: str = "ad-hoc / AI") -> Optional[dict]:
+    """Append a new check (typically AI-suggested) to an existing run.
+
+    Auto-de-dup: if a check with the same code already exists, returns the run unchanged.
+    """
+    run = await db.qa_runs.find_one({"run_id": run_id}, {"checks.code": 1, "closed_at": 1})
+    if not run:
+        return None
+    if run.get("closed_at"):
+        raise ValueError("Run is closed")
+    existing = {c.get("code") for c in run.get("checks", [])}
+    if code in existing:
+        # Idempotent: silently return the current run
+        return await get_run(run_id)
+    if priority not in ("P0", "P1", "P2"):
+        priority = "P1"
+    new_check = {
+        "id": str(uuid.uuid4()),
+        "code": code.strip()[:20],
+        "category": (category or "AD-HOC").strip().upper()[:40],
+        "subcategory": subcategory,
+        "priority": priority,
+        "description": (description or "").strip()[:600],
+        "status": "pending",
+        "note": "",
+        "updated_at": None,
+        "updated_by": None,
+        "ai_added": True,
+    }
+    now = datetime.now(timezone.utc).isoformat()
+    await db.qa_runs.update_one(
+        {"run_id": run_id},
+        {"$push": {"checks": new_check}, "$set": {"updated_at": now}},
+    )
+    return await get_run(run_id)
+
+
 async def get_run(run_id: str) -> Optional[dict]:
     r = await db.qa_runs.find_one({"run_id": run_id})
     if not r:
