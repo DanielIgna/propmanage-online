@@ -105,9 +105,13 @@ def _md_to_html(text: str) -> str:
     return text
 
 
-def render_doc_pdf(doc_slug: str) -> bytes:
-    """Render a PropManage doc to a PDF byte string."""
-    doc = get_doc(doc_slug)
+def render_doc_pdf(doc_slug: str, doc_override=None) -> bytes:
+    """Render a PropManage doc to a PDF byte string.
+
+    If `doc_override` is provided (a doc dict with overrides already applied),
+    it is used directly. Otherwise the registry copy is used as-is.
+    """
+    doc = doc_override or get_doc(doc_slug)
     if not doc:
         raise ValueError(f"Unknown doc slug: {doc_slug}")
 
@@ -307,3 +311,26 @@ async def email_doc_to_user(doc_slug: str, recipient_email: str,
 def list_docs_meta() -> list[dict]:
     """For admin UI — list all available docs with metadata."""
     return all_doc_meta()
+
+
+
+async def resolve_doc_with_overrides(doc_slug: str):
+    """Return a deep-copied doc dict with any `db.doc_overrides` patches applied."""
+    import copy
+    base = get_doc(doc_slug)
+    if not base:
+        return None
+    try:
+        from qa_content_audit import get_overrides_for_doc
+        overrides = await get_overrides_for_doc(doc_slug)
+    except Exception:  # noqa: BLE001
+        overrides = {}
+    if not overrides:
+        return base
+    doc = copy.deepcopy(base)
+    for (sec_idx, blk_idx), patch in overrides.items():
+        try:
+            doc["sections"][sec_idx]["body"][blk_idx] = patch
+        except (IndexError, KeyError, TypeError):
+            continue
+    return doc

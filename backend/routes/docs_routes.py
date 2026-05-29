@@ -73,7 +73,8 @@ async def admin_list_docs(user: dict = Depends(require_role("admin"))):
 
 @admin_router.get("/{slug}")
 async def admin_get_doc(slug: str, user: dict = Depends(require_role("admin"))):
-    doc = get_doc(slug)
+    from docs_service import resolve_doc_with_overrides
+    doc = await resolve_doc_with_overrides(slug)
     if not doc:
         raise HTTPException(404, "Doc not found")
     return doc
@@ -84,7 +85,9 @@ async def admin_download_pdf(slug: str, user: dict = Depends(require_role("admin
     if not get_doc(slug):
         raise HTTPException(404, "Doc not found")
     try:
-        pdf_bytes = render_doc_pdf(slug)
+        from docs_service import resolve_doc_with_overrides
+        resolved = await resolve_doc_with_overrides(slug)
+        pdf_bytes = render_doc_pdf(slug, doc_override=resolved)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"PDF render failed: {e}") from e
     return Response(

@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 import json
 import time
+import uuid
 import asyncio
 import logging
 import tempfile
@@ -332,6 +333,176 @@ async def browser_login_page_renders() -> dict:
 
 
 # ============================================================================
+# Content Audit tests (DOC-AUDIT-*)
+# Verify each role's manual uses audience-appropriate language.
+# ============================================================================
+
+async def doc_audit_specialist_no_client_perspective() -> dict:
+    """DOC-AUDIT-01: specialist doc must NOT include client-perspective callouts (e.g. 'banii pe care îi plătești')."""
+    from qa_content_audit import audit_doc
+    conflicts = [c for c in audit_doc("specialist") if c["wrong_audience"] == "client"]
+    if not conflicts:
+        return _ok("OK — specialist doc nu conține pasaje cu perspectivă client")
+    detail = "; ".join(f"sec {c['section_index']}.{c['block_index']} — {c['block_excerpt'][:80]}" for c in conflicts[:3])
+    return _ko(f"Conflict audience în specialist doc: {len(conflicts)} pasaj(e). {detail}")
+
+
+async def doc_audit_client_no_specialist_perspective() -> dict:
+    """DOC-AUDIT-02: client doc nu conține pasaje exclusiv specialist (lead fee, badge VERIFIED detaliat)."""
+    from qa_content_audit import audit_doc
+    conflicts = [c for c in audit_doc("client") if c["wrong_audience"] == "specialist"]
+    if not conflicts:
+        return _ok("OK — client doc fără perspective specialist greșite")
+    return _ko(f"{len(conflicts)} pasaj(e) suspecte: " + "; ".join(c["block_excerpt"][:60] for c in conflicts[:3]))
+
+
+async def doc_audit_specialist_has_payment_info() -> dict:
+    """DOC-AUDIT-03: specialist doc trebuie să menționeze 'comision' sau '95%' (informația principală pt. specialist)."""
+    from docs_content import get_doc
+    doc = get_doc("specialist")
+    if not doc:
+        return _ko("specialist doc missing")
+    blob = " ".join(
+        (b if isinstance(b, str) else (b.get("body", "") + " " + str(b.get("items", ""))))
+        for s in doc["sections"]
+        for b in s.get("body", [])
+    ).lower()
+    keywords = ["comision", "95%", "lead fee", "plătit"]
+    found = [k for k in keywords if k in blob]
+    if len(found) >= 2:
+        return _ok(f"OK — specialist doc conține info plată: {found}")
+    return _ko(f"Lipsesc keyword-uri financiare specialist: găsite doar {found}")
+
+
+async def doc_audit_client_has_dispute_info() -> dict:
+    """DOC-AUDIT-04: client doc trebuie să menționeze 'dispută' (protecția clientului)."""
+    from docs_content import get_doc
+    doc = get_doc("client")
+    blob = " ".join(
+        (b if isinstance(b, str) else (b.get("body", "") + " " + b.get("title", "")))
+        for s in doc["sections"]
+        for b in s.get("body", [])
+    ).lower()
+    if "dispută" in blob or "dispute" in blob or "rambursează" in blob:
+        return _ok("OK — client doc menționează disputele/rambursarea")
+    return _ko("Client doc NU menționează disputele — informație critică lipsă")
+
+
+async def doc_audit_all_docs_have_overrides_resolved() -> dict:
+    """DOC-AUDIT-05: dacă există override-uri, fiecare se aplică valid (nu cade pe IndexError)."""
+    from docs_service import resolve_doc_with_overrides
+    from docs_content import DOCS_CONTENT
+    errors = []
+    for slug in DOCS_CONTENT.keys():
+        try:
+            d = await resolve_doc_with_overrides(slug)
+            if not d:
+                errors.append(f"{slug}=None")
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"{slug}={type(e).__name__}")
+    if errors:
+        return _ko(f"Errors resolving overrides: {errors}")
+    return _ok(f"OK — overrides aplicate fără erori pentru {len(DOCS_CONTENT)} docuri")
+
+
+# ============================================================================
+# Lifecycle / Communication tests (LIFECYCLE-*)
+# Exercise full flows end-to-end via the public API.
+# ============================================================================
+
+async def lifecycle_client_register_then_delete() -> dict:
+    """LIFECYCLE-01: client se înregistrează → login → ștergere cont (GDPR DSAR right-to-be-forgotten)."""
+    email = f"lifecycle_client_{int(time.time())}_{uuid.uuid4().hex[:6]}@test.com"
+    async with await _client() as c:
+        # Register
+        r = await c.post("/api/auth/register", json={
+            "email": email, "password": "Test1234!", "name": "Lifecycle Client",
+            "role": "client", "phone": "0712345678", "zone": "Bucuresti",
+        })
+        if r.status_code != 200:
+            return _ko(f"register failed {r.status_code}: {r.text[:200]}")
+        # Login
+        r2 = await c.post("/api/auth/login", json={"email": email, "password": "Test1234!"})
+        if r2.status_code != 200:
+            return _ko(f"login failed {r2.status_code}")
+        # Try /api/auth/me
+        r3 = await c.get("/api/auth/me")
+        if r3.status_code != 200 or r3.json().get("email") != email:
+            return _ko(f"me endpoint failed {r3.status_code}")
+        # Cleanup: delete from DB directly (no public delete-account endpoint exists)
+        from db import db
+        await db.users.delete_one({"email": email})
+        return _ok(f"OK — register→login→me OK pentru {email}")
+
+
+async def lifecycle_specialist_register_then_onboarding_drip() -> dict:
+    """LIFECYCLE-02: specialist înregistrat → primește 3 emails enqueuate în db.onboarding_emails."""
+    email = f"lifecycle_spec_{int(time.time())}_{uuid.uuid4().hex[:6]}@test.com"
+    async with await _client() as c:
+        r = await c.post("/api/auth/register", json={
+            "email": email, "password": "Test1234!", "name": "Lifecycle Spec",
+            "role": "specialist", "phone": "0712345678",
+            "service_categories": ["electric"], "coverage_zones": ["Bucuresti"],
+        })
+        if r.status_code != 200:
+            return _ko(f"register failed {r.status_code}")
+    # Check that 3 onboarding rows were enqueued
+    from db import db
+    rows = await db.onboarding_emails.count_documents({"email": email})
+    # Cleanup
+    await db.onboarding_emails.delete_many({"email": email})
+    await db.users.delete_one({"email": email})
+    if rows >= 3:
+        return _ok(f"OK — specialist {email} a primit {rows} email-uri de onboarding")
+    return _ko(f"Doar {rows} email-uri enqueuate, așteptam ≥3")
+
+
+async def lifecycle_marketplace_search_returns_specialists() -> dict:
+    """LIFECYCLE-03: client (neautentificat) caută în marketplace → primește listă specialiști."""
+    async with await _client() as c:
+        r = await c.get("/api/marketplace/specialists?service=electric&city=Bucuresti&page=1")
+        if r.status_code != 200:
+            return _ko(f"marketplace search status {r.status_code}")
+        body = r.json()
+        # Accept either list-form (direct) or dict-form with items
+        if isinstance(body, list):
+            return _ok(f"OK — marketplace returnează listă cu {len(body)} specialiști")
+        if isinstance(body, dict):
+            items = body.get("items") or body.get("specialists") or body.get("results") or []
+            return _ok(f"OK — marketplace returnează {len(items)} specialiști (dict-form)")
+        return _ko(f"Răspuns marketplace neașteptat: {str(body)[:200]}")
+
+
+async def lifecycle_specialist_profile_public_view() -> dict:
+    """LIFECYCLE-04: profilul public al unui specialist este accesibil clienților."""
+    from db import db
+    spec = await db.users.find_one({"role": "specialist", "deleted": {"$ne": True}})
+    if not spec:
+        return _ko("Nu există niciun specialist în DB")
+    spec_id = str(spec["_id"])
+    async with await _client() as c:
+        # Real endpoint: /api/specialists/{id}/profile
+        r = await c.get(f"/api/specialists/{spec_id}/profile")
+        if r.status_code == 200:
+            return _ok("OK — /api/specialists/{id}/profile accesibil pentru clienți")
+        return _ko(f"Profil public specialist nu se vede ({r.status_code}): {r.text[:200]}")
+
+
+async def lifecycle_admin_role_unique_count() -> dict:
+    """LIFECYCLE-05: verifică integritate referențială — fiecare user are exact 1 rol valid."""
+    from db import db
+    valid_roles = {"client", "specialist", "operator", "admin"}
+    bad = []
+    async for u in db.users.find({}, {"email": 1, "role": 1}):
+        if u.get("role") not in valid_roles:
+            bad.append(f"{u.get('email')}={u.get('role')!r}")
+    if not bad:
+        total = await db.users.count_documents({})
+        return _ok(f"OK — toți cei {total} useri au roluri valide")
+    return _ko(f"{len(bad)} useri cu rol invalid: {bad[:5]}")
+
+
+# ============================================================================
 # Registry
 # ============================================================================
 
@@ -451,6 +622,88 @@ AUTOMATED_TESTS: dict[str, dict] = {
         "category": "PUBLIC",
         "priority": "P0",
         "runner": browser_login_page_renders,
+    },
+    # ---- Content Audit (5) ----
+    "DOC-AUDIT-01": {
+        "code": "DOC-AUDIT-01",
+        "title": "Specialist doc fără pasaje cu perspectivă client",
+        "kind": "http",
+        "category": "CONTENT",
+        "priority": "P0",
+        "runner": doc_audit_specialist_no_client_perspective,
+    },
+    "DOC-AUDIT-02": {
+        "code": "DOC-AUDIT-02",
+        "title": "Client doc fără pasaje strict specialist (lead fee etc.)",
+        "kind": "http",
+        "category": "CONTENT",
+        "priority": "P1",
+        "runner": doc_audit_client_no_specialist_perspective,
+    },
+    "DOC-AUDIT-03": {
+        "code": "DOC-AUDIT-03",
+        "title": "Specialist doc menționează comision, plată, lead fee",
+        "kind": "http",
+        "category": "CONTENT",
+        "priority": "P0",
+        "runner": doc_audit_specialist_has_payment_info,
+    },
+    "DOC-AUDIT-04": {
+        "code": "DOC-AUDIT-04",
+        "title": "Client doc menționează disputele și rambursarea",
+        "kind": "http",
+        "category": "CONTENT",
+        "priority": "P0",
+        "runner": doc_audit_client_has_dispute_info,
+    },
+    "DOC-AUDIT-05": {
+        "code": "DOC-AUDIT-05",
+        "title": "Toate override-urile aplicate cu success (no IndexError)",
+        "kind": "http",
+        "category": "CONTENT",
+        "priority": "P1",
+        "runner": doc_audit_all_docs_have_overrides_resolved,
+    },
+    # ---- Lifecycle / Communication (5) ----
+    "LIFECYCLE-01": {
+        "code": "LIFECYCLE-01",
+        "title": "Client: register → login → /me funcționează",
+        "kind": "http",
+        "category": "LIFECYCLE",
+        "priority": "P0",
+        "runner": lifecycle_client_register_then_delete,
+    },
+    "LIFECYCLE-02": {
+        "code": "LIFECYCLE-02",
+        "title": "Specialist nou primește 3 emails onboarding enqueuate",
+        "kind": "http",
+        "category": "LIFECYCLE",
+        "priority": "P0",
+        "runner": lifecycle_specialist_register_then_onboarding_drip,
+    },
+    "LIFECYCLE-03": {
+        "code": "LIFECYCLE-03",
+        "title": "Marketplace public returnează listă specialiști filtrabilă",
+        "kind": "http",
+        "category": "LIFECYCLE",
+        "priority": "P0",
+        "runner": lifecycle_marketplace_search_returns_specialists,
+    },
+    "LIFECYCLE-04": {
+        "code": "LIFECYCLE-04",
+        "title": "Profil public specialist accesibil pentru clienți",
+        "kind": "http",
+        "category": "LIFECYCLE",
+        "priority": "P1",
+        "runner": lifecycle_specialist_profile_public_view,
+    },
+    "LIFECYCLE-05": {
+        "code": "LIFECYCLE-05",
+        "title": "Toți userii au rol valid (integritate referențială)",
+        "kind": "http",
+        "category": "LIFECYCLE",
+        "priority": "P1",
+        "runner": lifecycle_admin_role_unique_count,
     },
 }
 

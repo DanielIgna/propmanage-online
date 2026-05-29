@@ -35,6 +35,13 @@ _CB_ESCROW = {
     "body": "Banii pe care îi plătești NU ajung la specialist până când tu nu apeși \"Confirmă finalizare\". Sunt blocați la PropManage într-un cont segregat, indisponibil pentru oricine altcineva. Dacă lucrarea nu e bună, deschizi o dispută și banii se rambursează."
 }
 
+# Specialist-perspective version (audience-correct: specialist is paid, not paying)
+_CB_ESCROW_SPECIALIST = {
+    "type": "callout", "variant": "info",
+    "title": "Plata escrow — siguranța ta că ești plătit",
+    "body": "Clientul alimentează escrow ÎNAINTE să începi lucrarea, iar banii sunt blocați la PropManage. Nu mai există riscul de tipul «lucrez și nu mai sunt plătit». După ce clientul confirmă finalizarea, 95% din sumă ajunge automat în portofelul tău (5% comision platformă, 4% dacă ai badge VERIFIED). În caz de dispută, fondurile rămân blocate până la medierea echipei."
+}
+
 # ============================================================================
 # 1) CLIENT — Proprietar
 # ============================================================================
@@ -248,7 +255,7 @@ SPECIALIST_DOC = {
                     "**Smart Match** — sistemul te recomandă proactiv proprietarilor pe baza Health Score",
                     "**Recomandări organice** — clienții te găsesc pe pagina ta publică (`/specialists/{id}`) via SEO și marketplace",
                 ]},
-                _CB_ESCROW,
+                _CB_ESCROW_SPECIALIST,
                 {"type": "callout", "variant": "info", "title": "Costul tău",
                  "body": "Comision platformă: **5%** (4% pentru badge VERIFIED). Lead fee opțional: **45 RON** dacă vrei numărul de telefon al clientului. În rest — gratis: profil, portofoliu, chat, escrow."},
             ],
