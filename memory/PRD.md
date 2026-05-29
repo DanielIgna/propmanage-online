@@ -1322,3 +1322,43 @@ Upgraded all 4 placeholder docs to v1.0 with full Romanian content.
 - 🟢 Trend comparison week-vs-week on Dev Velocity (P3).
 - 🟢 Avatar upload migration base64 → S3/Cloudinary (P3).
 
+
+
+---
+
+## Phase 35 — QA Automation Engine + Add-to-run (Feb 29, 2026) ✅
+
+### 1) "Add to current run" button on AI suggestions
+- New endpoint: `POST /api/admin/qa/runs/{id}/add-check` — idempotent append of an ad-hoc check (typically AI-suggested) into an active QA run.
+- Frontend: each AI card has `data-testid='qa-ai-add-{CODE}'`; toggle becomes "adăugat" after click. Bulk `qa-ai-add-all` adds the whole batch.
+
+### 2) Automation Engine (14 pre-defined automated tests)
+- New module **`/app/backend/qa_automation.py`** with 2 execution kinds:
+  - **HTTP (httpx async, in-process)**: 11 tests — duplicate-email rejected, short-password 422, bad-password 401, admin endpoints 401/403, RBAC 403 for client, sitemap.xml 229 URLs valid, SEO landing slug present, /api/public/status alive, 6 PDFs render, onboarding queue shape, QA template returns 105 items.
+  - **Browser (Playwright via subprocess to /opt/plugins-venv)**: 3 tests — landing page loads, /cookies page renders, /login form visible.
+- New endpoints: `GET /api/admin/qa/automation/tests`, `POST /api/admin/qa/automation/execute` `{test_codes:[...], run_id?}` → returns `{results:[…], summary:{pass,fail,total,written_to_run}}`. When `run_id` provided, results write into the run as checks marked `automated:true` with note `[automated · NNNms] …`.
+- New UI: **AutomationPanel** (`data-testid='qa-automation-panel'`) — checkbox catalog + "Selectează tot / Execută / Sumar" + inline ✓/✗ status per row.
+- Performance: 14 tests run in parallel ≈ 5s wall-time.
+
+### 3) Env config
+- `FRONTEND_PUBLIC_URL` added to `/app/backend/.env` — used by httpx (auth cookies require HTTPS) and Playwright subprocess.
+
+### Tests
+- Backend pytest **7/7 PASS** — `/app/backend/tests/test_phase34_automation.py`
+- Frontend testing-agent **100% P0 flows PASS** — all interactive flows green (add-to-run, automation execute → write-to-run, summary counters, RBAC blocked for non-admin).
+
+### Active QA capability after Phase 35
+- 105 manual checklist items + 14 automated tests = **119 trackable cases** per run
+- AI Suggester generates 8-12 fresh cases per feature (Claude Sonnet 4.5)
+- Both manual + AI-added + automated checks coexist in one run with consistent UI
+- Markdown export covers everything for release docs
+
+### P1 / P2 backlog (remaining)
+- 🔴 Stripe LIVE keys — pending user verification
+- 🟡 Onboarding tour (Driver.js) at first login (P2)
+- 🟡 Lottie animations in Knowledge Base (P2)
+- 🟡 Twilio SMS alerts for critical nighttime failures (P2)
+- 🟢 Trend comparison week-vs-week on Dev Velocity (P3)
+- 🟢 Avatar upload migration base64 → S3/Cloudinary (P3)
+- 🟢 Optional: split AdminQAPlaybook.jsx (674 lines) into 3 modules
+- 🟢 Add more automated tests (escrow flow, register flow with cleanup, dispute creation)
