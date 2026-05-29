@@ -1489,3 +1489,66 @@ Scan button · listă conflicte cu severity badges · per-conflict: „Cere fix 
 - 🟢 Avatar upload S3/Cloudinary
 - 🟢 Dev Velocity WoW trend
 
+
+---
+
+## Phase 39 — Terminology / Doc Translation Audit (Feb 29, 2026) ✅
+
+User: „într-o secțiune scrie escrow, în alta cont blocat, în alta depozit garanție — clientul se pierde". Sistemul detectează exact asta acum.
+
+### 1) `/app/backend/qa_terminology_audit.py`
+- **5 cluster-uri seed** în `db.term_clusters`:
+  - escrow ≡ cont blocat · depozit garanție · fonduri blocate · depozit blocat · cont segregat
+  - specialist ≡ meseriaș · profesionist · executant · prestator · tehnician
+  - client ≡ proprietar · beneficiar · deținător proprietate
+  - comision platformă ≡ taxă platformă · fee platformă · comision PropManage
+  - Trust Score ≡ scor încredere · punctaj încredere · rating intern
+- **Scanner** parcurge toate cele 6 docuri; per-cluster, dacă un doc folosește ≥2 termeni din cluster → inconsistență
+- **AI fix** (Claude Sonnet 4.5) rescrie blocul afectat folosind doar termenul canonic
+- **Apply** → `db.doc_overrides` (același sistem ca content-audit) → PDF + UI folosesc patch-ul
+- **AI Discover** (bonus): scanează samples din docuri, propune cluster-uri NOI; admin le adaugă cu un click
+
+### 2) Endpoints `/api/admin/qa/term-audit/`
+- `GET clusters` (auto-seed) · `POST clusters` (add custom)
+- `POST scan` · `GET inconsistencies?status=...`
+- `PATCH inconsistencies/{id}/status` (open/approved/dismissed/fixed)
+- `POST inconsistencies/{id}/ai-fix {occurrence_index}` (Claude)
+- `POST inconsistencies/{id}/apply` (DB override)
+- `POST discover` (AI propune cluster-uri noi)
+
+### 3) 5 teste automate noi (catalog crescut la 29)
+- TERM-01..05 verifică consistența pe cele 5 cluster-uri (escrow, specialist, client, comision, scor general)
+- Scopul: lipsește status NEXT BLEND — tests fail by design când există inconsistențe reale → admin știe ce să curețe
+
+### 4) UI: `TerminologyAuditCard` în QA Playbook landing
+- Buton scan · listă inconsistențe cu badge-uri pentru variantele folosite (canonic verde, restul amber) · per-rând: AI rescrie 1ª apariție → Aplică / Dismiss
+- „Vezi cluster-uri" + „AI discover cluster-uri noi" + „Add" pe fiecare propunere
+
+### Live findings la prima scanare pe documentația noastră
+- 6 inconsistențe reale detectate imediat: client doc amestecă „client+proprietar" + „specialist+profesionist" + „escrow+cont segregat", qa-testing doc are 2 inconsistențe, specialist doc are una
+
+### Tests
+- Backend pytest: **14/14 PASS** prin testing-agent
+- Frontend P0+P1+P2: **100% PASS**
+- AI Discover returns 7 propuneri noi de cluster din documentația existentă
+
+### Capabilități QA finale (după Phase 39)
+| Strat | Acoperire |
+|---|---|
+| Manual checklist | 105 scenarii |
+| Automate | 29 teste (HTTP 24 + Browser 3 + Content 5 + Lifecycle 5 + Term 5) |
+| AI Test Suggester | per-feature |
+| Content Audit | audiență vs rol (8 hints/audiență) |
+| Terminology Audit | 5 cluster-uri canonice + AI discovery |
+| Release Gate | one-click + cron luni 08:45 |
+| DB Overrides | patch-uri fără modificare cod |
+
+### Backlog rămas
+- 🔴 Stripe LIVE keys
+- 🟡 Curățarea celor 6 inconsistențe terminologice reale (1-click apiece via UI)
+- 🟡 Onboarding tour (Driver.js)
+- 🟡 Lottie KB
+- 🟡 Twilio SMS alerts
+- 🟢 More lifecycle tests (escrow happy path, dispute, file upload)
+- 🟢 Bulk-apply terminology fixes (1-click pe TOATE)
+
