@@ -76,6 +76,15 @@ async def _open_ai_findings() -> dict:
     return {"counts": {"open": total_open}, "by_severity": counts_by_sev, "top": top}
 
 
+async def _latest_backup() -> Optional[dict]:
+    """Latest DB backup run metadata for the Briefing tile."""
+    doc = await db.backup_runs.find_one({}, sort=[("started_at", -1)])
+    if not doc:
+        return None
+    doc.pop("_id", None)
+    return doc
+
+
 async def compute_briefing_payload() -> dict:
     """Build the full briefing payload (data only, no rendering)."""
     healthcheck = await compute_healthcheck_report()
@@ -83,6 +92,7 @@ async def compute_briefing_payload() -> dict:
     integrity = await _latest_data_integrity()
     incidents = await _active_incidents(days=30)
     findings = await _open_ai_findings()
+    backup = await _latest_backup()
 
     # Per-system tone classification (mirrors MorningBriefing.jsx)
     hc_sum = healthcheck.get("summary", {})
@@ -130,8 +140,26 @@ async def compute_briefing_payload() -> dict:
     else:
         fi_tone = "warn"
 
-    has_fail = any(t == "fail" for t in (hc_tone, smoke_tone, integ_tone, inc_tone, fi_tone))
-    has_warn = any(t == "warn" for t in (hc_tone, smoke_tone, integ_tone, inc_tone, fi_tone))
+    # Backup tone: ok if backup ran in last 36h, warn if 36-72h, fail if older or never
+    if not backup:
+        backup_tone = "fail"
+    else:
+        try:
+            last_ts = datetime.fromisoformat(backup.get("started_at", "").replace("Z", "+00:00"))
+            age_h = (datetime.now(timezone.utc) - last_ts).total_seconds() / 3600
+            if not backup.get("ok"):
+                backup_tone = "fail"
+            elif age_h > 72:
+                backup_tone = "fail"
+            elif age_h > 36:
+                backup_tone = "warn"
+            else:
+                backup_tone = "ok"
+        except Exception:  # noqa: BLE001
+            backup_tone = "warn"
+
+    has_fail = any(t == "fail" for t in (hc_tone, smoke_tone, integ_tone, inc_tone, fi_tone, backup_tone))
+    has_warn = any(t == "warn" for t in (hc_tone, smoke_tone, integ_tone, inc_tone, fi_tone, backup_tone))
     overall = "fail" if has_fail else ("warn" if has_warn else "ok")
 
     return {
@@ -141,6 +169,7 @@ async def compute_briefing_payload() -> dict:
         "integrity": {"tone": integ_tone, "report": integrity},
         "incidents": {"tone": inc_tone, **incidents},
         "findings": {"tone": fi_tone, **findings},
+        "backup": {"tone": backup_tone, "report": backup},
     }
 
 

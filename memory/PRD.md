@@ -1078,3 +1078,45 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
   target queries with 3-8K monthly searches in RO — even a #5 ranking position
   brings ~150-400 organic clicks/month per article.
 
+
+## Changelog — 2026-02-29 — Automatic MongoDB Backups (Resend email delivery)
+- **New module** `backend/backup_service.py`:
+  - `create_backup()` — dumps all Mongo collections to JSON (via `bson.json_util`
+    so ObjectIds/datetimes/Decimals roundtrip correctly), bundles into a single
+    `.tar.gz` (compresslevel=6, in-memory build then atomic write).
+  - Excludes transient/runtime collections (`smoke_test_runs`, `health_pings`,
+    `data_integrity_runs`, `rate_limit_attempts`) to keep size small.
+  - Adds a `MANIFEST.json` with restore instructions inside every archive.
+  - Local retention: last **7 backups** kept in `/app/backups/`; older ones auto-pruned.
+  - `email_backup()` — attaches the archive to a branded HTML email sent via
+    Resend to all `ADMIN_EMAILS`. If size > 15 MB (safety margin under Resend's
+    ~20 MB hard limit), sends a notification email WITHOUT attachment + link to
+    `/admin?tab=backups` for manual download.
+  - Persists each run in `db.backup_runs` for the Morning Briefing tile.
+- **New scheduler job**: daily **03:30 Europe/Bucharest** in `server.py`
+  (`run_daily_backup_job` — never raises, full try/except wrapper).
+- **New admin endpoints** in `routes/admin_backups.py`:
+  - `GET  /api/admin/backups`                  — list local files + latest run metadata
+  - `POST /api/admin/backups/run`              — manual trigger (creates + emails)
+  - `GET  /api/admin/backups/download/{file}`  — stream the .tar.gz with strict
+    filename validation (only `propmanage-backup-*.tar.gz`, no path traversal)
+- **Morning Briefing extended**:
+  - Backend `compute_briefing_payload()` now includes a 6th system (`backup`)
+    with tone: `ok` (≤36h old), `warn` (36-72h), `fail` (>72h or never).
+  - Frontend `MorningBriefing.jsx` grid is now `lg:grid-cols-6` with a new
+    "Backup DB" tile (HardDrive icon) showing collection count + size + email
+    delivery count + age. Inline "Backup acum" button triggers manual run with
+    toast feedback.
+- Validated end-to-end:
+  - Manual trigger: `{ok: true, size_mb: 2.25, collections_count: 60,
+    objects_count: 55, duration_s: 0.5, email: {sent: true, recipients: 3/3}}`
+  - Download endpoint streams valid 2.36 MB tar.gz containing MANIFEST.json
+    + 60 `collections/*.json` files.
+  - Briefing tile renders green with correct headline + sub.
+- Restoration steps (for the user's records):
+    1. Save the daily `.tar.gz` from Gmail to a safe location.
+    2. `tar -xzf propmanage-backup-YYYY-MM-DD_HH-MM-SS.tar.gz`
+    3. Use a Python script that loops over `collections/*.json`, parses each
+       with `bson.json_util.loads()`, drops the corresponding Mongo collection,
+       and bulk-inserts the documents back.
+

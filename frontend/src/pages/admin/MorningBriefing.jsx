@@ -6,7 +6,7 @@ import axios from "axios";
 import { Link } from "react-router-dom";
 import {
   Sunrise, CheckCircle2, AlertTriangle, XCircle, Activity, Database,
-  PlayCircle, AlertOctagon, FileSearch, RefreshCw, ArrowRight, Mail
+  PlayCircle, AlertOctagon, FileSearch, RefreshCw, ArrowRight, Mail, HardDrive
 } from "lucide-react";
 import { AdminCard } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
@@ -58,8 +58,29 @@ export const MorningBriefing = () => {
   const [integrity, setIntegrity] = useState(null);
   const [incidents, setIncidents] = useState(null);
   const [findings, setFindings] = useState(null);
+  const [backupStatus, setBackupStatus] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
+  const [runningBackup, setRunningBackup] = useState(false);
+
+  const runManualBackup = async () => {
+    setRunningBackup(true);
+    try {
+      const r = await axios.post(`${API}/admin/backups/run`);
+      const b = r.data?.backup || {};
+      const e = r.data?.email || {};
+      if (b.ok) {
+        toast.success(`Backup creat: ${b.size_mb}MB · ${b.collections_count} colecții · email→${e.recipients || 0}/${e.total_recipients || 0}`);
+        load();
+      } else {
+        toast.error(`Backup eșuat: ${b.error || "necunoscut"}`);
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Eroare la creare backup");
+    } finally {
+      setRunningBackup(false);
+    }
+  };
 
   const sendTestEmail = async () => {
     setSendingTest(true);
@@ -83,13 +104,14 @@ export const MorningBriefing = () => {
   const load = async () => {
     setRefreshing(true);
     const safe = (p) => p.then(r => r.data).catch(() => null);
-    const [hc, sh, sm, ig, inc, fi] = await Promise.all([
+    const [hc, sh, sm, ig, inc, fi, bk] = await Promise.all([
       safe(axios.get(`${API}/admin/healthcheck/run`)),
       safe(axios.get(`${API}/admin/smoke-test/history?limit=1`)),
       safe(axios.get(`${API}/admin/smoke-test/monitor/config`)),
       safe(axios.get(`${API}/admin/data-integrity/history?limit=1`)),
       safe(axios.get(`${API}/admin/incidents?days=30`)),
       safe(axios.get(`${API}/admin/ai/findings?status=open`)),
+      safe(axios.get(`${API}/admin/backups`)),
     ]);
     setHealthcheck(hc);
     setSmokeHistory(sh);
@@ -97,6 +119,7 @@ export const MorningBriefing = () => {
     setIntegrity(ig);
     setIncidents(inc);
     setFindings(fi);
+    setBackupStatus(bk);
     setRefreshing(false);
   };
 
@@ -160,8 +183,20 @@ export const MorningBriefing = () => {
     return { tone: "warn", headline: `${open} findings deschise`, sub: "Verifică AI Investigator" };
   })();
 
+  const backupTile = (() => {
+    const latest = backupStatus?.latest_run;
+    if (!latest) return { tone: "fail", headline: "Niciun backup creat", sub: "Apasă \"Backup acum\"" };
+    const startedAt = new Date(latest.started_at);
+    const ageH = (Date.now() - startedAt.getTime()) / 3600000;
+    const sub = `${startedAt.toLocaleString("ro-RO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · ${latest.size_mb}MB · email ${latest.email_recipients || 0}`;
+    if (!latest.ok) return { tone: "fail", headline: "Ultimul backup a eșuat", sub };
+    if (ageH > 72) return { tone: "fail", headline: `Vechi de ${Math.round(ageH / 24)}z`, sub };
+    if (ageH > 36) return { tone: "warn", headline: `Vechi de ${Math.round(ageH)}h`, sub };
+    return { tone: "ok", headline: `${latest.collections_count} colecții salvate`, sub };
+  })();
+
   // Aggregate overall health verdict
-  const tiles = [hcTile, smokeTile, integrityTile, incidentsTile, findingsTile];
+  const tiles = [hcTile, smokeTile, integrityTile, incidentsTile, findingsTile, backupTile];
   const hasFail = tiles.some(t => t.tone === "fail");
   const hasWarn = tiles.some(t => t.tone === "warn");
   const overallTone = hasFail ? "fail" : hasWarn ? "warn" : "ok";
@@ -217,8 +252,8 @@ export const MorningBriefing = () => {
         </div>
       </div>
 
-      {/* 5 system tiles in a responsive grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-2.5" data-testid="briefing-tiles">
+      {/* 6 system tiles in a responsive grid */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-2.5" data-testid="briefing-tiles">
         <SystemTile
           icon={Activity}
           title="Healthcheck"
@@ -263,6 +298,15 @@ export const MorningBriefing = () => {
           sub={findingsTile.sub}
           action={{ label: "Investighează", onClick: goToAI }}
           testid="briefing-tile-findings"
+        />
+        <SystemTile
+          icon={HardDrive}
+          title="Backup DB"
+          tone={backupTile.tone}
+          headline={backupTile.headline}
+          sub={backupTile.sub}
+          action={{ label: runningBackup ? "Se creează..." : "Backup acum", onClick: runManualBackup }}
+          testid="briefing-tile-backup"
         />
       </div>
     </AdminCard>

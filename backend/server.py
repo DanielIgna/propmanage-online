@@ -55,8 +55,10 @@ from routes.impersonation import router as impersonation_router
 from routes.admin_smoketest import router as admin_smoketest_router, run_smoke_test_monitor_tick
 from routes.admin_healthcheck import router as admin_healthcheck_router, briefing_router as admin_morning_briefing_router
 from routes.admin_data_integrity import router as admin_data_integrity_router
+from routes.admin_backups import router as admin_backups_router
 from routes.incidents import admin_router as incidents_admin_router, public_router as incidents_public_router
 from admin_briefing_digest import run_morning_briefing_job
+from backup_service import run_daily_backup_job
 from demo_reset import reset_demo_accounts
 
 logging.basicConfig(level=logging.INFO)
@@ -111,6 +113,7 @@ for r in (
     admin_healthcheck_router,
     admin_morning_briefing_router,
     admin_data_integrity_router,
+    admin_backups_router,
     incidents_admin_router,
     incidents_public_router,
 ):
@@ -210,6 +213,14 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=3600,
         )
+        # Daily MongoDB backup — 03:30 (before AI scan at 03:00 doesn't matter; this is its own slot)
+        scheduler.add_job(
+            run_daily_backup_job,
+            CronTrigger(hour=3, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="daily_mongodb_backup",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
         scheduler.start()
         # Record an immediate ping on startup so sparkline is non-empty from minute 1.
         try:
@@ -227,6 +238,7 @@ async def startup():
         logger.info("Health ping scheduler started (every 15 min, powers /status sparkline).")
         logger.info("Smoke Test auto-monitor scheduler started (every 30 min — alerts on FAIL).")
         logger.info("Morning Briefing digest scheduler started (daily 09:00 Europe/Bucharest).")
+        logger.info("Daily MongoDB backup scheduler started (03:30 Europe/Bucharest, emails admin).")
 
 
 @app.on_event("shutdown")
