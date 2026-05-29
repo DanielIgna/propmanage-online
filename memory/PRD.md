@@ -1120,3 +1120,59 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
        with `bson.json_util.loads()`, drops the corresponding Mongo collection,
        and bulk-inserts the documents back.
 
+
+## Changelog — 2026-02-29 — Knowledge Base & Training Center (Phase 1/3)
+### Foundation + Client doc COMPLETE; Specialist/Operator/Admin/QA = drafts (Phase 2)
+
+**Backend:**
+- `docs_content.py` — content registry (Python dict, no DB migrations needed
+  to update content). Schema supports: paragraph, list, callout (info/warn/success),
+  steps (numbered), code, image_placeholder (CSS pulse), screencast (mp4/gif),
+  lottie (JSON anim), h3 sub-headers, FAQ.
+- **Client doc fully written**: 11 sections (~3500 words), 10 FAQ items,
+  includes 3 case studies, 8 best practices, troubleshooting, escrow flow,
+  Digital Twin guide, dispute flow.
+- Specialist/Operator/Admin/QA = v0.1-draft placeholders (will be filled in
+  Phase 2 — content is large, ~3000 words each).
+- `docs_service.py` — PDF rendering (reportlab, brand-styled), tokenized share
+  links (24-char URL-safe tokens, 30-day TTL, open-counter), email delivery
+  via Resend (HTML + PDF attachment).
+- `routes/docs_routes.py`:
+    - Public (no auth): `GET /api/help/{token}`, `GET /api/help/{token}/pdf`
+    - Admin: list, get, PDF, send to custom recipients, bulk-send to role,
+      send-events history, share-tokens analytics.
+- **Auto-onboarding email** — on `/api/auth/register`, the new user
+  automatically gets the role-appropriate training doc (best-effort, doesn't
+  block registration if it fails).
+
+**Frontend:**
+- `components/DocViewer.jsx` — shared renderer used by public/admin/preview.
+  Block renderers: paragraph w/ inline bold/italic, lists w/ lime dots,
+  callouts (3 variants), numbered steps, code blocks, CSS-pulse animation
+  placeholder, native HTML5 `<video>` for MP4 screencasts, `<lottie-player>`
+  via lazy-loaded CDN script for Lottie JSON animations, FAQ accordion.
+- `pages/HelpPage.jsx` — public viewer at `/help/{token}` (no login needed).
+- `pages/admin/AdminDocs.jsx` — admin panel with: doc cards, preview modal
+  (inline DocViewer), PDF download, send modal supporting BOTH custom emails
+  AND bulk-send-to-role (with verified_only checkbox).
+- AdminLayoutMetronic sidebar: new "TRAINING" section with "Documentație &
+  Training NEW" link.
+- App.js: new public route `/help/:token`.
+
+**Validated end-to-end:**
+- `GET /api/admin/docs` → 5 docs returned with correct metadata.
+- `GET /api/admin/docs/client/pdf` → 15KB valid PDF (`%PDF-1.4` signature).
+- `POST /api/admin/docs/client/send` → 1/1 sent, returns share URL + token.
+- `GET /api/help/{token}` → resolves to full Client doc payload.
+- `GET /api/help/INVALID` → HTTP 404 with friendly UI message.
+- Admin UI screenshot: sidebar "Documentație & Training NEW" → page shows
+  5 cards, preview/PDF/send buttons, send history visible.
+
+**Phase 2 (next session)**: Write full content for Specialist (~3000 words),
+Operator (~2000 words), Admin (~3500 words).
+
+**Phase 3 (next session)**: QA Playbook with 100+ test cases, interactive
+checklists (mark test as passed/failed with notes), AI test-case suggester
+(Claude analyzes recent code commits + suggests new tests), driver.js-style
+onboarding tour on first login per role.
+

@@ -56,6 +56,7 @@ from routes.admin_smoketest import router as admin_smoketest_router, run_smoke_t
 from routes.admin_healthcheck import router as admin_healthcheck_router, briefing_router as admin_morning_briefing_router
 from routes.admin_data_integrity import router as admin_data_integrity_router
 from routes.admin_backups import router as admin_backups_router
+from routes.docs_routes import admin_router as admin_docs_router, public_router as public_help_router
 from routes.incidents import admin_router as incidents_admin_router, public_router as incidents_public_router
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
@@ -114,6 +115,8 @@ for r in (
     admin_morning_briefing_router,
     admin_data_integrity_router,
     admin_backups_router,
+    admin_docs_router,
+    public_help_router,
     incidents_admin_router,
     incidents_public_router,
 ):

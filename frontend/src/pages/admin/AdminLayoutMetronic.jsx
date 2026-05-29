@@ -65,6 +65,12 @@ const NAV_SECTIONS = [
       { id: "impersonation", label: "Impersonări", icon: ShieldCheck, badge: "NEW" },
     ],
   },
+  {
+    title: "TRAINING",
+    items: [
+      { id: "docs", label: "Documentație & Training", icon: FileText, badge: "NEW" },
+    ],
+  },
 ];
 
 export const useAdminTheme = () => {

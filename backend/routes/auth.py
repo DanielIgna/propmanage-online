@@ -111,6 +111,22 @@ async def register(data: RegisterIn, response: Response):
     user.pop("_id", None)
     user.pop("password_hash", None)
     await send_template(tpl_welcome, data.name, data.role, to=email)
+    # Auto-send role-specific training doc (best-effort, non-blocking)
+    try:
+        from docs_service import email_doc_to_user
+        from docs_content import get_doc
+        # Map user role to doc slug (qa users would be admins; specialist/operator/client/admin)
+        doc_slug = data.role if get_doc(data.role) else None
+        if doc_slug:
+            await email_doc_to_user(
+                doc_slug, email,
+                recipient_name=data.name,
+                include_pdf=True,
+                sent_by="auto-onboarding",
+            )
+    except Exception as e:
+        import logging
+        logging.getLogger("propmanage.auth").warning(f"[Onboarding] doc send failed: {e}")
     return user
 
 

@@ -19,6 +19,7 @@ import { PublicMarketplace } from "./pages/Marketplace";
 import { MarketplaceLanding } from "./pages/MarketplaceLanding";
 import { GhiduriIndex } from "./pages/GhiduriIndex";
 import { GhidPage } from "./pages/GhidPage";
+import { HelpPage } from "./pages/HelpPage";
 import { ProjectWorkspace } from "./pages/ProjectWorkspace";
 import { PaymentSuccess } from "./pages/PaymentSuccess";
 import { TutorialOverlay } from "./pages/TutorialOverlay";
@@ -1465,6 +1466,7 @@ function App() {
               <Route path="/marketplace/:slug" element={<MarketplaceLanding />} />
               <Route path="/ghiduri" element={<GhiduriIndex />} />
               <Route path="/ghiduri/:slug" element={<GhidPage />} />
+              <Route path="/help/:token" element={<HelpPage />} />
               <Route path="/specialists/:id" element={<SpecialistProfile />} />
               <Route path="/client" element={<ClientDashboard />} />
               <Route path="/specialist" element={<SpecialistDashboard />} />
