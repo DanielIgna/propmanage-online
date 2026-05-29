@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { toast } from "sonner";
-import { CheckCircle2, Clock, Loader2, Mail, Play, Rocket, RotateCw, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, Mail, Play, Rocket, RotateCw, Sparkles, Wrench, XCircle } from "lucide-react";
 import { AdminCard, AdminBtn } from "../AdminLayoutMetronic";
 import { API, PRIO_BADGE } from "./shared";
 
@@ -12,6 +12,7 @@ export const ReleaseGateCard = () => {
   const [emailEnabled, setEmailEnabled] = useState(true);
   const [last, setLast] = useState(null);
   const [history, setHistory] = useState([]);
+  const [autoFixing, setAutoFixing] = useState(false);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -49,6 +50,27 @@ export const ReleaseGateCard = () => {
       toast.error(e?.response?.data?.detail || "Eroare la rularea gate-ului");
     } finally {
       setRunning(false);
+    }
+  };
+
+  const autoFix = async () => {
+    if (!window.confirm("Auto-fix va: 1) șterge toate doc_overrides și term_inconsistencies vechi din DB · 2) re-scanează terminologia · 3) rulează release gate-ul. Continuați?")) {
+      return;
+    }
+    setAutoFixing(true);
+    try {
+      const { data } = await axios.post(`${API}/admin/qa/maintenance/auto-fix-release-gate`);
+      const c = data.cleanup || {};
+      const g = data.gate || {};
+      toast.success(
+        `🧹 Curățat ${c.deleted_overrides} overrides + ${c.deleted_inconsistencies} inc. · Gate: ${g.verdict} ${g.pass}/${g.total}`,
+        { duration: 8000 }
+      );
+      loadHistory();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Auto-fix a eșuat");
+    } finally {
+      setAutoFixing(false);
     }
   };
 
@@ -93,7 +115,7 @@ export const ReleaseGateCard = () => {
 
       <div className="flex gap-2 flex-wrap">
         {!confirming ? (
-          <AdminBtn variant="danger" onClick={() => setConfirming(true)} disabled={running} data-testid="qa-gate-run-btn">
+          <AdminBtn variant="danger" onClick={() => setConfirming(true)} disabled={running || autoFixing} data-testid="qa-gate-run-btn">
             {running ? <><Loader2 className="w-3.5 h-3.5 inline mr-1 animate-spin" /> Rulează gate (≈ 6s)...</> : <><Rocket className="w-3.5 h-3.5 inline mr-1" /> Rulează gate-ul de release</>}
           </AdminBtn>
         ) : (
@@ -104,7 +126,16 @@ export const ReleaseGateCard = () => {
             <AdminBtn variant="ghost" onClick={() => setConfirming(false)} data-testid="qa-gate-cancel-btn">Anulează</AdminBtn>
           </>
         )}
+        <AdminBtn variant="ghost" onClick={autoFix} disabled={running || autoFixing} data-testid="qa-gate-autofix-btn">
+          {autoFixing
+            ? <><Loader2 className="w-3.5 h-3.5 inline mr-1 animate-spin" /> Auto-fix în curs...</>
+            : <><Wrench className="w-3.5 h-3.5 inline mr-1" /> Auto-fix · curăță & rerulează</>}
+        </AdminBtn>
       </div>
+      <p className="text-[11px] text-slate-500 mt-2">
+        <Sparkles className="w-3 h-3 inline mr-1 text-amber-500" />
+        <strong>Auto-fix</strong> e util mai ales post-deploy când vezi RELEASE BLOCKED din cauza unor override-uri vechi. Șterge stale DB rows, re-scanează și re-rulează gate-ul într-un click.
+      </p>
 
       {/* History list */}
       {history.length > 0 && (

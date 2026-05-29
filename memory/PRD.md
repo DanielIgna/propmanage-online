@@ -1786,3 +1786,25 @@ User: „într-o secțiune scrie escrow, în alta cont blocat, în alta depozit 
 - 🔴 USER: webhook URLs + Stripe LIVE keys
 - 🟡 Twilio SMS critical alerts, Lottie KB
 - 🟢 Avatar S3/Cloudinary, badge URL params, Admin UI tab pentru Exec Briefing
+
+
+### Phase 45 — Post-deploy Auto-Fix tools (Feb 2026)
+
+**Context**: Primul redeploy în prod (Phase 40-44). Release Gate BLOCKED 13 fail din cauza: (1) stale doc_overrides în prod DB; (2) E2E tests Phase 41 crapau cu "Unhandled crash: NoneType.get" în loc de fail curat.
+
+**1) E2E defensive** — decorator `_safe_e2e` în qa_automation.py wrap-uiește toate E2E + LIFECYCLE-02. Convertește orice exception → `_ko()` cu mesaj clar.
+
+**2) Admin endpoints** (`routes/admin_qa_maintenance.py`):
+- `POST /api/admin/qa/maintenance/cleanup-stale-overrides`
+- `POST /api/admin/qa/maintenance/auto-fix-release-gate` (cleanup + rescan + run gate într-un click)
+
+**3) Frontend** — buton "Auto-fix · curăță & rerulează" în ReleaseGateCard cu confirm + toast + hint.
+
+**4) Fix terminology supplemental** în docs_content.py: "cont blocat"→"cont temporar suspendat", "profesionist"→"specialist".
+
+**Rezultat preview**: `38/38 pass · verdict=READY · 0 fail` ✓
+
+### Backlog rămas
+- 🔴 USER: **redeploy producție** pentru Phase 45 → apasă "Auto-fix" pe prod → 38/38 ✓
+- 🔴 USER: webhook URLs + Stripe LIVE keys
+- 🟡 Twilio SMS, Lottie KB

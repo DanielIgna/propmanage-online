@@ -50,6 +50,27 @@ def _ko(note: str) -> dict:
     return {"status": "fail", "note": note[:600]}
 
 
+def _safe_e2e(fn):
+    """Wrap an async E2E runner so unexpected exceptions become clean `fail` results."""
+    import functools
+
+    @functools.wraps(fn)
+    async def wrapper() -> dict:
+        try:
+            return await fn()
+        except RuntimeError as e:
+            return _ko(f"setup failed — {str(e)[:240]}")
+        except httpx.ReadError as e:
+            return _ko(f"ReadError (likely ingress/network timeout): {str(e)[:160]}")
+        except httpx.TimeoutException as e:
+            return _ko(f"Timeout: {str(e)[:160]}")
+        except Exception as e:  # noqa: BLE001
+            return _ko(f"{type(e).__name__}: {str(e)[:200]}")
+    return wrapper
+
+
+
+
 async def _client() -> httpx.AsyncClient:
     return httpx.AsyncClient(base_url=BACKEND_URL, timeout=20.0, follow_redirects=False)
 
@@ -478,6 +499,7 @@ async def lifecycle_client_register_then_delete() -> dict:
         return _ok(f"OK — register→login→me OK pentru {email}")
 
 
+@_safe_e2e
 async def lifecycle_specialist_register_then_onboarding_drip() -> dict:
     """LIFECYCLE-02: specialist înregistrat → primește 3 emails enqueuate în db.onboarding_emails."""
     email = f"lifecycle_spec_{int(time.time())}_{uuid.uuid4().hex[:6]}@test.com"
@@ -638,6 +660,25 @@ async def _admin_client() -> httpx.AsyncClient:
     return c
 
 
+def _safe_e2e(fn):
+    """Wrap an async E2E runner so unexpected exceptions become clean `fail` results."""
+    import functools
+
+    @functools.wraps(fn)
+    async def wrapper() -> dict:
+        try:
+            return await fn()
+        except RuntimeError as e:
+            return _ko(f"setup failed — {str(e)[:240]}")
+        except httpx.ReadError as e:
+            return _ko(f"ReadError (likely ingress/network timeout): {str(e)[:160]}")
+        except httpx.TimeoutException as e:
+            return _ko(f"Timeout: {str(e)[:160]}")
+        except Exception as e:  # noqa: BLE001
+            return _ko(f"{type(e).__name__}: {str(e)[:200]}")
+    return wrapper
+
+
 async def _seed_active_job(escrow_amount: float = 1000.0) -> dict:
     """Create a client + specialist + property + request fully assigned with escrow held.
 
@@ -728,6 +769,7 @@ async def _cleanup_e2e(env: dict):
 from bson import ObjectId  # noqa: E402
 
 
+@_safe_e2e
 async def e2e_escrow_funded_status_held() -> dict:
     """ESCROW-01: Client postează cerere → specialist acceptă → client alimentează escrow → status='held'."""
     env = await _seed_active_job(800.0)
@@ -742,6 +784,7 @@ async def e2e_escrow_funded_status_held() -> dict:
         await _cleanup_e2e(env)
 
 
+@_safe_e2e
 async def e2e_escrow_full_confirm_releases_split() -> dict:
     """ESCROW-02: După confirmare, specialistul primește 95%, platforma 5%."""
     env = await _seed_active_job(1000.0)
@@ -766,6 +809,7 @@ async def e2e_escrow_full_confirm_releases_split() -> dict:
         await _cleanup_e2e(env)
 
 
+@_safe_e2e
 async def e2e_dispute_opens_freezes_escrow() -> dict:
     """DISPUTE-01: Client deschide dispută pe job activ → escrow_status='frozen'."""
     env = await _seed_active_job(500.0)
@@ -786,6 +830,7 @@ async def e2e_dispute_opens_freezes_escrow() -> dict:
         await _cleanup_e2e(env)
 
 
+@_safe_e2e
 async def e2e_dispute_resolves_refund_client() -> dict:
     """DISPUTE-02: Admin rezolvă cu refund_client → wallet client crește cu suma escrow."""
     env = await _seed_active_job(600.0)
@@ -816,6 +861,7 @@ async def e2e_dispute_resolves_refund_client() -> dict:
         await _cleanup_e2e(env)
 
 
+@_safe_e2e
 async def e2e_quote_specialist_accept_charges_lead_fee() -> dict:
     """QUOTE-01: Specialistul acceptă lead-ul → 45 RON lead_fee dedus din wallet, status='assigned'."""
     client_c, c_email, _ = await _register_and_login("client", "qf_c")
@@ -859,6 +905,7 @@ async def e2e_quote_specialist_accept_charges_lead_fee() -> dict:
             pass
 
 
+@_safe_e2e
 async def e2e_specialist_kyc_upload_pending() -> dict:
     """FILE-01: Specialist încarcă document KYC → apare în users.documents cu status='pending'."""
     spec_c, s_email, _ = await _register_and_login("specialist", "kyc_s")
@@ -885,6 +932,7 @@ async def e2e_specialist_kyc_upload_pending() -> dict:
             pass
 
 
+@_safe_e2e
 async def e2e_chat_history_endpoint_returns_messages() -> dict:
     """CHAT-01: Client poate citi /api/chat/{req_id}/messages pe job-ul propriu (return list, fie și gol)."""
     env = await _seed_active_job(400.0)
@@ -900,6 +948,7 @@ async def e2e_chat_history_endpoint_returns_messages() -> dict:
         await _cleanup_e2e(env)
 
 
+@_safe_e2e
 async def e2e_gdpr_dsar_export_returns_account_data() -> dict:
     """GDPR-01: Authenticated user obține export DSAR (Art. 15) cu account + rights_summary."""
     client_c, c_email, _ = await _register_and_login("client", "gdpr_c")
@@ -919,6 +968,7 @@ async def e2e_gdpr_dsar_export_returns_account_data() -> dict:
             pass
 
 
+@_safe_e2e
 async def e2e_gdpr_erasure_request_creates_dsar_row() -> dict:
     """GDPR-02: POST /me/erasure-request creează rând în dsar_requests cu sla_due_at +30d."""
     client_c, c_email, c_id = await _register_and_login("client", "gdpr_e")

@@ -287,7 +287,7 @@ SPECIALIST_DOC = {
                     {"title": "Preț FIX, nu \"orientativ\"", "body": "Calculează rapid, scrie preț clar. Dacă nu poți estima fără vizită, scrie \"Vizită de evaluare gratuită, ofertă fixă în 24h\"."},
                     {"title": "Timp realist", "body": "Nu promite 24h dacă știi că ai nevoie de 3 zile. Recenziile proaste vin din termene depășite."},
                     {"title": "Diferențiator scurt", "body": "1-2 fraze de ce TE alege pe tine. Ex: \"Folosesc doar materiale Schneider/Legrand, garanție 24 luni (peste media)\"."},
-                    {"title": "Întreabă", "body": "Pune o întrebare clarificatoare. Arată că ai citit și ești profesionist."},
+                    {"title": "Întreabă", "body": "Pune o întrebare clarificatoare. Arată că ai citit și ești specialist."},
                 ]},
                 {"type": "callout", "variant": "success", "title": "Pro tip",
                  "body": "În ofertă, menționează că plata se face prin escrow. Clienții care nu cunosc platforma sunt mai relaxați când văd asta — îi face să accepte oferta mai ușor."},
@@ -339,7 +339,7 @@ SPECIALIST_DOC = {
                     "**Mulțumire la final** — Trimite un mesaj scurt: \"Mulțumesc pentru încredere, vă rog să-mi lăsați un feedback dacă a fost ok lucrarea, mă ajută foarte mult.\""
                 ]},
                 {"type": "callout", "variant": "info", "title": "Ce să faci dacă primești o recenzie nedreaptă",
-                 "body": "Răspunde public, calm și profesionist. NU ataca clientul. Răspunsurile bine scrise la recenzii proaste convertesc 3 din 4 viitori clienți. Dacă recenzia conține minciuni dovedibile, deschide dispută la echipa noastră."},
+                 "body": "Răspunde public, calm și echilibrat. NU ataca clientul. Răspunsurile bine scrise la recenzii proaste convertesc 3 din 4 viitori clienți. Dacă recenzia conține minciuni dovedibile, deschide dispută la echipa noastră."},
             ],
         },
         {
@@ -730,7 +730,7 @@ QA_DOC = {
                     "**C-05** Login cu Google OAuth → cont nou creat automat + ghid trimis pe email",
                     "**C-06** Reset parolă: cere → primește email → click link → setează parolă nouă → login funcționează",
                     "**C-07** Reset parolă: link expirat (>60 min) → eroare \"Link expirat, cere unul nou\"",
-                    "**C-08** Login cu 10 încercări greșite → cont blocat 15 min cu mesaj clar",
+                    "**C-08** Login cu 10 încercări greșite → cont temporar suspendat 15 min cu mesaj clar",
                 ]},
                 {"type": "h3", "text": "Proprietate + Cerere (P0)"},
                 {"type": "list", "items": [

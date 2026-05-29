@@ -58,6 +58,7 @@ from routes.admin_data_integrity import router as admin_data_integrity_router
 from routes.admin_backups import router as admin_backups_router
 from routes.public_trust import router as public_trust_router
 from routes.admin_exec_briefing import router as admin_exec_briefing_router
+from routes.admin_qa_maintenance import router as admin_qa_maintenance_router
 from executive_briefing import run_exec_briefing_job
 from routes.admin_dev_velocity import router as admin_dev_velocity_router
 from routes.docs_routes import admin_router as admin_docs_router, public_router as public_help_router
@@ -128,6 +129,7 @@ for r in (
     admin_backups_router,
     public_trust_router,
     admin_exec_briefing_router,
+    admin_qa_maintenance_router,
     admin_dev_velocity_router,
     admin_docs_router,
     public_help_router,
