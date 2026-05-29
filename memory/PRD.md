@@ -1218,3 +1218,31 @@ onboarding tour on first login per role.
 - Auto-available in Admin → Documentație & Training (preview + PDF + MD + send
   + Cmd+K search). 13 hits for query "backend".
 
+
+## Changelog — 2026-02-29 — Dev Velocity Weekly Report (AI-powered)
+- New service `backend/dev_velocity_service.py`:
+  - `collect_velocity(days=7)` — parses `git log --numstat` (last 7 days),
+    categorizes touched files into 11 buckets (api_endpoints, backend_logic,
+    tests, admin_panels, frontend_pages/components/hooks/data/other, docs,
+    config, other). Returns totals + per-category breakdown + top-15
+    most-touched files + last 30 commits.
+  - `ai_summary(stats)` — uses Claude Sonnet 4.5 (via Emergent LLM key) to
+    produce a 200-word Romanian executive summary structured: Headline →
+    Highlights (3-5 bullets) → Velocitate → Recomandare. Fallback to plain
+    stats summary if LLM unavailable.
+  - `send_weekly_velocity_email()` — branded HTML email with 4 KPI tiles
+    (commits, files, lines added/deleted) + category breakdown table + AI
+    summary. Persists each run in `dev_velocity_runs` collection.
+- New scheduler job: **Mondays 09:30 Europe/Bucharest**
+  (`weekly_dev_velocity`). Skips if 0 commits.
+- New admin endpoints in `routes/admin_dev_velocity.py`:
+  - `GET  /api/admin/dev-velocity/preview?days=7` — inline JSON preview.
+  - `POST /api/admin/dev-velocity/send-now` — force-send the weekly email.
+  - `GET  /api/admin/dev-velocity/history` — past reports.
+- Frontend `MorningBriefing.jsx`: new "📊 Raport săptămânal" button next to
+  "Test email" — triggers send-now with 60s timeout (Claude inference).
+- Validated end-to-end:
+  - `preview` → 164 commits, 341 files, +73K/-8K lines, 11 categories.
+  - Claude AI summary generates structured Romanian report.
+  - `send-now` → 3/3 admins delivered via Resend.
+

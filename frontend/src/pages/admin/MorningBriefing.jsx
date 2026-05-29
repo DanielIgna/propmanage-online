@@ -6,7 +6,7 @@ import axios from "axios";
 import { Link } from "react-router-dom";
 import {
   Sunrise, CheckCircle2, AlertTriangle, XCircle, Activity, Database,
-  PlayCircle, AlertOctagon, FileSearch, RefreshCw, ArrowRight, Mail, HardDrive
+  PlayCircle, AlertOctagon, FileSearch, RefreshCw, ArrowRight, Mail, HardDrive, BarChart3
 } from "lucide-react";
 import { AdminCard } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
@@ -61,6 +61,24 @@ export const MorningBriefing = () => {
   const [backupStatus, setBackupStatus] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
+  const [sendingVelocity, setSendingVelocity] = useState(false);
+
+  const sendVelocityReport = async () => {
+    setSendingVelocity(true);
+    try {
+      const r = await axios.post(`${API}/admin/dev-velocity/send-now`, {}, { timeout: 60000 });
+      const d = r.data || {};
+      if (d.sent) {
+        toast.success(`Raport săptămânal trimis · ${d.stats?.commits || 0} commits · ${d.recipients}/${d.total_recipients} admini`);
+      } else {
+        toast.error(`Trimitere eșuată: ${d.reason || "necunoscut"}`);
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Eroare la generarea raportului");
+    } finally {
+      setSendingVelocity(false);
+    }
+  };
   const [runningBackup, setRunningBackup] = useState(false);
 
   const runManualBackup = async () => {
@@ -220,6 +238,16 @@ export const MorningBriefing = () => {
       }
       action={
         <div className="flex items-center gap-1">
+          <button
+            onClick={sendVelocityReport}
+            disabled={sendingVelocity}
+            className="px-2 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30 hover:bg-blue-100 dark:hover:bg-blue-500/20 disabled:opacity-50"
+            data-testid="briefing-send-velocity-btn"
+            title="Generează și trimite raportul săptămânal de dev velocity (AI summary + stats git)"
+          >
+            <BarChart3 className={`w-3 h-3 ${sendingVelocity ? "animate-pulse" : ""}`} />
+            {sendingVelocity ? "Se generează..." : "Raport săptămânal"}
+          </button>
           <button
             onClick={sendTestEmail}
             disabled={sendingTest}

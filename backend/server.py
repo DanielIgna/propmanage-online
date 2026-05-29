@@ -56,10 +56,12 @@ from routes.admin_smoketest import router as admin_smoketest_router, run_smoke_t
 from routes.admin_healthcheck import router as admin_healthcheck_router, briefing_router as admin_morning_briefing_router
 from routes.admin_data_integrity import router as admin_data_integrity_router
 from routes.admin_backups import router as admin_backups_router
+from routes.admin_dev_velocity import router as admin_dev_velocity_router
 from routes.docs_routes import admin_router as admin_docs_router, public_router as public_help_router
 from routes.incidents import admin_router as incidents_admin_router, public_router as incidents_public_router
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
+from dev_velocity_service import run_weekly_velocity_job
 from demo_reset import reset_demo_accounts
 
 logging.basicConfig(level=logging.INFO)
@@ -115,6 +117,7 @@ for r in (
     admin_morning_briefing_router,
     admin_data_integrity_router,
     admin_backups_router,
+    admin_dev_velocity_router,
     admin_docs_router,
     public_help_router,
     incidents_admin_router,
@@ -224,6 +227,14 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=7200,
         )
+        # Weekly Dev Velocity — Mondays 09:30 Europe/Bucharest
+        scheduler.add_job(
+            run_weekly_velocity_job,
+            CronTrigger(day_of_week="mon", hour=9, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="weekly_dev_velocity",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
         scheduler.start()
         # Record an immediate ping on startup so sparkline is non-empty from minute 1.
         try:
@@ -242,6 +253,7 @@ async def startup():
         logger.info("Smoke Test auto-monitor scheduler started (every 30 min — alerts on FAIL).")
         logger.info("Morning Briefing digest scheduler started (daily 09:00 Europe/Bucharest).")
         logger.info("Daily MongoDB backup scheduler started (03:30 Europe/Bucharest, emails admin).")
+        logger.info("Weekly Dev Velocity scheduler started (Mondays 09:30 Europe/Bucharest).")
 
 
 @app.on_event("shutdown")
