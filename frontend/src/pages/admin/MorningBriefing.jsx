@@ -6,10 +6,11 @@ import axios from "axios";
 import { Link } from "react-router-dom";
 import {
   Sunrise, CheckCircle2, AlertTriangle, XCircle, Activity, Database,
-  PlayCircle, AlertOctagon, FileSearch, RefreshCw, ArrowRight
+  PlayCircle, AlertOctagon, FileSearch, RefreshCw, ArrowRight, Mail
 } from "lucide-react";
 import { AdminCard } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
+import { toast } from "sonner";
 
 // Status helpers
 const TONE = {
@@ -58,6 +59,26 @@ export const MorningBriefing = () => {
   const [incidents, setIncidents] = useState(null);
   const [findings, setFindings] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
+
+  const sendTestEmail = async () => {
+    setSendingTest(true);
+    try {
+      const r = await axios.post(`${API}/admin/morning-briefing/send-test`);
+      const d = r.data || {};
+      if (d.sent) {
+        toast.success(`Email trimis către ${d.recipients}/${d.total_recipients} admin(s) · stare: ${d.overall}`);
+      } else if (d.reason === "no_recipients") {
+        toast.error("Niciun admin în ADMIN_EMAILS — configurează în deployment secrets.");
+      } else {
+        toast.error(`Trimitere eșuată: ${d.reason || "necunoscut"}`);
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Eroare la trimiterea email-ului de test");
+    } finally {
+      setSendingTest(false);
+    }
+  };
 
   const load = async () => {
     setRefreshing(true);
@@ -163,15 +184,27 @@ export const MorningBriefing = () => {
         </div>
       }
       action={
-        <button
-          onClick={load}
-          disabled={refreshing}
-          className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 disabled:opacity-50"
-          data-testid="briefing-refresh-btn"
-          title="Reîncarcă"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={sendTestEmail}
+            disabled={sendingTest}
+            className="px-2 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 hover:bg-amber-100 dark:hover:bg-amber-500/20 disabled:opacity-50"
+            data-testid="briefing-send-test-email-btn"
+            title="Forțează trimiterea email-ului de briefing acum (test Resend)"
+          >
+            <Mail className={`w-3 h-3 ${sendingTest ? "animate-pulse" : ""}`} />
+            {sendingTest ? "Se trimite..." : "Test email"}
+          </button>
+          <button
+            onClick={load}
+            disabled={refreshing}
+            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 disabled:opacity-50"
+            data-testid="briefing-refresh-btn"
+            title="Reîncarcă"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          </button>
+        </div>
       }
     >
       {/* Overall verdict banner */}

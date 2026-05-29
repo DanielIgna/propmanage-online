@@ -231,9 +231,8 @@ async def _probe_admin_emails() -> dict:
 # ============================================================================
 
 
-@router.get("/run")
-async def run_healthcheck(user: dict = Depends(require_role("admin"))):
-    """Run all integration probes in parallel and return a structured report."""
+async def compute_healthcheck_report() -> dict:
+    """Internal: run all probes and return structured report. No auth, safe for scheduler use."""
     import asyncio
     started = _now()
     started_t = time.perf_counter()
@@ -255,7 +254,7 @@ async def run_healthcheck(user: dict = Depends(require_role("admin"))):
     info_failed = sum(1 for r in results if not r["ok"] and r["severity"] == "info")
     overall_ok = critical_failed == 0
 
-    report = {
+    return {
         "started_at": started,
         "finished_at": _now(),
         "ok": overall_ok,
@@ -269,5 +268,39 @@ async def run_healthcheck(user: dict = Depends(require_role("admin"))):
             "info_failed": info_failed,
         },
     }
-    logger.info(f"[Healthcheck] done · ok={overall_ok} · {report['summary']}")
+
+
+@router.get("/run")
+async def run_healthcheck(user: dict = Depends(require_role("admin"))):
+    """Run all integration probes in parallel and return a structured report."""
+    report = await compute_healthcheck_report()
+    logger.info(f"[Healthcheck] done · ok={report['ok']} · {report['summary']}")
     return report
+
+
+# ============================================================================
+# MORNING BRIEFING — admin daily digest controls
+# ============================================================================
+
+
+briefing_router = APIRouter(prefix="/api/admin/morning-briefing", tags=["admin-morning-briefing"])
+
+
+@briefing_router.get("/preview")
+async def preview_morning_briefing(user: dict = Depends(require_role("admin"))):
+    """Return the JSON payload that would be rendered into the daily email.
+    Useful for debugging the cron output without sending an email.
+    """
+    from admin_briefing_digest import compute_briefing_payload
+    return await compute_briefing_payload()
+
+
+@briefing_router.post("/send-test")
+async def send_morning_briefing_test(user: dict = Depends(require_role("admin"))):
+    """Force-send the morning briefing email NOW (ignoring 'all OK' skip rule).
+    Used by admins to verify Resend setup & email rendering.
+    """
+    from admin_briefing_digest import send_morning_briefing_email
+    result = await send_morning_briefing_email(force=True)
+    logger.info(f"[MorningBriefing] manual send by {user.get('email')}: {result}")
+    return result

@@ -894,3 +894,38 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Use case: morning login → 5 second glance → admin knows if today is a "all good"
   day or needs to investigate something. Replaces need to manually check 6
   different cards inside AI Investigator.
+
+
+## Changelog — 2026-02-29 — Morning Briefing Daily Digest Email
+- New backend module `/app/backend/admin_briefing_digest.py`:
+  - `compute_briefing_payload()` aggregates the same 5 data points as the in-app
+    Morning Briefing widget (healthcheck, latest smoke test, latest data
+    integrity, active incidents in last 30 days, open AI findings).
+  - Reuses `compute_healthcheck_report()` (extracted from `admin_healthcheck.py`)
+    so the cron job runs the FULL probe set with zero duplication.
+  - Computes per-system tone (ok / warn / fail / idle) and an overall verdict.
+  - `send_morning_briefing_email(force=False)`:
+    - Default behavior: sends ONLY when overall != "ok" (no noise on quiet days).
+    - `force=True`: always sends (used by the manual "Test email" button).
+    - Reads recipients from `ADMIN_EMAILS` env var; renders HTML using existing
+      brand-styled `_layout()` from `email_service.py`.
+    - Uses console fallback if `RESEND_API_KEY` not set (no failures in preview).
+  - `run_morning_briefing_job()`: APScheduler entrypoint, never raises.
+- New admin endpoints (admin role required):
+  - `GET  /api/admin/morning-briefing/preview` — returns the raw payload JSON
+    that would be rendered into the email (debug helper).
+  - `POST /api/admin/morning-briefing/send-test` — force-sends the email now.
+- New scheduler job in `server.py`: daily 09:00 Europe/Bucharest, calls
+  `run_morning_briefing_job`. Logged on startup alongside other crons.
+- Frontend `MorningBriefing.jsx`:
+  - Added "Test email" button in the card header (next to Refresh) that calls
+    the new `send-test` endpoint and shows a toast with the result
+    (`recipients/total_recipients` + `overall` tone). Test ID:
+    `briefing-send-test-email-btn`.
+- Validated end-to-end via curl in preview:
+  - `POST /api/admin/morning-briefing/send-test` → `sent=true, recipients=3/3, overall=fail`.
+  - Logs confirm Resend code path is wired (currently falling back to console
+    because `RESEND_API_KEY` lives in deployment secrets, not preview env).
+- Result: in production (with `RESEND_API_KEY` set), admins receive a single
+  branded digest at 09:00 only when something is wrong — proactive monitoring
+  without inbox noise.

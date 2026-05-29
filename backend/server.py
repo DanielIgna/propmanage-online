@@ -53,9 +53,10 @@ from routes.gdpr import router as gdpr_router, admin_router as gdpr_admin_router
 from routes.digital_twin import router as digital_twin_router, admin_router as digital_twin_admin_router, operator_router as digital_twin_operator_router
 from routes.impersonation import router as impersonation_router
 from routes.admin_smoketest import router as admin_smoketest_router, run_smoke_test_monitor_tick
-from routes.admin_healthcheck import router as admin_healthcheck_router
+from routes.admin_healthcheck import router as admin_healthcheck_router, briefing_router as admin_morning_briefing_router
 from routes.admin_data_integrity import router as admin_data_integrity_router
 from routes.incidents import admin_router as incidents_admin_router, public_router as incidents_public_router
+from admin_briefing_digest import run_morning_briefing_job
 from demo_reset import reset_demo_accounts
 
 logging.basicConfig(level=logging.INFO)
@@ -108,6 +109,7 @@ for r in (
     impersonation_router,
     admin_smoketest_router,
     admin_healthcheck_router,
+    admin_morning_briefing_router,
     admin_data_integrity_router,
     incidents_admin_router,
     incidents_public_router,
@@ -200,6 +202,14 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=600,
         )
+        # Morning Briefing digest — daily 09:00, sent only when warn/fail
+        scheduler.add_job(
+            run_morning_briefing_job,
+            CronTrigger(hour=9, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="morning_briefing_digest",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
         scheduler.start()
         # Record an immediate ping on startup so sparkline is non-empty from minute 1.
         try:
@@ -216,6 +226,7 @@ async def startup():
         logger.info("Demo accounts auto-reset scheduler started (daily 02:00 Europe/Bucharest).")
         logger.info("Health ping scheduler started (every 15 min, powers /status sparkline).")
         logger.info("Smoke Test auto-monitor scheduler started (every 30 min — alerts on FAIL).")
+        logger.info("Morning Briefing digest scheduler started (daily 09:00 Europe/Bucharest).")
 
 
 @app.on_event("shutdown")
