@@ -8,5 +8,15 @@ Disallow: /client
 Disallow: /specialist
 Disallow: /operator
 Disallow: /dashboard
+Disallow: /auth/callback
+Disallow: /payment-success
+Disallow: /report-respond/
 
-Sitemap: https://propmanage.io/sitemap.xml
+# Slow down aggressive crawlers, allow Google/Bing full speed
+User-agent: AhrefsBot
+Crawl-delay: 10
+
+User-agent: SemrushBot
+Crawl-delay: 10
+
+Sitemap: https://propmanage.ro/api/public/sitemap.xml

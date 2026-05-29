@@ -929,3 +929,50 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
 - Result: in production (with `RESEND_API_KEY` set), admins receive a single
   branded digest at 09:00 only when something is wrong — proactive monitoring
   without inbox noise.
+
+## Changelog — 2026-02-29 — SEO Foundation (sitemap, OG, JSON-LD, lang fix)
+- **Critical fix**: `<html lang="en">` → `<html lang="ro">` in `index.html`. Google
+  was indexing the entire site as English content despite Romanian copy.
+- **Domain migration**: replaced all `propmanage.io` references with `propmanage.ro`:
+  - `index.html`: canonical, og:url, og:image, twitter:image, hreflang.
+  - `robots.txt`: sitemap URL.
+  - Backend `.env`: `APP_PUBLIC_URL=https://propmanage.ro` (powers email links,
+    sitemap URLs, AI Investigator emails, payment receipts).
+- **Dynamic sitemap** at `GET /api/public/sitemap.xml` (in `routes/public.py`):
+  - 9 static pages (landing, marketplace, digital-twin, login, register, privacy,
+    privacy/notices, terms, status) with per-page priority + changefreq.
+  - All verified, non-deleted specialist profiles (`/specialists/{id}`) — auto-
+    refreshed on every fetch from Mongo, no stale state.
+  - Currently: 15 URLs (9 static + 6 verified specialists). Will grow naturally.
+  - Served as `application/xml`. Linked from `robots.txt`.
+- **Static sitemap removed**: `public/sitemap.xml` deleted (was hardcoded with
+  3 URLs pointing to `.io`).
+- **robots.txt enhanced**:
+  - Added Disallow rules for `/auth/callback`, `/payment-success`, `/report-respond/`.
+  - Added crawl-delay=10 for aggressive bots (AhrefsBot, SemrushBot).
+  - Sitemap URL now points to dynamic endpoint on `.ro`.
+- **JSON-LD structured data** in `index.html` (3 blocks):
+  - `Organization`: name, alternateName "Residency", url, logo, address (RO).
+  - `WebSite` with `SearchAction` (Sitelinks Searchbox in Google).
+  - `Service`: type "Property Management Platform", areaServed RO, offers RON.
+- **Geo meta tags**: `geo.region=RO`, `geo.placename=România`.
+- **Per-route dynamic SEO** via new lightweight hook `hooks/useSEO.js`:
+  - No new npm dependency (no react-helmet-async). ~50 lines, vanilla DOM.
+  - Updates `document.title`, meta description, canonical, OG/Twitter tags,
+    and injects optional JSON-LD `<script>` on mount; restores on unmount.
+  - Wired into `Marketplace.jsx` — title/desc reflect active category filter,
+    canonical includes `?category=` for crawlable variants, `CollectionPage`
+    JSON-LD + breadcrumbs.
+  - Wired into `SpecialistProfile.jsx` — title `{name} · {specialty} · Specialist
+    verificat PropManage`, description includes rating & review count, `Person`
+    JSON-LD with `AggregateRating` (drives star snippets in Google Search), and
+    `noindex` for 404s so broken profile URLs don't get indexed.
+- Validated end-to-end via Playwright + curl:
+  - Marketplace page returns: title="Marketplace specialiști verificați · PropManage",
+    canonical=propmanage.ro/marketplace, og:url=propmanage.ro/marketplace,
+    html lang="ro", 4 JSON-LD blocks present.
+  - `/api/public/sitemap.xml` returns 15 URLs, all on `propmanage.ro`.
+- Production action (user): after deploy, submit
+  `https://propmanage.ro/api/public/sitemap.xml` in Google Search Console
+  (Sitemaps tab) for fast indexing.
+

@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Building2, Star, CheckCircle2, Search, Filter, ArrowLeft, Shield, QrCode, Copy, Check, Calendar, Wrench, AlertTriangle, CreditCard } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { HealthScoreBadge } from "../components/HealthScoreBadge";
+import { useSEO } from "../hooks/useSEO";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -14,6 +15,33 @@ export const PublicMarketplace = () => {
   const [specialists, setSpecialists] = useState([]);
   const [filters, setFilters] = useState({ category: "", verified_only: false, sort: "rating" });
   const [loading, setLoading] = useState(true);
+
+  useSEO({
+    title: filters.category
+      ? `Specialiști ${filters.category} verificați · Marketplace PropManage`
+      : "Marketplace specialiști verificați · PropManage",
+    description: filters.category
+      ? `Găsește cei mai buni specialiști ${filters.category} verificați pentru proprietatea ta. Recenzii reale, plăți escrow, garanție lucrare.`
+      : "Descoperă peste 100 de specialiști verificați (instalatori, electricieni, designeri, zugravi) pentru proprietatea ta. Plăți escrow, recenzii reale, garanție lucrare.",
+    canonical: filters.category
+      ? `https://propmanage.ro/marketplace?category=${encodeURIComponent(filters.category)}`
+      : "https://propmanage.ro/marketplace",
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      "name": "Marketplace Specialiști PropManage",
+      "url": "https://propmanage.ro/marketplace",
+      "description": "Listă de specialiști verificați pentru proprietăți rezidențiale în România.",
+      "isPartOf": { "@type": "WebSite", "name": "PropManage", "url": "https://propmanage.ro" },
+      "breadcrumb": {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "Acasă", "item": "https://propmanage.ro/" },
+          { "@type": "ListItem", "position": 2, "name": "Marketplace", "item": "https://propmanage.ro/marketplace" },
+        ],
+      },
+    },
+  });
 
   useEffect(() => {
     const params = new URLSearchParams();

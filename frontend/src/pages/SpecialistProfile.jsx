@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Star, CheckCircle2, Award, Briefcase, Calendar, ArrowLeft, Building2, Image as ImageIcon, Shield, Clock, Camera, AlertOctagon } from "lucide-react";
 import { PortfolioGallery } from "./Portfolio";
 import { HealthScoreBadge } from "../components/HealthScoreBadge";
+import { useSEO } from "../hooks/useSEO";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -97,6 +98,42 @@ export const SpecialistProfile = () => {
       .then(r => setData(r.data))
       .catch(() => setError(true));
   }, [id]);
+
+  // Dynamic SEO — only injected once profile data is loaded.
+  const seoTitle = data
+    ? `${data.name}${data.specialty ? ` · ${data.specialty}` : ""} · Specialist verificat PropManage`
+    : "Profil specialist · PropManage";
+  const seoDesc = data
+    ? `${data.name}${data.verified ? " (specialist VERIFIED)" : ""}${data.specialty ? `, ${data.specialty}` : ""} pe PropManage. ${data.reviews_count || 0} recenzii, rating ${data.rating || "—"}/5. Contactează prin platformă cu plată escrow.`
+    : "Profil public specialist verificat pe marketplace-ul PropManage.";
+
+  useSEO({
+    title: seoTitle,
+    description: seoDesc,
+    canonical: `https://propmanage.ro/specialists/${id}`,
+    noindex: error,    // 404 — don't index broken profiles
+    jsonLd: data ? {
+      "@context": "https://schema.org",
+      "@type": "Person",
+      "name": data.name,
+      "jobTitle": data.specialty || "Specialist",
+      "url": `https://propmanage.ro/specialists/${id}`,
+      "aggregateRating": data.reviews_count
+        ? {
+            "@type": "AggregateRating",
+            "ratingValue": data.rating || 0,
+            "reviewCount": data.reviews_count,
+            "bestRating": 5,
+          }
+        : undefined,
+      "memberOf": {
+        "@type": "Organization",
+        "name": "PropManage",
+        "url": "https://propmanage.ro",
+      },
+      "knowsAbout": data.service_categories || (data.specialty ? [data.specialty] : []),
+    } : null,
+  });
 
   if (error) return (
     <div className="min-h-screen flex items-center justify-center text-stone-400">

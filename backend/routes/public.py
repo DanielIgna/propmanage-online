@@ -329,3 +329,78 @@ async def delete_demo_lead(lead_id: str, user: dict = Depends(require_role("admi
         raise HTTPException(400, "Invalid lead id")
     await db.demo_leads.delete_one({"_id": oid})
     return {"ok": True}
+
+
+
+# ============================================================================
+# SEO — Dynamic sitemap.xml
+# ============================================================================
+# Listed in robots.txt as the canonical sitemap. Includes:
+#  - Static public pages (landing, marketplace, login, register, privacy, terms, status)
+#  - Public profile of every VERIFIED specialist (non-deleted)
+# Google/Bing re-fetch it weekly; freshness is guaranteed because we hit Mongo
+# on every request (response is small — < 50KB even at 1000 specialists).
+
+from fastapi.responses import Response as FastResponse  # noqa: E402
+
+_SITE_URL = os.environ.get("APP_PUBLIC_URL", "https://propmanage.ro").rstrip("/")
+
+
+@router.get("/public/sitemap.xml")
+async def public_sitemap():
+    """Dynamic XML sitemap — included in robots.txt."""
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    static_pages = [
+        ("/",                "1.0", "weekly"),
+        ("/marketplace",     "0.9", "daily"),
+        ("/digital-twin",    "0.7", "monthly"),
+        ("/login",           "0.4", "monthly"),
+        ("/register",        "0.5", "monthly"),
+        ("/privacy",         "0.3", "yearly"),
+        ("/privacy/notices", "0.3", "yearly"),
+        ("/terms",           "0.3", "yearly"),
+        ("/status",          "0.3", "weekly"),
+    ]
+
+    urls_xml = []
+    for path, prio, freq in static_pages:
+        urls_xml.append(
+            f"  <url>\n"
+            f"    <loc>{_SITE_URL}{path}</loc>\n"
+            f"    <lastmod>{now_iso}</lastmod>\n"
+            f"    <changefreq>{freq}</changefreq>\n"
+            f"    <priority>{prio}</priority>\n"
+            f"  </url>"
+        )
+
+    # Public specialist profiles — only verified & non-deleted ones
+    cursor = db.users.find(
+        {"role": "specialist", "verified": True, "deleted": {"$ne": True}},
+        {"_id": 1, "updated_at": 1, "created_at": 1},
+    ).limit(5000)
+    async for u in cursor:
+        spec_id = str(u["_id"])
+        lastmod = u.get("updated_at") or u.get("created_at")
+        if isinstance(lastmod, datetime):
+            lastmod_str = lastmod.strftime("%Y-%m-%d")
+        elif isinstance(lastmod, str) and len(lastmod) >= 10:
+            lastmod_str = lastmod[:10]
+        else:
+            lastmod_str = now_iso
+        urls_xml.append(
+            f"  <url>\n"
+            f"    <loc>{_SITE_URL}/specialists/{spec_id}</loc>\n"
+            f"    <lastmod>{lastmod_str}</lastmod>\n"
+            f"    <changefreq>weekly</changefreq>\n"
+            f"    <priority>0.7</priority>\n"
+            f"  </url>"
+        )
+
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "\n".join(urls_xml)
+        + "\n</urlset>\n"
+    )
+    return FastResponse(content=body, media_type="application/xml")
