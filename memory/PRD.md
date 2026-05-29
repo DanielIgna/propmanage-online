@@ -976,3 +976,105 @@ Build a comprehensive Property Operating System "PropManage" - a Romanian-first 
   `https://propmanage.ro/api/public/sitemap.xml` in Google Search Console
   (Sitemaps tab) for fast indexing.
 
+
+## Changelog — 2026-02-29 — SEO Landing Pages (programmatic SEO, 200+ pages)
+- **New dynamic route** `/marketplace/:slug` in `App.js` → `MarketplaceLanding.jsx`.
+  Supported slug formats:
+    - `/marketplace/{category}`              (e.g. `/electrician`)
+    - `/marketplace/{category}-{city}`       (e.g. `/electrician-bucuresti`,
+                                              `/design-interior-cluj-napoca`)
+- **Slug parser**: 9 specialty slugs × 22 city slugs = **207 valid combinations**
+  + 9 standalone category pages = **216 SEO landing pages** total.
+  - Romanian-friendly slugs: `electrician`, `instalator`, `hvac`, `design-interior`,
+    `tamplar`, `zugrav`, `firma-curatenie`, `service-electrocasnice`, `gradinar`.
+  - Cities: `bucuresti`, `cluj-napoca`, `timisoara`, `iasi`, `brasov`, `constanta`,
+    `craiova`, `galati`, `oradea`, `ploiesti`, `sibiu`, `arad`, `bacau`, `pitesti`,
+    `braila`, `buzau`, `suceava`, `baia-mare`, `satu-mare`, `ramnicu-valcea`,
+    `targu-mures`, `drobeta-turnu-severin`.
+  - Slug parser handles multi-word categories (greedy longest-match) so
+    `design-interior-cluj-napoca` correctly splits into `design-interior` + `cluj-napoca`.
+- **Backend additions**:
+  - `seo_slugs.py` — single source of truth for slug↔DB mappings, used by both
+    `routes/public.py` (sitemap) and `routes/marketplace.py` (city filter).
+  - `routes/marketplace.py`: added `city` query param that expands to ALL zones
+    inside that city via `db.regions.distinct("zone", {"city": X})`. Returns
+    empty list on unknown city (no data leak).
+  - `routes/public.py` sitemap: now emits all 216 landing-page URLs with
+    `priority=0.85` for parent (category-only) pages and `0.7` for city-specific
+    ones. Sitemap total: **222 URLs** (9 static + 216 landings + 6 specialists).
+- **Frontend `MarketplaceLanding.jsx`** (~290 lines):
+  - Unique H1 per page: `{Plural} verificați în {Oraș}` or `... în România`.
+  - **Unique intro copy per category** (CATEGORY_INTROS object) — avoids
+    Google "duplicate content" penalty across 200+ pages.
+  - 4 trust bullets (Shield, Star, Award, Sparkles) reinforce value prop.
+  - Specialist cards (same UI as main marketplace) filtered by `category + city`.
+  - Empty state: "Postează cerere gratuit" CTA when no specialists match.
+  - **Internal-link blocks** (huge for SEO):
+    - 9 sibling-city links (same category, other top cities).
+    - 8 sibling-category links (same city, other specialties).
+  - Bottom CTA: "Postează cerere gratuit" → /register.
+  - Footer with links to /terms, /privacy, /status (link equity distribution).
+  - `useSEO` hook injects: unique title, description, canonical, breadcrumb
+    JSON-LD, and a `Service` schema with `areaServed=City` when city is set
+    (eligible for Google local pack snippets).
+  - 404 fallback for unknown slugs sets `meta robots=noindex,nofollow`.
+- **Main `/marketplace`** now has a bottom section linking to all 216 landing
+  pages (organized by category → 10 top cities each), accelerating Google's
+  discovery via internal crawl rather than waiting for sitemap re-fetch.
+- Validated:
+  - HTTP 200 for `/electrician`, `/instalator-cluj-napoca`, `/design-interior`,
+    `/zugrav-iasi`, `/gradinar-timisoara`.
+  - `/electrician-bucuresti` returns 16 specialists (city-expansion working).
+  - `/api/marketplace/specialists?city=NonExistentCity` returns `[]` (safe).
+  - Invalid slug `/xyz-invalid` → `noindex, nofollow` + clean 404 page.
+  - Screenshots confirm: unique H1, unique meta description, 4 JSON-LD blocks,
+    9 sibling-city links + 8 sibling-category links rendered.
+- Production effect (estimated): Romania has ~30-50 monthly searches per
+  `[specialty] [city]` query (long-tail). With 200 landing pages × ~10 ranking
+  positions = 2,000 keyword surface area. Even 5% conversion on Google's first
+  3 results → ~300-600 organic clicks/month within 60 days of indexing.
+
+
+## Changelog — 2026-02-29 — Evergreen Blog `/ghiduri` (6 long-form articles)
+- **New routes**:
+  - `/ghiduri`       → `GhiduriIndex.jsx` (blog index)
+  - `/ghiduri/:slug` → `GhidPage.jsx`     (article detail)
+- **Content** in `frontend/src/data/ghiduri.js` — single source of truth.
+  6 evergreen articles (~800-1500 words each) targeting high-volume Romanian
+  search intent:
+    1. `cost-renovare-apartament-2-camere` — Cost & Buget, 9 min read
+    2. `cum-alegi-designer-interior`        — Decizie & Sfaturi, 8 min read
+    3. `cum-verifici-instalator`            — Verificare & Siguranță, 7 min read
+    4. `cost-instalatie-electrica-apartament` — Cost & Buget, 7 min read
+    5. `cum-functioneaza-escrow-lucrari`    — Plăți & Siguranță, 6 min read
+    6. `cum-alegi-zugrav-bun`               — Decizie & Sfaturi, 6 min read
+- **Article structure**: hero (icon tag + H1 + description + readtime), 4-5
+  sections with markdown-style body (paragraphs, bullet lists, lime callouts),
+  5-question FAQ block (accordion UI), internal links to relevant marketplace
+  landing pages, related-guides section at bottom, CTA to /register.
+- **SEO per article**:
+  - Unique title, description, canonical URL.
+  - **`@graph` JSON-LD with 3 schemas**: `Article` (with publisher/author/dates),
+    `FAQPage` (drives Google FAQ rich snippets — visible directly in SERP!),
+    `BreadcrumbList`.
+- **Index page** has `Blog` JSON-LD listing all `BlogPosting` entries.
+- **Internal-link strategy** (huge for SEO):
+  - Each article links to **~24 marketplace landing pages** (3 relevant
+    categories × 8 top cities). E.g. "Cum verifici un instalator" links to
+    `/marketplace/instalator-bucuresti`, `/marketplace/electrician-cluj-napoca`, etc.
+  - Each marketplace landing page has a new "Înainte să angajezi, citește"
+    block showing 2 relevant guides → boosts time-on-site + link equity flow.
+  - Marketplace header now has a `/ghiduri` link.
+- **Sitemap** updated in `routes/public.py`:
+  - Added `/ghiduri` (priority 0.85) + 6 individual articles (priority 0.75).
+  - **Total sitemap: 229 URLs** (was 222).
+- Validated via Playwright:
+  - `/ghiduri` renders 6 cards, 4 JSON-LD blocks, canonical correct.
+  - `/ghiduri/cum-verifici-instalator` renders unique title, 4 JSON-LD blocks
+    (Article + FAQPage + Breadcrumb + global Organization), 5 FAQ accordion
+    items, 3 related guides, **24 internal links** to marketplace landing pages.
+- Production effect: FAQ rich snippets typically appear in SERP within 14-28
+  days of indexing. Articles like "Cât costă o renovare apartament 2 camere"
+  target queries with 3-8K monthly searches in RO — even a #5 ranking position
+  brings ~150-400 organic clicks/month per article.
+

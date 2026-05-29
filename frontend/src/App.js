@@ -16,6 +16,9 @@ import { ClientDashboard, SpecialistDashboard, AdminDashboard, OperatorDashboard
 import { AuthCallback } from "./pages/AuthCallback";
 import { SpecialistProfile } from "./pages/SpecialistProfile";
 import { PublicMarketplace } from "./pages/Marketplace";
+import { MarketplaceLanding } from "./pages/MarketplaceLanding";
+import { GhiduriIndex } from "./pages/GhiduriIndex";
+import { GhidPage } from "./pages/GhidPage";
 import { ProjectWorkspace } from "./pages/ProjectWorkspace";
 import { PaymentSuccess } from "./pages/PaymentSuccess";
 import { TutorialOverlay } from "./pages/TutorialOverlay";
@@ -1459,6 +1462,9 @@ function App() {
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/marketplace" element={<PublicMarketplace />} />
+              <Route path="/marketplace/:slug" element={<MarketplaceLanding />} />
+              <Route path="/ghiduri" element={<GhiduriIndex />} />
+              <Route path="/ghiduri/:slug" element={<GhidPage />} />
               <Route path="/specialists/:id" element={<SpecialistProfile />} />
               <Route path="/client" element={<ClientDashboard />} />
               <Route path="/specialist" element={<SpecialistDashboard />} />

@@ -354,6 +354,7 @@ async def public_sitemap():
     static_pages = [
         ("/",                "1.0", "weekly"),
         ("/marketplace",     "0.9", "daily"),
+        ("/ghiduri",         "0.85", "weekly"),
         ("/digital-twin",    "0.7", "monthly"),
         ("/login",           "0.4", "monthly"),
         ("/register",        "0.5", "monthly"),
@@ -361,6 +362,16 @@ async def public_sitemap():
         ("/privacy/notices", "0.3", "yearly"),
         ("/terms",           "0.3", "yearly"),
         ("/status",          "0.3", "weekly"),
+    ]
+
+    # Guide articles (mirror of frontend/src/data/ghiduri.js — keep in sync)
+    guide_slugs = [
+        ("cost-renovare-apartament-2-camere", "2026-02-29"),
+        ("cum-alegi-designer-interior",        "2026-02-29"),
+        ("cum-verifici-instalator",            "2026-02-29"),
+        ("cost-instalatie-electrica-apartament", "2026-02-29"),
+        ("cum-functioneaza-escrow-lucrari",    "2026-02-29"),
+        ("cum-alegi-zugrav-bun",               "2026-02-29"),
     ]
 
     urls_xml = []
@@ -371,6 +382,34 @@ async def public_sitemap():
             f"    <lastmod>{now_iso}</lastmod>\n"
             f"    <changefreq>{freq}</changefreq>\n"
             f"    <priority>{prio}</priority>\n"
+            f"  </url>"
+        )
+
+    # Guide articles — Article + FAQPage schema, high SEO value
+    for gslug, gmod in guide_slugs:
+        urls_xml.append(
+            f"  <url>\n"
+            f"    <loc>{_SITE_URL}/ghiduri/{gslug}</loc>\n"
+            f"    <lastmod>{gmod}</lastmod>\n"
+            f"    <changefreq>monthly</changefreq>\n"
+            f"    <priority>0.75</priority>\n"
+            f"  </url>"
+        )
+
+    # SEO category-landing pages (e.g. /marketplace/electrician,
+    # /marketplace/electrician-bucuresti) — drives long-tail local search traffic.
+    from seo_slugs import all_landing_slugs
+    for slug in all_landing_slugs():
+        # Slugs without a city are higher priority (parent pages)
+        is_with_city = "-" in slug and not slug.startswith("design-interior") or slug.count("-") >= (2 if slug.startswith("design-interior") else 1)
+        # Simpler: split into parts and check if more than 1
+        is_with_city = slug not in ("electrician", "instalator", "hvac", "design-interior", "tamplar", "zugrav", "firma-curatenie", "service-electrocasnice", "gradinar")
+        urls_xml.append(
+            f"  <url>\n"
+            f"    <loc>{_SITE_URL}/marketplace/{slug}</loc>\n"
+            f"    <lastmod>{now_iso}</lastmod>\n"
+            f"    <changefreq>weekly</changefreq>\n"
+            f"    <priority>{'0.7' if is_with_city else '0.85'}</priority>\n"
             f"  </url>"
         )
 

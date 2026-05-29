@@ -64,7 +64,10 @@ export const PublicMarketplace = () => {
             </div>
             <span className="font-serif text-lg font-semibold">PropManage</span>
           </Link>
-          <Link to="/login" className="text-xs text-stone-400 hover:text-white">Conectare</Link>
+          <div className="flex items-center gap-4">
+            <Link to="/ghiduri" className="text-xs text-stone-400 hover:text-white hidden sm:inline">Ghiduri</Link>
+            <Link to="/login" className="text-xs text-stone-400 hover:text-white">Conectare</Link>
+          </div>
         </div>
       </header>
 
@@ -130,6 +133,49 @@ export const PublicMarketplace = () => {
             </motion.div>
           ))}
         </div>
+
+        {/* SEO internal-link block — surfaces all category/city landing pages */}
+        <section className="mt-16 pt-10 border-t border-white/5" data-testid="mkt-seo-links">
+          <h2 className="font-serif text-2xl mb-4">Caută după categorie și oraș</h2>
+          <p className="text-stone-400 text-sm mb-6 max-w-2xl">
+            Vezi specialiști verificați filtrați pe specialitate și oraș — pagini dedicate cu profile, recenzii și prețuri.
+          </p>
+          <div className="space-y-5">
+            {[
+              { cat: "electrician",            plural: "Electricieni" },
+              { cat: "instalator",             plural: "Instalatori" },
+              { cat: "hvac",                   plural: "Specialiști HVAC" },
+              { cat: "design-interior",        plural: "Designeri interior" },
+              { cat: "tamplar",                plural: "Tâmplari" },
+              { cat: "zugrav",                 plural: "Zugravi" },
+              { cat: "firma-curatenie",        plural: "Firme de curățenie" },
+              { cat: "service-electrocasnice", plural: "Service electrocasnice" },
+              { cat: "gradinar",               plural: "Grădinari" },
+            ].map(({ cat, plural }) => (
+              <div key={cat}>
+                <Link to={`/marketplace/${cat}`} className="text-sm font-medium text-[#d4ff3a] hover:underline">
+                  {plural} →
+                </Link>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {[
+                    ["bucuresti", "București"], ["cluj-napoca", "Cluj-Napoca"],
+                    ["timisoara", "Timișoara"], ["iasi", "Iași"],
+                    ["brasov", "Brașov"], ["constanta", "Constanța"],
+                    ["sibiu", "Sibiu"], ["oradea", "Oradea"], ["craiova", "Craiova"], ["ploiesti", "Ploiești"],
+                  ].map(([slug, name]) => (
+                    <Link
+                      key={slug}
+                      to={`/marketplace/${cat}-${slug}`}
+                      className="text-[11px] text-stone-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-full px-2.5 py-1 transition"
+                    >
+                      {name}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       </main>
     </div>
   );

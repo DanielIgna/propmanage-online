@@ -31,14 +31,16 @@ async def public_marketplace(
     min_rating: Optional[float] = None,
     sort: str = "rating",  # rating, reviews, recent
     zone: Optional[str] = None,
+    city: Optional[str] = None,
     style: Optional[str] = None,
 ):
     """Public endpoint: browse all specialists with filters. No auth required.
 
     Optional filters:
       - category: matches primary specialty OR service_categories.
-      - zone: matches coverage_zones (specialist serves that area).
-      - style: matches at least one portfolio item with that style (client-relevant for design).
+      - zone:     matches a single coverage zone (sector/cartier).
+      - city:     expands to ALL zones inside that city (uses regions collection).
+      - style:    matches at least one portfolio item with that style.
     """
     q = {"role": "specialist", "deleted": {"$ne": True}}
     if category:
@@ -49,6 +51,14 @@ async def public_marketplace(
         q["rating"] = {"$gte": min_rating}
     if zone:
         q["coverage_zones"] = zone
+    elif city:
+        # Expand city → all its zones, then match if specialist covers ANY of them.
+        city_zones = await db.regions.distinct("zone", {"city": city})
+        if city_zones:
+            q["coverage_zones"] = {"$in": city_zones}
+        else:
+            # Unknown city → empty result set (avoid leaking unfiltered list).
+            return []
 
     sort_map = {
         "rating": [("rating", -1), ("reviews_count", -1)],
