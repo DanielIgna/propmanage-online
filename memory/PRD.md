@@ -1808,3 +1808,39 @@ User: „într-o secțiune scrie escrow, în alta cont blocat, în alta depozit 
 - 🔴 USER: **redeploy producție** pentru Phase 45 → apasă "Auto-fix" pe prod → 38/38 ✓
 - 🔴 USER: webhook URLs + Stripe LIVE keys
 - 🟡 Twilio SMS, Lottie KB
+
+### Phase 46 — Production hardening (post-deploy fix) (Feb 2026)
+
+**Context**: User a apăsat Auto-fix pe producție și a primit BLOCKED 11 fail. Analiză screenshot:
+1. AUTO-UI-01/02/03 (3 P0) — chromium nu există pe host prod. Script-ul Playwright prinde error în interior și emite marker cu status=fail → outer skip-check nu se activează.
+2. ESCROW/DISPUTE/QUOTE/FILE (6 fails) — cookies httpx nu se propagă corect între requests pe prod în unele scenarii. Setup-ul ajunge la URL-uri 401/non-JSON, apoi codul descendent crapă cu `NoneType.get`.
+3. LIFECYCLE-02 — onboarding email enqueue e async; testul polling fără wait.
+4. GDPR-02 — același timing issue cu dsar_requests insert.
+
+**Fix-uri**:
+
+1. **Playwright skip detection**: în `_run_browser_test`, post-parsing al marker-ului `__PM_RESULT__` se inspectează `note` pentru "Executable doesn't exist" / "playwright install" → convert la skip. Fix de prioritate (paranthezing) pentru outer fallback check.
+
+2. **`_register_and_login` defensive**:
+   - Parse JSON cu try/except (răspunsuri non-JSON pe prod nu mai crapă)
+   - Fallback explicit la `/api/auth/login` dacă `/me` returnează 401 după register (cookies cookies nu s-au propagat din register response)
+   - Raise RuntimeError descriptiv în loc de a continua cu uid=""
+
+3. **`_seed_active_job` step-by-step validation**:
+   - Helper `_parse_id` validează că response e dict și conține 'id'
+   - Fiecare step (property_create, request_create, specialist_accept, escrow_place) raise RuntimeError cu mesaj clar dacă eșuează
+   - `_safe_e2e` propagă mesajul descriptiv în loc de NoneType.get
+
+4. **Toate teste E2E individuale**: adăugat verificare `if not row/req/user: return _ko(...)` înainte de `.get()` pe rezultate DB → previne NoneType crash chiar și în edge cases extreme
+
+5. **LIFECYCLE-02 polling**: 10× 300ms wait (3s total) pentru onboarding enqueue async
+
+6. **GDPR-02 polling**: 8× 250ms wait (2s total) pentru dsar_requests insert async
+
+**Rezultat preview**: 38/38 pass · 0 fail · 0 P0 ✓
+
+### Backlog rămas
+- 🔴 USER: **redeploy producție** (Phase 46) → apasă Auto-fix → ar trebui 38/38 (Playwright vor fi SKIP, nu FAIL pe prod care nu are chromium)
+- 🔴 USER: webhook URLs + Stripe LIVE keys
+- 🟡 Twilio SMS, Lottie KB
+

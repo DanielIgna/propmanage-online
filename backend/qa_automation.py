@@ -320,7 +320,15 @@ async def _run_browser_test(test_body: str, target_url: str) -> dict:
         for line in out.splitlines():
             if line.startswith("__PM_RESULT__"):
                 try:
-                    return json.loads(line[len("__PM_RESULT__"):])
+                    result = json.loads(line[len("__PM_RESULT__"):])
+                    # Convert env-level failures (no chromium installed) to skip
+                    note = (result.get("note") or "") if isinstance(result, dict) else ""
+                    if "Executable doesn't exist" in note or "playwright install" in note.lower():
+                        return {
+                            "status": "skip",
+                            "note": "Chromium binary not installed. Run `playwright install chromium` on the host.",
+                        }
+                    return result
                 except Exception:
                     pass
         # Detect missing chromium binary → mark as skip (env limitation, not a real fail)
@@ -328,7 +336,7 @@ async def _run_browser_test(test_body: str, target_url: str) -> dict:
         if (
             "Executable doesn't exist" in haystack
             or "playwright install" in haystack.lower()
-            or "BrowserType.launch" in haystack and "Executable" in haystack
+            or ("BrowserType.launch" in haystack and "Executable" in haystack)
         ):
             return {
                 "status": "skip",
@@ -511,15 +519,20 @@ async def lifecycle_specialist_register_then_onboarding_drip() -> dict:
         })
         if r.status_code != 200:
             return _ko(f"register failed {r.status_code}")
-    # Check that 3 onboarding rows were enqueued
+    # Check that 3 onboarding rows were enqueued — allow small async write lag
     from db import db
-    rows = await db.onboarding_emails.count_documents({"email": email})
+    rows = 0
+    for _ in range(10):
+        rows = await db.onboarding_emails.count_documents({"email": email})
+        if rows >= 3:
+            break
+        await asyncio.sleep(0.3)
     # Cleanup
     await db.onboarding_emails.delete_many({"email": email})
     await db.users.delete_one({"email": email})
     if rows >= 3:
         return _ok(f"OK — specialist {email} a primit {rows} email-uri de onboarding")
-    return _ko(f"Doar {rows} email-uri enqueuate, așteptam ≥3")
+    return _ko(f"Doar {rows} email-uri enqueuate, așteptam ≥3 (după 3s polling)")
 
 
 async def lifecycle_marketplace_search_returns_specialists() -> dict:
@@ -644,9 +657,31 @@ async def _register_and_login(role: str, prefix: str, *, extra: Optional[dict] =
     if r.status_code != 200:
         await c.aclose()
         raise RuntimeError(f"register {role} failed {r.status_code}: {r.text[:200]}")
-    # Get id via /me
+    # Defensive parse — if response isn't JSON dict, fall back to explicit login
+    try:
+        register_body = r.json()
+        if not isinstance(register_body, dict):
+            register_body = {}
+    except Exception:
+        register_body = {}
+    # If auth cookies didn't survive register (some prod setups), re-login explicitly.
     me = await c.get("/api/auth/me")
-    uid = (me.json() or {}).get("id") or ""
+    if me.status_code != 200:
+        login = await c.post("/api/auth/login", json={"email": email, "password": "Test1234!"})
+        if login.status_code != 200:
+            await c.aclose()
+            raise RuntimeError(f"register OK but auth/me {me.status_code} and login {login.status_code}: cookies not propagating")
+        me = await c.get("/api/auth/me")
+        if me.status_code != 200:
+            await c.aclose()
+            raise RuntimeError(f"login OK but /me still {me.status_code} — cookie domain mismatch on prod?")
+    try:
+        me_body = me.json()
+        if not isinstance(me_body, dict):
+            me_body = {}
+    except Exception:
+        me_body = {}
+    uid = me_body.get("id") or register_body.get("id") or ""
     return c, email, uid
 
 
@@ -683,12 +718,24 @@ async def _seed_active_job(escrow_amount: float = 1000.0) -> dict:
     """Create a client + specialist + property + request fully assigned with escrow held.
 
     Returns dict with: client_email, specialist_email, request_id, property_id, client_id, specialist_id.
-    All clients are closed by caller via the returned cookies' close (we keep cookies until tests are done).
+    Raises RuntimeError on any step failure with a descriptive message. _safe_e2e converts to clean fail.
     """
     client_c, c_email, c_id = await _register_and_login("client", "e2e_c")
     spec_c, s_email, s_id = await _register_and_login("specialist", "e2e_s")
     # Top-up specialist wallet so they can pay the 45 RON lead fee
     await db.users.update_one({"email": s_email}, {"$inc": {"wallet_balance": 200.0}})
+
+    def _parse_id(resp, step: str) -> str:
+        try:
+            body = resp.json()
+        except Exception:
+            body = None
+        if not isinstance(body, dict):
+            raise RuntimeError(f"step:{step} returned non-dict body (status={resp.status_code}, type={type(body).__name__})")
+        the_id = body.get("id")
+        if not the_id:
+            raise RuntimeError(f"step:{step} returned no 'id' field (status={resp.status_code}, keys={list(body.keys())[:5]})")
+        return the_id
 
     # Client creates a property
     pr = await client_c.post("/api/properties", json={
@@ -697,8 +744,8 @@ async def _seed_active_job(escrow_amount: float = 1000.0) -> dict:
     if pr.status_code != 200:
         await client_c.aclose()
         await spec_c.aclose()
-        raise RuntimeError(f"property create failed {pr.status_code}: {pr.text[:200]}")
-    pid = (pr.json() or {}).get("id") or ""
+        raise RuntimeError(f"step:property_create failed {pr.status_code}: {pr.text[:200]}")
+    pid = _parse_id(pr, "property_create")
 
     # Client creates a request
     rq = await client_c.post("/api/requests", json={
@@ -708,22 +755,22 @@ async def _seed_active_job(escrow_amount: float = 1000.0) -> dict:
     if rq.status_code != 200:
         await client_c.aclose()
         await spec_c.aclose()
-        raise RuntimeError(f"request create failed {rq.status_code}: {rq.text[:300]}")
-    req_id = (rq.json() or {}).get("id") or ""
+        raise RuntimeError(f"step:request_create failed {rq.status_code}: {rq.text[:300]}")
+    req_id = _parse_id(rq, "request_create")
 
     # Specialist accepts (pays 45 RON lead fee)
     ac = await spec_c.post(f"/api/requests/{req_id}/accept", json={})
     if ac.status_code != 200:
         await client_c.aclose()
         await spec_c.aclose()
-        raise RuntimeError(f"specialist accept failed {ac.status_code}: {ac.text[:200]}")
+        raise RuntimeError(f"step:specialist_accept failed {ac.status_code}: {ac.text[:200]}")
 
     # Client places escrow
     esc = await client_c.post(f"/api/requests/{req_id}/escrow?amount={escrow_amount}")
     if esc.status_code != 200:
         await client_c.aclose()
         await spec_c.aclose()
-        raise RuntimeError(f"escrow place failed {esc.status_code}: {esc.text[:200]}")
+        raise RuntimeError(f"step:escrow_place failed {esc.status_code}: {esc.text[:200]}")
 
     return {
         "client_c": client_c, "spec_c": spec_c,
@@ -775,6 +822,8 @@ async def e2e_escrow_funded_status_held() -> dict:
     env = await _seed_active_job(800.0)
     try:
         req = await db.requests.find_one({"_id": ObjectId(env["request_id"])})
+        if not req:
+            return _ko(f"request {env['request_id']} not found in DB after seed")
         amt = req.get("escrow_amount")
         st = req.get("escrow_status")
         if st == "held" and amt == 800.0:
@@ -794,12 +843,16 @@ async def e2e_escrow_full_confirm_releases_split() -> dict:
         await env["spec_c"].post(f"/api/requests/{env['request_id']}/complete")
         # Snapshot specialist wallet
         spec_before = await db.users.find_one({"email": env["specialist_email"]})
+        if not spec_before:
+            return _ko(f"specialist {env['specialist_email']} disappeared from DB")
         bal_before = float(spec_before.get("wallet_balance") or 0)
         # Client confirms
         cf = await env["client_c"].post(f"/api/requests/{env['request_id']}/confirm")
         if cf.status_code != 200:
             return _ko(f"confirm failed {cf.status_code}: {cf.text[:200]}")
         spec_after = await db.users.find_one({"email": env["specialist_email"]})
+        if not spec_after:
+            return _ko("specialist disappeared after confirm")
         bal_after = float(spec_after.get("wallet_balance") or 0)
         delta = round(bal_after - bal_before, 2)
         if abs(delta - 950.0) < 1.0:
@@ -823,8 +876,10 @@ async def e2e_dispute_opens_freezes_escrow() -> dict:
         if dp.status_code != 200:
             return _ko(f"open dispute failed {dp.status_code}: {dp.text[:200]}")
         req = await db.requests.find_one({"_id": ObjectId(env["request_id"])})
+        if not req:
+            return _ko("request not found after dispute open")
         if req.get("escrow_status") == "frozen" and req.get("disputed") is True:
-            return _ok(f"OK — escrow frozen, disputed=True (dispute_id={dp.json().get('id','?')[:12]})")
+            return _ok(f"OK — escrow frozen, disputed=True (dispute_id={(dp.json() or {}).get('id','?')[:12]})")
         return _ko(f"escrow not frozen: status={req.get('escrow_status')}, disputed={req.get('disputed')}")
     finally:
         await _cleanup_e2e(env)
@@ -838,12 +893,18 @@ async def e2e_dispute_resolves_refund_client() -> dict:
     try:
         await env["spec_c"].post(f"/api/requests/{env['request_id']}/start")
         dp = await env["client_c"].post(f"/api/requests/{env['request_id']}/dispute", json={"reason": "E2E test dispută refund client"})
-        dispute_id = (dp.json() or {}).get("id")
+        try:
+            dispute_body = dp.json()
+        except Exception:
+            dispute_body = {}
+        dispute_id = dispute_body.get("id") if isinstance(dispute_body, dict) else None
         if not dispute_id:
-            return _ko(f"no dispute id: {dp.text[:200]}")
+            return _ko(f"no dispute id in response (status={dp.status_code}): {dp.text[:200]}")
         # Admin resolves
         admin_c = await _admin_client()
         client_before = await db.users.find_one({"email": env["client_email"]})
+        if not client_before:
+            return _ko("client missing from DB")
         bal_b = float(client_before.get("wallet_balance") or 0)
         rs = await admin_c.post(f"/api/admin/disputes/{dispute_id}/resolve", json={
             "resolution": "refund_client", "notes": "E2E test refund",
@@ -851,6 +912,8 @@ async def e2e_dispute_resolves_refund_client() -> dict:
         if rs.status_code != 200:
             return _ko(f"resolve failed {rs.status_code}: {rs.text[:200]}")
         client_after = await db.users.find_one({"email": env["client_email"]})
+        if not client_after:
+            return _ko("client missing after resolve")
         delta = round(float(client_after.get("wallet_balance") or 0) - bal_b, 2)
         if abs(delta - 600.0) < 1.0:
             return _ok(f"OK — client rambursat {delta} RON din escrow")
@@ -872,20 +935,42 @@ async def e2e_quote_specialist_accept_charges_lead_fee() -> dict:
         pr = await client_c.post("/api/properties", json={
             "name": "Q Apt", "address": "Str Q 1", "type": "apartment", "surface": 50.0, "rooms": 2,
         })
-        pid = (pr.json() or {}).get("id") or ""
+        if pr.status_code != 200:
+            return _ko(f"property create failed {pr.status_code}: {pr.text[:200]}")
+        try:
+            pr_body = pr.json()
+        except Exception:
+            pr_body = {}
+        pid = (pr_body or {}).get("id") if isinstance(pr_body, dict) else None
+        if not pid:
+            return _ko(f"no property id (status={pr.status_code}, body keys={list((pr_body or {}).keys())[:5]})")
         rq = await client_c.post("/api/requests", json={
             "property_id": pid, "title": "Lead test", "category": "electric",
             "priority": "normal", "budget_estimate": 500, "description": "Q",
         })
-        req_id = (rq.json() or {}).get("id") or ""
+        if rq.status_code != 200:
+            return _ko(f"request create failed {rq.status_code}: {rq.text[:200]}")
+        try:
+            rq_body = rq.json()
+        except Exception:
+            rq_body = {}
+        req_id = (rq_body or {}).get("id") if isinstance(rq_body, dict) else None
+        if not req_id:
+            return _ko(f"no request id (status={rq.status_code})")
         before = await db.users.find_one({"email": s_email})
+        if not before:
+            return _ko("specialist not in DB after register")
         bal_b = float(before.get("wallet_balance") or 0)
         ac = await spec_c.post(f"/api/requests/{req_id}/accept", json={})
         if ac.status_code != 200:
             return _ko(f"accept failed {ac.status_code}: {ac.text[:200]}")
         after = await db.users.find_one({"email": s_email})
+        if not after:
+            return _ko("specialist disappeared after accept")
         delta = round(bal_b - float(after.get("wallet_balance") or 0), 2)
         req = await db.requests.find_one({"_id": ObjectId(req_id)})
+        if not req:
+            return _ko("request disappeared after accept")
         if abs(delta - 45.0) < 0.01 and req.get("status") == "assigned":
             return _ok(f"OK — lead fee 45 RON dedus, status='assigned' (specialist={s_email[:18]}...)")
         return _ko(f"delta={delta} RON (await 45), status={req.get('status')} (await assigned)")
@@ -918,6 +1003,8 @@ async def e2e_specialist_kyc_upload_pending() -> dict:
         if up.status_code != 200:
             return _ko(f"upload failed {up.status_code}: {up.text[:200]}")
         spec = await db.users.find_one({"email": s_email})
+        if not spec:
+            return _ko("specialist not in DB after upload")
         docs = spec.get("documents") or []
         match = [d for d in docs if d.get("name") == "buletin_e2e.pdf" and d.get("status") == "pending"]
         if match:
@@ -976,9 +1063,16 @@ async def e2e_gdpr_erasure_request_creates_dsar_row() -> dict:
         r = await client_c.post("/api/gdpr/me/erasure-request", json={"confirm": True, "reason": "E2E test"})
         if r.status_code != 200:
             return _ko(f"erasure failed {r.status_code}: {r.text[:200]}")
-        row = await db.dsar_requests.find_one({"user_email": c_email, "type": "erasure"})
+        # Allow tiny write delay (transaction commit on prod can lag a few ms)
+        import asyncio as _asyncio
+        row = None
+        for _ in range(8):
+            row = await db.dsar_requests.find_one({"user_email": c_email, "type": "erasure"})
+            if row:
+                break
+            await _asyncio.sleep(0.25)
         if not row:
-            return _ko("no dsar_requests row created")
+            return _ko("no dsar_requests row created after 2s polling")
         if row.get("status") != "new" or not row.get("sla_due_at"):
             return _ko(f"row malformed: status={row.get('status')}, sla={row.get('sla_due_at')}")
         return _ok(f"OK — erasure DSAR creat, status=new, SLA={row['sla_due_at'][:10]} (30 zile)")
