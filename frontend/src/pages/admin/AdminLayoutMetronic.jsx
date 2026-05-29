@@ -69,6 +69,7 @@ const NAV_SECTIONS = [
     title: "TRAINING",
     items: [
       { id: "docs", label: "Documentație & Training", icon: FileText, badge: "NEW" },
+      { id: "qa_playbook", label: "QA Playbook", icon: ShieldCheck, badge: "NEW" },
     ],
   },
 ];

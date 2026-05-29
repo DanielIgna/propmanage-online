@@ -20,6 +20,7 @@ import { AdminGDPR } from "./AdminGDPR";
 import { AdminImpersonationLogs } from "./AdminImpersonationLogs";
 import { AdminBetaTesters } from "./AdminBetaTesters";
 import { AdminDocs } from "./AdminDocs";
+import { AdminQAPlaybook } from "./AdminQAPlaybook";
 
 const TITLES = {
   overview: { title: "Dashboard", subtitle: "Privire de ansamblu asupra platformei" },
@@ -44,6 +45,7 @@ const TITLES = {
   impersonation: { title: "Impersonare utilizatori", subtitle: "Jurnal sesiuni admin care au accesat contul altor utilizatori · GDPR audit" },
   beta_testers: { title: "Beta Testers", subtitle: "Useri noi în beta · Provenance Google/Email · Activitate engagement" },
   docs: { title: "Documentație & Training", subtitle: "Ghiduri training per rol · trimite pe email cu PDF · link-uri tokenizate" },
+  qa_playbook: { title: "QA Playbook", subtitle: "105 scenarii de test interactive · AI Test Suggester (Claude Sonnet 4.5) · markdown export" },
 };
 
 export const AdminDashboard = () => {
@@ -96,6 +98,7 @@ export const AdminDashboard = () => {
       {active === "impersonation" && <AdminImpersonationLogs />}
       {active === "beta_testers" && <AdminBetaTesters />}
       {active === "docs" && <AdminDocs />}
+      {active === "qa_playbook" && <AdminQAPlaybook />}
     </AdminLayoutMetronic>
   );
 };

@@ -25,7 +25,7 @@ import { PaymentSuccess } from "./pages/PaymentSuccess";
 import { TutorialOverlay } from "./pages/TutorialOverlay";
 import { AIConciergeBubble } from "./components/AIConciergeBubble";
 import { BookDemoModal } from "./pages/BookDemoModal";
-import { PrivacyPage, TermsPage } from "./pages/LegalPages";
+import { PrivacyPage, TermsPage, CookiePolicyPage } from "./pages/LegalPages";
 import { PrivacyNoticesPage } from "./pages/PrivacyNoticesPage";
 import { StatusPage } from "./pages/StatusPage";
 import { GDPRAuditBadge } from "./components/GDPRAuditBadge";
@@ -1343,6 +1343,7 @@ const Footer = () => (
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-stone-500">
         <Link to="/terms" className="hover:text-white transition-colors" data-testid="footer-terms">Termeni</Link>
         <Link to="/privacy" className="hover:text-white transition-colors" data-testid="footer-privacy">Confidențialitate</Link>
+        <Link to="/cookies" className="hover:text-white transition-colors" data-testid="footer-cookies">Cookies</Link>
         <Link to="/status" className="hover:text-white transition-colors inline-flex items-center gap-1" data-testid="footer-status">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Status
         </Link>
@@ -1458,6 +1459,7 @@ function App() {
               <Route path="/digital-twin" element={<DigitalTwinPage />} />
               <Route path="/report-respond/:token" element={<ReportApprovalPage />} />
               <Route path="/terms" element={<TermsPage />} />
+              <Route path="/cookies" element={<CookiePolicyPage />} />
               <Route path="/status" element={<StatusPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />

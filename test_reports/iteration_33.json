@@ -1,0 +1,51 @@
+{
+  "summary": "Phase 33 — Tested 3 new feature areas (Knowledge Base Phase 2/3 PDFs/MDs, Specialist Onboarding Email Drip, Interactive QA Playbook + AI Suggester) plus Cookie Policy page. Backend: 20/20 pytest tests PASSED (test_phase33_new_features.py) covering: PDF + Markdown rendering for 4 doc slugs, specialist register → 3-row drip enqueue with day_offset [1,3,7] sent=false, dispatch-now ok+summary, cancel/{uid} ok, QA template returns 105 items with required stats keys, run creation w/ 105 pending checks, PATCH check → summary updated (pass=1, closed=1), GET /runs/{id}/markdown returns text/markdown, AI suggester returns >=6 items with code+priority+category+description and provider='claude-sonnet-4-5', run close persists closed_at, non-admin (client) returns 403 on both /admin/qa and /admin/onboarding. Frontend: UI testing BLOCKED — Emergent preview frontend returns 'Preview Unavailable!!! Our Agent is resting after inactivity' on all /* routes (login, cookies, admin). Verified via curl + Playwright; frontend supervisor service is RUNNING and localhost:3000 responds 200, so the issue is at the Emergent preview ingress (not our code). Did static code-review of all required data-testids — every selector listed in the request is present in code.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Preview URL frontend routing",
+        "issue": "https://propmanage-bg.preview.emergentagent.com/login, /cookies, /admin all return HTTP 404 + Emergent 'Preview Unavailable' placeholder, even though supervisor reports frontend RUNNING and http://localhost:3000/login returns 200. Backend /api/* works fine at same hostname. Likely infrastructure-side preview suspension — main agent needs to wake the preview via app.emergent.sh before any UI Playwright runs.",
+        "affected_selectors": ["all"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "/cookies (LegalPages.jsx:158)",
+        "issues": ["Page title prop is 'Politica de cookies' (no diacritic) while spec/request mentions 'Politică de cookies' (with ă). Minor Romanian copy diacritic mismatch — only relevant if a strict text assertion is used."]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase33_new_features.py",
+    "/app/test_reports/pytest/phase33_results.xml"
+  ],
+  "action_items": [
+    "Wake the Emergent preview from app.emergent.sh (or contact support) so that public URL /* routes serve the React SPA instead of 'Preview Unavailable'. Backend /api/* already works.",
+    "Optional copy fix: change LegalPages.jsx line 158 title from 'Politica de cookies' to 'Politică de cookies' (with ă) to match Romanian convention used elsewhere.",
+    "After preview is reachable again, run the documented Playwright flows (login admin → /admin → TRAINING → QA Playbook → create run → mark pass → AI suggester; landing footer-cookies → /cookies)."
+  ],
+  "critical_code_review_comments": [
+    "AdminQAPlaybook.jsx (522 lines) is close to the 700-line soft limit — consider splitting RunHeader / CheckRow / AISuggester / Landing into separate files for maintainability.",
+    "All required data-testids verified present: qa-intro, qa-run-create, qa-runs-list, qa-ai-suggester, qa-new-run-name, qa-create-run-btn, qa-run-name, qa-progress-ring, qa-filters, qa-cat-toggle-{CAT}, qa-{code}-set-{status}, qa-ai-feature-input, qa-ai-suggest-btn, cookies-page, footer-cookies.",
+    "Backend onboarding /queue returns rows under key 'recent' (not 'rows'/'queue'); fine but document in API contract.",
+    "Backend QA endpoints wrap response in {'run': {...}, 'summary': {...}} — consistent, but client must always traverse .run."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase33_new_features.py"
+  ],
+  "success_rate": {
+    "backend": "100% (20/20)",
+    "frontend": "0% executed — blocked by Emergent preview being in 'resting' state; static code review of selectors = 100% present"
+  },
+  "test_credentials": "admin@propmanage.io / Admin123! (worked for all admin tests). client@propmanage.io / Client123! (worked for 403 guard tests).",
+  "seed_data_creation": "Created 1 specialist user spec_auto_{ts}@test.com + 3 onboarding rows + 1 QA run 'Test Run Auto'. Cleaned up post-run via mongosh on propmanage_db (deleted users, onboarding_emails, qa_runs matching test patterns).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest file at /app/backend/tests/test_phase33_new_features.py is fully green and reusable as regression. Key endpoint quirks: (1) PDF/MD are GET /api/admin/docs/{slug}/pdf|markdown — NOT a 'phased-document' subpath (that was misleading in the original request). (2) Onboarding queue returns {stats, recent:[...]} — rows under 'recent'. (3) QA run responses wrap content in {'run': {...}, 'summary': {...}}; closed_at lives on run.closed_at. (4) AI suggester provider string is exactly 'claude-sonnet-4-5'. For frontend retest: preview MUST be woken first (currently shows 'Preview Unavailable'). Once awake, the data-testid map in critical_code_review_comments above is the authoritative selector list.",
+  "rca of the issue": "Frontend test block — RCA: The Emergent preview ingress for hostname propmanage-bg.preview.emergentagent.com is returning the 'Preview Unavailable!!! Our Agent is resting after inactivity' page for every non-/api path. Reproduction: `curl -i https://propmanage-bg.preview.emergentagent.com/login` → HTTP/2 404, body is Emergent placeholder; same URL `/api/admin/qa/checklist/template` with admin auth → 200 + JSON. Locally `curl http://localhost:3000/login` → 200 + React SPA shell. Mitigation: not in agent scope — user/main agent must restart the preview via app.emergent.sh."
+}

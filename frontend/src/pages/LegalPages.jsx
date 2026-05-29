@@ -1,7 +1,7 @@
-// Privacy Policy + Terms of Service — static public pages, GDPR-aware (RO).
+// Privacy Policy + Terms of Service + Cookie Policy — static public pages, GDPR-aware (RO).
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Shield, FileText } from "lucide-react";
+import { ArrowLeft, Shield, FileText, Cookie } from "lucide-react";
 
 const Layout = ({ icon: Icon, title, subtitle, children, testid }) => (
   <div className="min-h-screen bg-[#0a0a0b] text-stone-200 grain" data-testid={testid}>
@@ -150,5 +150,93 @@ export const TermsPage = () => (
 
     <h2>12. Modificări</h2>
     <p>Vom notifica modificările materiale prin email cu cel puțin 14 zile înainte.</p>
+  </Layout>
+);
+
+
+export const CookiePolicyPage = () => (
+  <Layout icon={Cookie} title="Politica de cookies" subtitle="Ultima actualizare: februarie 2026" testid="cookies-page">
+    <p>Această pagină explică în detaliu cum folosește <strong>PropManage</strong> cookies-uri și tehnologii similare. Politica este conformă cu <strong>GDPR</strong>, <strong>Directiva ePrivacy</strong> și legea română 506/2004.</p>
+
+    <h2>1. Ce sunt cookies-urile</h2>
+    <p>Cookies-urile sunt fișiere text mici stocate de browser pe dispozitivul tău. Le folosim pentru a-ți păstra sesiunea de autentificare, preferințele de interfață și pentru a îmbunătăți securitatea contului.</p>
+
+    <h2>2. Ce cookies folosim</h2>
+    <p>PropManage folosește exclusiv cookies-uri <strong>strict necesare</strong>. Nu setăm cookies de tracking publicitar, de profilare comportamentală sau de re-marketing.</p>
+
+    <table style={{width:'100%', borderCollapse:'collapse', margin:'16px 0', fontSize:'13px'}}>
+      <thead>
+        <tr style={{borderBottom:'1px solid #ffffff20', textAlign:'left'}}>
+          <th style={{padding:'8px 10px', color:'#d4ff3a'}}>Nume</th>
+          <th style={{padding:'8px 10px', color:'#d4ff3a'}}>Scop</th>
+          <th style={{padding:'8px 10px', color:'#d4ff3a'}}>Durată</th>
+          <th style={{padding:'8px 10px', color:'#d4ff3a'}}>Tip</th>
+        </tr>
+      </thead>
+      <tbody style={{color:'#c8c8cc'}}>
+        <tr style={{borderBottom:'1px solid #ffffff10'}}>
+          <td style={{padding:'8px 10px'}}><code>access_token</code></td>
+          <td style={{padding:'8px 10px'}}>Autentificare JWT — îți păstrează sesiunea activă.</td>
+          <td style={{padding:'8px 10px'}}>1 oră</td>
+          <td style={{padding:'8px 10px'}}>Strict necesar</td>
+        </tr>
+        <tr style={{borderBottom:'1px solid #ffffff10'}}>
+          <td style={{padding:'8px 10px'}}><code>refresh_token</code></td>
+          <td style={{padding:'8px 10px'}}>Reînnoire automată a sesiunii fără logout.</td>
+          <td style={{padding:'8px 10px'}}>30 zile</td>
+          <td style={{padding:'8px 10px'}}>Strict necesar</td>
+        </tr>
+        <tr style={{borderBottom:'1px solid #ffffff10'}}>
+          <td style={{padding:'8px 10px'}}><code>theme</code> / <code>locale</code></td>
+          <td style={{padding:'8px 10px'}}>Reține preferințele tale de UI (dark/light, limba RO/EN).</td>
+          <td style={{padding:'8px 10px'}}>1 an</td>
+          <td style={{padding:'8px 10px'}}>Funcțional</td>
+        </tr>
+        <tr style={{borderBottom:'1px solid #ffffff10'}}>
+          <td style={{padding:'8px 10px'}}><code>csrf_token</code></td>
+          <td style={{padding:'8px 10px'}}>Protecție anti-CSRF pentru formulare sensibile.</td>
+          <td style={{padding:'8px 10px'}}>Sesiune</td>
+          <td style={{padding:'8px 10px'}}>Strict necesar (Securitate)</td>
+        </tr>
+        <tr>
+          <td style={{padding:'8px 10px'}}><code>onboarding_seen</code></td>
+          <td style={{padding:'8px 10px'}}>Indică dacă ai parcurs deja tour-ul inițial (pentru a nu-l reafișa).</td>
+          <td style={{padding:'8px 10px'}}>1 an</td>
+          <td style={{padding:'8px 10px'}}>Funcțional</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>3. Cookies de la terți</h2>
+    <p>Folosim un set <strong>limitat și auditat</strong> de servicii terțe, fiecare cu rol esențial:</p>
+    <ul>
+      <li><strong>Stripe</strong> (<code>__stripe_mid</code>, <code>__stripe_sid</code>) — anti-fraudă pentru plățile escrow. Stripe nu primește datele tale personale dincolo de ce e necesar pentru a procesa o plată.</li>
+      <li><strong>Cloudflare</strong> (<code>__cf_bm</code>, <code>cf_clearance</code>) — protecție anti-bot și CDN. Nu folosit pentru profilare.</li>
+    </ul>
+    <p>Niciun cookie de la <strong>Google Analytics</strong>, <strong>Facebook Pixel</strong>, <strong>LinkedIn Insight</strong> sau alte platforme de reclamă behaviorală.</p>
+
+    <h2>4. De ce nu există banner de consimțământ?</h2>
+    <p>Conform Directivei ePrivacy și art. 5(3) PECR, <strong>cookies-urile strict necesare</strong> și cele <strong>funcționale solicitate explicit de utilizator</strong> (cum ar fi „ține-mă logat") nu necesită consimțământ prealabil. Deoarece NU folosim cookies de tracking publicitar, nu există obligativitate de cookie banner.</p>
+    <p>Dacă vom introduce vreodată cookies non-essentials, vom afișa un banner cu opțiuni granulare (acceptă / refuză / personalizează) ÎNAINTE de a le seta.</p>
+
+    <h2>5. Cum controlezi cookies-urile</h2>
+    <ul>
+      <li><strong>Browser</strong>: setările tale de browser îți permit să blochezi sau să ștergi cookies-uri. Atenție: blocarea cookies-urilor strict necesare va face imposibilă autentificarea pe PropManage.</li>
+      <li><strong>Mobil</strong>: Setări → Aplicații → Browser → Permisiuni → Cookies.</li>
+      <li><strong>Logout</strong>: la logout din contul tău, cookies-urile de autentificare sunt invalidate imediat (server-side blacklist).</li>
+    </ul>
+
+    <h2>6. LocalStorage și sessionStorage</h2>
+    <p>Pe lângă cookies, folosim <code>localStorage</code> pentru a stoca preferințe UI (sortare tabele, filtrele tale salvate, cache offline pentru Digital Twin). Acestea NU conțin date personale identificabile și NU sunt trimise către server. Le poți șterge oricând din DevTools → Application → Storage.</p>
+
+    <h2>7. Modificări ale acestei politici</h2>
+    <p>Orice modificare materială va fi anunțată prin email tuturor utilizatorilor înregistrați cu cel puțin <strong>14 zile</strong> înainte. Versiunea curentă este întotdeauna afișată la <Link to="/cookies" className="text-[#d4ff3a]">/cookies</Link>.</p>
+
+    <h2>8. Contact DPO</h2>
+    <p>Pentru orice întrebare legată de cookies sau alte date personale, scrie la <a href="mailto:contact@propmanage.ro">contact@propmanage.ro</a>. Răspundem în maximum 30 zile (de obicei sub 7 zile).</p>
+
+    <p className="mt-6 p-4 rounded-xl bg-white/5 border border-white/10 text-xs">
+      Vezi și: <Link to="/privacy" className="text-[#d4ff3a]">Politica de confidențialitate</Link> · <Link to="/privacy/notices" className="text-[#d4ff3a]">Notificări per rol</Link> · <Link to="/terms" className="text-[#d4ff3a]">Termeni și condiții</Link>
+    </p>
   </Layout>
 );

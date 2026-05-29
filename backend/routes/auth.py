@@ -111,6 +111,14 @@ async def register(data: RegisterIn, response: Response):
     user.pop("_id", None)
     user.pop("password_hash", None)
     await send_template(tpl_welcome, data.name, data.role, to=email)
+    # Schedule 3-email onboarding drip for new specialists (Day 1, 3, 7) — best-effort
+    if data.role == "specialist":
+        try:
+            from onboarding_emails import enqueue_specialist_onboarding
+            await enqueue_specialist_onboarding(uid, email, data.name)
+        except Exception as _e:  # noqa: BLE001
+            import logging
+            logging.getLogger("propmanage.auth").warning(f"[Onboarding] enqueue failed: {_e}")
     # Auto-send role-specific training doc (best-effort, non-blocking)
     try:
         from docs_service import email_doc_to_user

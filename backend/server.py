@@ -59,9 +59,12 @@ from routes.admin_backups import router as admin_backups_router
 from routes.admin_dev_velocity import router as admin_dev_velocity_router
 from routes.docs_routes import admin_router as admin_docs_router, public_router as public_help_router
 from routes.incidents import admin_router as incidents_admin_router, public_router as incidents_public_router
+from routes.admin_onboarding import router as admin_onboarding_router
+from routes.admin_qa_playbook import router as admin_qa_playbook_router
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
+from onboarding_emails import run_onboarding_dispatch_job
 from demo_reset import reset_demo_accounts
 
 logging.basicConfig(level=logging.INFO)
@@ -122,6 +125,8 @@ for r in (
     public_help_router,
     incidents_admin_router,
     incidents_public_router,
+    admin_onboarding_router,
+    admin_qa_playbook_router,
 ):
     app.include_router(r)
 
@@ -234,6 +239,14 @@ async def startup():
             id="weekly_dev_velocity",
             replace_existing=True,
             misfire_grace_time=7200,
+        )
+        # Specialist onboarding email drip — every 15 minutes
+        scheduler.add_job(
+            run_onboarding_dispatch_job,
+            CronTrigger(minute="*/15", timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="onboarding_email_dispatch",
+            replace_existing=True,
+            misfire_grace_time=900,
         )
         scheduler.start()
         # Record an immediate ping on startup so sparkline is non-empty from minute 1.
