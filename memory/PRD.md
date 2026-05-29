@@ -1428,3 +1428,64 @@ A red, prominent card on the QA Playbook landing — **"🚀 Rulează gate-ul de
 - All-pass invocation → 0 emails sent, log `[ReleaseGate cron] All clear — 14/14 pass`.
 - Simulated P0 fail (monkey-patched first test) → email captured with correct subject `[Cron luni 08:45] 🚫 Release Gate — RELEASE BLOCKED (13/14)` to 3 admins.
 
+
+---
+
+## Phase 38 — Content Audit + Real Bug Fix + 10 New Automated Tests (Feb 29, 2026) ✅
+
+User raportat un bug real în production: callout-ul „Plata Escrow" în manualul SPECIALISTULUI folosea text de perspectivă client („Banii pe care îi PLĂTEȘTI..."). Cauza: un singur `_CB_ESCROW` reutilizat. Acum am construit întreg sistemul care detectează acest tip de bug automat.
+
+### 1) Bug fix concret
+- Adăugat `_CB_ESCROW_SPECIALIST` în `/app/backend/docs_content.py` (perspectivă specialist: „Clientul alimentează escrow, ești plătit 95% după confirmare").
+- Înlocuit `_CB_ESCROW` cu varianta corectă în doc-ul specialist.
+
+### 2) Content Audit Engine — `/app/backend/qa_content_audit.py`
+- Detector heuristic cu 8 client-hints + 9 specialist-hints + 7 admin-hints.
+- Persistent în `db.doc_conflicts` (idempotent prin key `slug::sec::block`).
+- AI Fix prin Claude Sonnet 4.5: la cerere, rescrie pasajul în perspectiva audienței corecte.
+- Apply Fix → `db.doc_overrides` (upsert) + `docs_service.resolve_doc_with_overrides` aplică patch-ul la randare (PDF + admin view), **fără modificare de cod**.
+
+### 3) Admin endpoints `/api/admin/qa/content-audit/`
+- `POST /scan` · `GET /conflicts` · `PATCH /{id}/status` · `POST /{id}/ai-fix` · `POST /{id}/apply`
+
+### 4) 10 teste automate noi (catalog crescut la 24)
+**Content Audit (5):**
+- DOC-AUDIT-01: specialist doc fără perspectivă client
+- DOC-AUDIT-02: client doc fără pasaje strict-specialist
+- DOC-AUDIT-03: specialist doc are info plată/comision/lead fee
+- DOC-AUDIT-04: client doc menționează disputele
+- DOC-AUDIT-05: toate override-urile aplicate fără IndexError
+
+**Lifecycle/Communication (5):**
+- LIFECYCLE-01: register → login → /me (client cleanup)
+- LIFECYCLE-02: specialist new → 3 onboarding emails enqueuate
+- LIFECYCLE-03: marketplace public listare specialiști
+- LIFECYCLE-04: profil public specialist accesibil clienților
+- LIFECYCLE-05: integritate referențială rol-user (115 users curat)
+
+### 5) UI — `ContentAuditCard` în QA Playbook landing
+Scan button · listă conflicte cu severity badges · per-conflict: „Cere fix de la AI" → vizualizare sugestie → „Aplică" sau „Dismiss".
+
+### Tests
+- Backend pytest: **8/8 PASS** în 6.2s (`/app/backend/tests/test_phase38_content_audit.py`)
+- Testing-agent: **8/8 backend + 3/3 frontend P0** verde
+- Self-test all 10 noi: **10/10 PASS în ~1s paralel**
+
+### Capabilități QA finale (după Phase 38)
+| Strat | Volum |
+|---|---|
+| Manual checklist | 105 scenarii |
+| Automate (24 teste) | HTTP 18 + Browser 3 + Content 5 + Lifecycle 5 |
+| AI Test Suggester | 8-12/feature |
+| Content Audit | auto-detect + AI rewrite + DB overrides |
+| Release Gate | one-click + cron luni 08:45 |
+
+### Backlog rămas
+- 🔴 Stripe LIVE keys — pending user verification
+- 🟡 Onboarding tour (Driver.js)
+- 🟡 Lottie animations în KB
+- 🟡 Twilio SMS alerts
+- 🟢 Mai multe teste lifecycle (escrow happy path, dispute create, file upload)
+- 🟢 Avatar upload S3/Cloudinary
+- 🟢 Dev Velocity WoW trend
+
