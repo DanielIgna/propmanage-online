@@ -27,6 +27,7 @@ import { RoleTour } from "./pages/RoleTour";
 import { AIConciergeBubble } from "./components/AIConciergeBubble";
 import { BookDemoModal } from "./pages/BookDemoModal";
 import { PrivacyPage, TermsPage, CookiePolicyPage } from "./pages/LegalPages";
+import { TrustCenterPage } from "./pages/TrustCenterPage";
 import { PrivacyNoticesPage } from "./pages/PrivacyNoticesPage";
 import { StatusPage } from "./pages/StatusPage";
 import { GDPRAuditBadge } from "./components/GDPRAuditBadge";
@@ -1345,6 +1346,7 @@ const Footer = () => (
         <Link to="/terms" className="hover:text-white transition-colors" data-testid="footer-terms">Termeni</Link>
         <Link to="/privacy" className="hover:text-white transition-colors" data-testid="footer-privacy">Confidențialitate</Link>
         <Link to="/cookies" className="hover:text-white transition-colors" data-testid="footer-cookies">Cookies</Link>
+        <Link to="/trust" className="hover:text-white transition-colors" data-testid="footer-trust">Trust Center</Link>
         <Link to="/status" className="hover:text-white transition-colors inline-flex items-center gap-1" data-testid="footer-status">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Status
         </Link>
@@ -1461,6 +1463,7 @@ function App() {
               <Route path="/report-respond/:token" element={<ReportApprovalPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/cookies" element={<CookiePolicyPage />} />
+              <Route path="/trust" element={<TrustCenterPage />} />
               <Route path="/status" element={<StatusPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />

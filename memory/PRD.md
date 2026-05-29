@@ -1636,3 +1636,104 @@ User: „într-o secțiune scrie escrow, în alta cont blocat, în alta depozit 
 - 🟢 Avatar S3/Cloudinary
 - 🟢 Split AdminQAPlaybook.jsx în module
 - 🟢 Optional: install `playwright` în backend venv pentru a rula browser tests și în producție
+
+
+### Phase 41 — E2E expansion + Driver.js Onboarding Tour + Slack/Discord Webhook + Playwright in prod (Feb 2026)
+
+**1) 9 noi teste E2E în `qa_automation.py`** (P0/P1, http kind, fără browser):
+- `ESCROW-01` Client alimentează escrow → status='held'
+- `ESCROW-02` Confirmare → specialist primește 95% (split 95/5 verificat)
+- `DISPUTE-01` Deschidere dispută → escrow='frozen', disputed=True
+- `DISPUTE-02` Admin resolve `refund_client` → wallet client crește
+- `QUOTE-01` Specialist accept lead → 45 RON deduce, status='assigned'
+- `FILE-01` Specialist upload KYC PDF (base64) → status='pending'
+- `CHAT-01` Client citește `/api/chat/{req_id}/messages` pe job propriu
+- `GDPR-01` `/api/gdpr/me/export` returnează account+rights_summary
+- `GDPR-02` `/api/gdpr/me/erasure-request` creează `dsar_requests` cu SLA +30d
+- Helper-uri noi: `_register_and_login`, `_admin_client`, `_seed_active_job`, `_cleanup_e2e` — fac setup/teardown atomic per test (user nou, property, request, escrow held), cleanup în finally.
+- Release Gate acum: **38/38 pass · 0 fail · verdict=READY**.
+
+**2) Driver.js Onboarding Tour pentru toate 4 rolurile**:
+- `driver.js@1.4.0` instalat în frontend.
+- Componente noi: `/app/frontend/src/pages/RoleTour.jsx` (`RoleTour`, `ReplayTourButton`).
+- Mount în `App.js` după `TutorialOverlay`.
+- Per-role steps (5 client, 5 specialist, 4 operator, 5 admin) cu popovers anchorate la `data-tour="..."` attributes.
+- **Bounded retry loop** (20× 500ms = 10s) așteaptă ca elementele DOM să se monteze după fetch-uri inițiale → fix critic pentru cazul când dashboardurile redau cu delay async.
+- Persistență flag: backend `POST /api/auth/dashboard-tour-done` setează `dashboard_tour_completed=true` în DB. `/auth/me` returnează acum și acest field.
+- Reset/replay: linkat în `SettingsPanel.jsx` ca rând "Reia turul ghidat" (testid `replay-tour-btn`).
+- `data-tour` anchors adăugate în: ClientDashboard (client-property-card, client-new-request, client-marketplace, client-escrow-info), SpecialistDashboard (specialist-leads, specialist-wallet, specialist-trust-score, specialist-kyc), OperatorDashboard (operator-twin-queue, operator-kyc-queue), AdminLayoutMetronic (admin-ai-health, admin-qa-playbook, admin-analytics, admin-content-tools), DashShared (notifications-bell).
+
+**3) Slack/Discord Webhook în Release Gate**:
+- Funcție nouă `_post_release_gate_webhook` în `qa_automation.py`.
+- Citește 3 env vars: `RELEASE_GATE_SLACK_WEBHOOK_URL`, `RELEASE_GATE_DISCORD_WEBHOOK_URL`, sau generic `RELEASE_GATE_WEBHOOK_URL` (auto-detect Slack/Discord după URL).
+- Auto-suprimă pe runs de cron green (postează doar pe BLOCKED sau pe trigger manual).
+- Body include verdict + summary + top 8 failed checks + gate_id + duration.
+- Placeholder gol în `.env` — user completează URL-ul pentru activare.
+
+**4) Playwright în production**:
+- `playwright==1.60.0` adăugat în `requirements.txt` via pip freeze.
+- `_run_browser_test` îmbunătățit: dacă chromium binary nu există (caz tipic în deploys proaspete), returnează `status="skip"` în loc de fail. Nota cerere `playwright install chromium` pe host.
+- Combinat cu `_detect_pw_python` fallback la `sys.executable`, browser tests vor SKIP cu eleganță în production.
+
+**5) Fix-uri secundare**:
+- Adăugat `summary.verdict` ("READY"/"BLOCKED") în răspunsul release-gate (cerere testing agent).
+- Stat component din DashShared acceptă acum `...rest` props pentru a propaga `data-tour` ✓.
+
+**Testing confirmat** (iteration_41.json):
+- Backend: 5/5 pytest tests new file `/app/backend/tests/test_phase41_tour_release_gate.py` ✓
+- Frontend: Driver.js tour vizual confirmat — popover RO, butoane "Mai departe →"/"← Înapoi", dismiss persistă flag, no re-trigger la reload ✓
+- 38/38 release gate verde ✓
+
+### Backlog rămas
+- 🔴 USER: redeploy producție pentru propagare fix-uri (Phase 40 + 41)
+- 🔴 USER: Stripe LIVE keys
+- 🔴 USER: completează `RELEASE_GATE_SLACK_WEBHOOK_URL` sau `RELEASE_GATE_DISCORD_WEBHOOK_URL` în .env pentru webhook live
+- 🔴 USER (opțional): rulează `playwright install chromium` pe production host dacă vrei browser tests live (alternativ: ele vor SKIP automat)
+- 🟡 Lottie KB animations
+- 🟡 Twilio SMS critical alerts
+- 🟢 Avatar S3/Cloudinary
+- 🟢 Split AdminQAPlaybook.jsx în module
+
+
+### Phase 42 — Public Trust Center + AdminQAPlaybook modularizare (Feb 2026)
+
+**1) Public Trust Center la `/trust`** (no-auth):
+- Backend: `/app/backend/routes/public_trust.py` cu endpoint `GET /api/public/trust-stats` care expune LIVE:
+  - Release Gate verdict (verdict, pass/fail/total, age, triggered_by)
+  - Last MongoDB backup (status, size_mb, collections, age)
+  - Platform metrics (verified_specialists, total_specialists, total_clients, completed_requests, active_requests)
+  - Process uptime (seconds + human format)
+  - Compliance facts (GDPR SLA, escrow provider, EU residency, AES-256, TLS 1.3, daily backups)
+- Frontend: `/app/frontend/src/pages/TrustCenterPage.jsx` — pagină modernă glass-strong cu:
+  - HERO row: Release Gate (cu StatusPill READY/BLOCKED) + Uptime card
+  - 3-col grid: Backup · Verified specialists · Activity
+  - Compliance 3-col grid cu 6 trust signals
+  - Auto-refresh la 60s + buton manual
+  - Link în footer (`/trust` data-testid `footer-trust`)
+- Route adăugat în App.js.
+
+**2) Split AdminQAPlaybook.jsx** (1294 lines → 681 lines):
+- Director nou `/app/frontend/src/pages/admin/qa/` cu:
+  - `shared.js` (8 linii) — API constant + PRIO_BADGE
+  - `ReleaseGateCard.jsx` (170 linii)
+  - `ContentAuditCard.jsx` (179 linii)
+  - `TerminologyAuditCard.jsx` (286 linii)
+- AdminQAPlaybook.jsx redus la 681 linii (47% reducere).
+- Lint trecut pe toate cele 4 fișiere noi.
+- Funcționalitatea identică confirmată vizual (Release Gate istoric vizibil cu 9 runs, toate `READY · 38/38`).
+
+**Status final**:
+- Backend: 38/38 release gate verde ✓
+- Trust Center vizual confirmat (screenshot)
+- AdminQAPlaybook split funcțional (smoke test pe live)
+
+### Backlog rămas
+- 🔴 USER: redeploy producție pentru Phase 40 + 41 + 42
+- 🔴 USER: Stripe LIVE keys (sk_live_..., whsec_...)
+- 🔴 USER: completează URL webhook în `.env` pentru alerts live
+- 🔴 USER (opțional): `playwright install chromium` pe host production
+- 🟡 Lottie KB animations
+- 🟡 Twilio SMS critical alerts
+- 🟢 Avatar S3/Cloudinary
+- 🟢 Trust Center: badge/embed snippet pentru ca alți să-l linke-uiască
+- 🟢 SEO meta tags + OG image pentru /trust page

@@ -1515,6 +1515,7 @@ async def run_release_gate(triggered_by: str = "manual", email_admins: bool = Tr
     summary["p0_fail"] = p0_fail
     summary["p1_fail"] = p1_fail
     summary["blocked"] = p0_fail > 0
+    summary["verdict"] = "BLOCKED" if summary["blocked"] else "READY"
 
     payload = {
         "gate_id": _uuid.uuid4().hex[:12],

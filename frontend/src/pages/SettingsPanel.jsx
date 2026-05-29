@@ -249,6 +249,21 @@ export const SettingsPanel = () => {
           tid="row-privacy"
         />
         <Row
+          icon={Eye}
+          title="Reia turul ghidat"
+          subtitle="Reactivează turul interactiv de bun-venit (Driver.js)."
+          onClick={async () => {
+            try {
+              await axios.post(`${API}/auth/tutorial-reset`);
+              if (refreshUser) await refreshUser();
+              window.location.reload();
+            } catch (e) {
+              alert(formatApiError(e));
+            }
+          }}
+          tid="replay-tour-btn"
+        />
+        <Row
           icon={Trash2}
           title="Deconectare"
           subtitle="Ieși din contul curent."
