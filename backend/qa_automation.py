@@ -503,6 +503,61 @@ async def lifecycle_admin_role_unique_count() -> dict:
 
 
 # ============================================================================
+# Terminology Audit tests (TERM-*) — vocabulary consistency across docs.
+# ============================================================================
+
+async def term_audit_no_escrow_variants() -> dict:
+    """TERM-01: escrow cluster — un singur doc nu poate folosi simultan 2+ termeni pentru același concept."""
+    from qa_terminology_audit import scan_all_docs
+    report = await scan_all_docs()
+    bad = [(slug, inc) for slug, lst in report["by_doc"].items() for inc in lst if inc["cluster_key"] == "escrow"]
+    if not bad:
+        return _ok("OK — termenul «escrow» e folosit consistent în toate cele 6 docuri")
+    return _ko(f"{len(bad)} docuri folosesc simultan termeni diferiți pentru escrow: " + "; ".join(f"{s}={i['variants_used']}" for s,i in bad[:3]))
+
+
+async def term_audit_specialist_consistent() -> dict:
+    """TERM-02: termenul «specialist» nu se amestecă cu «meseriaș/profesionist/executant» în același doc."""
+    from qa_terminology_audit import scan_all_docs
+    report = await scan_all_docs()
+    bad = [(s, i) for s, lst in report["by_doc"].items() for i in lst if i["cluster_key"] == "specialist"]
+    if not bad:
+        return _ok("OK — termenul «specialist» e folosit consistent")
+    return _ko(f"{len(bad)} docuri amestecă: " + "; ".join(f"{s}={i['variants_used']}" for s,i in bad[:3]))
+
+
+async def term_audit_client_consistent() -> dict:
+    """TERM-03: termenul «client» nu se amestecă cu «proprietar/beneficiar»."""
+    from qa_terminology_audit import scan_all_docs
+    report = await scan_all_docs()
+    bad = [(s, i) for s, lst in report["by_doc"].items() for i in lst if i["cluster_key"] == "client"]
+    if not bad:
+        return _ok("OK — termenul «client» e folosit consistent")
+    return _ko(f"{len(bad)} docuri amestecă: " + "; ".join(f"{s}={i['variants_used']}" for s,i in bad[:3]))
+
+
+async def term_audit_commission_consistent() -> dict:
+    """TERM-04: «comision platformă» nu se amestecă cu «taxă/fee platformă»."""
+    from qa_terminology_audit import scan_all_docs
+    report = await scan_all_docs()
+    bad = [(s, i) for s, lst in report["by_doc"].items() for i in lst if i["cluster_key"] == "comision"]
+    if not bad:
+        return _ok("OK — termenul «comision platformă» folosit consistent")
+    return _ko(f"{len(bad)} docuri amestecă: " + "; ".join(f"{s}={i['variants_used']}" for s,i in bad[:3]))
+
+
+async def term_audit_overall_score() -> dict:
+    """TERM-05: scor general de consistență — niciun doc nu poate avea ≥3 inconsistențe."""
+    from qa_terminology_audit import scan_all_docs
+    report = await scan_all_docs()
+    heavy = [(s, len(lst)) for s, lst in report["by_doc"].items() if len(lst) >= 3]
+    total = report["total_inconsistencies"]
+    if not heavy:
+        return _ok(f"OK — {total} inconsistențe totale, niciun doc cu ≥3 (clusters_checked={report['clusters_checked']})")
+    return _ko(f"{len(heavy)} docuri cu ≥3 inconsistențe: {heavy}. Total: {total}")
+
+
+# ============================================================================
 # Registry
 # ============================================================================
 
@@ -704,6 +759,47 @@ AUTOMATED_TESTS: dict[str, dict] = {
         "category": "LIFECYCLE",
         "priority": "P1",
         "runner": lifecycle_admin_role_unique_count,
+    },
+    # ---- Terminology Audit (5) ----
+    "TERM-01": {
+        "code": "TERM-01",
+        "title": "Termenul «escrow» folosit consistent (fără variante alternative)",
+        "kind": "http",
+        "category": "TERMINOLOGY",
+        "priority": "P1",
+        "runner": term_audit_no_escrow_variants,
+    },
+    "TERM-02": {
+        "code": "TERM-02",
+        "title": "«Specialist» nu se amestecă cu «meseriaș/profesionist» în același doc",
+        "kind": "http",
+        "category": "TERMINOLOGY",
+        "priority": "P1",
+        "runner": term_audit_specialist_consistent,
+    },
+    "TERM-03": {
+        "code": "TERM-03",
+        "title": "«Client» nu se amestecă cu «proprietar/beneficiar» în același doc",
+        "kind": "http",
+        "category": "TERMINOLOGY",
+        "priority": "P1",
+        "runner": term_audit_client_consistent,
+    },
+    "TERM-04": {
+        "code": "TERM-04",
+        "title": "«Comision platformă» nu se amestecă cu «taxă/fee»",
+        "kind": "http",
+        "category": "TERMINOLOGY",
+        "priority": "P2",
+        "runner": term_audit_commission_consistent,
+    },
+    "TERM-05": {
+        "code": "TERM-05",
+        "title": "Scor general de consistență — niciun doc cu ≥3 inconsistențe",
+        "kind": "http",
+        "category": "TERMINOLOGY",
+        "priority": "P1",
+        "runner": term_audit_overall_score,
     },
 }
 

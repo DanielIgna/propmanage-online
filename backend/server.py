@@ -62,6 +62,7 @@ from routes.incidents import admin_router as incidents_admin_router, public_rout
 from routes.admin_onboarding import router as admin_onboarding_router
 from routes.admin_qa_playbook import router as admin_qa_playbook_router
 from routes.admin_content_audit import router as admin_content_audit_router
+from routes.admin_term_audit import router as admin_term_audit_router
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
@@ -130,6 +131,7 @@ for r in (
     admin_onboarding_router,
     admin_qa_playbook_router,
     admin_content_audit_router,
+    admin_term_audit_router,
 ):
     app.include_router(r)
 
