@@ -1761,3 +1761,28 @@ User: „într-o secțiune scrie escrow, în alta cont blocat, în alta depozit 
 - 🟢 Avatar S3/Cloudinary
 - 🟢 SEO meta tags + OG image pentru /trust
 - 🟢 Promovare badge: email automat la specialiști VERIFIED cu invitație "Adaugă badge pe site-ul tău"
+
+
+### Phase 44 — Executive Briefing + Trust Badge Promo + SEO/OG (Feb 2026)
+
+**1) Weekly Executive Briefing**:
+- `/app/backend/executive_briefing.py` (340 linii) — KPIs WoW: lucrări finalizate, GMV, specialiști/clienți noi, VERIFIED total + delta, dispute (+top 3 cauze heuristic regex RO), release gate weekly stats.
+- Email HTML "investor-ready" cu delta chips ▲▼ colorate + procentaj WoW.
+- Scheduler `weekly_exec_briefing` Mon 09:45 Europe/Bucharest.
+- Router `/api/admin/exec-briefing/{preview,send,history}`.
+- Persistă în `db.exec_briefings`.
+
+**2) Trust Badge Promo Email**:
+- Template nou `tpl_trust_badge_invite` cu badge embed + 3 snippets copy-paste in-email + "+38% mai multe lead-uri" copy.
+- Trigger AUTO la verify specialist + endpoint blast `POST /api/admin/specialists/trust-badge/blast?dry_run` idempotent (via `trust_badge_invite_sent_at`).
+
+**3) SEO meta + OG image `/trust`**:
+- `GET /api/public/trust-og.svg` — 1200×630 SVG dinamic cu shield lime + RELEASE GATE verdict gigant + stats grid.
+- Hook `useTrustSEO()` injectează imperatively: `<title>`, `og:*`, `twitter:*`, `canonical`, description RO.
+- Toate meta tags verificate live ✓.
+
+### Backlog rămas
+- 🔴 USER: redeploy producție (Phase 40-44)
+- 🔴 USER: webhook URLs + Stripe LIVE keys
+- 🟡 Twilio SMS critical alerts, Lottie KB
+- 🟢 Avatar S3/Cloudinary, badge URL params, Admin UI tab pentru Exec Briefing

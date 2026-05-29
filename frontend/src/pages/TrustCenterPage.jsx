@@ -10,6 +10,60 @@ import {
 } from "lucide-react";
 import { API } from "./DashShared";
 
+// SEO + OG: inject head meta tags imperatively (no react-helmet dependency)
+function useTrustSEO(stats) {
+  useEffect(() => {
+    const base = process.env.REACT_APP_BACKEND_URL || "https://propmanage.ro";
+    const ogImg = `${base}/api/public/trust-og.svg`;
+    const verdict = stats?.release_gate?.verdict || "READY";
+    const passCount = stats?.release_gate?.pass ?? 38;
+    const total = stats?.release_gate?.total ?? 38;
+    const verified = stats?.platform?.verified_specialists ?? 6;
+
+    const title = `Trust Center · PropManage — ${verdict} · ${passCount}/${total} tests · ${verified} verified specialists`;
+    const description = `Transparență live PropManage: status release gate, backup-uri, specialiști verificați KYC și conformitate GDPR. Date actualizate la fiecare 60 secunde.`;
+    const url = `${base}/trust`;
+
+    document.title = title;
+
+    const meta = (selector, attrs) => {
+      let el = document.head.querySelector(selector);
+      if (!el) {
+        el = document.createElement("meta");
+        Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+        if (attrs.content !== undefined) el.setAttribute("content", attrs.content);
+        document.head.appendChild(el);
+      } else if (attrs.content !== undefined) {
+        el.setAttribute("content", attrs.content);
+      }
+      return el;
+    };
+
+    meta('meta[name="description"]', { name: "description", content: description });
+    meta('meta[property="og:title"]', { property: "og:title", content: title });
+    meta('meta[property="og:description"]', { property: "og:description", content: description });
+    meta('meta[property="og:image"]', { property: "og:image", content: ogImg });
+    meta('meta[property="og:image:width"]', { property: "og:image:width", content: "1200" });
+    meta('meta[property="og:image:height"]', { property: "og:image:height", content: "630" });
+    meta('meta[property="og:url"]', { property: "og:url", content: url });
+    meta('meta[property="og:type"]', { property: "og:type", content: "website" });
+    meta('meta[property="og:site_name"]', { property: "og:site_name", content: "PropManage" });
+    meta('meta[name="twitter:card"]', { name: "twitter:card", content: "summary_large_image" });
+    meta('meta[name="twitter:title"]', { name: "twitter:title", content: title });
+    meta('meta[name="twitter:description"]', { name: "twitter:description", content: description });
+    meta('meta[name="twitter:image"]', { name: "twitter:image", content: ogImg });
+
+    // canonical
+    let canonical = document.head.querySelector('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement("link");
+      canonical.setAttribute("rel", "canonical");
+      document.head.appendChild(canonical);
+    }
+    canonical.setAttribute("href", url);
+  }, [stats]);
+}
+
 const Card = ({ children, className = "", testid }) => (
   <div className={`glass-strong rounded-3xl p-6 sm:p-7 border border-white/5 ${className}`} data-testid={testid}>
     {children}
@@ -160,6 +214,7 @@ export const TrustCenterPage = () => {
   }, []);
 
   const gate = data?.release_gate;
+  useTrustSEO(data);
   const gateOk = gate && !gate.blocked;
   const backup = data?.last_backup;
   const platform = data?.platform || {};

@@ -17,6 +17,7 @@ from models import *
 from email_service import (
     send_template, tpl_welcome, tpl_dispute_opened, tpl_dispute_resolved,
     tpl_design_phase_quote, tpl_specialist_verified, tpl_escrow_funded,
+    tpl_trust_badge_invite,
 )
 from demo_reset import reset_demo_accounts
 
@@ -355,13 +356,52 @@ async def verify_specialist(spec_id: str, user: dict = Depends(require_role("adm
     spec = await db.users.find_one({"_id": ObjectId(spec_id), "role": "specialist"})
     if not spec:
         raise HTTPException(404, "Specialist not found")
+    now_iso = datetime.now(timezone.utc).isoformat()
     await db.users.update_one(
         {"_id": ObjectId(spec_id), "role": "specialist"},
-        {"$set": {"verified": True, "tier": "VERIFIED"}}
+        {"$set": {"verified": True, "tier": "VERIFIED", "verified_at": now_iso}}
     )
     await notify(spec_id, "Cont verificat ✓", "Felicitări! Contul tău este acum VERIFIED. Ai acces la marketplace-ul de premium leads.", type_="verification", link="/specialist")
     await send_template(tpl_specialist_verified, spec.get("name"), to=spec.get("email"))
+    # Send the Trust Badge invite (encourages embed → organic backlinks)
+    try:
+        await send_template(tpl_trust_badge_invite, spec.get("name"), to=spec.get("email"))
+    except Exception:  # noqa: BLE001
+        pass
     return {"ok": True}
+
+
+@router.post("/admin/specialists/trust-badge/blast")
+async def trust_badge_blast(user: dict = Depends(require_role("admin")), dry_run: bool = False):
+    """One-shot: send the trust-badge invite email to ALL existing VERIFIED specialists.
+
+    Idempotent via `trust_badge_invite_sent_at` flag — re-runs only target users who
+    haven't received it yet. Pass `dry_run=true` to count without sending.
+    """
+    cursor = db.users.find(
+        {"role": "specialist", "verified": True, "trust_badge_invite_sent_at": {"$exists": False}},
+        {"email": 1, "name": 1},
+    )
+    targets: list[dict] = []
+    async for d in cursor:
+        if d.get("email"):
+            targets.append({"id": str(d["_id"]), "email": d["email"], "name": d.get("name") or "Specialist"})
+    if dry_run:
+        return {"dry_run": True, "would_send_to": len(targets), "targets": [t["email"] for t in targets]}
+
+    sent, failed = 0, 0
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for t in targets:
+        try:
+            await send_template(tpl_trust_badge_invite, t["name"], to=t["email"])
+            await db.users.update_one(
+                {"_id": ObjectId(t["id"])},
+                {"$set": {"trust_badge_invite_sent_at": now_iso}},
+            )
+            sent += 1
+        except Exception:  # noqa: BLE001
+            failed += 1
+    return {"sent": sent, "failed": failed, "total_targets": len(targets)}
 
 @router.get("/admin/disputes")
 async def list_disputes(user: dict = Depends(require_role("admin"))):

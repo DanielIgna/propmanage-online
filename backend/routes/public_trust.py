@@ -206,6 +206,89 @@ async def trust_badge_svg() -> Response:
     )
 
 
+@router.get("/public/trust-og.svg")
+async def trust_og_svg() -> Response:
+    """1200×630 SVG meant to be used as `og:image` / `twitter:image` for the /trust page.
+
+    Built dynamically — verdict and counts reflect live state at request time.
+    Most platforms (LinkedIn, Twitter, Facebook, Slack) render SVG OG images.
+    """
+    s = await _badge_stats()
+    blocked = s["blocked"]
+    accent = "#ef4444" if blocked else "#10b981"
+    verdict_label = "BLOCKED" if blocked else "READY"
+
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a0a0b"/>
+      <stop offset="100%" stop-color="#15151a"/>
+    </linearGradient>
+    <linearGradient id="lime" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#d4ff3a"/>
+      <stop offset="100%" stop-color="#a3e635"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0%" cy="0%" r="60%">
+      <stop offset="0%" stop-color="#d4ff3a" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#d4ff3a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- Top brand pill -->
+  <g transform="translate(80, 80)">
+    <rect width="220" height="42" rx="21" fill="#1a1a1f" stroke="#232329" stroke-width="1"/>
+    <circle cx="22" cy="21" r="5" fill="{accent}"/>
+    <text x="38" y="27" font-family="Inter, Verdana, sans-serif" font-size="13" font-weight="600" fill="#a3a3a3" letter-spacing="2">PROPMANAGE TRUST · LIVE</text>
+  </g>
+
+  <!-- Shield emblem -->
+  <g transform="translate(80, 200)">
+    <rect width="90" height="90" rx="20" fill="url(#lime)"/>
+    <path d="M45 22 L25 30 v18 c0 14 9 26 20 30 11-4 20-16 20-30 V30 z M37 50 l5 5 11-12" stroke="#0a0a0b" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Verdict block -->
+  <g transform="translate(200, 220)">
+    <text x="0" y="0" font-family="Inter, Verdana, sans-serif" font-size="16" font-weight="600" fill="#9ca3af" letter-spacing="3">RELEASE GATE</text>
+    <text x="0" y="80" font-family="Georgia, 'Times New Roman', serif" font-size="120" font-weight="700" fill="{accent}">{verdict_label}</text>
+  </g>
+
+  <!-- Stats grid -->
+  <g transform="translate(80, 410)">
+    <rect width="1040" height="120" rx="20" fill="#1a1a1f" stroke="#232329" stroke-width="1"/>
+
+    <g transform="translate(48, 36)">
+      <text font-family="Inter, Verdana, sans-serif" font-size="13" font-weight="600" fill="#9ca3af" letter-spacing="2">TESTS</text>
+      <text y="40" font-family="Georgia, serif" font-size="36" font-weight="700" fill="#d4ff3a">{s["pass_count"]}/{s["total"]}</text>
+    </g>
+
+    <g transform="translate(360, 36)">
+      <text font-family="Inter, Verdana, sans-serif" font-size="13" font-weight="600" fill="#9ca3af" letter-spacing="2">VERIFIED SPECIALISTS</text>
+      <text y="40" font-family="Georgia, serif" font-size="36" font-weight="700" fill="#ffffff">{s["verified"]}</text>
+    </g>
+
+    <g transform="translate(720, 36)">
+      <text font-family="Inter, Verdana, sans-serif" font-size="13" font-weight="600" fill="#9ca3af" letter-spacing="2">COMPLIANCE</text>
+      <text y="40" font-family="Georgia, serif" font-size="36" font-weight="700" fill="#ffffff">GDPR · PCI · EU</text>
+    </g>
+  </g>
+
+  <!-- URL footer -->
+  <text x="600" y="580" text-anchor="middle" font-family="Inter, Verdana, sans-serif" font-size="14" fill="#525252" letter-spacing="3">PROPMANAGE.RO/TRUST</text>
+</svg>'''
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={
+            "Cache-Control": "public, max-age=300, s-maxage=300",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
+
+
 @router.get("/public/trust-badge/embed", response_class=HTMLResponse)
 async def trust_badge_embed() -> HTMLResponse:
     """Self-contained iframe HTML — richer than SVG, animated, dark-theme.

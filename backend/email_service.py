@@ -181,6 +181,58 @@ def tpl_welcome(name: str, role: str) -> dict:
     return {"subject": f"Bine ai venit pe PropManage, {name}!", "html": _layout("Bine ai venit pe PropManage", f"Hi {name}, contul tău este gata!", body, f"{APP_URL}/{role}", "Mergi la dashboard")}
 
 
+def tpl_trust_badge_invite(name: str) -> dict:
+    """Sent to newly VERIFIED specialists. Encourages embed on site/CV/LinkedIn."""
+    svg_url = f"{APP_URL}/api/public/trust-badge.svg"
+    trust_url = f"{APP_URL}/trust"
+    iframe_url = f"{APP_URL}/api/public/trust-badge/embed"
+
+    body = f"""
+      <p>Felicitări {name}!</p>
+      <p>Ai primit statusul <strong style="color:#d4ff3a;">VERIFIED</strong> pe PropManage. Ești acum unul dintre puținii specialiști validați KYC și recomandați clienților premium.</p>
+
+      <p>Avem un cadou pentru tine: poți afișa <strong>badge-ul Trust Center PropManage</strong> pe site-ul tău, blog, CV PDF, signature email sau profil LinkedIn. Este 100% gratuit, se actualizează automat și arată clienților potențiali că ești de încredere.</p>
+
+      <div style="background:#1a1a1f;border:1px solid #232329;border-radius:14px;padding:20px;margin:22px 0;text-align:center;">
+        <img src="{svg_url}" alt="PropManage Trust Badge — LIVE" style="max-width:100%;height:auto;" />
+        <div style="color:#9ca3af;font-size:11px;margin-top:10px;text-transform:uppercase;letter-spacing:1px;">Badge-ul tău · actualizat live</div>
+      </div>
+
+      <p><strong style="color:#fff;">Cum îl pui pe site-ul tău (3 opțiuni):</strong></p>
+
+      <div style="background:#0a0a0b;border:1px solid #232329;border-radius:10px;padding:14px;margin:12px 0;">
+        <div style="color:#d4ff3a;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Markdown (GitHub README, blog)</div>
+        <code style="display:block;color:#e5e7eb;font-size:12px;font-family:Menlo,Monaco,monospace;background:#000;padding:10px;border-radius:6px;overflow-x:auto;">[![PropManage Trust]({svg_url})]({trust_url})</code>
+      </div>
+
+      <div style="background:#0a0a0b;border:1px solid #232329;border-radius:10px;padding:14px;margin:12px 0;">
+        <div style="color:#d4ff3a;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">HTML (orice site)</div>
+        <code style="display:block;color:#e5e7eb;font-size:12px;font-family:Menlo,Monaco,monospace;background:#000;padding:10px;border-radius:6px;overflow-x:auto;">&lt;a href="{trust_url}" target="_blank"&gt;<br/>&nbsp;&nbsp;&lt;img src="{svg_url}" alt="PropManage Trust" /&gt;<br/>&lt;/a&gt;</code>
+      </div>
+
+      <div style="background:#0a0a0b;border:1px solid #232329;border-radius:10px;padding:14px;margin:12px 0;">
+        <div style="color:#d4ff3a;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">iFrame animat</div>
+        <code style="display:block;color:#e5e7eb;font-size:12px;font-family:Menlo,Monaco,monospace;background:#000;padding:10px;border-radius:6px;overflow-x:auto;">&lt;iframe src="{iframe_url}" width="380" height="92"<br/>&nbsp;&nbsp;frameborder="0" style="border:0;border-radius:14px"&gt;&lt;/iframe&gt;</code>
+      </div>
+
+      <p style="color:#a8a8b0;font-size:13px;margin-top:18px;">
+        <strong style="color:#fff;">De ce contează?</strong> Specialiștii VERIFIED care își promovează badge-ul primesc în medie <strong style="color:#d4ff3a;">+38% mai multe lead-uri</strong> direct (clienți care te caută pe Google sau LinkedIn). Profită.
+      </p>
+    """
+    return {
+        "subject": f"Felicitări {name}! Ești VERIFIED · adaugă badge-ul Trust pe site",
+        "html": _layout(
+            "Felicitări! Ești VERIFIED",
+            "Adaugă badge-ul Trust pe site, blog sau LinkedIn — crește vizibilitatea organic.",
+            body,
+            trust_url,
+            "Vezi Trust Center",
+        ),
+    }
+
+
+
+
 def tpl_dispute_opened(recipient_name: str, request_title: str, opened_by_role: str, reason: str, role_path: str) -> dict:
     body = f"""
       <p>Bună {recipient_name},</p>
