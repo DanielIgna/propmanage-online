@@ -1737,3 +1737,27 @@ User: „într-o secțiune scrie escrow, în alta cont blocat, în alta depozit 
 - 🟢 Avatar S3/Cloudinary
 - 🟢 Trust Center: badge/embed snippet pentru ca alți să-l linke-uiască
 - 🟢 SEO meta tags + OG image pentru /trust page
+
+
+### Phase 43 — Trust Badge Embed (Feb 2026)
+
+**Goal**: Permite parteneri/specialiști să afișeze badge-ul Trust Center pe site-ul lor, blog, README, LinkedIn → cresc credibilitatea + obține linkuri organice gratuite.
+
+**Backend (`public_trust.py`)**:
+- `GET /api/public/trust-badge.svg` — SVG shields.io-style (357×28px, 1.1KB), markdown-ready. Cache 5 min CDN. CORS deschis.
+- `GET /api/public/trust-badge/embed` — HTML iframeable (3.7KB), dark theme animat: shield lime gradient + LIVE dot pulsant + verdict + stats + link clickable la `/trust`. `X-Frame-Options: ALLOWALL` + `Content-Security-Policy: frame-ancestors *;`.
+
+**Frontend (`TrustCenterPage.jsx`)**:
+- Componenta nouă `EmbedSection` cu previzualizare iframe live + 3 snippets copy-paste (Markdown, HTML, iFrame). `CodeSnippet` cu button "Copiază/Copiat" animat.
+
+**Testing**: SVG 200/1109 bytes ✓, iframe 200/3752 bytes ✓, copy-clipboard funcțional ✓.
+
+### Backlog rămas
+- 🔴 USER: redeploy producție pentru Phase 40 + 41 + 42 + 43
+- 🔴 USER: completează URL webhook în `.env`
+- 🔴 USER: Stripe LIVE keys
+- 🟡 Twilio SMS critical alerts
+- 🟡 Lottie KB animations
+- 🟢 Avatar S3/Cloudinary
+- 🟢 SEO meta tags + OG image pentru /trust
+- 🟢 Promovare badge: email automat la specialiști VERIFIED cu invitație "Adaugă badge pe site-ul tău"

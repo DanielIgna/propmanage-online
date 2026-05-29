@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import {
   ArrowLeft, ShieldCheck, Activity, Database, Users, Server, Lock,
-  CheckCircle2, AlertOctagon, RefreshCw, Globe2, Clock,
+  CheckCircle2, AlertOctagon, RefreshCw, Globe2, Clock, Code2, Copy, Check,
 } from "lucide-react";
 import { API } from "./DashShared";
 
@@ -36,6 +36,102 @@ const StatusPill = ({ ok, labelOk, labelBad }) => (
     {ok ? labelOk : labelBad}
   </span>
 );
+
+// ============================================================================
+// Embed section — copy-paste snippets so partners can drop badges anywhere
+// ============================================================================
+
+const CodeSnippet = ({ label, code, testid }) => {
+  const [copied, setCopied] = useState(false);
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* ignore */
+    }
+  };
+  return (
+    <div className="bg-black/40 border border-white/5 rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-white/5 bg-white/[0.02]">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-stone-400">{label}</span>
+        <button
+          onClick={onCopy}
+          className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full bg-white/5 hover:bg-[#d4ff3a]/10 hover:text-[#d4ff3a] transition-colors"
+          data-testid={`${testid}-copy`}
+        >
+          {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+          {copied ? "Copiat" : "Copiază"}
+        </button>
+      </div>
+      <pre className="px-4 py-3 text-[11px] sm:text-xs text-stone-200 overflow-x-auto whitespace-pre font-mono">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+};
+
+const EmbedSection = () => {
+  // Use REACT_APP_BACKEND_URL — in production this should point to https://propmanage.ro
+  const base = process.env.REACT_APP_BACKEND_URL || "https://propmanage.ro";
+  const svgUrl = `${base}/api/public/trust-badge.svg`;
+  const iframeUrl = `${base}/api/public/trust-badge/embed`;
+  const trustUrl = `${base}/trust`;
+
+  const mdSnippet = `[![PropManage Trust](${svgUrl})](${trustUrl})`;
+  const htmlSnippet = `<a href="${trustUrl}" target="_blank" rel="noopener">\n  <img src="${svgUrl}" alt="PropManage Trust Center — live verdict" />\n</a>`;
+  const iframeSnippet = `<iframe src="${iframeUrl}" width="380" height="92" frameborder="0" scrolling="no" style="border:0;border-radius:14px"\n        title="PropManage Trust Badge"></iframe>`;
+
+  return (
+    <div className="glass-strong rounded-3xl p-6 sm:p-8 border border-white/5" data-testid="trust-card-embed">
+      <div className="flex items-center gap-2 mb-2">
+        <Code2 className="w-5 h-5 text-[#d4ff3a]" />
+        <h2 className="text-sm uppercase tracking-[0.2em] text-stone-300">Pune badge-ul pe site-ul tău</h2>
+      </div>
+      <p className="text-stone-400 text-sm mb-6 max-w-2xl">
+        Ești specialist sau partener PropManage? Adaugă badge-ul nostru live pe site, blog sau LinkedIn — se actualizează automat la fiecare 5 minute și inspiră încredere vizitatorilor.
+      </p>
+
+      {/* Live preview */}
+      <div className="mb-6">
+        <div className="text-[10px] uppercase tracking-[0.18em] text-stone-500 mb-2">Previzualizare live</div>
+        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 flex justify-center">
+          <iframe
+            src={iframeUrl}
+            width="380"
+            height="92"
+            frameBorder="0"
+            scrolling="no"
+            style={{ border: 0, borderRadius: 14 }}
+            title="PropManage Trust Badge preview"
+            data-testid="trust-embed-preview-iframe"
+          />
+        </div>
+      </div>
+
+      {/* Snippets */}
+      <div className="grid lg:grid-cols-3 gap-4">
+        <CodeSnippet label="Markdown (README, blog)" code={mdSnippet} testid="snippet-md" />
+        <CodeSnippet label="HTML (orice site)" code={htmlSnippet} testid="snippet-html" />
+        <CodeSnippet label="iFrame (versiune animată)" code={iframeSnippet} testid="snippet-iframe" />
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-3 text-[11px] text-stone-500">
+        <span className="inline-flex items-center gap-1.5">
+          <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Date LIVE (cache 5 min)
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Zero JavaScript extern necesar
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Funcționează pe orice CMS sau GitHub README
+        </span>
+      </div>
+    </div>
+  );
+};
+
 
 export const TrustCenterPage = () => {
   const [data, setData] = useState(null);
@@ -266,6 +362,8 @@ export const TrustCenterPage = () => {
                 <a href="mailto:trust@propmanage.ro" className="text-[#d4ff3a] hover:underline">trust@propmanage.ro</a>
               </p>
             </div>
+
+            <EmbedSection />
           </div>
         )}
       </div>
