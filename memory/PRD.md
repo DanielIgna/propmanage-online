@@ -1362,3 +1362,52 @@ Upgraded all 4 placeholder docs to v1.0 with full Romanian content.
 - 🟢 Avatar upload migration base64 → S3/Cloudinary (P3)
 - 🟢 Optional: split AdminQAPlaybook.jsx (674 lines) into 3 modules
 - 🟢 Add more automated tests (escrow flow, register flow with cleanup, dispute creation)
+
+---
+
+## Phase 36 — Release Gate (Feb 29, 2026) ✅
+
+The release-gating piece on top of the QA automation engine.
+
+### What it does
+A red, prominent card on the QA Playbook landing — **"🚀 Rulează gate-ul de release"** — with a 2-step confirm. When triggered:
+1. Runs ALL 14 automated tests in parallel (~5-6s wall-time)
+2. Persists the run as a `release_gate` document in MongoDB (auto-trimmed to last 100)
+3. Sends a branded HTML email to all admins in `ADMIN_EMAILS` env var with:
+   - Verdict banner (RELEASE READY vs RELEASE BLOCKED)
+   - Per-test table with status, code, priority, duration, note
+   - Gate ID for traceability
+4. Renders the verdict + per-test accordion + history list on the UI
+
+### Endpoints
+- `POST /api/admin/qa/automation/release-gate {email_admins?:bool=true}` → full payload
+- `GET  /api/admin/qa/automation/release-gates` → last 20 metadata-only
+- `GET  /api/admin/qa/automation/release-gates/{gate_id}` → full detail
+
+### Bug fixed during testing
+`ReleaseGateCard.loadHistory()` was overwriting the rich `last` state (with `results`) with the lightweight list response (which strips `results` via Mongo projection). Fix: preserve existing rich state if `gate_id` matches, otherwise lazy-fetch the full detail of the top gate. This guarantees the details accordion stays visible after gate run, refresh, AND page reload.
+
+### Tests
+- Backend pytest: 10/10 PASS (`/app/backend/tests/test_phase35_release_gate.py`)
+- Frontend testing-agent: 12/13 → bug fix retest 5/5 → final **all green**
+
+### Active QA capability after Phase 36 (full chain)
+1. **105 manual checklist items** (organized by 5 roles × prio P0/P1/P2)
+2. **AI Test Suggester** generates ad-hoc cases per feature (Claude Sonnet 4.5)
+3. **"Add to current run"** button on each AI card → instant ingestion
+4. **14 automated tests** (11 HTTP + 3 Playwright) selectable per run
+5. **Release Gate** — one-click run-all + persist + email admins + per-test breakdown
+6. **History** of all gates (last 100) with verdict + timestamp + actor
+7. Markdown export per run for release docs
+
+### Remaining backlog
+- 🔴 Stripe LIVE keys — pending user verification
+- 🟡 Onboarding tour (Driver.js) at first login (P2)
+- 🟡 Lottie animations in KB (P2)
+- 🟡 Twilio SMS alerts for critical nighttime failures (P2)
+- 🟢 Dev Velocity WoW trend (P3)
+- 🟢 Avatar upload migrate base64 → S3/Cloudinary (P3)
+- 🟢 Split AdminQAPlaybook.jsx (~830 lines) into ReleaseGateCard / AISuggester / AutomationPanel / RunView modules
+- 🟢 Add more automated tests: escrow happy-path, dispute creation, register-with-cleanup
+- 🟢 Optional: cron-trigger release gate weekly + alert if any P0 starts failing
+
