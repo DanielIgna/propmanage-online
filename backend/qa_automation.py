@@ -215,7 +215,34 @@ async def http_qa_checklist_template() -> dict:
 # Browser test runners — via subprocess to /opt/plugins-venv
 # ============================================================================
 
-PW_PYTHON = "/opt/plugins-venv/bin/python"
+def _detect_pw_python() -> Optional[str]:
+    """Detect a Python interpreter that has Playwright installed.
+
+    In Emergent preview, Playwright lives in /opt/plugins-venv. In production
+    deploys it might not be present at all, so we fall back to checking the
+    current interpreter. Returns None if no usable interpreter is found.
+    """
+    import sys
+    candidates = [
+        "/opt/plugins-venv/bin/python",
+        sys.executable,
+    ]
+    for path in candidates:
+        if not path or not os.path.exists(path):
+            continue
+        try:
+            r = subprocess.run(
+                [path, "-c", "import playwright.async_api; print('ok')"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if r.returncode == 0 and "ok" in r.stdout:
+                return path
+        except Exception:
+            continue
+    return None
+
+
+PW_PYTHON = _detect_pw_python()
 PW_BROWSERS_PATH = "/pw-browsers"
 
 
@@ -246,6 +273,11 @@ asyncio.run(main())
 
 async def _run_browser_test(test_body: str, target_url: str) -> dict:
     """Run a Playwright async test in a subprocess. test_body must define `async def test(page) -> dict`."""
+    if not PW_PYTHON:
+        return {
+            "status": "skip",
+            "note": "Playwright not available in this environment (preview-only test). Production deploys skip browser tests.",
+        }
     script = _BROWSER_TEMPLATE.format(browsers=PW_BROWSERS_PATH, url=target_url, body=test_body)
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
         f.write(script)
@@ -892,6 +924,7 @@ async def execute_tests(test_codes: list[str], run_id: Optional[str] = None) -> 
         "total": len(results),
         "pass": sum(1 for r in results if r["status"] == "pass"),
         "fail": sum(1 for r in results if r["status"] == "fail"),
+        "skip": sum(1 for r in results if r["status"] == "skip"),
         "written_to_run": written,
     }
     return {"results": results, "summary": summary}

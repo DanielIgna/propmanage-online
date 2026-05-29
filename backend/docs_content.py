@@ -32,7 +32,7 @@ UPDATED = "2026-02-29"
 _CB_ESCROW = {
     "type": "callout", "variant": "info",
     "title": "Plata escrow — protecția ta de bază",
-    "body": "Banii pe care îi plătești NU ajung la specialist până când tu nu apeși \"Confirmă finalizare\". Sunt blocați la PropManage într-un cont segregat, indisponibil pentru oricine altcineva. Dacă lucrarea nu e bună, deschizi o dispută și banii se rambursează."
+    "body": "Banii pe care îi plătești NU ajung la specialist până când tu nu apeși \"Confirmă finalizare\". Sunt blocați în escrow la PropManage, indisponibili pentru oricine altcineva. Dacă lucrarea nu e bună, deschizi o dispută și banii se rambursează."
 }
 
 # Specialist-perspective version (audience-correct: specialist is paid, not paying)
@@ -58,7 +58,7 @@ CLIENT_DOC = {
         {
             "heading": "1. Ce poți face ca proprietar (Overview)",
             "body": [
-                "Ca proprietar pe PropManage ai acces la 4 module principale:",
+                "Ca client pe PropManage ai acces la 4 module principale:",
                 {"type": "list", "items": [
                     "**Marketplace** — descoperi specialiști verificați, citești recenzii reale, ceri oferte directe",
                     "**Cereri & Lucrări** — postezi o cerere, primești 3-5 oferte în 24h, alegi cea mai bună",
@@ -108,7 +108,7 @@ CLIENT_DOC = {
                 {"type": "list", "items": [
                     "**Preț propus** + dacă include sau nu materialele",
                     "**Timp de execuție** estimat",
-                    "**Health Score** (algoritm proprietar — combinație: reviews, rate de dispute, vechime, portofoliu)",
+                    "**Health Score** (algoritm intern PropManage — combinație: reviews, rate de dispute, vechime, portofoliu)",
                     "**Rating + număr recenzii** istorice",
                     "**Badge VERIFIED** (lime) — documente validate manual de echipa noastră",
                     "**Portofoliu** — poze cu lucrări anterioare",
@@ -124,7 +124,7 @@ CLIENT_DOC = {
                 "Când accepți oferta, sistemul îți cere să \"alimentezi escrow\":",
                 {"type": "steps", "items": [
                     {"title": "Alegi metoda de plată", "body": "Card (Visa/Mastercard) prin Stripe — instant, sau transfer bancar (1-2 zile lucrătoare)."},
-                    {"title": "Banii se blochează", "body": "PropManage primește banii într-un cont segregat. Specialistul primește notificare \"Escrow alimentat\" și are voie să înceapă."},
+                    {"title": "Banii se blochează", "body": "PropManage primește banii în escrow (cont separat de operațiuni). Specialistul primește notificare \"Escrow alimentat\" și are voie să înceapă."},
                     {"title": "Specialistul lucrează", "body": "Comunici prin chat-ul aplicației. Toate mesajele se salvează ca dovadă."},
                     {"title": "Confirmi finalizarea", "body": "Când lucrarea e gata și inspectată, apeși \"Confirm finalizare\" în pagina lucrării. Acesta este momentul când banii pleacă din escrow către specialist."},
                     {"title": "Garanție 12 luni", "body": "Chiar dacă banii sunt eliberați, ai garanție 12 luni pentru manoperă. Orice problemă o semnalezi în aplicație și specialistul e obligat să remedieze gratuit."},
@@ -148,7 +148,7 @@ CLIENT_DOC = {
         {
             "heading": "7. Digital Twin (premium) — modelul 3D al proprietății",
             "body": [
-                "Premium feature pentru proprietari care vor să gestioneze profesionist proprietatea:",
+                "Premium feature pentru clienții care vor să gestioneze eficient proprietatea:",
                 {"type": "list", "items": [
                     "Încarci un model 3D al proprietății (`.glb`/`.gltf` — îți face arhitectul sau topograful)",
                     "Suprapui peste el plan 2D structural (PDF)",
@@ -198,7 +198,7 @@ CLIENT_DOC = {
                     "**Cere oferta scrisă** cu preț FIX, înainte de a alimenta escrow. Nu \"preț orientativ\".",
                     "**Plătește prin escrow chiar și pentru lucrări mici** (sub 500 RON). Asigurare gratuită.",
                     "**Inspectează vizual lucrarea ÎNAINTE să confirmi finalizarea.** După confirmare, banii pleacă. Garanția acoperă defectele ascunse, dar e mai ușor să refuzi acum decât să mediezi după.",
-                    "**Lasă o recenzie sinceră** — ajuți următorii proprietari să aleagă bine. Recenzia poate fi modificată în 30 zile dacă te răzgândești.",
+                    "**Lasă o recenzie sinceră** — ajuți următorii clienți să aleagă bine. Recenzia poate fi modificată în 30 zile dacă te răzgândești.",
                     "**Folosește chat-ul aplicației, NU WhatsApp.** Mesajele de pe WhatsApp NU sunt dovezi în dispute.",
                     "**Setează urgența realist.** \"Urgent (24h)\" costă 15-25% peste preț. Pentru lucrări care pot aștepta o săptămână, alege \"Flexibil\" și obții discount.",
                 ]},
@@ -828,8 +828,8 @@ QA_DOC = {
                     "**O-03** Aprobă KYC valid → user primește badge VERIFIED + email confirmare",
                     "**O-04** Respinge KYC cu motiv → user primește email cu motivul",
                     "**O-05** Listează Twin pending → toate cu preview model 3D",
-                    "**O-06** Aprobă Twin valid → status \"Approved\", apare la proprietar",
-                    "**O-07** Respinge Twin cu motiv detaliat → notificare proprietar",
+                    "**O-06** Aprobă Twin valid → status \"Approved\", apare la client",
+                    "**O-07** Respinge Twin cu motiv detaliat → notificare client",
                     "**O-08** Citește dispută < 1000 RON → poate decide",
                     "**O-09** Decide dispută \"Refund client\" → escrow returnează banii pe card",
                     "**O-10** Decide dispută \"Split 70/30\" → escrow împarte corect",
