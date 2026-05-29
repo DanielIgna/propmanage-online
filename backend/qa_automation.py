@@ -546,3 +546,154 @@ async def execute_tests(test_codes: list[str], run_id: Optional[str] = None) -> 
         "written_to_run": written,
     }
     return {"results": results, "summary": summary}
+
+
+# ============================================================================
+# Release Gate — run ALL automated tests, persist, email admins
+# ============================================================================
+
+def _gate_email_html(payload: dict) -> dict:
+    """Build a branded HTML email with the gate verdict + per-test rows."""
+    from email_service import _layout, APP_URL  # local import to avoid cycle
+
+    summary = payload["summary"]
+    results = payload["results"]
+    blocked = summary.get("p0_fail", 0) > 0
+    verdict_color = "#ef4444" if blocked else "#34d399"
+    verdict_label = "RELEASE BLOCKED" if blocked else "RELEASE READY"
+
+    rows_html = []
+    for r in results:
+        status = r["status"]
+        is_pass = status == "pass"
+        bg = "#34d39915" if is_pass else "#ef444415"
+        icon = "✅" if is_pass else "❌"
+        prio_color = {"P0": "#ef4444", "P1": "#fbbf24", "P2": "#60a5fa"}.get(r["priority"], "#9ca3af")
+        rows_html.append(f"""
+          <tr style="background:{bg};">
+            <td style="padding:8px 10px; vertical-align:top; font-family:monospace; color:#fff;">{icon} <strong>{r['code']}</strong></td>
+            <td style="padding:8px 10px; vertical-align:top;">
+              <div style="color:#e5e5e5; font-size:13px;">{r['title']}</div>
+              <div style="color:#9ca3af; font-size:11px; margin-top:2px;">{r['kind']} · {r['category']} · {r['duration_ms']}ms</div>
+              <div style="color:#c8c8cc; font-size:11px; margin-top:4px; font-style:italic;">{r['note'][:280]}</div>
+            </td>
+            <td style="padding:8px 10px; vertical-align:top; text-align:center;">
+              <span style="display:inline-block; padding:2px 8px; border-radius:9999px; font-size:10px; font-weight:600; background:{prio_color}25; color:{prio_color};">{r['priority']}</span>
+            </td>
+          </tr>
+        """)
+
+    body = f"""
+      <div style="margin-bottom:20px;">
+        <div style="background:{verdict_color}15; border-left:4px solid {verdict_color}; padding:16px 20px; border-radius:12px;">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:{verdict_color}; margin-bottom:6px;">Verdict gate de release</div>
+          <div style="font-family:Georgia,serif; font-size:28px; color:{verdict_color}; font-weight:700;">{verdict_label}</div>
+          <div style="color:#c8c8cc; font-size:13px; margin-top:6px;">
+            <strong>{summary['pass']}/{summary['total']}</strong> PASS · {summary['fail']} FAIL · {summary['p0_fail']} P0 fail · {summary['p1_fail']} P1 fail
+          </div>
+        </div>
+      </div>
+
+      <p style="color:#c8c8cc; font-size:13px;">
+        {('🚫 Un test P0 a căzut. NU se face deploy până nu rezolvi problemele de mai jos.' if blocked else '🟢 Toate testele P0 trec. Poți face deploy în siguranță.')}
+      </p>
+
+      <table border="0" cellpadding="0" cellspacing="0" style="width:100%; margin-top:16px; border-collapse:collapse;">
+        <thead>
+          <tr style="background:#1a1a1f;">
+            <th style="padding:10px; text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#9ca3af;">Test</th>
+            <th style="padding:10px; text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#9ca3af;">Detalii</th>
+            <th style="padding:10px; text-align:center; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#9ca3af;">Prio</th>
+          </tr>
+        </thead>
+        <tbody>
+          {''.join(rows_html)}
+        </tbody>
+      </table>
+
+      <p style="color:#9ca3af; font-size:11px; margin-top:24px;">
+        Gate ID: <code>{payload['gate_id']}</code> · Trigger: <code>{payload['triggered_by']}</code> · Durata: {payload['duration_ms']}ms
+      </p>
+    """
+    subj_prefix = "🚫" if blocked else "✅"
+    return {
+        "subject": f"{subj_prefix} Release Gate — {verdict_label} ({summary['pass']}/{summary['total']})",
+        "html": _layout(f"Release Gate · {verdict_label}", f"{summary['pass']}/{summary['total']} pass · {summary['fail']} fail · {summary['p0_fail']} P0 fail", body, f"{APP_URL}/admin", "Deschide QA Playbook"),
+    }
+
+
+async def run_release_gate(triggered_by: str = "manual", email_admins: bool = True) -> dict:
+    """Execute ALL automated tests, persist the result, optionally email admins."""
+    import uuid as _uuid
+    t0 = time.time()
+    started = datetime.now(timezone.utc).isoformat()
+    all_codes = list(AUTOMATED_TESTS.keys())
+    exec_res = await execute_tests(all_codes, run_id=None)
+    finished = datetime.now(timezone.utc).isoformat()
+    duration_ms = round((time.time() - t0) * 1000)
+
+    p0_fail = sum(1 for r in exec_res["results"] if r["status"] == "fail" and r["priority"] == "P0")
+    p1_fail = sum(1 for r in exec_res["results"] if r["status"] == "fail" and r["priority"] == "P1")
+    summary = dict(exec_res["summary"])
+    summary["p0_fail"] = p0_fail
+    summary["p1_fail"] = p1_fail
+    summary["blocked"] = p0_fail > 0
+
+    payload = {
+        "gate_id": _uuid.uuid4().hex[:12],
+        "triggered_by": triggered_by,
+        "started_at": started,
+        "finished_at": finished,
+        "duration_ms": duration_ms,
+        "summary": summary,
+        "results": exec_res["results"],
+        "email": {"sent": False, "recipients": [], "error": None},
+    }
+
+    # Persist gate (keep last 100 only)
+    try:
+        await db.release_gates.insert_one({**payload})
+        cur = db.release_gates.find({}, {"_id": 1}).sort("started_at", -1).skip(100)
+        old_ids = [d["_id"] async for d in cur]
+        if old_ids:
+            await db.release_gates.delete_many({"_id": {"$in": old_ids}})
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[ReleaseGate] persist failed: {e}")
+
+    # Send email
+    if email_admins:
+        try:
+            from email_service import send_email, ADMIN_EMAILS as _CFG_ADMIN_EMAILS
+            recipients = _CFG_ADMIN_EMAILS or [
+                e.strip() for e in (os.environ.get("ADMIN_EMAILS") or "").split(",") if e.strip()
+            ]
+            if not recipients:
+                payload["email"]["error"] = "ADMIN_NOTIFICATION_EMAILS / ADMIN_EMAILS not configured"
+            else:
+                tpl = _gate_email_html(payload)
+                await send_email(recipients, tpl["subject"], tpl["html"])
+                payload["email"]["sent"] = True
+                payload["email"]["recipients"] = recipients
+        except Exception as e:  # noqa: BLE001
+            payload["email"]["error"] = f"{type(e).__name__}: {str(e)[:200]}"
+            logger.warning(f"[ReleaseGate] email send failed: {e}")
+
+    payload.pop("_id", None)
+    return payload
+
+
+async def list_release_gates(limit: int = 20) -> list[dict]:
+    cursor = db.release_gates.find({}, {"results": 0}).sort("started_at", -1).limit(limit)
+    out = []
+    async for r in cursor:
+        r.pop("_id", None)
+        out.append(r)
+    return out
+
+
+async def get_release_gate(gate_id: str) -> Optional[dict]:
+    r = await db.release_gates.find_one({"gate_id": gate_id})
+    if not r:
+        return None
+    r.pop("_id", None)
+    return r

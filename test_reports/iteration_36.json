@@ -1,0 +1,66 @@
+{
+  "summary": "Phase-35 (Release Gate) backend + frontend e2e tested. All 10 backend pytest cases PASS in 11.5s (no-email gate, list-strips-results, detail-200/404, RBAC 403 for client on all 3 endpoints). Frontend: qa-release-gate-card renders at top of landing, verdict='RELEASE READY' with last-summary '14/14 pass · 0 fail · 0 P0 fail', 2-step confirm/cancel works, email-toggle defaults ON & uncheck works, gate completes in ~5s with toast, history list updates with 4 entries (gate_id, READY/BLOCKED, X/total, timestamp, actor, duration). qa-gate-refresh re-fetches without flicker. ONE FRONTEND P1 BUG FOUND: qa-gate-details-toggle never renders after running a gate due to a state-overwrite race in ReleaseGateCard (see rca).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "ReleaseGateCard / AdminQAPlaybook.jsx",
+        "issue": "qa-gate-details-toggle accordion never appears because `last.results` gets nuked. In runGate() line 541 setLast(fullPayload-with-results) is called, then line 547 loadHistory() runs which overwrites `last` with the lightweight gates[0] (the list endpoint strips `results` via Mongo projection `{'results': 0}`). Net effect: the details accordion gated by `{last?.results && ...}` (line 636) is never rendered. Spec test #12 (P1) cannot be satisfied via UI.",
+        "selector": "[data-testid='qa-gate-details-toggle']",
+        "priority": "P1"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase35_release_gate.py",
+    "/app/test_reports/pytest/phase35_release_gate.xml"
+  ],
+  "action_items": [
+    "Fix ReleaseGateCard so details-toggle stays visible after a gate run. Two clean options: (a) in runGate() call loadHistory() FIRST, then setLast(data) so the rich payload wins; or (b) inside loadHistory() preserve existing rich `last` (e.g. `setLast(prev => prev?.gate_id === data.gates[0].gate_id && prev.results ? prev : data.gates[0])`); or (c) when history loads, also GET /release-gates/{gates[0].gate_id} to fetch full results for the most recent gate.",
+    "OPTIONAL: register the `email` marker in pytest.ini/pyproject to silence PytestUnknownMarkWarning.",
+    "OPTIONAL: AdminQAPlaybook.jsx is now 824 lines (was 674). Continue split into ReleaseGateCard / AISuggester / AutomationPanel / RunView modules."
+  ],
+  "critical_code_review_comments": [
+    "qa_automation.run_release_gate persists `payload` directly with `insert_one({**payload})` — Motor mutates the dict by adding `_id`. The function then does `payload.pop('_id', None)` before returning, which is correct, but using a shallow copy for insert would be safer and avoid implicit mutation.",
+    "list_release_gates uses `{'results': 0}` projection but does NOT exclude `_id`; the manual `r.pop('_id', None)` covers it, but a unified projection `{'results': 0, '_id': 0}` is cleaner.",
+    "Auto-trim logic in run_release_gate: `.sort('started_at', -1).skip(100)` then delete — this is correct but executes on every gate run; consider adding an index on `started_at` (currently unindexed) to keep this O(log n).",
+    "ReleaseGateCard `loadHistory` swallows errors silently (`/* silent */`). Should at least console.warn for prod debuggability."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase35_release_gate.py (new — 11 tests, 10 P0/P1 run by default + 1 email-marker opt-in)"
+  ],
+  "success_rate": {
+    "backend": "100% (10/10 in 11.5s; email-marker test deliberately skipped per spec)",
+    "frontend": "92% (12/13 spec-listed flows pass; 1 P1 fails — details-toggle never renders)"
+  },
+  "test_credentials": "admin@propmanage.io / Admin123!  |  client@propmanage.io / Client123!  (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created ~5 release_gates rows during testing via POST /release-gate. All cleaned up at end via db.release_gates.deleteMany({triggered_by:/admin@propmanage.io/}) — remaining count after cleanup = 0.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Preview URL https://phased-document.preview.emergentagent.com. Sidebar TRAINING → 'QA Playbook'. Release Gate card renders at TOP of QA Playbook landing (above Run nou + Run-uri recente). On a fresh DB the verdict-banner reads 'Niciun gate rulat încă' (slate gradient) and qa-gate-last-summary is NOT in DOM until at least one gate has been persisted. Backend gate completes in ~5–6s with all 14 PASS. Email toggle defaults ON — always uncheck it before triggering a gate during automated testing to avoid hitting Resend with real emails. Cleanup db.release_gates after running tests. Run regression: `pytest /app/backend/tests/test_phase35_release_gate.py -v -m 'not email'` (10 tests, ~11s).",
+  "verified_endpoints": {
+    "POST /api/admin/qa/automation/release-gate {email_admins:false}": "200 in ~5s, payload shape correct, summary.total=14, blocked == (p0_fail>0), email.sent=false, results=14 items",
+    "GET /api/admin/qa/automation/release-gates": "200, gates list (>=1), each item missing `results` (lightweight), all required metadata fields present",
+    "GET /api/admin/qa/automation/release-gates/{gate_id}": "200 with full results array of 14 items; unknown id returns 404",
+    "POST /api/admin/qa/automation/release-gate as client": "403 ✓",
+    "GET /api/admin/qa/automation/release-gates as client": "403 ✓",
+    "GET /api/admin/qa/automation/release-gates/<id> as client": "403 ✓"
+  },
+  "verified_ui_flows": [
+    "P0 admin login → /admin",
+    "P0 sidebar 'QA Playbook' → landing renders qa-release-gate-card at TOP",
+    "P0 verdict banner 'RELEASE READY' visible after gate persisted; last-summary='14/14 pass · 0 fail · 0 P0 fail'",
+    "P0 click qa-gate-run-btn → button swaps to qa-gate-confirm-btn + qa-gate-cancel-btn",
+    "P0 qa-gate-cancel-btn → original run-btn restored",
+    "P0 uncheck qa-gate-email-toggle, click run → confirm → spinner → toast '✅ Release ready — 14/14 pass. Email neexpediat.' (matches spec exactly)",
+    "P0 qa-gate-verdict updates to 'RELEASE READY' + qa-gate-last-summary='14/14 pass · 0 fail · 0 P0 fail'",
+    "P0 qa-gate-history list contains new gate as FIRST entry (gate_id 12-char hex, 'READY · 14/14', timestamp, by admin@propmanage.io, duration_ms)",
+    "P1 qa-gate-refresh → re-fetches history, state preserved (count stays at 4, no flicker observed)"
+  ],
+  "rca of the issue": "qa-gate-details-toggle missing — RCA: In /app/frontend/src/pages/admin/AdminQAPlaybook.jsx, ReleaseGateCard.runGate() executes `setLast(data)` with the rich payload (line 541, data.results.length==14) and immediately calls loadHistory() (line 547). loadHistory() awaits GET /release-gates which STRIPS results via Mongo projection `{'results': 0}` in list_release_gates() (qa_automation.py line 686), then does `setLast(data.gates[0])` (line 530), overwriting the rich state with a results-less object. The accordion render gate `{last?.results && (...)}` at line 636 evaluates falsy → no details-toggle rendered. Reproduction: open /admin → QA Playbook → run gate → wait for completion → grep DOM for qa-gate-details-toggle → 0 matches. Mitigation (suggested in action_items): either reorder so setLast wins after loadHistory, or merge state (`setLast(prev => prev?.results ? prev : data.gates[0])`), or fetch the full detail of the latest gate in loadHistory."
+}

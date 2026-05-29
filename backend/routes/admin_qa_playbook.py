@@ -17,7 +17,7 @@ from qa_playbook import (
     ai_suggest_tests,
     render_run_markdown,
 )
-from qa_automation import list_automated_tests, execute_tests
+from qa_automation import list_automated_tests, execute_tests, run_release_gate, list_release_gates, get_release_gate
 
 router = APIRouter(prefix="/api/admin/qa", tags=["admin-qa"])
 
@@ -149,3 +149,27 @@ async def automation_execute(payload: AutomateRunIn, admin=Depends(require_role(
         raise HTTPException(400, "test_codes required")
     result = await execute_tests(payload.test_codes, run_id=payload.run_id)
     return result
+
+
+class ReleaseGateIn(BaseModel):
+    email_admins: bool = True
+
+
+@router.post("/automation/release-gate")
+async def automation_release_gate(payload: ReleaseGateIn, admin=Depends(require_role("admin"))):
+    triggered_by = admin.get("email") or "unknown-admin"
+    result = await run_release_gate(triggered_by=triggered_by, email_admins=payload.email_admins)
+    return result
+
+
+@router.get("/automation/release-gates")
+async def release_gates_history(admin=Depends(require_role("admin"))):
+    return {"gates": await list_release_gates(limit=20)}
+
+
+@router.get("/automation/release-gates/{gate_id}")
+async def release_gate_detail(gate_id: str, admin=Depends(require_role("admin"))):
+    g = await get_release_gate(gate_id)
+    if not g:
+        raise HTTPException(404, "Gate not found")
+    return g
