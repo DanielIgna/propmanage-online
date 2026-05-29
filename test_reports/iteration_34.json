@@ -1,0 +1,44 @@
+{
+  "summary": "Frontend retest of iteration-33 features against the correct preview URL (https://phased-document.preview.emergentagent.com). All P0 flows PASS: admin login, QA Playbook landing (4 blocks), run creation, pass/fail counters with RELEASE BLOCKED badge on P0 fail, note toggle/save/persist, status & search filters, switch-run + re-open with preserved counters (Pass:1, Fail:1), Export MD (verified backend returns 200 text/markdown 9.9KB), Cookie Policy page (/cookies) with diacritic 'Politică de cookies' and all required cookie rows, footer-cookies link from landing. P1 AI Test Suggester also PASS — screenshot confirmed CP-01/CP-02/CP-03 cards with P0/P1 badges rendered. P2 AdminDocs preview modals for specialist/operator/admin/qa-testing all open and render markdown content via DocViewer with zero JS errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_34.json",
+    "/app/backend/tests/test_phase33_new_features.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdminDocs PreviewModal uses raw div (no role=dialog/aria-modal). Consider adding role='dialog' aria-modal='true' for accessibility and easier automated testing.",
+    "AdminQAPlaybook.jsx is 700+ lines (per file listing) — consider splitting into smaller modules (RunHeader, RunFilters, CheckRow, AISuggester) for maintainability."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only pass)", "frontend": "100% (11/11 flows verified)"},
+  "test_credentials": "admin@propmanage.io / Admin123! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created one QA run 'UI Smoke Test' for testing; cleaned up via mongosh after tests (db.qa_runs.deleteMany on propmanage_db).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Preview URL: https://phased-document.preview.emergentagent.com (LIVE). MongoDB: mongodb://localhost:27017 / propmanage_db. AdminDocs PreviewModal uses a plain fixed div — to detect it in Playwright use [data-testid='docs-preview-close'] as the open indicator (not role='dialog'). Export MD opens new tab via window.open — to assert in Playwright use context.expect_page() not page.expect_response().",
+  "verified_endpoints": {
+    "POST /api/auth/login (admin)": "200",
+    "GET /api/admin/qa/runs": "200",
+    "GET /api/admin/qa/runs/{id}/markdown": "200 (text/markdown, 9.9KB)"
+  },
+  "verified_ui_flows": [
+    "P0 admin login → /admin",
+    "P0 sidebar TRAINING → QA Playbook landing renders qa-intro, qa-run-create, qa-runs-list, qa-ai-suggester",
+    "P0 create run 'UI Smoke Test' → run view with qa-run-name, qa-progress-ring, qa-filters, qa-cat-toggle-CLIENT",
+    "P0 C-01 Pass + C-02 Fail → counters update + qa-release-blocked badge appears",
+    "P0 C-01 note toggle/input/save → textarea closes and note 'Verified manually' persists on row",
+    "P0 status filter pass/ALL + search 'escrow' + clear",
+    "P0 switch-run → landing → re-open run → Pass:1 Fail:1 preserved",
+    "P0 Export MD → window.open new tab; backend GET /markdown returned 200 with valid markdown",
+    "P0 /cookies page renders cookies-page testid, h1='Politică de cookies' (diacritic OK), all rows (access_token/refresh_token/csrf_token/theme/locale/onboarding_seen) present",
+    "P0 landing /  footer-cookies link visible text='Cookies' → click navigates to /cookies",
+    "P1 AI Test Suggester: typed 'Cookie Policy page' → Claude Sonnet 4.5 returned cards (CP-01 P0 CLIENT, CP-02 P0, CP-03 P1, …) verified via screenshot",
+    "P2 AdminDocs preview for specialist/operator/admin/qa-testing all open modal with DocViewer markdown content, zero JS errors"
+  ]
+}

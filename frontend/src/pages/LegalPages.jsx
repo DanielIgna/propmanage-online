@@ -155,7 +155,7 @@ export const TermsPage = () => (
 
 
 export const CookiePolicyPage = () => (
-  <Layout icon={Cookie} title="Politica de cookies" subtitle="Ultima actualizare: februarie 2026" testid="cookies-page">
+  <Layout icon={Cookie} title="Politică de cookies" subtitle="Ultima actualizare: februarie 2026" testid="cookies-page">
     <p>Această pagină explică în detaliu cum folosește <strong>PropManage</strong> cookies-uri și tehnologii similare. Politica este conformă cu <strong>GDPR</strong>, <strong>Directiva ePrivacy</strong> și legea română 506/2004.</p>
 
     <h2>1. Ce sunt cookies-urile</h2>
