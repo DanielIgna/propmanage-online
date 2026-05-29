@@ -527,8 +527,18 @@ const ReleaseGateCard = () => {
     try {
       const { data } = await axios.get(`${API}/admin/qa/automation/release-gates`);
       setHistory(data.gates || []);
-      if ((data.gates || []).length > 0) setLast(data.gates[0]);
-    } catch (e) { /* silent */ }
+      // Preserve the rich `last` (with full `results`) if it matches the latest gate;
+      // otherwise lazy-fetch the full detail so the per-test accordion stays available.
+      if ((data.gates || []).length > 0) {
+        const topId = data.gates[0].gate_id;
+        setLast((prev) => (prev?.gate_id === topId && Array.isArray(prev?.results) ? prev : data.gates[0]));
+        // If we have no rich payload for the top gate, fetch it once
+        try {
+          const cur = await axios.get(`${API}/admin/qa/automation/release-gates/${topId}`);
+          setLast((prev) => (prev?.gate_id === topId && Array.isArray(prev?.results) ? prev : cur.data));
+        } catch { /* silent */ }
+      }
+    } catch { /* silent */ }
   }, []);
 
   useEffect(() => { loadHistory(); }, [loadHistory]);

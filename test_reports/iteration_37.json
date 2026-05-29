@@ -1,0 +1,40 @@
+{
+  "summary": "Re-test of P1 bug fix in ReleaseGateCard.loadHistory() (AdminQAPlaybook.jsx lines 526-542). The fix is VERIFIED WORKING across all 5 acceptance criteria. loadHistory() now (a) preserves the existing rich `last` when its gate_id matches the latest, AND (b) lazy-fetches GET /release-gates/{topId} to populate full results for the most-recent gate, guaranteeing the per-test accordion stays visible after run, after refresh-button, and after a full page reload + re-nav.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verified_acceptance_criteria": {
+    "P0_card_visible_at_top": "PASS — qa-release-gate-card renders at top of QA Playbook landing",
+    "P0_uncheck_email_run_confirm": "PASS — email-toggle uncheck works, run-btn → confirm-btn flow completes in ~5s",
+    "P0_FIX_details_toggle_after_run": "PASS — qa-gate-details-toggle present in DOM immediately after gate completion; expanding shows 14 rows; first row asserted: code='AUTO-AUTH-01', priority='P0', duration='2981ms', note starts with '📋'",
+    "P1_FIX_details_toggle_after_refresh_btn": "PASS — qa-gate-details-toggle remains present after clicking qa-gate-refresh button",
+    "P1_FIX_details_toggle_after_full_page_reload": "PASS — after full page reload + sidebar re-nav, the details-toggle is STILL present (top gate_id preserved: d3804532c1a4). The lazy-fetch of GET /release-gates/{topId} in loadHistory() successfully restores rich `last.results` from a cold load.",
+    "P1_second_gate_fresh_data": "PASS — second gate created NEW gate_id (c866e7eaa74b ≠ d3804532c1a4), details-toggle reflects NEW gate with fresh duration_ms (750ms vs prev 2981ms)"
+  },
+  "test_evidence": {
+    "first_gate_id": "d3804532c1a4 (duration_ms=4975)",
+    "second_gate_id": "c866e7eaa74b (duration_ms=5049, different first-test duration: 750ms vs 2981ms)",
+    "history_count_observed": "grew 2 → 3 → 4 as expected",
+    "verdict_banner": "RELEASE READY (green gradient), 14/14 pass · 0 fail · 0 P0 fail",
+    "accordion_rows": "14 rows on every render path (post-run, post-refresh-btn, post-page-reload)",
+    "row_format": "code AUTO-AUTH-01 + P0 badge + 2981ms + Romanian title + 📋 note"
+  },
+  "test_report_links": ["/app/backend/tests/test_phase35_release_gate.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "loadHistory() makes 2 sequential setLast() calls — first with the list-projection version then with the full detail. This causes a brief flicker (50-200ms) where the accordion disappears then reappears on cold load. Minor; could be avoided by skipping the first setLast when a fetch will follow. Not blocking.",
+    "AdminQAPlaybook.jsx is now 834 lines — still over the 700-line guideline. Suggest splitting ReleaseGateCard into its own module (carrying loadHistory + verdict UI).",
+    "The lazy detail-fetch in loadHistory() catches errors silently. If GET /release-gates/{id} ever 404s due to a race with the auto-trim (>100 gates), the user would see no details and no warning — at minimum console.warn."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only retest)", "frontend": "100% (5/5 acceptance criteria pass)"},
+  "test_credentials": "admin@propmanage.io / Admin123! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created 2 new release_gates during testing (d3804532c1a4, c866e7eaa74b). All 4 admin-triggered gates cleaned up at end via db.release_gates.delete_many({'triggered_by': /admin@propmanage.io/}); remaining count = 0.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "P1 bug from iter 36 is FIXED. The fix is in /app/frontend/src/pages/admin/AdminQAPlaybook.jsx lines 526-542. The QA Playbook page renders at /admin (the SPA keeps a stateful sidebar — full page reload reverts to Dashboard, sidebar re-click required). Email toggle defaults ON — always uncheck before running gates in automated tests. To wait for gate completion, poll history-list count growth (NOT the run-btn visibility — that button stays visible during running, just with a different label).",
+  "rca of the issue": "Original RCA (iter 36): loadHistory() overwrote rich `last` (with results) using the list-endpoint response (no results). Fix applied: setLast now uses functional form `(prev) => (prev?.gate_id === topId && Array.isArray(prev?.results) ? prev : data.gates[0])` so it preserves rich state when matching, then lazy-fetches GET /release-gates/{topId} to populate the rich payload on cold loads. Verified: on full page reload, the per-test accordion appears within ~2.5s for the most-recent gate."
+}
