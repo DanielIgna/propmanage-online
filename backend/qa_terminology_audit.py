@@ -117,13 +117,16 @@ def _word_present(text: str, term: str) -> bool:
     return re.search(pattern, t) is not None
 
 
-def scan_doc_for_clusters(slug: str, clusters: list[dict]) -> list[dict]:
+def scan_doc_for_clusters(slug: str, clusters: list[dict], resolved_doc: Optional[dict] = None) -> list[dict]:
     """Return inconsistencies in a doc.
 
     An inconsistency = within the same DOC, two or more terms of the same
     cluster appear (e.g. one section uses 'escrow' and another uses 'cont blocat').
+
+    If `resolved_doc` is provided (with overrides already applied), it is used
+    instead of the raw `DOCS_CONTENT[slug]` — so we don't re-flag fixed conflicts.
     """
-    doc = DOCS_CONTENT.get(slug)
+    doc = resolved_doc or DOCS_CONTENT.get(slug)
     if not doc:
         return []
     out = []
@@ -160,12 +163,18 @@ def scan_doc_for_clusters(slug: str, clusters: list[dict]) -> list[dict]:
 
 async def scan_all_docs() -> dict:
     """Run the full audit across every doc; returns aggregated report."""
+    from docs_service import resolve_doc_with_overrides
     await seed_clusters_if_empty()
     clusters = await list_clusters()
     by_doc = {}
     total = 0
     for slug in DOCS_CONTENT.keys():
-        inc = scan_doc_for_clusters(slug, clusters)
+        # Use the resolved doc (with overrides applied) so fixes are reflected immediately
+        try:
+            resolved = await resolve_doc_with_overrides(slug)
+        except Exception:  # noqa: BLE001
+            resolved = None
+        inc = scan_doc_for_clusters(slug, clusters, resolved_doc=resolved)
         if inc:
             by_doc[slug] = inc
             total += len(inc)
@@ -419,3 +428,130 @@ async def add_cluster(key: str, canonical: str, variants: list[str], description
         "description": description, "created_at": now, "updated_at": now, "is_seed": False,
     })
     return {"ok": True}
+
+
+# ----------------------------------------------------------------------------
+# Bulk: AI-fix + apply on every open inconsistency in one shot
+# ----------------------------------------------------------------------------
+
+async def _ai_rewrite_block(doc_slug: str, section_heading: str, canonical: str, other_variants: list[str], excerpt: str) -> dict:
+    """Pure AI call: rewrite block to use canonical term. Doesn't touch DB."""
+    import asyncio as _aio
+    key = os.environ.get("EMERGENT_LLM_KEY", "").strip()
+    if not key:
+        return {"error": "EMERGENT_LLM_KEY missing"}
+    prompt = f"""Document: `{doc_slug}` · Secțiune: `{section_heading}`
+
+Termen canonic: **{canonical}**
+Variante de înlocuit: {other_variants}
+
+Paragraf:
+\"\"\"
+{excerpt}
+\"\"\"
+
+Rescrie înlocuind variantele cu termenul canonic. Răspuns STRICT JSON: {{"title":"","body":""}}. Fără fences."""
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = (LlmChat(
+            api_key=key,
+            session_id=f"term-bulk-{uuid.uuid4().hex[:8]}",
+            system_message="Editor de documentație. Standardizezi terminologia.",
+        ).with_model("anthropic", "claude-sonnet-4-5-20250929"))
+        resp = await _aio.wait_for(chat.send_message(UserMessage(text=prompt)), timeout=25)
+        cleaned = re.sub(r"^```(?:json)?\s*|\s*```\s*$", "", resp.strip())
+        try:
+            data = json.loads(cleaned)
+        except Exception:
+            m = re.search(r"\{[\s\S]*\}", cleaned)
+            data = json.loads(m.group(0)) if m else None
+        if not data or not data.get("body"):
+            return {"error": "AI returned empty/non-JSON", "raw": resp[:200]}
+        return {"title": (data.get("title") or "").strip()[:200], "body": data["body"].strip()[:2000]}
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"{type(e).__name__}: {str(e)[:200]}"}
+
+
+async def apply_all_open(actor: str, max_items: int = 50, max_occurrences_per_inc: int = 5, concurrency: int = 8, inc_id: Optional[str] = None) -> dict:
+    """Bulk fix. If `inc_id` is provided, processes only that one inconsistency.
+
+    Frontend can call this in a loop per-inconsistency to stay under the 60s
+    ingress timeout while showing live progress.
+    """
+    import asyncio
+    if inc_id:
+        row = await db.term_inconsistencies.find_one({"id": inc_id, "status": "open"})
+        inconsistencies = [row] if row else []
+    else:
+        cursor = db.term_inconsistencies.find({"status": "open"}).limit(max_items)
+        inconsistencies = []
+        async for row in cursor:
+            inconsistencies.append(row)
+
+    # Build list of (inc_row, occurrence_index, occurrence_obj)
+    jobs = []
+    for row in inconsistencies:
+        canonical = row["canonical"]
+        others = [v for v in row.get("variants_used", []) if v.lower() != canonical.lower()]
+        for i, occ in enumerate(row.get("occurrences", [])[:max_occurrences_per_inc]):
+            jobs.append((row, i, occ, canonical, others))
+
+    sem = asyncio.Semaphore(concurrency)
+    now = datetime.now(timezone.utc).isoformat()
+    success_per_inc: dict[str, int] = {}
+    fail_per_inc: dict[str, int] = {}
+
+    async def _run(row, idx, occ, canonical, others):
+        async with sem:
+            res = await _ai_rewrite_block(row["doc_slug"], occ.get("section_heading", ""), canonical, others, occ.get("excerpt", ""))
+            inc_id = row["id"]
+            if res.get("error"):
+                fail_per_inc[inc_id] = fail_per_inc.get(inc_id, 0) + 1
+                return
+            # Apply override directly
+            override = {
+                "doc_slug": row["doc_slug"],
+                "section_index": occ["section_index"],
+                "block_index": occ["block_index"],
+                "patch": {"type": "callout", "variant": "info", "title": res.get("title", ""), "body": res["body"]},
+                "source_term_inconsistency_id": inc_id,
+                "applied_by": actor,
+                "applied_at": now,
+            }
+            try:
+                await db.doc_overrides.replace_one(
+                    {"doc_slug": override["doc_slug"], "section_index": occ["section_index"], "block_index": occ["block_index"]},
+                    override,
+                    upsert=True,
+                )
+                success_per_inc[inc_id] = success_per_inc.get(inc_id, 0) + 1
+            except Exception:  # noqa: BLE001
+                fail_per_inc[inc_id] = fail_per_inc.get(inc_id, 0) + 1
+
+    await asyncio.gather(*[_run(*j) for j in jobs])
+
+    # Mark inconsistencies as fixed if at least 1 occurrence patched, partial if mixed
+    details = []
+    fixed = 0
+    failed = 0
+    for row in inconsistencies:
+        inc_id = row["id"]
+        s = success_per_inc.get(inc_id, 0)
+        f = fail_per_inc.get(inc_id, 0)
+        status = "fixed" if (s > 0 and f == 0) else ("partial" if s > 0 else "fail")
+        if status in ("fixed", "partial"):
+            await db.term_inconsistencies.update_one(
+                {"id": inc_id},
+                {"$set": {"status": "fixed", "applied_at": now, "updated_at": now, "updated_by": actor}},
+            )
+            fixed += 1
+        else:
+            failed += 1
+        details.append({
+            "id": inc_id, "doc_slug": row["doc_slug"], "cluster": row["cluster_key"],
+            "status": status, "occurrences_patched": s, "occurrences_failed": f,
+        })
+    return {
+        "processed": len(inconsistencies), "fixed": fixed, "failed": failed,
+        "total_occurrences": len(jobs), "details": details,
+    }

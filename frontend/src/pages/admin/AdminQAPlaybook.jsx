@@ -861,6 +861,8 @@ const TerminologyAuditCard = () => {
   const [showClusters, setShowClusters] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [proposed, setProposed] = useState([]);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0, current: "" });
 
   const loadClusters = useCallback(async () => {
     try {
@@ -949,6 +951,41 @@ const TerminologyAuditCard = () => {
     } catch {}
   };
 
+  const applyAll = async () => {
+    // Get fresh list of opens
+    const { data } = await axios.get(`${API}/admin/qa/term-audit/inconsistencies?status=open`);
+    const opens = data.inconsistencies || [];
+    if (opens.length === 0) {
+      toast.info("Niciun conflict deschis de rezolvat");
+      return;
+    }
+    if (!confirm(`Rulează AI fix + apply override pentru toate cele ${opens.length} inconsistențe? Durează ~${opens.length * 10} secunde.`)) return;
+    setBulkRunning(true);
+    setBulkProgress({ done: 0, total: opens.length, current: "" });
+    let totalFixed = 0;
+    let totalPartial = 0;
+    let totalOcc = 0;
+    for (let i = 0; i < opens.length; i++) {
+      const inc = opens[i];
+      setBulkProgress({ done: i, total: opens.length, current: `${inc.doc_slug} · ${inc.cluster_key}` });
+      try {
+        const { data: res } = await axios.post(`${API}/admin/qa/term-audit/apply-all`, { inc_id: inc.id });
+        const det = res?.details?.[0];
+        if (det) {
+          totalOcc += det.occurrences_patched || 0;
+          if (det.status === "fixed") totalFixed++;
+          else if (det.status === "partial") totalPartial++;
+        }
+      } catch (e) {
+        // continue
+      }
+    }
+    setBulkProgress({ done: opens.length, total: opens.length, current: "" });
+    setBulkRunning(false);
+    toast.success(`Bulk apply complet: ${totalFixed} fixate · ${totalPartial} parțiale · ${totalOcc} blocuri patch-uite`);
+    loadIncs();
+  };
+
   const statBadge = (s) => ({
     open: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
     approved: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
@@ -980,6 +1017,9 @@ const TerminologyAuditCard = () => {
         <AdminBtn variant="primary" onClick={scan} disabled={scanning} data-testid="qa-term-scan-btn">
           {scanning ? <><Loader2 className="w-3.5 h-3.5 inline mr-1 animate-spin" /> Scanare...</> : <><Search className="w-3.5 h-3.5 inline mr-1" /> Scanează manualele</>}
         </AdminBtn>
+        <AdminBtn variant="success" onClick={applyAll} disabled={bulkRunning} data-testid="qa-term-apply-all-btn">
+          {bulkRunning ? <><Loader2 className="w-3.5 h-3.5 inline mr-1 animate-spin" /> Apply ALL ({bulkProgress.done}/{bulkProgress.total})...</> : <><Wand2 className="w-3.5 h-3.5 inline mr-1" /> Apply ALL AI fixes</>}
+        </AdminBtn>
         <AdminBtn variant="secondary" onClick={() => setShowClusters((v) => !v)} data-testid="qa-term-toggle-clusters">
           {showClusters ? "Ascunde" : "Vezi"} cluster-uri ({clusters.length})
         </AdminBtn>
@@ -987,6 +1027,18 @@ const TerminologyAuditCard = () => {
           {discovering ? <><Loader2 className="w-3.5 h-3.5 inline mr-1 animate-spin" /> AI caută...</> : <><Sparkles className="w-3.5 h-3.5 inline mr-1" /> AI discover cluster-uri noi</>}
         </AdminBtn>
       </div>
+
+      {bulkRunning && bulkProgress.total > 0 && (
+        <div className="mb-3 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800" data-testid="qa-term-bulk-progress">
+          <div className="flex items-center justify-between text-xs text-emerald-700 dark:text-emerald-300 mb-1">
+            <span><strong>Bulk Apply în curs:</strong> {bulkProgress.current || "..."}</span>
+            <span>{bulkProgress.done} / {bulkProgress.total}</span>
+          </div>
+          <div className="w-full h-2 bg-emerald-100 dark:bg-emerald-800/40 rounded-full overflow-hidden">
+            <div className="h-2 bg-emerald-500 rounded-full transition-all" style={{width: `${(bulkProgress.done / bulkProgress.total) * 100}%`}} />
+          </div>
+        </div>
+      )}
 
       {showClusters && clusters.length > 0 && (
         <div className="mb-3 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 max-h-[200px] overflow-y-auto">

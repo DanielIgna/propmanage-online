@@ -8,6 +8,7 @@ from qa_terminology_audit import (
     seed_clusters_if_empty, list_clusters, scan_all_docs,
     persist_inconsistencies, list_inconsistencies, update_status,
     ai_suggest_fix, apply_fix, ai_discover_clusters, add_cluster,
+    apply_all_open,
 )
 
 router = APIRouter(prefix="/api/admin/qa/term-audit", tags=["admin-term-audit"])
@@ -89,3 +90,20 @@ async def apply(inc_id: str, payload: ApplyIn, admin=Depends(require_role("admin
 @router.post("/discover")
 async def discover(admin=Depends(require_role("admin"))):
     return await ai_discover_clusters()
+
+
+class ApplyAllIn(BaseModel):
+    inc_id: Optional[str] = None  # if set, processes only this one
+
+
+@router.post("/apply-all")
+async def apply_all(payload: Optional[ApplyAllIn] = None, admin=Depends(require_role("admin"))):
+    """Bulk: AI-fix + apply override.
+
+    POST body { inc_id?: str } — if `inc_id` is provided, processes only that one
+    inconsistency (used by the frontend to iterate with progress UI under the
+    K8s ingress 60s timeout). With no body, processes ALL open inconsistencies.
+    """
+    actor = admin.get("email") or "unknown-admin"
+    inc_id = payload.inc_id if payload else None
+    return await apply_all_open(actor, inc_id=inc_id)
