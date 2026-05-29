@@ -1176,3 +1176,31 @@ checklists (mark test as passed/failed with notes), AI test-case suggester
 (Claude analyzes recent code commits + suggests new tests), driver.js-style
 onboarding tour on first login per role.
 
+
+## Changelog — 2026-02-29 — Markdown Export + Cmd+K Search
+- New module `backend/docs_search.py`:
+  - `render_doc_markdown(slug)` — converts any doc to clean Markdown.
+    Handles all block types (paragraph, list, callout w/ emoji, code, steps,
+    media as `_[Media: caption — src]_`) and FAQ.
+  - `search_docs(q, limit=20)` — diacritic-insensitive full-text search across
+    title, headings, body, callouts, FAQ. Returns ranked hits with type
+    indicator (`title|heading|body|faq`) + ~160-char contextual snippet
+    centered on the match.
+- New admin endpoints:
+  - `GET /api/admin/docs/{slug}/markdown` — download as `.md` (text/markdown).
+  - `GET /api/admin/docs/admin/search?q=...` — JSON hits for Cmd+K palette.
+    (Note: route lives under `/admin/search` sub-path so it doesn't collide
+    with `/{slug}` dynamic routing.)
+- Frontend `AdminDocs.jsx`:
+  - Global hotkey `Cmd+K` / `Ctrl+K` opens a search palette overlay.
+    Auto-debounced search (200ms), suggests common queries (escrow, dispute,
+    twin, verificare, garanție) when empty, click on hit → opens the relevant
+    doc in Preview modal.
+  - New per-card `MD` button copies the full Markdown to clipboard
+    (uses `navigator.clipboard.writeText`).
+  - Search-trigger button in card header with `⌘K` kbd hint.
+- Validated:
+  - `GET /admin/docs/client/markdown` → clean MD with emoji callouts (`> ℹ️`).
+  - `q=escrow` → 13 hits across heading/body/faq.
+  - `q=dispute` → 7 hits. Diacritic normalization works.
+

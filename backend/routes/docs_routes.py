@@ -24,6 +24,7 @@ from docs_service import (
     render_doc_pdf, email_doc_to_user, list_docs_meta,
     resolve_share_token,
 )
+from docs_search import render_doc_markdown, search_docs
 from docs_content import get_doc
 from db import db
 
@@ -91,6 +92,25 @@ async def admin_download_pdf(slug: str, user: dict = Depends(require_role("admin
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="PropManage-{slug}.pdf"'},
     )
+
+
+@admin_router.get("/{slug}/markdown")
+async def admin_download_markdown(slug: str, user: dict = Depends(require_role("admin"))):
+    """Plain markdown export — easy to paste into Slack / Notion / email."""
+    md = render_doc_markdown(slug)
+    if md is None:
+        raise HTTPException(404, "Doc not found")
+    return Response(
+        content=md,
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="PropManage-{slug}.md"'},
+    )
+
+
+@admin_router.get("/admin/search")
+async def admin_search_docs(q: str, limit: int = 20, user: dict = Depends(require_role("admin"))):
+    """Full-text search across all docs. Used by Cmd+K palette."""
+    return {"query": q, "hits": search_docs(q, limit=min(limit, 50))}
 
 
 @admin_router.post("/{slug}/send")
