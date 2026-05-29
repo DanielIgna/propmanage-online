@@ -697,3 +697,30 @@ async def get_release_gate(gate_id: str) -> Optional[dict]:
         return None
     r.pop("_id", None)
     return r
+
+
+async def run_weekly_release_gate_job():
+    """APScheduler job: run release gate weekly, email admins ONLY if P0 fail (silent on green)."""
+    try:
+        # Run with email_admins=False; we'll send manually only on P0 fail to keep inbox quiet.
+        payload = await run_release_gate(triggered_by="weekly-cron", email_admins=False)
+        if payload.get("summary", {}).get("p0_fail", 0) > 0:
+            try:
+                from email_service import send_email, ADMIN_EMAILS as _CFG_ADMIN_EMAILS
+                recipients = _CFG_ADMIN_EMAILS or [
+                    e.strip() for e in (os.environ.get("ADMIN_EMAILS") or "").split(",") if e.strip()
+                ]
+                if recipients:
+                    tpl = _gate_email_html(payload)
+                    # Override subject to make weekly origin clear
+                    tpl["subject"] = "[Cron luni 08:45] " + tpl["subject"]
+                    await send_email(recipients, tpl["subject"], tpl["html"])
+                    logger.warning(f"[ReleaseGate cron] P0 FAIL — emailed {len(recipients)} admins (gate {payload['gate_id']})")
+                else:
+                    logger.warning(f"[ReleaseGate cron] P0 FAIL but no admin emails configured (gate {payload['gate_id']})")
+            except Exception as e:  # noqa: BLE001
+                logger.exception(f"[ReleaseGate cron] failed to send P0-fail email: {e}")
+        else:
+            logger.info(f"[ReleaseGate cron] All clear — {payload['summary']['pass']}/{payload['summary']['total']} pass (gate {payload['gate_id']}); no email sent.")
+    except Exception as e:  # noqa: BLE001
+        logger.exception(f"[ReleaseGate cron] crashed: {e}")

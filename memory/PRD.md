@@ -1411,3 +1411,20 @@ A red, prominent card on the QA Playbook landing — **"🚀 Rulează gate-ul de
 - 🟢 Add more automated tests: escrow happy-path, dispute creation, register-with-cleanup
 - 🟢 Optional: cron-trigger release gate weekly + alert if any P0 starts failing
 
+
+---
+
+## Phase 37 — Weekly Cron Release Gate (silent unless P0 fail) (Feb 29, 2026) ✅
+
+- **APScheduler job** `weekly_release_gate` — Mondays **08:45 Europe/Bucharest**.
+- Runs ALL 14 automated tests in parallel (~5-6s).
+- **Silent on green**: no email if everything passes (logged INFO only).
+- **Alerts on P0 fail**: sends the standard branded HTML release-gate email to all admins from `ADMIN_EMAILS`, with subject prefixed `[Cron luni 08:45]`.
+- Persists every weekly gate as a `release_gate` document, so the history list in the admin UI shows both manual + scheduled gates side-by-side.
+- Function: `run_weekly_release_gate_job` in `/app/backend/qa_automation.py`.
+- Wired in `/app/backend/server.py` between the onboarding dispatch job and the weekly Dev Velocity job.
+
+### Verified manually (no test framework needed — straightforward cron wrapper)
+- All-pass invocation → 0 emails sent, log `[ReleaseGate cron] All clear — 14/14 pass`.
+- Simulated P0 fail (monkey-patched first test) → email captured with correct subject `[Cron luni 08:45] 🚫 Release Gate — RELEASE BLOCKED (13/14)` to 3 admins.
+

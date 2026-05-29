@@ -65,6 +65,7 @@ from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
 from onboarding_emails import run_onboarding_dispatch_job
+from qa_automation import run_weekly_release_gate_job
 from demo_reset import reset_demo_accounts
 
 logging.basicConfig(level=logging.INFO)
@@ -247,6 +248,15 @@ async def startup():
             id="onboarding_email_dispatch",
             replace_existing=True,
             misfire_grace_time=900,
+        )
+        # Weekly Release Gate — Mondays 08:45 Europe/Bucharest
+        # Silent unless any P0 fails (only then admins get alerted)
+        scheduler.add_job(
+            run_weekly_release_gate_job,
+            CronTrigger(day_of_week="mon", hour=8, minute=45, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="weekly_release_gate",
+            replace_existing=True,
+            misfire_grace_time=7200,
         )
         scheduler.start()
         # Record an immediate ping on startup so sparkline is non-empty from minute 1.
