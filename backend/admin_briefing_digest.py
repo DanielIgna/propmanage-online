@@ -20,7 +20,8 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from db import db
-from routes.admin_healthcheck import compute_healthcheck_report
+# Lazy-imported inside `compute_briefing_payload` to break circular dependency
+# with routes/admin_healthcheck.py (which imports from this module at runtime).
 
 logger = logging.getLogger("propmanage.admin_briefing_digest")
 
@@ -87,6 +88,8 @@ async def _latest_backup() -> Optional[dict]:
 
 async def compute_briefing_payload() -> dict:
     """Build the full briefing payload (data only, no rendering)."""
+    # Lazy import to break circular dependency with routes/admin_healthcheck.py
+    from routes.admin_healthcheck import compute_healthcheck_report
     healthcheck = await compute_healthcheck_report()
     smoke = await _latest_smoke_test()
     integrity = await _latest_data_integrity()

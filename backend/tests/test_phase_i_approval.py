@@ -23,8 +23,18 @@ except ImportError:
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://phased-document.preview.emergentagent.com").rstrip("/")
 
-# Match backend secret loader (backend/.env)
-JWT_SECRET = "24bcea8b82f112c7805cbeb6e0858fadc81b8da0b0038ce3618d925d2f124db2"
+# Load JWT secret from environment (mirrors backend/.env) — never hardcode production secrets.
+JWT_SECRET = os.environ.get("JWT_SECRET")
+if not JWT_SECRET:
+    # Fallback: read from backend/.env (test runner convenience)
+    try:
+        from dotenv import dotenv_values
+        _envfile = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+        JWT_SECRET = (dotenv_values(_envfile) or {}).get("JWT_SECRET")
+    except Exception:
+        JWT_SECRET = None
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET not configured — set env var or backend/.env before running phase_i tests.")
 JWT_ALGORITHM = "HS256"
 
 
