@@ -2268,6 +2268,33 @@ Acoperire automată: **105/105 scenarios = 100%** (vs 38/105 la începutul ciclu
 - 🔴 USER: Stripe LIVE keys + Slack/Discord webhooks
 - 🟡 Aspose.3D Cloud API SKP→GLB direct ($0.04/conv)
 - 🟡 Lottie animations Knowledge Base
+
+### Phase 62 — Sparkline Hourly Trend pe `/admin/auth-health` (Feb 2026)
+
+**Feature: Mini-grafic SVG inline cu success rate pe ultimele 24h, oră-cu-oră**
+
+Backend:
+- `_build_hourly_buckets(events, now, hours)` — grupează events în 24 bucket-uri (oldest→newest). Fiecare bucket: `{hour_iso, hour_label, total, success, success_rate_pct}`
+- `_build_auth_health_payload()` returnează acum și `hourly_buckets` array
+
+Frontend (pure SVG, no chart libs):
+- Componentă `<Sparkline24h buckets={...} />` deasupra KPI cards
+- 24 bare verticale color-coded:
+  - 🟢 Verde (≥95% success rate)
+  - 🟡 Galben (80-95%)
+  - 🔴 Roșu (<80%)
+  - ⚫ Gri închis (fără date)
+- Trend line peste data points
+- Linie threshold 80% (dashed amber)
+- Hover tooltip per bar: "13:00 · 8 req · 100% success"
+- Footer cu count "Ore cu activitate: X / 24"
+
+**Use case:** Identifică pattern temporal — dacă bug-ul 520 apare doar noaptea (mentenanță upstream Emergent), sparkline-ul îl arată instant (toate barele roșii între 02:00-05:00).
+
+**Verified:** Backend returnează 24 buckets corecte (`/api/admin/auth-health` testat live cu admin).
+
+**Files:** `/app/backend/routes/auth.py` · `/app/frontend/src/pages/admin/AdminAuthHealthPage.jsx`
+
 - 🟡 Twilio SMS alerts nighttime (paralel cu email pentru critical only)
 - 🟢 Avatar S3/Cloudinary migration
 

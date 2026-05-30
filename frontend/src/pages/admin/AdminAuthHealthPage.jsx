@@ -27,6 +27,98 @@ const ColorChip = ({ color, children, "data-testid": testId }) => {
   return <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider border ${cls}`} data-testid={testId}>{children}</span>;
 };
 
+// Inline SVG sparkline — no chart libs needed. Shows hourly success rate over 24h.
+// Color per bar: green (≥95%), amber (80-95%), red (<80%), stone (no data).
+const Sparkline24h = ({ buckets }) => {
+  const W = 900;
+  const H = 110;
+  const PAD_X = 8;
+  const PAD_Y = 20;
+  const BAR_GAP = 3;
+  const n = buckets.length || 24;
+  const barW = (W - PAD_X * 2 - BAR_GAP * (n - 1)) / n;
+  const chartH = H - PAD_Y - 18; // top padding + bottom label space
+  const colorFor = (r) => {
+    if (r === null || r === undefined) return "#3f3f46";
+    if (r >= 95) return "#34d399";
+    if (r >= 80) return "#fbbf24";
+    return "#ef4444";
+  };
+  const points = buckets.map((b, i) => {
+    const x = PAD_X + i * (barW + BAR_GAP) + barW / 2;
+    const r = b.success_rate_pct;
+    const y = r === null ? PAD_Y + chartH : PAD_Y + chartH - (r / 100) * chartH;
+    return { x, y, r, label: b.hour_label, total: b.total };
+  });
+  // Line path connecting samples that have data
+  const dataPoints = points.filter(p => p.r !== null);
+  const pathD = dataPoints.length > 1
+    ? dataPoints.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ")
+    : "";
+  return (
+    <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-5" data-testid="auth-health-sparkline">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-medium text-stone-300 flex items-center gap-2">
+          <Activity className="w-4 h-4 text-[#d4ff3a]" /> Success rate · ultimele 24h
+        </h2>
+        <div className="flex items-center gap-3 text-[10px] text-stone-500">
+          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400" />≥95%</span>
+          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" />80-95%</span>
+          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" />&lt;80%</span>
+          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-stone-600" />fără date</span>
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="none">
+        {/* 80% threshold guide line */}
+        <line x1={PAD_X} y1={PAD_Y + chartH - 0.8 * chartH} x2={W - PAD_X} y2={PAD_Y + chartH - 0.8 * chartH}
+              stroke="#fbbf24" strokeWidth="1" strokeDasharray="3 4" opacity="0.4" />
+        <text x={PAD_X + 4} y={PAD_Y + chartH - 0.8 * chartH - 3} fill="#fbbf24" fontSize="9" opacity="0.7">80% threshold</text>
+        {/* Trend line over data points */}
+        {pathD && <path d={pathD} fill="none" stroke="#d4ff3a" strokeWidth="1.5" opacity="0.45" />}
+        {/* Bars (success rate height) */}
+        {points.map((p, i) => {
+          const r = p.r;
+          const x0 = PAD_X + i * (barW + BAR_GAP);
+          const fullH = chartH;
+          const valH = r === null ? 0 : (r / 100) * chartH;
+          return (
+            <g key={i}>
+              <rect x={x0} y={PAD_Y} width={barW} height={fullH} fill="#27272a" opacity="0.5" rx="1.5" />
+              {r !== null && (
+                <rect
+                  x={x0}
+                  y={PAD_Y + chartH - valH}
+                  width={barW}
+                  height={valH}
+                  fill={colorFor(r)}
+                  rx="1.5"
+                >
+                  <title>{`${p.label} · ${p.total} req · ${r}% success`}</title>
+                </rect>
+              )}
+              {/* Hour label every 4 hours */}
+              {i % 4 === 0 && (
+                <text x={x0 + barW / 2} y={H - 4} fill="#71717a" fontSize="9" textAnchor="middle">{p.label}</text>
+              )}
+              {/* Dot for active hours */}
+              {r !== null && (
+                <circle cx={p.x} cy={p.y} r="2" fill={colorFor(r)} stroke="#0a0a0a" strokeWidth="1" />
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      <div className="mt-2 flex items-center justify-between text-[10px] text-stone-500">
+        <span>Cel mai vechi · {buckets[0]?.hour_label || "—"}</span>
+        <span data-testid="sparkline-active-hours">
+          Ore cu activitate: {points.filter(p => p.r !== null).length} / {n}
+        </span>
+        <span>Acum · {buckets[buckets.length - 1]?.hour_label || "—"}</span>
+      </div>
+    </div>
+  );
+};
+
 export const AdminAuthHealthPage = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -74,6 +166,7 @@ export const AdminAuthHealthPage = () => {
   const succRate = data.success_rate_pct;
   const succColor = succRate === null ? "stone" : succRate >= 95 ? "emerald" : succRate >= 80 ? "amber" : "red";
   const lat = data.latency_ms || {};
+  const buckets = data.hourly_buckets || [];
 
   return (
     <div className="min-h-screen bg-stone-950 text-white p-6 lg:p-10" data-testid="admin-auth-health-page">
@@ -115,6 +208,9 @@ export const AdminAuthHealthPage = () => {
             ⚙️ Alertă automată: email când success rate &lt; 80% în ultima oră (cooldown 60min)
           </div>
         </div>
+
+        {/* Sparkline graph — 24h hourly success rate trend */}
+        <Sparkline24h buckets={buckets} />
 
         {/* KPI cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

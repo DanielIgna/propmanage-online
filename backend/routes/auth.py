@@ -1018,7 +1018,40 @@ async def _build_auth_health_payload(hours: int = 24, raw_limit: int = 20) -> di
     async for ev in cursor:
         ev["_id"] = str(ev.get("_id"))
         events.append(ev)
-    return _aggregate_auth_health(events, hours, raw_limit)
+    payload = _aggregate_auth_health(events, hours, raw_limit)
+    # Build hourly buckets for sparkline (oldest → newest, exactly `hours` entries)
+    payload["hourly_buckets"] = _build_hourly_buckets(events, now, hours)
+    return payload
+
+
+def _build_hourly_buckets(events: List[dict], now: datetime, hours: int) -> List[dict]:
+    """Group events into 1h buckets, oldest first.
+
+    Returns list of {hour_iso, hour_label, total, success, success_rate_pct}.
+    """
+    buckets = []
+    for i in range(hours - 1, -1, -1):  # oldest first
+        bucket_start = now - timedelta(hours=i + 1)
+        bucket_end = now - timedelta(hours=i)
+        bs_iso = bucket_start.isoformat()
+        be_iso = bucket_end.isoformat()
+        total = 0
+        success = 0
+        for ev in events:
+            ts = ev.get("started_at") or ""
+            if bs_iso <= ts < be_iso:
+                total += 1
+                if ev.get("outcome") == "success":
+                    success += 1
+        rate = round((success / total) * 100, 1) if total else None
+        buckets.append({
+            "hour_iso": bs_iso,
+            "hour_label": bucket_start.strftime("%H:00"),
+            "total": total,
+            "success": success,
+            "success_rate_pct": rate,
+        })
+    return buckets
 
 
 @router.get("/admin/auth-health")
