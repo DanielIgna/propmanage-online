@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { API } from "../pages/DashShared";
 import { FACE_STYLES, TOOLS, SECTION_AXES } from "./viewer/constants";
-import { DemoHouse, ModelWithEvents, ResetCamera } from "./viewer/ViewerScene";
+import { DemoHouse, ModelWithEvents, ResetCamera, MultiLayerScene } from "./viewer/ViewerScene";
 import { MeasureMarkers } from "./viewer/MeasureSection";
 import { PinMarker, PinDraftModal, PinThreadModal } from "./viewer/PinSystem";
 
@@ -87,6 +87,64 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
       .then(r => setPins(r.data.items || []))
       .catch(() => setPins([]));
   }, [projectId]);
+
+  // Phase 56 — Multi-layer: fetch all uploaded .glb models for the project so
+  // we can render the X-Ray "glass walls" overlay (electric + plumbing + structure).
+  const [projectLayers, setProjectLayers] = useState([]);   // backend metadata
+  const [layerOverrides, setLayerOverrides] = useState({}); // { model_id: { visible, opacity } }
+  useEffect(() => {
+    if (!projectId) return;
+    axios.get(`${API}/digital-twin/projects/${projectId}/models`)
+      .then(r => setProjectLayers(r.data.models || []))
+      .catch(() => setProjectLayers([]));
+  }, [projectId]);
+
+  // Build the layer list passed to the renderer. Falls back to a single-model
+  // setup if the project has only one upload (backwards-compat).
+  const renderLayers = useMemo(() => {
+    if (!projectLayers.length) return null;
+    const backend = process.env.REACT_APP_BACKEND_URL || "";
+    return projectLayers.map((m) => {
+      const o = layerOverrides[m.id] || {};
+      const url = (m.public_path || m.url || "").startsWith("http")
+        ? (m.public_path || m.url)
+        : `${backend}${m.public_path || m.url || ""}`;
+      // Map face style to per-layer opacity:
+      //   xray   → force 25% opacity (glass walls)
+      //   wireframe → very low opacity to emphasise edges
+      //   else → use the layer's natural opacity (structure=opaque, MEP=45%)
+      let effectiveOpacity = (o.opacity ?? m.layer_opacity ?? 1.0);
+      if (faceStyle === "xray") effectiveOpacity = Math.min(effectiveOpacity, 0.25);
+      else if (faceStyle === "wireframe") effectiveOpacity = 0.15;
+      else if (faceStyle === "white") {
+        // White mode: structure stays solid, MEPs become highlights
+        if (m.layer_type === "structure") effectiveOpacity = 1.0;
+      }
+      const color = faceStyle === "white" ? "#e7e5e4" : (m.layer_color || "#c8b89a");
+      return {
+        id: m.id,
+        url,
+        label: m.layer_label || m.filename,
+        layer_type: m.layer_type,
+        color,
+        opacity: effectiveOpacity,
+        visible: o.visible !== undefined ? o.visible : (m.layer_visible !== false),
+      };
+    });
+  }, [projectLayers, layerOverrides, faceStyle]);
+
+  const toggleProjectLayer = (modelId) => {
+    setLayerOverrides((prev) => {
+      const cur = prev[modelId] || {};
+      const layerMeta = projectLayers.find(m => m.id === modelId);
+      const wasVisible = cur.visible !== undefined ? cur.visible : (layerMeta?.layer_visible !== false);
+      return { ...prev, [modelId]: { ...cur, visible: !wasVisible } };
+    });
+  };
+
+  const setProjectLayerOpacity = (modelId, op) => {
+    setLayerOverrides((prev) => ({ ...prev, [modelId]: { ...(prev[modelId] || {}), opacity: op } }));
+  };
 
   const url = modelUrl
     ? (modelUrl.startsWith("http") ? modelUrl : `${process.env.REACT_APP_BACKEND_URL || ""}${modelUrl}`)
@@ -280,6 +338,64 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
           </div>
         </div>
 
+        {/* Phase 56 — Multi-layer Building Systems panel.
+            Shows one row per uploaded .glb model (electric / plumbing / structure / ...)
+            with visibility toggle + opacity slider. This is the "glass walls X-Ray"
+            feature for layered BIM-style models. */}
+        {renderLayers && renderLayers.length > 0 && (
+          <div className="px-4 py-4 border-b border-white/10" data-testid="dt-systems-panel">
+            <div className="flex items-center gap-2 mb-2">
+              <Layers className="w-3.5 h-3.5 text-emerald-400" />
+              <div className="text-[10px] uppercase tracking-[0.16em] text-stone-400 font-semibold">
+                Sisteme ({renderLayers.length})
+              </div>
+            </div>
+            <p className="text-[10px] text-stone-500 mb-2 leading-relaxed">
+              Activează simultan structură + electric + apă pentru vedere X-Ray.
+            </p>
+            <div className="space-y-1.5">
+              {renderLayers.map((l) => (
+                <div key={l.id} className="rounded-lg bg-white/[0.03] border border-white/5 p-2" data-testid={`dt-system-${l.layer_type || l.id}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <button
+                      onClick={() => toggleProjectLayer(l.id)}
+                      className={`w-6 h-6 rounded flex items-center justify-center transition ${
+                        l.visible ? "bg-emerald-500/20 text-emerald-300" : "bg-white/5 text-stone-500"
+                      }`}
+                      data-testid={`dt-system-toggle-${l.id}`}
+                      title={l.visible ? "Ascunde stratul" : "Afișează stratul"}
+                    >
+                      {l.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                    </button>
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ background: l.color }}
+                      title={l.color}
+                    />
+                    <span className="text-xs text-stone-200 truncate flex-1" title={l.label}>{l.label}</span>
+                  </div>
+                  {l.visible && (
+                    <div className="flex items-center gap-2 px-1">
+                      <span className="text-[9px] text-stone-500 uppercase tracking-wider w-12 shrink-0">Opac.</span>
+                      <input
+                        type="range"
+                        min={0.05}
+                        max={1.0}
+                        step={0.05}
+                        value={l.opacity}
+                        onChange={(e) => setProjectLayerOpacity(l.id, parseFloat(e.target.value))}
+                        className="flex-1 accent-emerald-400 h-1"
+                        data-testid={`dt-system-opacity-${l.id}`}
+                      />
+                      <span className="text-[10px] text-emerald-300 font-mono w-8 text-right">{Math.round(l.opacity * 100)}%</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="px-4 py-4 border-b border-white/10 flex-1 overflow-y-auto">
           <div className="flex items-center gap-2 mb-2">
             <Layers className="w-3.5 h-3.5 text-stone-500" />
@@ -358,7 +474,13 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
           <directionalLight position={[10, 15, 8]} intensity={0.9} />
           <hemisphereLight args={[0xddeeff, 0x202020, 0.3]} />
           <Suspense fallback={null}>
-            {url ? (
+            {renderLayers && renderLayers.length > 0 ? (
+              <MultiLayerScene
+                layers={renderLayers}
+                clippingPlanes={clippingPlanes}
+                onMeshClick={onMeshClick}
+              />
+            ) : url ? (
               <ModelWithEvents
                 url={url}
                 faceStyle={faceStyle}

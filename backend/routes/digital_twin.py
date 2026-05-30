@@ -23,6 +23,9 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, Body, Query, UploadFile, File
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
+import logging
+
+logger = logging.getLogger("propmanage.digital_twin")
 
 from db import db
 from deps import get_current_user, require_role
@@ -294,9 +297,15 @@ async def delete_project(project_id: str, user: dict = Depends(get_current_user)
 async def upload_model(
     project_id: str,
     file: UploadFile = File(...),
+    layer_type: Optional[str] = Query(None, description="structure | electric | plumbing | hvac | decor | other"),
     user: dict = Depends(get_current_user),
 ):
-    """Upload a .glb/.gltf model for the project. Stored locally and served via /files/."""
+    """Upload a .glb/.gltf model for the project. Stored locally and served via /files/.
+
+    Each uploaded model is treated as an independent BUILDING LAYER (structure,
+    electric, plumbing, hvac, ...). Multiple layers per project let the viewer
+    render the X-Ray "glass walls" overlay business case.
+    """
     await _ensure_dt_access(user)
     p = await _ensure_project_access(project_id, user)
     if user.get("role") not in ("admin", "operator") and p.get("owner_id") != user["id"]:
@@ -337,6 +346,35 @@ async def upload_model(
     # Build the public URL. Use APP_PUBLIC_URL when set, else relative path the frontend will resolve.
     public_path = f"/api/digital-twin/files/{project_id}/{safe_name}"
 
+    # Layer metadata — color & default opacity per building system. This mirrors
+    # frontend's MultiLayerScene defaults so the viewer can apply consistent
+    # "glass walls" visuals.
+    LAYER_DEFAULTS = {
+        "structure":  {"label": "Structură",   "color": "#c8b89a", "opacity": 1.00},
+        "electric":   {"label": "Electricitate", "color": "#fbbf24", "opacity": 0.45},
+        "plumbing":   {"label": "Apă/Canal",    "color": "#3b82f6", "opacity": 0.45},
+        "hvac":       {"label": "Climatizare",  "color": "#10b981", "opacity": 0.45},
+        "decor":      {"label": "Decor",        "color": "#a78bfa", "opacity": 0.85},
+        "other":      {"label": "Alt strat",    "color": "#94a3b8", "opacity": 0.70},
+    }
+    norm_layer = (layer_type or "").strip().lower()
+    if norm_layer not in LAYER_DEFAULTS:
+        # Auto-detect from filename for backwards-compat (e.g. "electric_layer.glb")
+        n = raw_name.lower()
+        if any(k in n for k in ("electric", "elect", "el_")):
+            norm_layer = "electric"
+        elif any(k in n for k in ("plumb", "apa", "sanitar", "water")):
+            norm_layer = "plumbing"
+        elif any(k in n for k in ("hvac", "clima", "ventil")):
+            norm_layer = "hvac"
+        elif any(k in n for k in ("decor", "interior", "design", "mobil")):
+            norm_layer = "decor"
+        elif any(k in n for k in ("struct", "rezist", "arhitectur", "ar_")):
+            norm_layer = "structure"
+        else:
+            norm_layer = "structure"  # first upload default
+    layer_meta = LAYER_DEFAULTS[norm_layer]
+
     # Save model metadata + set as current model on project
     is_archive = ext in DOWNLOAD_ONLY_EXTS
     model_doc = {
@@ -348,6 +386,11 @@ async def upload_model(
         "url": public_path,
         "kind": "archive" if is_archive else "model",  # "archive" = .skp (download only), "model" = .glb/.gltf
         "ext": ext,
+        "layer_type": norm_layer,
+        "layer_label": layer_meta["label"],
+        "layer_color": layer_meta["color"],
+        "layer_opacity": layer_meta["opacity"],
+        "layer_visible": True,
         "uploaded_by": user["id"],
         "uploaded_by_name": user.get("name") or user.get("email"),
         "uploaded_by_role": user.get("role"),
@@ -381,6 +424,82 @@ async def upload_model(
             to=s["email"],
         )
     return _clean(model_doc)
+
+
+# ============= MULTI-LAYER VIEWER ENDPOINTS =============
+@router.get("/projects/{project_id}/models")
+async def list_project_models(project_id: str, user: dict = Depends(get_current_user)):
+    """List all uploaded models (layers) for a project — used by the multi-layer
+    viewer to render multiple `.glb` files simultaneously as glass-wall overlays."""
+    await _ensure_dt_access(user)
+    await _ensure_project_access(project_id, user)
+    docs = await db.digital_twin_models.find({"project_id": project_id}).to_list(50)
+    # Only return viewable models (.glb/.gltf) — archives (.skp) listed separately
+    items = []
+    archives = []
+    for d in docs:
+        clean = _clean(d)
+        if d.get("kind") == "archive":
+            archives.append(clean)
+        else:
+            items.append(clean)
+    return {"models": items, "archives": archives, "total": len(items) + len(archives)}
+
+
+class _LayerUpdateIn(BaseModel):
+    layer_type: Optional[str] = Field(None, max_length=20)
+    layer_label: Optional[str] = Field(None, max_length=80)
+    layer_color: Optional[str] = Field(None, max_length=20)
+    layer_opacity: Optional[float] = Field(None, ge=0.0, le=1.0)
+    layer_visible: Optional[bool] = None
+
+
+@router.patch("/models/{model_id}")
+async def update_model_layer(
+    model_id: str,
+    payload: _LayerUpdateIn,
+    user: dict = Depends(get_current_user),
+):
+    """Update a model's layer metadata (color / opacity / label / visibility)."""
+    await _ensure_dt_access(user)
+    doc = await db.digital_twin_models.find_one({"id": model_id})
+    if not doc:
+        raise HTTPException(404, "Model not found.")
+    # Only project members + admin/operator can edit
+    await _ensure_project_access(doc["project_id"], user)
+    update = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if not update:
+        raise HTTPException(400, "Nothing to update.")
+    update["updated_at"] = _now_iso()
+    await db.digital_twin_models.update_one({"id": model_id}, {"$set": update})
+    refreshed = await db.digital_twin_models.find_one({"id": model_id})
+    return _clean(refreshed)
+
+
+@router.delete("/models/{model_id}")
+async def delete_model_layer(model_id: str, user: dict = Depends(get_current_user)):
+    """Remove a model file from a project (owner / admin / operator only)."""
+    await _ensure_dt_access(user)
+    doc = await db.digital_twin_models.find_one({"id": model_id})
+    if not doc:
+        raise HTTPException(404, "Model not found.")
+    proj = await _ensure_project_access(doc["project_id"], user)
+    if user.get("role") not in ("admin", "operator") and proj.get("owner_id") != user["id"]:
+        raise HTTPException(403, "Only the project owner can delete models.")
+    # Best-effort filesystem cleanup — never block the DB delete on filesystem errors
+    try:
+        path = UPLOAD_ROOT / doc["project_id"] / doc["stored_as"]
+        if path.exists():
+            path.unlink()
+    except Exception as _e:  # noqa: BLE001
+        logger.warning(f"[dt] failed to remove file {doc.get('stored_as')}: {_e}")
+    await db.digital_twin_models.delete_one({"id": model_id})
+    # Decrement project counter
+    await db.digital_twin_projects.update_one(
+        {"id": doc["project_id"]},
+        {"$inc": {"model_count": -1}, "$set": {"updated_at": _now_iso()}},
+    )
+    return {"ok": True, "id": model_id}
 
 
 @router.get("/files/{project_id}/{filename}")
