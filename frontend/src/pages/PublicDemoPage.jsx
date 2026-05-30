@@ -1,9 +1,9 @@
 // Dedicated public /demo page — full interactive Three.js viewer.
 // Canvas isolated in DemoCanvas (lazy-loaded) to avoid React 19 StrictMode
 // double-mount triggering R3F applyProps reconciler bugs.
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { Box, Eye, Sparkles, Layers as LayersIcon, RotateCcw, ArrowLeft, Home, Loader2 } from "lucide-react";
+import { Box, Eye, Sparkles, Layers as LayersIcon, RotateCcw, ArrowLeft, Home, X, Loader2 } from "lucide-react";
 import { MountOnce } from "../components/MountOnce";
 import DemoCanvas from "../components/DemoCanvas";
 
@@ -26,14 +26,45 @@ export const PublicDemoPage = () => {
   const [faceStyle, setFaceStyle] = useState("shaded");
   const [hiddenLayers, setHiddenLayers] = useState(new Set());
   const [resetKey, setResetKey] = useState(0);
+  const [engageToast, setEngageToast] = useState({ show: false, dismissed: false });
+
+  // Engagement signals
+  const xrayActivatedAt = useRef(null);
+  const layersHiddenAt = useRef(null);
 
   const toggleLayer = (l) => {
     setHiddenLayers(prev => {
       const next = new Set(prev);
       if (next.has(l)) next.delete(l); else next.add(l);
+      if (next.size >= 1 && !layersHiddenAt.current) {
+        layersHiddenAt.current = Date.now();
+      }
       return next;
     });
   };
+
+  // Track X-Ray activation
+  useEffect(() => {
+    if (faceStyle === "xray" && !xrayActivatedAt.current) {
+      xrayActivatedAt.current = Date.now();
+    }
+  }, [faceStyle]);
+
+  // Show conversion toast: 30s after page load AND user has explored X-Ray + hidden a layer.
+  // This converts curiosity into a lead without being pushy on bored visitors.
+  useEffect(() => {
+    if (engageToast.show || engageToast.dismissed) return undefined;
+    const timer = setInterval(() => {
+      const xrayMs = xrayActivatedAt.current ? Date.now() - xrayActivatedAt.current : 0;
+      const layersMs = layersHiddenAt.current ? Date.now() - layersHiddenAt.current : 0;
+      // Trigger if user explored X-Ray for >5s OR hid layers for >5s (signal of intent)
+      if (xrayMs > 5000 || layersMs > 5000) {
+        setEngageToast({ show: true, dismissed: false });
+        clearInterval(timer);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [engageToast]);
 
   return (
     <div className="min-h-screen bg-stone-950 text-white flex flex-col" data-testid="public-demo-page">
@@ -144,6 +175,46 @@ export const PublicDemoPage = () => {
           </div>
         </aside>
       </div>
+
+      {/* Engagement toast — slides in from bottom-left after user explores
+          X-Ray or hides a layer for >5s. Single chance to convert. */}
+      {engageToast.show && !engageToast.dismissed && (
+        <div
+          className="fixed bottom-6 left-6 z-50 max-w-sm bg-stone-900/95 backdrop-blur-xl border border-[#d4ff3a]/40 rounded-2xl shadow-2xl shadow-[#d4ff3a]/10 p-4 animate-in slide-in-from-left-5 fade-in duration-500"
+          data-testid="demo-engage-toast"
+        >
+          <button
+            onClick={() => setEngageToast({ show: false, dismissed: true })}
+            className="absolute top-2 right-2 w-6 h-6 inline-flex items-center justify-center rounded-full text-stone-500 hover:text-white hover:bg-white/10"
+            data-testid="demo-engage-dismiss"
+            aria-label="Închide"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+          <div className="flex items-start gap-3 pr-4">
+            <div className="w-10 h-10 rounded-xl bg-[#d4ff3a]/15 border border-[#d4ff3a]/30 flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5 text-[#d4ff3a]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white leading-snug mb-1">
+                Vrei să vezi <span className="text-[#d4ff3a]">casa TA</span> așa?
+              </p>
+              <p className="text-[11px] text-stone-400 leading-relaxed mb-3">
+                48h scanare LiDAR + livrare directă în PropManage. Răspuns în 24h.
+              </p>
+              <Link
+                to="/register"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#d4ff3a] hover:bg-[#c5f000] text-black font-bold text-xs"
+                data-testid="demo-engage-cta"
+                onClick={() => setEngageToast({ show: false, dismissed: true })}
+              >
+                <Home className="w-3 h-3" />
+                Programează vizita
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

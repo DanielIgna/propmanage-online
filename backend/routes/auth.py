@@ -815,40 +815,62 @@ async def status_2fa(user: dict = Depends(get_current_user)):
 # ============= GOOGLE OAUTH (Emergent-managed) =============
 @router.post("/auth/google/session")
 async def google_session_exchange(request: Request, response: Response):
-    """Exchange Emergent session_id for our JWT cookie + user record."""
+    """Exchange Emergent session_id for our JWT cookie + user record.
+
+    Calls upstream `demobackend.emergentagent.com` to verify the session and
+    retrieve the Google profile. Retries up to 3× with exponential backoff so
+    transient upstream slowness (often 5-15s on cold start) doesn't yield a
+    520/origin-empty response that users see as "Autentificare Google eșuată".
+    """
     session_id = request.headers.get("X-Session-ID")
     if not session_id:
         raise HTTPException(400, "Lipsește header-ul X-Session-ID")
     upstream_status = None
     upstream_body = None
-    async with httpx.AsyncClient(timeout=10) as http_client:
+    last_err = None
+    data = None
+    # Retry loop: 3 attempts, 30s timeout each, with light backoff.
+    for attempt in range(3):
         try:
-            r = await http_client.get(
-                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-                headers={"X-Session-ID": session_id}
-            )
-            upstream_status = r.status_code
-            try:
-                upstream_body = r.text[:300]
-            except Exception:
-                upstream_body = "(no body)"
-            if r.status_code != 200:
-                # Surface the EXACT upstream error so we can diagnose redirect-URL whitelist /
-                # session expiry / wrong client_id from the user's side.
-                logger.warning(f"Emergent OAuth exchange failed: status={upstream_status} body={upstream_body[:200]}")
-                raise HTTPException(
-                    401,
-                    f"Emergent OAuth a refuzat sesiunea (upstream HTTP {upstream_status}). "
-                    f"Detaliu: {upstream_body[:200]}. Cauze posibile: (1) session_id expirat — încearcă din nou rapid, "
-                    f"(2) propmanage.ro/auth/callback nu este whitelisted în panoul OAuth Emergent — "
-                    f"contactează support@emergent.sh."
+            async with httpx.AsyncClient(timeout=30) as http_client:
+                r = await http_client.get(
+                    "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
+                    headers={"X-Session-ID": session_id}
                 )
-            data = r.json()
+                upstream_status = r.status_code
+                upstream_body = (r.text or "")[:300]
+                if r.status_code == 200:
+                    data = r.json()
+                    break
+                # 4xx → user-fixable (session expired, redirect URL not whitelisted)
+                if 400 <= r.status_code < 500:
+                    logger.warning(f"Emergent OAuth user error: status={upstream_status} body={upstream_body[:200]}")
+                    raise HTTPException(
+                        401,
+                        f"Emergent OAuth a refuzat sesiunea (upstream HTTP {upstream_status}). "
+                        f"Detaliu: {upstream_body[:200]}. Cauze posibile: (1) session_id expirat — încearcă din nou rapid, "
+                        f"(2) propmanage.ro/auth/callback nu este whitelisted în panoul OAuth Emergent — "
+                        f"contactează support@emergent.sh."
+                    )
+                # 5xx upstream → transient, will retry
+                last_err = f"upstream HTTP {r.status_code}"
+                logger.warning(f"Emergent OAuth transient {r.status_code} (attempt {attempt+1}/3): {upstream_body[:120]}")
         except HTTPException:
             raise
-        except httpx.HTTPError as e:
-            logger.error(f"Emergent OAuth network failure: {e!r}")
-            raise HTTPException(502, f"Nu pot contacta serverul OAuth Emergent: {e}")
+        except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPError) as e:
+            last_err = f"network: {type(e).__name__}: {e}"
+            logger.warning(f"Emergent OAuth network error (attempt {attempt+1}/3): {last_err}")
+        if attempt < 2:
+            await asyncio.sleep(1.5 * (attempt + 1))  # 1.5s, 3s
+    if data is None:
+        # All 3 attempts failed — return a SAFE 503 with JSON body so Cloudflare
+        # doesn't see an empty origin response (which would map to 520).
+        logger.error(f"Emergent OAuth exhausted retries: {last_err}")
+        raise HTTPException(
+            503,
+            f"Serverul Emergent OAuth nu răspunde (3 încercări, ultima: {last_err}). "
+            "Încearcă din nou peste 1-2 minute sau folosește email + parolă."
+        )
 
     email = data.get("email", "").lower()
     name = data.get("name", "")
