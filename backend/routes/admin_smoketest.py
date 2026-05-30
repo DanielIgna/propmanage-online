@@ -24,18 +24,23 @@ from deps import require_role
 logger = logging.getLogger("propmanage.admin_smoketest")
 router = APIRouter(prefix="/api/admin/smoke-test", tags=["admin-smoketest"])
 
-# Demo credentials used for the smoke test. These must always exist (seed) and
-# are reset nightly by demo_reset.py, so a smoke test never corrupts real data.
-SMOKE_EMAIL = "client@propmanage.io"
-SMOKE_PASSWORD = "Client123!"
+# Demo credentials for smoke tests. These accounts are seeded in seed.py and
+# reset nightly by demo_reset.py, so a smoke test never corrupts real data.
+# Default values match the seeded fixtures — override via env vars if you
+# rotate the demo passwords (the seed must be updated too).
+SMOKE_EMAIL = os.environ.get("SMOKE_TEST_EMAIL", "client@propmanage.io")
+SMOKE_PASSWORD = os.environ.get("SMOKE_TEST_PASSWORD", "Client123!")
 
 # Role-specific demo credentials for multi-role smoke tests.
-# All accounts are seeded and reset nightly by demo_reset.py.
 ROLE_CREDENTIALS = {
-    "client":     {"email": "client@propmanage.io",     "password": "Client123!"},
-    "specialist": {"email": "specialist@propmanage.io", "password": "Spec123!"},
-    "admin":      {"email": "admin@propmanage.io",      "password": "Admin123!"},
-    "operator":   {"email": "operator@propmanage.io",   "password": "Op123!"},
+    "client":     {"email": os.environ.get("SMOKE_CLIENT_EMAIL", "client@propmanage.io"),
+                   "password": os.environ.get("SMOKE_CLIENT_PASSWORD", "Client123!")},
+    "specialist": {"email": os.environ.get("SMOKE_SPECIALIST_EMAIL", "specialist@propmanage.io"),
+                   "password": os.environ.get("SMOKE_SPECIALIST_PASSWORD", "Spec123!")},
+    "admin":      {"email": os.environ.get("SMOKE_ADMIN_EMAIL", "admin@propmanage.io"),
+                   "password": os.environ.get("SMOKE_ADMIN_PASSWORD", "Admin123!")},
+    "operator":   {"email": os.environ.get("SMOKE_OPERATOR_EMAIL", "operator@propmanage.io"),
+                   "password": os.environ.get("SMOKE_OPERATOR_PASSWORD", "Op123!")},
 }
 
 # Default base URL preference:
