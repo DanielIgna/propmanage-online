@@ -2244,6 +2244,495 @@ async def admin_impersonate_client_success() -> dict:
 
 
 
+# ============================================================================
+# PACHET C — Operator · Projects · Notifications · Wallet · Misc (17)
+# ============================================================================
+
+# ---------- Operator flows (4) ----------
+
+@_safe_e2e
+async def op_flag_authz_client_blocked() -> dict:
+    """OP-FLAG-AUTHZ: Client NU poate flag nonconformity (403 — doar operator)."""
+    client_c, c_email, _ = await _register_and_login("client", "op_authz_c")
+    try:
+        # Folosim un property_id real dar accesul e blocat de require_role("operator")
+        r = await client_c.post("/api/operator/flag-nonconformity", json={
+            "target_type": "request", "target_id": "507f1f77bcf86cd799439011",
+            "reason": "test client tries to flag", "severity": "low",
+        })
+        if r.status_code in (401, 403):
+            return _ok(f"OK — client blocat la flag-nonconformity (HTTP {r.status_code})")
+        return _ko(f"⚠ client a putut flag: HTTP {r.status_code}")
+    finally:
+        await client_c.aclose()
+        try:
+            await db.users.delete_one({"email": c_email})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def op_flag_create_then_list_resolve() -> dict:
+    """OP-FLAG-FULL: Operator flag → nonconformity creată cu status=open. Admin o vede în list. Apoi /resolve → status=resolved."""
+    # Seed un job pt context
+    env = await _seed_active_job(400.0)
+    op_c, op_email, op_id = await _register_and_login("operator", "op_full")
+    admin_c = None
+    flag_id = None
+    try:
+        # Operator flag pe request-ul deja creat
+        r = await op_c.post("/api/operator/flag-nonconformity", json={
+            "target_type": "request", "target_id": env["request_id"],
+            "reason": "E2E test - lucrare neconformă", "severity": "medium",
+        })
+        if r.status_code != 200:
+            return _ko(f"flag {r.status_code}: {r.text[:200]}")
+        flag_id = (r.json() or {}).get("id")
+        if not flag_id:
+            return _ko("no flag id")
+        # Verify DB record
+        flag = await db.nonconformities.find_one({"_id": ObjectId(flag_id)})
+        if not flag or flag.get("status") != "open":
+            return _ko(f"flag DB stare: {flag.get('status') if flag else 'missing'}")
+        # Admin sees it
+        admin_c = await _admin_client()
+        lr = await admin_c.get("/api/admin/nonconformities")
+        if lr.status_code != 200:
+            return _ko(f"admin/nonconformities {lr.status_code}")
+        items = lr.json() if isinstance(lr.json(), list) else []
+        found = any(d.get("id") == flag_id or d.get("_id") == flag_id for d in items)
+        if not found:
+            return _ko(f"admin nu vede flag {flag_id[:10]} în lista de {len(items)} items")
+        # Admin resolves
+        rs = await admin_c.post(f"/api/admin/nonconformities/{flag_id}/resolve", json={
+            "resolution": "E2E resolved by admin"
+        })
+        if rs.status_code != 200:
+            return _ko(f"resolve {rs.status_code}")
+        flag_after = await db.nonconformities.find_one({"_id": ObjectId(flag_id)})
+        if flag_after and flag_after.get("status") == "resolved":
+            return _ok(f"OK — flag creat (id={flag_id[:10]}), văzut de admin, rezolvat → status=resolved")
+        return _ko(f"după resolve status={flag_after.get('status') if flag_after else 'missing'}")
+    finally:
+        await op_c.aclose()
+        if admin_c:
+            await admin_c.aclose()
+        try:
+            if flag_id:
+                await db.nonconformities.delete_one({"_id": ObjectId(flag_id)})
+            await db.users.delete_one({"email": op_email})
+        except Exception:
+            pass
+        await _cleanup_e2e(env)
+
+
+@_safe_e2e
+async def op_queue_endpoint_accessible() -> dict:
+    """OP-QUEUE: Operator vede /operator/queue (lista de log-uri pt validare twin)."""
+    op_c, op_email, _ = await _register_and_login("operator", "op_q")
+    try:
+        r = await op_c.get("/api/operator/queue")
+        if r.status_code != 200:
+            return _ko(f"queue {r.status_code}: {r.text[:160]}")
+        body = r.json()
+        # Acceptă listă sau dict cu items
+        if isinstance(body, list) or (isinstance(body, dict) and "items" in body):
+            count = len(body) if isinstance(body, list) else len(body.get("items", []))
+            return _ok(f"OK — operator queue accesibil, {count} items")
+        return _ko(f"răspuns neașteptat: type={type(body).__name__}")
+    finally:
+        await op_c.aclose()
+        try:
+            await db.users.delete_one({"email": op_email})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def op_flag_404_for_inexistent_target() -> dict:
+    """OP-FLAG-404: Operator flag pe target inexistent → 404."""
+    op_c, op_email, _ = await _register_and_login("operator", "op_404")
+    try:
+        r = await op_c.post("/api/operator/flag-nonconformity", json={
+            "target_type": "request", "target_id": "000000000000000000000000",
+            "reason": "E2E test target inexistent", "severity": "low",
+        })
+        if r.status_code == 404:
+            return _ok("OK — flag pe request inexistent respins corect (404)")
+        return _ko(f"⚠ flag pe target inexistent NU a fost respins: HTTP {r.status_code}")
+    finally:
+        await op_c.aclose()
+        try:
+            await db.users.delete_one({"email": op_email})
+        except Exception:
+            pass
+
+
+# ---------- Projects / Workspace (4) ----------
+
+@_safe_e2e
+async def proj_authz_non_designer_blocked() -> dict:
+    """PROJ-AUTHZ: Specialist non-designer NU poate crea project (403)."""
+    spec_c, s_email, _ = await _register_and_login("specialist", "proj_az",
+                                                     extra={"service_categories": ["electric"]})
+    client_c, c_email, c_id = await _register_and_login("client", "proj_az_c")
+    try:
+        r = await spec_c.post("/api/projects", json={
+            "name": "Test project", "client_id": c_id,
+        })
+        if r.status_code == 403:
+            return _ok("OK — non-designer blocat la proiect (HTTP 403)")
+        return _ko(f"⚠ non-designer a putut crea proiect: HTTP {r.status_code}")
+    finally:
+        await spec_c.aclose()
+        await client_c.aclose()
+        try:
+            await db.users.delete_one({"email": s_email})
+            await db.users.delete_one({"email": c_email})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def proj_designer_create_project_with_client() -> dict:
+    """PROJ-CREATE: Designer creează project pentru client → members include client."""
+    designer_c, d_email, _ = await _register_and_login("specialist", "proj_d",
+                                                          extra={"service_categories": ["interior_design"]})
+    client_c, c_email, c_id = await _register_and_login("client", "proj_cl")
+    project_id = None
+    try:
+        r = await designer_c.post("/api/projects", json={
+            "name": "Renovare 2 camere E2E", "client_id": c_id,
+            "description": "Test E2E project", "style": "scandinav",
+        })
+        if r.status_code != 200:
+            return _ko(f"create project {r.status_code}: {r.text[:200]}")
+        body = r.json()
+        project_id = body.get("id")
+        if not project_id:
+            return _ko("no project id")
+        members = body.get("members") or []
+        client_in_members = any(m.get("user_id") == c_id for m in members)
+        if client_in_members and body.get("status") == "active":
+            return _ok(f"OK — proiect creat (id={project_id[:10]}), client în members, status=active")
+        return _ko(f"members shape: client_in={client_in_members}, status={body.get('status')}")
+    finally:
+        await designer_c.aclose()
+        await client_c.aclose()
+        try:
+            if project_id:
+                await db.projects.delete_one({"_id": ObjectId(project_id)})
+            await db.users.delete_one({"email": d_email})
+            await db.users.delete_one({"email": c_email})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def proj_client_sees_project_in_list() -> dict:
+    """PROJ-LIST: Client vede în /projects proiectul în care e membru."""
+    designer_c, d_email, _ = await _register_and_login("specialist", "proj_d2",
+                                                          extra={"service_categories": ["interior_design"]})
+    client_c, c_email, c_id = await _register_and_login("client", "proj_cl2")
+    project_id = None
+    try:
+        r = await designer_c.post("/api/projects", json={
+            "name": "Vizibilitate listă E2E", "client_id": c_id,
+        })
+        if r.status_code != 200:
+            return _ko(f"create {r.status_code}")
+        project_id = (r.json() or {}).get("id")
+        # Client cere lista
+        lr = await client_c.get("/api/projects")
+        if lr.status_code != 200:
+            return _ko(f"list {lr.status_code}")
+        items = lr.json() if isinstance(lr.json(), list) else []
+        found = any((p.get("id") == project_id or p.get("_id") == project_id) for p in items)
+        if found:
+            return _ok(f"OK — clientul vede {len(items)} proiect(e), inclusiv {project_id[:10]}")
+        return _ko(f"client NU vede project {project_id[:10]} în lista de {len(items)}")
+    finally:
+        await designer_c.aclose()
+        await client_c.aclose()
+        try:
+            if project_id:
+                await db.projects.delete_one({"_id": ObjectId(project_id)})
+            await db.users.delete_one({"email": d_email})
+            await db.users.delete_one({"email": c_email})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def proj_task_create_and_visible() -> dict:
+    """PROJ-TASK: Designer adaugă task în project → task apare în /tasks."""
+    designer_c, d_email, _ = await _register_and_login("specialist", "proj_t",
+                                                          extra={"service_categories": ["interior_design"]})
+    client_c, c_email, c_id = await _register_and_login("client", "proj_t_c")
+    project_id = task_id = None
+    try:
+        cr = await designer_c.post("/api/projects", json={
+            "name": "Task E2E project", "client_id": c_id,
+        })
+        if cr.status_code != 200:
+            return _ko(f"create project {cr.status_code}")
+        project_id = (cr.json() or {}).get("id")
+        # Adăugăm un task
+        tr = await designer_c.post(f"/api/projects/{project_id}/tasks", json={
+            "title": "Comandă parchet", "description": "Comandă din magazin X",
+            "priority": "normal", "status": "todo",
+        })
+        if tr.status_code != 200:
+            return _ko(f"task create {tr.status_code}: {tr.text[:160]}")
+        task_id = (tr.json() or {}).get("id")
+        # List tasks
+        lr = await designer_c.get(f"/api/projects/{project_id}/tasks")
+        if lr.status_code != 200:
+            return _ko(f"task list {lr.status_code}")
+        tasks = lr.json() if isinstance(lr.json(), list) else []
+        found = any(t.get("id") == task_id for t in tasks)
+        if found and len(tasks) >= 1:
+            return _ok(f"OK — task creat (id={task_id[:10] if task_id else '?'}) vizibil în lista de {len(tasks)}")
+        return _ko(f"task NU vizibil: found={found}, total tasks={len(tasks)}")
+    finally:
+        await designer_c.aclose()
+        await client_c.aclose()
+        try:
+            if task_id:
+                await db.project_tasks.delete_one({"_id": ObjectId(task_id)})
+            if project_id:
+                await db.projects.delete_one({"_id": ObjectId(project_id)})
+            await db.users.delete_one({"email": d_email})
+            await db.users.delete_one({"email": c_email})
+        except Exception:
+            pass
+
+
+# ---------- Notifications (3) ----------
+
+@_safe_e2e
+async def notif_list_returns_array() -> dict:
+    """NOTIF-LIST: GET /notifications returnează array (gol pt user nou)."""
+    client_c, c_email, _ = await _register_and_login("client", "notif_l")
+    try:
+        r = await client_c.get("/api/notifications")
+        if r.status_code != 200:
+            return _ko(f"notifications {r.status_code}")
+        body = r.json()
+        if isinstance(body, list):
+            return _ok(f"OK — notifications listă cu {len(body)} items")
+        return _ko(f"răspuns nu e listă: {type(body).__name__}")
+    finally:
+        await client_c.aclose()
+        try:
+            await db.users.delete_one({"email": c_email})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def notif_mark_read_sets_flag() -> dict:
+    """NOTIF-READ: POST /{id}/read setează read=True pe notificarea proprie."""
+    client_c, c_email, c_id = await _register_and_login("client", "notif_r")
+    notif_id = None
+    try:
+        # Insert manual o notificare via DB (mai rapid decât a trigger flow)
+        ins = await db.notifications.insert_one({
+            "user_id": c_id, "type": "test", "title": "E2E notif",
+            "message": "test", "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        notif_id = str(ins.inserted_id)
+        r = await client_c.post(f"/api/notifications/{notif_id}/read")
+        if r.status_code != 200:
+            return _ko(f"mark-read {r.status_code}")
+        doc = await db.notifications.find_one({"_id": ins.inserted_id})
+        if doc and doc.get("read") is True:
+            return _ok(f"OK — notif {notif_id[:10]} marcată read=True")
+        return _ko(f"read flag nu setat: {doc.get('read') if doc else 'missing'}")
+    finally:
+        await client_c.aclose()
+        try:
+            if notif_id:
+                await db.notifications.delete_one({"_id": ObjectId(notif_id)})
+            await db.users.delete_one({"email": c_email})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def notif_cross_user_mark_blocked() -> dict:
+    """NOTIF-CROSS: User B NU poate marca read-o notificare a lui User A (silent fail / no-op)."""
+    user_a_c, a_email, a_id = await _register_and_login("client", "notif_a")
+    user_b_c, b_email, _ = await _register_and_login("client", "notif_b")
+    notif_id = None
+    try:
+        # Notificare pentru A
+        ins = await db.notifications.insert_one({
+            "user_id": a_id, "type": "test", "title": "Pentru A",
+            "message": "test", "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        notif_id = str(ins.inserted_id)
+        # B încearcă să marcheze
+        await user_b_c.post(f"/api/notifications/{notif_id}/read")
+        # Endpoint-ul actual e silent (filtrează după user_id, update_one nu modifică nimic)
+        # Verifică DB că read=False încă
+        doc = await db.notifications.find_one({"_id": ins.inserted_id})
+        if doc and doc.get("read") is not True:
+            return _ok("OK — user B NU a putut marca notif lui A (still read=False)")
+        return _ko(f"⚠ user B a marcat notif lui A: read={doc.get('read') if doc else 'missing'}")
+    finally:
+        await user_a_c.aclose()
+        await user_b_c.aclose()
+        try:
+            if notif_id:
+                await db.notifications.delete_one({"_id": ObjectId(notif_id)})
+            await db.users.delete_one({"email": a_email})
+            await db.users.delete_one({"email": b_email})
+        except Exception:
+            pass
+
+
+# ---------- Wallet / Misc (3) ----------
+
+@_safe_e2e
+async def wallet_transactions_list_for_user() -> dict:
+    """WALLET-TX: GET /transactions returnează tranzacțiile user-ului curent."""
+    # Folosim _seed_active_job care creează un lead_fee tx pe specialist
+    env = await _seed_active_job(400.0)
+    try:
+        r = await env["spec_c"].get("/api/transactions")
+        if r.status_code != 200:
+            return _ko(f"transactions {r.status_code}")
+        items = r.json() if isinstance(r.json(), list) else []
+        lead_tx = [t for t in items if t.get("type") == "lead_fee"]
+        if lead_tx:
+            return _ok(f"OK — specialist vede {len(items)} tx (lead_fee: {len(lead_tx)})")
+        return _ko(f"⚠ specialist NU vede lead_fee în {len(items)} tx")
+    finally:
+        await _cleanup_e2e(env)
+
+
+@_safe_e2e
+async def wallet_topup_test_increases_balance() -> dict:
+    """WALLET-TOPUP: POST /wallet/topup?amount=100 crește wallet_balance cu 100."""
+    client_c, c_email, c_id = await _register_and_login("client", "topup")
+    try:
+        before = await db.users.find_one({"_id": ObjectId(c_id)})
+        bal_b = float(before.get("wallet_balance") or 0)
+        r = await client_c.post("/api/wallet/topup?amount=100")
+        if r.status_code != 200:
+            return _ko(f"topup {r.status_code}: {r.text[:160]}")
+        after = await db.users.find_one({"_id": ObjectId(c_id)})
+        delta = round(float(after.get("wallet_balance") or 0) - bal_b, 2)
+        if abs(delta - 100.0) < 0.01:
+            return _ok(f"OK — topup +100 RON aplicat (delta={delta})")
+        return _ko(f"delta={delta} (await 100)")
+    finally:
+        await client_c.aclose()
+        try:
+            await db.transactions.delete_many({"user_id": c_id})
+            await db.users.delete_one({"_id": ObjectId(c_id)})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def concierge_public_settings_endpoint() -> dict:
+    """CONCIERGE-SETTINGS: GET /concierge/settings/public returnează enabled + user_role."""
+    client_c, c_email, _ = await _register_and_login("client", "conc")
+    try:
+        r = await client_c.get("/api/concierge/settings/public")
+        if r.status_code != 200:
+            return _ko(f"concierge settings {r.status_code}")
+        body = r.json()
+        if not isinstance(body, dict):
+            return _ko("nu e dict")
+        required = {"enabled", "user_role"}
+        missing = required - set(body.keys())
+        if missing:
+            return _ko(f"chei lipsă: {missing}")
+        if body.get("user_role") != "client":
+            return _ko(f"user_role={body.get('user_role')} (await 'client')")
+        return _ok(f"OK — concierge settings: enabled={body['enabled']}, role={body['user_role']}")
+    finally:
+        await client_c.aclose()
+        try:
+            await db.users.delete_one({"email": c_email})
+        except Exception:
+            pass
+
+
+# ---------- Digital Twin · Property timeline · Referral (3) ----------
+
+@_safe_e2e
+async def dt_subscription_endpoint() -> dict:
+    """DT-SUB: GET /digital-twin/subscription returnează active + reason + tier (admin role bypass)."""
+    admin_c = await _admin_client()
+    try:
+        r = await admin_c.get("/api/digital-twin/subscription")
+        if r.status_code != 200:
+            return _ko(f"dt subscription {r.status_code}")
+        body = r.json()
+        if not isinstance(body, dict):
+            return _ko("nu e dict")
+        if body.get("active") is True and body.get("reason") == "role_bypass":
+            return _ok(f"OK — admin are DT acces (role_bypass), tier={body.get('tier')}")
+        return _ko(f"admin DT shape neașteptat: {body}")
+    finally:
+        await admin_c.aclose()
+
+
+@_safe_e2e
+async def property_timeline_endpoint() -> dict:
+    """TIMELINE: GET /properties/{prop_id}/timeline returnează listă de evenimente (poate fi goală pt prop nou)."""
+    env = await _seed_active_job(400.0)
+    try:
+        r = await env["client_c"].get(f"/api/properties/{env['property_id']}/timeline")
+        if r.status_code != 200:
+            return _ko(f"timeline {r.status_code}")
+        body = r.json()
+        if isinstance(body, list):
+            return _ok(f"OK — property timeline returnează listă cu {len(body)} eveniment(e)")
+        if isinstance(body, dict) and "events" in body:
+            return _ok(f"OK — property timeline cu {len(body['events'])} eveniment(e)")
+        return _ko(f"răspuns neașteptat: {type(body).__name__}")
+    finally:
+        await _cleanup_e2e(env)
+
+
+@_safe_e2e
+async def auth_referral_endpoint_returns_stats() -> dict:
+    """REFERRAL: GET /auth/referral returnează referral_url + counters."""
+    client_c, c_email, _ = await _register_and_login("client", "ref")
+    try:
+        r = await client_c.get("/api/auth/referral")
+        if r.status_code != 200:
+            return _ko(f"referral {r.status_code}")
+        body = r.json()
+        if not isinstance(body, dict):
+            return _ko("nu e dict")
+        required = {"user_id", "referred_total", "converted_total", "referral_url"}
+        missing = required - set(body.keys())
+        if missing:
+            return _ko(f"chei lipsă: {missing}")
+        if "?ref=" in body.get("referral_url", ""):
+            return _ok(f"OK — referral_url={body['referral_url'][:40]}, referred={body['referred_total']}")
+        return _ko(f"referral_url shape: {body.get('referral_url')}")
+    finally:
+        await client_c.aclose()
+        try:
+            await db.users.delete_one({"email": c_email})
+        except Exception:
+            pass
+
+
+
+
+
+
+
 
 
 
@@ -2823,6 +3312,96 @@ AUTOMATED_TESTS: dict[str, dict] = {
         "code": "ADMIN-IMP-CLIENT", "title": "Admin impersonează client → 200 + redirect_to=/client",
         "kind": "http", "category": "ADMIN", "priority": "P1",
         "runner": admin_impersonate_client_success,
+    },
+    # ---- PACHET C · Operator flows (4) ----
+    "OP-FLAG-AUTHZ": {
+        "code": "OP-FLAG-AUTHZ", "title": "Client NU poate flag nonconformity (403)",
+        "kind": "http", "category": "E2E", "priority": "P0",
+        "runner": op_flag_authz_client_blocked,
+    },
+    "OP-FLAG-FULL": {
+        "code": "OP-FLAG-FULL", "title": "Operator flag → DB open → admin list → admin resolve",
+        "kind": "http", "category": "E2E", "priority": "P0",
+        "runner": op_flag_create_then_list_resolve,
+    },
+    "OP-QUEUE": {
+        "code": "OP-QUEUE", "title": "Operator /queue endpoint accesibil",
+        "kind": "http", "category": "E2E", "priority": "P1",
+        "runner": op_queue_endpoint_accessible,
+    },
+    "OP-FLAG-404": {
+        "code": "OP-FLAG-404", "title": "Operator flag pe target inexistent → 404",
+        "kind": "http", "category": "E2E", "priority": "P1",
+        "runner": op_flag_404_for_inexistent_target,
+    },
+    # ---- PACHET C · Projects / Workspace (4) ----
+    "PROJ-AUTHZ": {
+        "code": "PROJ-AUTHZ", "title": "Specialist non-designer NU poate crea proiect (403)",
+        "kind": "http", "category": "E2E", "priority": "P0",
+        "runner": proj_authz_non_designer_blocked,
+    },
+    "PROJ-CREATE": {
+        "code": "PROJ-CREATE", "title": "Designer creează project → client în members, status=active",
+        "kind": "http", "category": "E2E", "priority": "P0",
+        "runner": proj_designer_create_project_with_client,
+    },
+    "PROJ-LIST": {
+        "code": "PROJ-LIST", "title": "Clientul vede proiectul în /api/projects",
+        "kind": "http", "category": "E2E", "priority": "P1",
+        "runner": proj_client_sees_project_in_list,
+    },
+    "PROJ-TASK": {
+        "code": "PROJ-TASK", "title": "Designer adaugă task → vizibil în /tasks list",
+        "kind": "http", "category": "E2E", "priority": "P1",
+        "runner": proj_task_create_and_visible,
+    },
+    # ---- PACHET C · Notifications (3) ----
+    "NOTIF-LIST": {
+        "code": "NOTIF-LIST", "title": "GET /notifications returnează listă pentru user",
+        "kind": "http", "category": "E2E", "priority": "P1",
+        "runner": notif_list_returns_array,
+    },
+    "NOTIF-READ": {
+        "code": "NOTIF-READ", "title": "POST /{id}/read setează read=True",
+        "kind": "http", "category": "E2E", "priority": "P1",
+        "runner": notif_mark_read_sets_flag,
+    },
+    "NOTIF-CROSS": {
+        "code": "NOTIF-CROSS", "title": "SECURITY: user B NU poate marca notif lui A",
+        "kind": "http", "category": "E2E", "priority": "P0",
+        "runner": notif_cross_user_mark_blocked,
+    },
+    # ---- PACHET C · Wallet / Misc (3) ----
+    "WALLET-TX": {
+        "code": "WALLET-TX", "title": "GET /transactions returnează tranzacțiile user-ului",
+        "kind": "http", "category": "E2E", "priority": "P1",
+        "runner": wallet_transactions_list_for_user,
+    },
+    "WALLET-TOPUP": {
+        "code": "WALLET-TOPUP", "title": "POST /wallet/topup?amount=100 crește wallet_balance +100",
+        "kind": "http", "category": "E2E", "priority": "P1",
+        "runner": wallet_topup_test_increases_balance,
+    },
+    "CONCIERGE-SETTINGS": {
+        "code": "CONCIERGE-SETTINGS", "title": "GET /concierge/settings/public returnează enabled+user_role",
+        "kind": "http", "category": "PUBLIC", "priority": "P2",
+        "runner": concierge_public_settings_endpoint,
+    },
+    # ---- PACHET C · Digital Twin / Timeline / Referral (3) ----
+    "DT-SUB": {
+        "code": "DT-SUB", "title": "GET /digital-twin/subscription pentru admin → active + role_bypass",
+        "kind": "http", "category": "ADMIN", "priority": "P2",
+        "runner": dt_subscription_endpoint,
+    },
+    "TIMELINE": {
+        "code": "TIMELINE", "title": "GET /properties/{id}/timeline returnează listă evenimente",
+        "kind": "http", "category": "E2E", "priority": "P1",
+        "runner": property_timeline_endpoint,
+    },
+    "REFERRAL": {
+        "code": "REFERRAL", "title": "GET /auth/referral → user_id + referral_url + counters",
+        "kind": "http", "category": "CLIENT", "priority": "P1",
+        "runner": auth_referral_endpoint_returns_stats,
     },
 }
 

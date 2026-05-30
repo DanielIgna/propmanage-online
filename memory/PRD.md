@@ -1920,3 +1920,47 @@ Creștere de la 53→88 teste (+66% coverage). Pachet B P0 count: 13/25.
 - 🟡 Pachet C (~17 teste rămase) — operator flows, projects, notifications, browser E2E
 - 🟡 Refactor: split qa_automation.py (~2650 lines) în /backend/qa_tests/
 - 🟢 Twilio SMS, Lottie KB, S3/Cloudinary avatar migration
+
+
+### Phase 49 — Pachet C: Operator · Projects · Notifications · Wallet · Misc (Feb 2026)
+
+**17 teste E2E noi adăugate** — registry final: **105 tests** (atinge target playbook 105/105) · 102 HTTP + 3 browser · P0:52 / P1:48 / P2:5
+
+**Operator flows (4)**:
+- OP-FLAG-AUTHZ — Client NU poate flag nonconformity (403)
+- OP-FLAG-FULL — Operator flag → DB open → admin list → admin /resolve → status=resolved
+- OP-QUEUE — Operator queue endpoint accesibil
+- OP-FLAG-404 — Flag pe target inexistent → 404
+
+**Projects / Workspace (4)**:
+- PROJ-AUTHZ — Non-designer NU poate crea proiect (403)
+- PROJ-CREATE — Designer creează → client în members, status=active
+- PROJ-LIST — Client vede proiectul în /api/projects
+- PROJ-TASK — Designer creează task → vizibil în lista de tasks
+
+**Notifications (3)**:
+- NOTIF-LIST — GET /notifications returnează listă
+- NOTIF-READ — POST /{id}/read setează read=True
+- NOTIF-CROSS — SECURITY: user B NU poate marca notif lui A
+
+**Wallet / Misc (3)**:
+- WALLET-TX — GET /transactions returnează tx lead_fee
+- WALLET-TOPUP — /wallet/topup?amount=100 → +100 RON balance
+- CONCIERGE-SETTINGS — Public settings cu enabled+user_role
+
+**Digital Twin / Timeline / Referral (3)**:
+- DT-SUB — Admin bypass DT subscription = active+role_bypass
+- TIMELINE — /properties/{id}/timeline returnează listă evenimente
+- REFERRAL — /auth/referral cu referral_url + counters
+
+**Rezultat preview**: `17/17 Pachet C pass · 102/102 sequential HTTP pass · 8/8 pytest validation pass` ✓
+
+### 🎯 PLAYBOOK COMPLETAT
+Acoperire automată: **105/105 scenarios = 100%** (vs 38/105 la începutul ciclului = +176% creștere). Toate categoriile playbook-ului (SECURITY, E2E, LIFECYCLE, ADMIN, CLIENT, SPECIALIST, SEO, PUBLIC, CONTENT, TERMINOLOGY) au coverage automată.
+
+### Backlog rămas
+- 🔴 USER: redeploy producție (Phase 46+47+48+49) → Auto-fix → rerun Release Gate → ar trebui 105/105
+- 🔴 USER: Stripe LIVE keys + webhook URLs Slack/Discord
+- 🟡 Digital Twin 3D Module (Phase A-I) — `.glb`/`.gltf` upload + viewer  
+- 🟡 Refactor: split qa_automation.py (~3760 lines) în /backend/qa_tests/{tests_payment,tests_dispute,tests_seo,tests_operator,tests_projects}.py
+- 🟢 Twilio SMS, Lottie KB, S3/Cloudinary avatar migration
