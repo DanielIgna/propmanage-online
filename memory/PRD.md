@@ -1979,3 +1979,41 @@ Acoperire automată: **105/105 scenarios = 100%** (vs 38/105 la începutul ciclu
 **Verificat în preview:**
 - 9/9 tests folosind `_wait_for_db` polling → toate pass (ESCROW, DISPUTE, QUOTE, FILE, LIFECYCLE, GDPR, OP-FLAG, TIMELINE)
 - Lint Python + JS OK
+
+
+### Phase 51 — Code review fix-uri + JWT rotation + complexity refactor (Feb 2026)
+
+**🔴 Security:**
+- **JWT_SECRET rotat** (vechi: `24bcea8b...` era hardcodat în test file + commitat în git). Înlocuit cu valoare random nouă în `backend/.env`. Toți userii reseignați. Login admin@propmanage.io verificat OK.
+- `tests/test_phase_i_approval.py` acum citește `JWT_SECRET` din `os.environ` + fallback `backend/.env` via `dotenv_values`. Niciun secret hardcodat.
+
+**🟡 Architectural cleanup:**
+- **Circular import** `admin_briefing_digest.py` ↔ `routes/admin_healthcheck.py` rezolvat prin lazy import în `compute_briefing_payload()`.
+- **Wildcard imports** `from models import *` eliminate din 3 fișiere:
+  - `routes/admin.py` → `from models import DocumentReviewIn, SpecialistRejectIn`
+  - `routes/ai.py` și `routes/chat.py` → wildcard eliminat (nu folosea niciun model)
+- **`__import__("module")` dynamic** eliminate din 2 locuri: `routes/admin.py:224` și `qa_automation.py:3490` (folosesc importurile normale la top).
+
+**🟢 Complexity refactor (top 3 hot-spot-uri):**
+- `compute_briefing_payload()`: extrase 6 helper-uri private (`_healthcheck_tone`, `_smoke_tone`, `_integrity_tone`, `_incidents_tone`, `_findings_tone`, `_backup_tone`). Complexitate: 23 → ~5.
+- `_tile_headline()`: refactor cu dispatch table (`_HEADLINE_DISPATCH`) + 5 funcții mici. Complexitate: 21 → 1.
+- `collect_velocity()`: extrase 3 helper-uri (`_parse_commit_header`, `_parse_numstat_line`, `_aggregate_categories`). Complexitate: 22 → ~6.
+
+**❌ False positives respinse (NU vor fi reparate — explicat):**
+- `exec()` în `qa_automation.py:307` = `asyncio.create_subprocess_exec` (subprocess), nu Python eval.
+- `Admin123!`/`Client123!` în teste = fixture-uri locale seedat de `seed.py`, nu credentiale reale.
+- 47 "undefined vars" = noise din `_safe_e2e` wrapper-style code, fără locații concrete.
+
+**Verification:**
+- Toate cele 7 module se importă fără erori ✅
+- Backend răspunde 200 cu noul JWT secret ✅
+- `_tile_headline` testat pe 5 chei (healthcheck/smoke/incidents/findings/unknown) — identice cu vechiul output ✅
+- `collect_velocity()` returnează 30 commits + totals.commits=198 ✅
+- pytest `test_phase42_pachet_b.py` → 8/8 pass ✅
+
+### Backlog rămas după Phase 51
+- 🔴 USER: redeploy producție pt Phase 50+51 fixes
+- 🔴 USER: Stripe LIVE keys + webhook URLs Slack/Discord
+- 🟡 Digital Twin 3D Module (Phase A-I)
+- 🟡 Refactor split qa_automation.py (~3800 lines)
+- 🟢 Complexity remaining: `send_weekly_velocity_email()`, `create_backup()`, `email_backup()` — deferred to next sprint

@@ -86,6 +86,67 @@ async def _latest_backup() -> Optional[dict]:
     return doc
 
 
+def _healthcheck_tone(healthcheck: dict) -> str:
+    s = healthcheck.get("summary", {})
+    if s.get("critical_failed", 0) > 0:
+        return "fail"
+    if s.get("warnings_failed", 0) > 0:
+        return "warn"
+    return "ok"
+
+
+def _smoke_tone(smoke: Optional[dict]) -> str:
+    if not smoke:
+        return "idle"
+    return "ok" if smoke.get("ok") else "fail"
+
+
+def _integrity_tone(integrity: Optional[dict]) -> str:
+    if not integrity:
+        return "idle"
+    s = integrity.get("summary", {})
+    if s.get("critical_failed", 0) > 0:
+        return "fail"
+    if s.get("total_issues_found", 0) > 0:
+        return "warn"
+    return "ok"
+
+
+def _incidents_tone(incidents: dict) -> str:
+    if not incidents["active"]:
+        return "ok"
+    severity_score = {"critical": 3, "major": 2, "minor": 1}
+    worst = max(
+        (severity_score.get(i.get("severity"), 0) for i in incidents["active"]),
+        default=0,
+    )
+    return "fail" if worst >= 3 else "warn"
+
+
+def _findings_tone(findings: dict) -> str:
+    if findings["counts"]["open"] == 0:
+        return "ok"
+    by_sev = findings.get("by_severity", {})
+    if by_sev.get("high", 0) > 0:
+        return "fail"
+    return "warn"
+
+
+def _backup_tone(backup: Optional[dict]) -> str:
+    if not backup:
+        return "fail"
+    try:
+        last_ts = datetime.fromisoformat(backup.get("started_at", "").replace("Z", "+00:00"))
+        age_h = (datetime.now(timezone.utc) - last_ts).total_seconds() / 3600
+        if not backup.get("ok") or age_h > 72:
+            return "fail"
+        if age_h > 36:
+            return "warn"
+        return "ok"
+    except Exception:  # noqa: BLE001
+        return "warn"
+
+
 async def compute_briefing_payload() -> dict:
     """Build the full briefing payload (data only, no rendering)."""
     # Lazy import to break circular dependency with routes/admin_healthcheck.py
@@ -97,82 +158,26 @@ async def compute_briefing_payload() -> dict:
     findings = await _open_ai_findings()
     backup = await _latest_backup()
 
-    # Per-system tone classification (mirrors MorningBriefing.jsx)
-    hc_sum = healthcheck.get("summary", {})
-    if hc_sum.get("critical_failed", 0) > 0:
-        hc_tone = "fail"
-    elif hc_sum.get("warnings_failed", 0) > 0:
-        hc_tone = "warn"
-    else:
-        hc_tone = "ok"
-
-    if not smoke:
-        smoke_tone = "idle"
-    elif smoke.get("ok"):
-        smoke_tone = "ok"
-    else:
-        smoke_tone = "fail"
-
-    if not integrity:
-        integ_tone = "idle"
-    else:
-        s = integrity.get("summary", {})
-        if s.get("critical_failed", 0) > 0:
-            integ_tone = "fail"
-        elif s.get("total_issues_found", 0) > 0:
-            integ_tone = "warn"
-        else:
-            integ_tone = "ok"
-
-    if incidents["active"]:
-        worst = max(
-            ({"critical": 3, "major": 2, "minor": 1}.get(i.get("severity"), 0) for i in incidents["active"]),
-            default=0,
-        )
-        inc_tone = "fail" if worst >= 3 else "warn"
-    else:
-        inc_tone = "ok"
-
-    by_sev = findings.get("by_severity", {})
-    if findings["counts"]["open"] == 0:
-        fi_tone = "ok"
-    elif by_sev.get("high", 0) > 0:
-        fi_tone = "fail"
-    elif by_sev.get("warning", 0) > 0:
-        fi_tone = "warn"
-    else:
-        fi_tone = "warn"
-
-    # Backup tone: ok if backup ran in last 36h, warn if 36-72h, fail if older or never
-    if not backup:
-        backup_tone = "fail"
-    else:
-        try:
-            last_ts = datetime.fromisoformat(backup.get("started_at", "").replace("Z", "+00:00"))
-            age_h = (datetime.now(timezone.utc) - last_ts).total_seconds() / 3600
-            if not backup.get("ok"):
-                backup_tone = "fail"
-            elif age_h > 72:
-                backup_tone = "fail"
-            elif age_h > 36:
-                backup_tone = "warn"
-            else:
-                backup_tone = "ok"
-        except Exception:  # noqa: BLE001
-            backup_tone = "warn"
-
-    has_fail = any(t == "fail" for t in (hc_tone, smoke_tone, integ_tone, inc_tone, fi_tone, backup_tone))
-    has_warn = any(t == "warn" for t in (hc_tone, smoke_tone, integ_tone, inc_tone, fi_tone, backup_tone))
+    tones = {
+        "hc": _healthcheck_tone(healthcheck),
+        "smoke": _smoke_tone(smoke),
+        "integ": _integrity_tone(integrity),
+        "inc": _incidents_tone(incidents),
+        "fi": _findings_tone(findings),
+        "backup": _backup_tone(backup),
+    }
+    has_fail = any(t == "fail" for t in tones.values())
+    has_warn = any(t == "warn" for t in tones.values())
     overall = "fail" if has_fail else ("warn" if has_warn else "ok")
 
     return {
         "overall": overall,
-        "healthcheck": {"tone": hc_tone, "report": healthcheck},
-        "smoke": {"tone": smoke_tone, "report": smoke},
-        "integrity": {"tone": integ_tone, "report": integrity},
-        "incidents": {"tone": inc_tone, **incidents},
-        "findings": {"tone": fi_tone, **findings},
-        "backup": {"tone": backup_tone, "report": backup},
+        "healthcheck": {"tone": tones["hc"], "report": healthcheck},
+        "smoke": {"tone": tones["smoke"], "report": smoke},
+        "integrity": {"tone": tones["integ"], "report": integrity},
+        "incidents": {"tone": tones["inc"], **incidents},
+        "findings": {"tone": tones["fi"], **findings},
+        "backup": {"tone": tones["backup"], "report": backup},
     }
 
 
@@ -196,60 +201,76 @@ _TILE_LABEL = {
 }
 
 
+def _headline_healthcheck(section: dict) -> tuple[str, str]:
+    s = (section.get("report") or {}).get("summary", {})
+    p_t = f"{s.get('passed', 0)}/{s.get('total', 0)}"
+    if s.get("critical_failed", 0) > 0:
+        return (f"{s['critical_failed']} integrare critică jos", f"{p_t} OK")
+    if s.get("warnings_failed", 0) > 0:
+        return (f"{s['warnings_failed']} cu avertizare", f"{p_t} OK")
+    return ("Toate integrările OK", f"{p_t} verificate")
+
+
+def _headline_smoke(section: dict) -> tuple[str, str]:
+    last = section.get("report")
+    if not last:
+        return ("Niciun test rulat", "Activează monitorul în AI Investigator")
+    when = last.get("started_at", "")[:16].replace("T", " ")
+    if last.get("ok"):
+        return (f"{last.get('passed', last.get('total'))}/{last.get('total')} PASS", when)
+    return (f"{last.get('failed', 0)} pași eșuați din {last.get('total', 0)}", when)
+
+
+def _headline_integrity(section: dict) -> tuple[str, str]:
+    last = section.get("report")
+    if not last:
+        return ("Niciun scan rulat", "Rulează din AI Investigator")
+    s = last.get("summary", {})
+    when = (last.get("started_at") or "")[:16].replace("T", " ")
+    if s.get("critical_failed", 0) > 0:
+        return (f"{s['critical_failed']} verificări critice eșuate", when)
+    if s.get("total_issues_found", 0) > 0:
+        return (f"{s['total_issues_found']} probleme detectate", when)
+    return ("Toate verificările OK", when)
+
+
+def _headline_incidents(section: dict) -> tuple[str, str]:
+    active = section.get("active", [])
+    total = section.get("total", 0)
+    if not active:
+        return ("Niciun incident activ", f"{total} închise în ultimele 30 zile")
+    plural = "e" if len(active) > 1 else ""
+    return (
+        f"{len(active)} incident{plural} activ{plural}",
+        f"Cel mai grav: {active[0].get('title', '—')}",
+    )
+
+
+def _headline_findings(section: dict) -> tuple[str, str]:
+    open_count = section.get("counts", {}).get("open", 0)
+    by_sev = section.get("by_severity", {})
+    if open_count == 0:
+        return ("Niciun finding deschis", "Platforma e curată")
+    if by_sev.get("high", 0) > 0:
+        return (f"{by_sev['high']} findings critice", f"{open_count} deschise total")
+    if by_sev.get("warning", 0) > 0:
+        return (f"{by_sev['warning']} warnings", f"{open_count} deschise total")
+    return (f"{open_count} findings deschise", "Verifică AI Investigator")
+
+
+_HEADLINE_DISPATCH = {
+    "healthcheck": _headline_healthcheck,
+    "smoke": _headline_smoke,
+    "integrity": _headline_integrity,
+    "incidents": _headline_incidents,
+    "findings": _headline_findings,
+}
+
+
 def _tile_headline(key: str, section: dict) -> tuple[str, str]:
     """Return (headline, sub) for a system tile in the email."""
-    if key == "healthcheck":
-        r = section.get("report") or {}
-        s = r.get("summary", {})
-        if s.get("critical_failed", 0) > 0:
-            return (f"{s['critical_failed']} integrare critică jos", f"{s.get('passed', 0)}/{s.get('total', 0)} OK")
-        if s.get("warnings_failed", 0) > 0:
-            return (f"{s['warnings_failed']} cu avertizare", f"{s.get('passed', 0)}/{s.get('total', 0)} OK")
-        return ("Toate integrările OK", f"{s.get('passed', 0)}/{s.get('total', 0)} verificate")
-
-    if key == "smoke":
-        last = section.get("report")
-        if not last:
-            return ("Niciun test rulat", "Activează monitorul în AI Investigator")
-        when = last.get("started_at", "")[:16].replace("T", " ")
-        if last.get("ok"):
-            return (f"{last.get('passed', last.get('total'))}/{last.get('total')} PASS", when)
-        return (f"{last.get('failed', 0)} pași eșuați din {last.get('total', 0)}", when)
-
-    if key == "integrity":
-        last = section.get("report")
-        if not last:
-            return ("Niciun scan rulat", "Rulează din AI Investigator")
-        s = last.get("summary", {})
-        when = (last.get("started_at") or "")[:16].replace("T", " ")
-        if s.get("critical_failed", 0) > 0:
-            return (f"{s['critical_failed']} verificări critice eșuate", when)
-        if s.get("total_issues_found", 0) > 0:
-            return (f"{s['total_issues_found']} probleme detectate", when)
-        return ("Toate verificările OK", when)
-
-    if key == "incidents":
-        active = section.get("active", [])
-        total = section.get("total", 0)
-        if not active:
-            return ("Niciun incident activ", f"{total} închise în ultimele 30 zile")
-        return (
-            f"{len(active)} incident{'e' if len(active) > 1 else ''} activ{'e' if len(active) > 1 else ''}",
-            f"Cel mai grav: {active[0].get('title', '—')}",
-        )
-
-    if key == "findings":
-        open_count = section.get("counts", {}).get("open", 0)
-        by_sev = section.get("by_severity", {})
-        if open_count == 0:
-            return ("Niciun finding deschis", "Platforma e curată")
-        if by_sev.get("high", 0) > 0:
-            return (f"{by_sev['high']} findings critice", f"{open_count} deschise total")
-        if by_sev.get("warning", 0) > 0:
-            return (f"{by_sev['warning']} warnings", f"{open_count} deschise total")
-        return (f"{open_count} findings deschise", "Verifică AI Investigator")
-
-    return ("—", "")
+    handler = _HEADLINE_DISPATCH.get(key)
+    return handler(section) if handler else ("—", "")
 
 
 def _render_briefing_html(payload: dict, app_url: str) -> str:
