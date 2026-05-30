@@ -10,6 +10,7 @@ import axios from "axios";
 import {
   Box, Upload, FileText, CheckCircle2, Clock, AlertCircle, Loader2, X,
   Plus, Search, Mail, MapPin, User as UserIcon, Layers, Eye, ShieldCheck, Edit3,
+  RefreshCw, Wand2,
 } from "lucide-react";
 import { API } from "./DashShared";
 
@@ -204,6 +205,26 @@ const UploadFilesModal = ({ project, client, onClose, onUploaded }) => {
   };
   useEffect(() => { loadHistory(); }, [project.id]);
 
+  // Auto-poll while any .skp archive is mid-conversion so the UI updates
+  // from "Se convertește 35%" → "Gata!" without manual refresh.
+  useEffect(() => {
+    const converting = (history.models || []).filter(
+      m => m.kind === "archive" && m.conversion_status && !["completed", "failed", "n/a"].includes(m.conversion_status)
+    );
+    if (converting.length === 0) return undefined;
+    const t = setInterval(() => { loadHistory(); }, 5000);
+    return () => clearInterval(t);
+  }, [history.models]);
+
+  const retryConversion = async (modelId) => {
+    try {
+      await axios.post(`${API}/digital-twin/conversions/${modelId}/retry`);
+      await loadHistory();
+    } catch (e) {
+      setErr(e?.response?.data?.detail || e.message);
+    }
+  };
+
   const uploadModel = async () => {
     if (!model) return;
     setUploading(true); setErr(null); setProgress(0);
@@ -319,16 +340,55 @@ const UploadFilesModal = ({ project, client, onClose, onUploaded }) => {
             {history.models.length > 0 && (
               <div className="pt-3 space-y-1.5">
                 <div className="text-[10px] uppercase tracking-wider text-stone-500 font-bold">Versiuni încărcate</div>
-                {history.models.map(m => (
-                  <div key={m.id} className="flex items-center gap-2 bg-white/[0.03] border border-white/5 rounded-lg p-2 text-xs" data-testid={`model-row-${m.id}`}>
-                    {m.kind === "archive" ? <FileText className="w-3.5 h-3.5 text-amber-400" /> : <Box className="w-3.5 h-3.5 text-emerald-400" />}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-white truncate">{m.filename}</div>
-                      <div className="text-stone-500 text-[10px]">{fmtBytes(m.size_bytes)} · {new Date(m.uploaded_at).toLocaleDateString("ro-RO")} · {m.uploaded_by_name}</div>
+                {history.models.map(m => {
+                  const isArchive = m.kind === "archive";
+                  const cstatus = m.conversion_status;
+                  const cpct = m.conversion_percent || 0;
+                  const isConverting = isArchive && cstatus && !["completed", "failed", "n/a"].includes(cstatus);
+                  const conversionLabel = {
+                    pending: "În așteptare…",
+                    uploading: "Trimit la CloudConvert…",
+                    converting: "Se convertește SKP → GLB…",
+                    downloading: "Descarc rezultatul…",
+                    completed: "Convertit ✓",
+                    failed: "Conversie eșuată",
+                  }[cstatus] || null;
+                  return (
+                    <div key={m.id} className="bg-white/[0.03] border border-white/5 rounded-lg p-2 text-xs space-y-1.5" data-testid={`model-row-${m.id}`}>
+                      <div className="flex items-center gap-2">
+                        {isArchive ? <FileText className="w-3.5 h-3.5 text-amber-400" /> : <Box className="w-3.5 h-3.5 text-emerald-400" />}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-white truncate">{m.filename}</div>
+                          <div className="text-stone-500 text-[10px]">
+                            {fmtBytes(m.size_bytes)} · {new Date(m.uploaded_at).toLocaleDateString("ro-RO")} · {m.uploaded_by_name}
+                            {m.converted_from_filename && <span className="text-emerald-400/80"> · ⚡ auto din {m.converted_from_filename}</span>}
+                          </div>
+                        </div>
+                        {isArchive && !cstatus && <span className="text-[9px] uppercase text-amber-400">Descărcabil</span>}
+                        {cstatus === "completed" && <span className="text-[9px] uppercase text-emerald-400 flex items-center gap-1"><Wand2 className="w-3 h-3"/>GLB Gata</span>}
+                      </div>
+                      {isConverting && (
+                        <div className="space-y-1" data-testid={`conv-row-${m.id}`}>
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-emerald-300 flex items-center gap-1"><Loader2 className="w-2.5 h-2.5 animate-spin" />{conversionLabel}</span>
+                            <span className="text-stone-400 font-mono">{cpct}%</span>
+                          </div>
+                          <div className="bg-white/5 rounded-full h-1 overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-amber-500 via-emerald-500 to-emerald-400 transition-all" style={{ width: `${cpct}%` }} />
+                          </div>
+                        </div>
+                      )}
+                      {cstatus === "failed" && (
+                        <div className="flex items-center justify-between gap-2 bg-red-500/10 border border-red-500/20 rounded p-1.5">
+                          <div className="text-[10px] text-red-300 truncate" title={m.conversion_error}>⚠️ {m.conversion_error || "Eroare conversie"}</div>
+                          <button onClick={() => retryConversion(m.id)} className="text-[10px] px-2 py-0.5 rounded bg-red-500/20 hover:bg-red-500/30 text-red-200 flex items-center gap-1" data-testid={`conv-retry-${m.id}`}>
+                            <RefreshCw className="w-2.5 h-2.5" />Reîncearcă
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    {m.kind === "archive" && <span className="text-[9px] uppercase text-amber-400">Descărcabil</span>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

@@ -31,6 +31,8 @@ from db import db
 from deps import get_current_user, require_role
 from core_utils import JWT_SECRET, JWT_ALGORITHM
 import jwt as _jwt
+import asyncio
+import cloudconvert_client as _ccv
 from email_service import (
     send_template,
     tpl_dt_pin_created,
@@ -396,6 +398,13 @@ async def upload_model(
         "uploaded_by_role": user.get("role"),
         "uploaded_at": _now_iso(),
     }
+    # CloudConvert auto-conversion for .skp: kick off SKP→GLB conversion in the
+    # background so the user can immediately see "Converting..." in the UI and
+    # the converted .glb layer appears automatically when ready.
+    if is_archive and ext == ".skp" and _ccv.is_enabled():
+        model_doc["conversion_status"] = "pending"  # pending → uploading → converting → downloading → completed / failed
+        model_doc["conversion_percent"] = 0
+        model_doc["conversion_started_at"] = _now_iso()
     await db.digital_twin_models.insert_one(model_doc)
     # Only set as the active model_url if it's actually viewable (.glb/.gltf)
     update_set = {"updated_at": _now_iso()}
@@ -405,6 +414,9 @@ async def upload_model(
         {"id": project_id},
         {"$set": update_set, "$inc": {"model_count": 1}},
     )
+    # Fire-and-forget conversion: doesn't block the upload response.
+    if model_doc.get("conversion_status") == "pending":
+        asyncio.create_task(_run_skp_to_glb_conversion(model_doc["id"]))
     # Phase G: notify stakeholders the architect updated the model
     actor_name = user.get("name") or user.get("email") or "Utilizator"
     project_name = p.get("name", "Proiect")
@@ -424,6 +436,202 @@ async def upload_model(
             to=s["email"],
         )
     return _clean(model_doc)
+
+
+# ============= CLOUDCONVERT SKP → GLB PIPELINE =============
+
+LAYER_DEFAULTS_FOR_CONVERT = {
+    "structure":  {"label": "Structură",   "color": "#c8b89a", "opacity": 1.00},
+    "electric":   {"label": "Electricitate", "color": "#fbbf24", "opacity": 0.45},
+    "plumbing":   {"label": "Apă/Canal",    "color": "#3b82f6", "opacity": 0.45},
+    "hvac":       {"label": "Climatizare",  "color": "#10b981", "opacity": 0.45},
+    "decor":      {"label": "Decor",        "color": "#a78bfa", "opacity": 0.85},
+    "other":      {"label": "Alt strat",    "color": "#94a3b8", "opacity": 0.70},
+}
+
+
+async def _update_conversion(model_id: str, **fields) -> None:
+    fields["updated_at"] = _now_iso()
+    await db.digital_twin_models.update_one({"id": model_id}, {"$set": fields})
+
+
+async def _run_skp_to_glb_conversion(model_id: str) -> None:
+    """Background task: full SKP → GLB pipeline via CloudConvert.
+
+    Steps: create job → upload .skp → poll until finished → download .glb →
+    insert a new sibling `digital_twin_models` row linked to the same project
+    so the multi-layer viewer picks it up automatically.
+    """
+    archive = await db.digital_twin_models.find_one({"id": model_id})
+    if not archive:
+        return
+    project_id = archive["project_id"]
+    src_path = UPLOAD_ROOT / project_id / archive["stored_as"]
+    if not src_path.exists():
+        await _update_conversion(model_id, conversion_status="failed", conversion_error="Source .skp file missing on disk.")
+        return
+
+    # 1) Create CC job
+    try:
+        await _update_conversion(model_id, conversion_status="uploading", conversion_percent=5)
+        cc_job = await _ccv.create_skp_to_glb_job()
+        cc_job_id = cc_job["id"]
+        await _update_conversion(model_id, cloudconvert_job_id=cc_job_id)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("[CloudConvert] create job failed")
+        await _update_conversion(model_id, conversion_status="failed", conversion_error=f"Create job: {e}")
+        return
+
+    # 2) Upload the .skp file (uses the import/upload task's signed form)
+    try:
+        await _ccv.upload_file_for_import_task(cc_job, str(src_path), archive["filename"])
+        await _update_conversion(model_id, conversion_status="converting", conversion_percent=20)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("[CloudConvert] upload failed")
+        await _update_conversion(model_id, conversion_status="failed", conversion_error=f"Upload: {e}")
+        return
+
+    # 3) Poll until job is finished or errored (max ~30 min)
+    max_polls = 360  # 360 * 5s = 30 min
+    finished_job = None
+    for i in range(max_polls):
+        await asyncio.sleep(5)
+        try:
+            job_state = await _ccv.get_job(cc_job_id)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[CloudConvert] poll error (attempt {i}): {e}")
+            continue
+        summary = _ccv.aggregate_job_status(job_state)
+        # Map CloudConvert progress to our 20-85 range.
+        pct = 20
+        if summary["convert_percent"] is not None:
+            pct = 20 + int(summary["convert_percent"] * 0.65)
+        await _update_conversion(model_id, conversion_percent=pct)
+        if summary["cc_status"] == "finished":
+            finished_job = job_state
+            break
+        if summary["cc_status"] == "error":
+            await _update_conversion(
+                model_id,
+                conversion_status="failed",
+                conversion_error=summary.get("error_message") or "CloudConvert reported error.",
+            )
+            return
+    if finished_job is None:
+        await _update_conversion(model_id, conversion_status="failed", conversion_error="Conversion timeout (30 min).")
+        return
+
+    # 4) Pull export URL + stream the .glb to local disk
+    try:
+        export_url, export_filename = _ccv.extract_export_file_url(finished_job)
+    except Exception as e:  # noqa: BLE001
+        await _update_conversion(model_id, conversion_status="failed", conversion_error=f"Export URL: {e}")
+        return
+
+    await _update_conversion(model_id, conversion_status="downloading", conversion_percent=90)
+    glb_safe = f"{uuid.uuid4().hex[:12]}.glb"
+    glb_path = UPLOAD_ROOT / project_id / glb_safe
+    try:
+        bytes_written = await _ccv.download_file(export_url, str(glb_path))
+    except Exception as e:  # noqa: BLE001
+        logger.exception("[CloudConvert] download failed")
+        await _update_conversion(model_id, conversion_status="failed", conversion_error=f"Download: {e}")
+        return
+
+    # 5) Insert the converted .glb as a sibling layer linked to the same project.
+    norm_layer = archive.get("layer_type") or "structure"
+    meta = LAYER_DEFAULTS_FOR_CONVERT.get(norm_layer, LAYER_DEFAULTS_FOR_CONVERT["structure"])
+    glb_public_path = f"/api/digital-twin/files/{project_id}/{glb_safe}"
+    converted_doc = {
+        "id": _new_id(),
+        "project_id": project_id,
+        "filename": export_filename or (Path(archive["filename"]).stem + ".glb"),
+        "stored_as": glb_safe,
+        "size_bytes": bytes_written,
+        "url": glb_public_path,
+        "kind": "model",
+        "ext": ".glb",
+        "layer_type": norm_layer,
+        "layer_label": meta["label"],
+        "layer_color": meta["color"],
+        "layer_opacity": meta["opacity"],
+        "layer_visible": True,
+        "uploaded_by": archive.get("uploaded_by"),
+        "uploaded_by_name": archive.get("uploaded_by_name"),
+        "uploaded_by_role": archive.get("uploaded_by_role"),
+        "uploaded_at": _now_iso(),
+        "converted_from_id": model_id,
+        "converted_from_filename": archive.get("filename"),
+    }
+    await db.digital_twin_models.insert_one(converted_doc)
+    await db.digital_twin_projects.update_one(
+        {"id": project_id},
+        {"$set": {"model_url": glb_public_path, "updated_at": _now_iso()},
+         "$inc": {"model_count": 1}},
+    )
+    await _update_conversion(
+        model_id,
+        conversion_status="completed",
+        conversion_percent=100,
+        conversion_completed_at=_now_iso(),
+        converted_model_id=converted_doc["id"],
+    )
+    logger.info(f"[CloudConvert] SKP→GLB done: {model_id} → {converted_doc['id']} ({bytes_written} bytes)")
+
+
+@router.get("/conversions/{model_id}/status")
+async def get_conversion_status(model_id: str, user: dict = Depends(get_current_user)):
+    """Polling endpoint — frontend hits this every 5s while a .skp is converting.
+
+    Returns:
+      { status, percent, error, converted_model_id, converted_url }
+    """
+    await _ensure_dt_access(user)
+    doc = await db.digital_twin_models.find_one({"id": model_id})
+    if not doc:
+        raise HTTPException(404, "Model not found.")
+    await _ensure_project_access(doc["project_id"], user)
+    converted_url = None
+    if doc.get("converted_model_id"):
+        sibling = await db.digital_twin_models.find_one({"id": doc["converted_model_id"]})
+        if sibling:
+            converted_url = sibling.get("url")
+    return {
+        "model_id": model_id,
+        "status": doc.get("conversion_status", "n/a"),
+        "percent": doc.get("conversion_percent", 0),
+        "error": doc.get("conversion_error"),
+        "converted_model_id": doc.get("converted_model_id"),
+        "converted_url": converted_url,
+        "cc_job_id": doc.get("cloudconvert_job_id"),
+        "started_at": doc.get("conversion_started_at"),
+        "completed_at": doc.get("conversion_completed_at"),
+    }
+
+
+@router.post("/conversions/{model_id}/retry")
+async def retry_conversion(model_id: str, user: dict = Depends(get_current_user)):
+    """Re-trigger SKP→GLB conversion (owner / admin / operator only)."""
+    await _ensure_dt_access(user)
+    doc = await db.digital_twin_models.find_one({"id": model_id})
+    if not doc:
+        raise HTTPException(404, "Model not found.")
+    proj = await _ensure_project_access(doc["project_id"], user)
+    if user.get("role") not in ("admin", "operator") and proj.get("owner_id") != user["id"]:
+        raise HTTPException(403, "Only the project owner can retry conversion.")
+    if doc.get("ext") != ".skp":
+        raise HTTPException(400, "Only .skp archives can be re-converted.")
+    if not _ccv.is_enabled():
+        raise HTTPException(503, "CloudConvert is not configured.")
+    await _update_conversion(
+        model_id,
+        conversion_status="pending",
+        conversion_percent=0,
+        conversion_error=None,
+        conversion_started_at=_now_iso(),
+    )
+    asyncio.create_task(_run_skp_to_glb_conversion(model_id))
+    return {"ok": True, "model_id": model_id, "status": "pending"}
 
 
 # ============= MULTI-LAYER VIEWER ENDPOINTS =============
