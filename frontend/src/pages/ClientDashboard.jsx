@@ -17,6 +17,7 @@ import { TwoFASetupModal, PropertyTimelineModal } from "./Marketplace";
 import { OpenDisputeModal } from "./AdminModals";
 import { InteriorDesignCard, InteriorDesignModal, DesignPhasesPanel } from "./InteriorDesign";
 import { ClientTwinViewerModal, DesignersBrowse } from "./ClientTwinViewer";
+import DigitalTwinViewer from "../components/DigitalTwinViewer";
 import { ProjectListSection } from "./ProjectWorkspace";
 import { API, DashLayout, Stat, StatusBadge, NavigateButtons } from "./DashShared";
 import { BottomNav } from "./BottomNav";
@@ -175,18 +176,39 @@ export const ClientDashboard = () => {
         properties={properties}
         onClose={() => setShowPropManager(false)}
         onChange={setProperties}
-        onOpenTwin={(p) => { setTwinPropOverride(p); setShowPropManager(false); setShowTwinViewer(true); }}
+        onOpenTwin={(twinInfo) => {
+          // twinInfo: { property_id, property_name, dt_project_id, model_url }
+          setTwinPropOverride(twinInfo);
+          setShowPropManager(false);
+          setShowTwinViewer(true);
+        }}
       />}
       {timelineFor && <PropertyTimelineModal propertyId={timelineFor} onClose={() => setTimelineFor(null)} />}
       {disputeFor && <OpenDisputeModal requestId={disputeFor.id} requestTitle={disputeFor.title} onClose={() => setDisputeFor(null)} onOpened={() => loadRequests()} />}
       {showDesign && <InteriorDesignModal onClose={() => setShowDesign(false)} onCreated={() => loadRequests()} />}
-      {showTwinViewer && (twinPropOverride || prop) && (
-        <ClientTwinViewerModal
-          propertyId={(twinPropOverride || prop).id}
-          propertyName={(twinPropOverride || prop).name}
-          onClose={() => { setShowTwinViewer(false); setTwinPropOverride(null); }}
-        />
-      )}
+      {showTwinViewer && (twinPropOverride || prop) && (() => {
+        const t = twinPropOverride || { property_id: prop.id, property_name: prop.name };
+        // If we have a real 3D project with model uploaded, open the Three.js viewer
+        // (rotation 360° · X-Ray · wireframe · sections · pins · screenshots)
+        if (t.dt_project_id && t.model_url) {
+          return (
+            <DigitalTwinViewer
+              projectId={t.dt_project_id}
+              modelUrl={t.model_url}
+              projectName={t.property_name || t.dt_project_name}
+              onClose={() => { setShowTwinViewer(false); setTwinPropOverride(null); }}
+            />
+          );
+        }
+        // Fallback: 2D top-down room layout from the legacy twins collection
+        return (
+          <ClientTwinViewerModal
+            propertyId={t.property_id}
+            propertyName={t.property_name}
+            onClose={() => { setShowTwinViewer(false); setTwinPropOverride(null); }}
+          />
+        );
+      })()}
       {designPhasesFor && <DesignPhasesViewer request={designPhasesFor} onClose={() => setDesignPhasesFor(null)} onUpdate={() => { loadRequests(); refreshUser(); }} />}
       {timelineRequestId && <RequestTimelineModal requestId={timelineRequestId} onClose={() => setTimelineRequestId(null)} />}
       {show2FA && <TwoFASetupModal onClose={() => setShow2FA(false)} currentlyEnabled={false} />}

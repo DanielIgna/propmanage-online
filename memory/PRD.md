@@ -2116,3 +2116,41 @@ Acoperire automată: **105/105 scenarios = 100%** (vs 38/105 la începutul ciclu
 - Click count redus: 1 click în loc de 2 (Setări → Card DT → Vezi)
 - Discoverability: utilizatorul vede butonul 3D direct în lista de imobile
 - Vizual immediat care imobile au DT disponibil (verde) vs în lucru (galben) vs lipsă (gri)
+
+
+### Phase 55 — Digital Twin end-to-end flow: 3D Viewer real cu X-Ray, Wireframe, Sections (Feb 2026)
+
+**Audit findings:** După cererea utilizatorului de a verifica feature-urile DT (rotație 360°, X-Ray, .skp upload), am descoperit că **TOATE feature-urile sunt deja implementate** în `DigitalTwinViewer.jsx` (Three.js + react-three-fiber):
+- Rotație 360° (OrbitControls)
+- 5 stiluri: Shaded / White / **X-Ray** / Wireframe / Monochrome
+- Section tool (planul de tăiere pe X/Y/Z)
+- Measure tool (distanță 2 puncte)
+- Pin system (notițe ancorate pe model)
+- Screenshot canvas → PNG
+- Layer toggles
+
+**Limitare reală:** Fișierele `.skp` (SketchUp) se pot încărca dar **NU se randează în browser** (format proprietar Trimble, fără parser open-source). Workflow recomandat: user exportă manual `.glb` din SketchUp (File → Export → 3D → glTF).
+
+**Bug-ul real fixat:** Butonul "Vezi Digital Twin 3D" din Settings + lista proprietăți deschidea **viewer-ul 2D top-down** (`ClientTwinViewerModal`), nu cel 3D real (`DigitalTwinViewer`).
+
+**Implementare:**
+- `GET /api/me/digital-twins` îmbogățit cu `dt_project_id`, `dt_project_name`, `model_url` (din `digital_twin_projects`)
+- `SettingsPanel.DigitalTwinCard` + `Components.PropertyManagerModal` + `ClientDashboard` — toate deschid acum:
+  - **3D real** (`DigitalTwinViewer` Three.js) când există `dt_project_id` + `model_url`
+  - **2D fallback** (`ClientTwinViewerModal`) când nu există model GLB încărcat
+- Butonul 3D din lista de proprietăți afișează acum **"3D"** vs **"2D"** în funcție de disponibilitate, plus tooltip îmbunătățit: "Vezi modelul 3D (rotație 360° · X-Ray · Wireframe)"
+
+**Verification:**
+- Backend manual curl: endpoint returnează `dt_project_id`, `model_url` corect (null pentru properties fără DT project)
+- 24/24 pytest pass (Phase 42 + 52 + 53)
+- ESLint clean
+
+**Notă pentru user:** Demo data nu are încă proiecte DT cu model GLB urcat — `/api/me/digital-twins` raportează `dt_project_id=null` pentru toate cele 34 properties seedat. Ca să testezi 3D viewer real, mergi pe `/digital-twin` → click "Adaugă model" pe orice proiect → upload `.glb` → revino în Settings → click "Vezi Digital Twin 3D". Va deschide viewer-ul Three.js cu toate feature-urile (X-Ray, rotație, etc).
+
+### Backlog rămas după Phase 55
+- 🔴 USER: redeploy producție pt Phases 50-55
+- 🔴 USER: Stripe LIVE keys + Slack/Discord webhooks
+- 🟡 Conversie automată `.skp` → `.glb` server-side (necesită Trimble Ruby SDK sau API plătit Trimble Connect)
+- 🟡 Refactor split qa_automation.py (~3800 lines)
+- 🟢 Specialist Onboarding Wizard (KYC docs after become-specialist)
+- 🟢 DT freshness indicator (badge "Actualizat acum X zile")

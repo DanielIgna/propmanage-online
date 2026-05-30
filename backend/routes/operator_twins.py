@@ -161,12 +161,31 @@ async def my_digital_twins(user: dict = Depends(get_current_user)):
     # Batch-fetch all twins for owned properties in one query
     twin_docs = await db.twins.find({"property_id": {"$in": prop_ids}}).to_list(len(prop_ids))
     twin_by_pid = {t["property_id"]: t for t in twin_docs}
+    # Batch-fetch DT projects (Phase G) so the frontend can deep-link directly into
+    # the 3D viewer when the architect has uploaded a GLB/GLTF model.
+    dt_projects = await db.digital_twin_projects.find(
+        {"property_id": {"$in": prop_ids}}
+    ).to_list(len(prop_ids))
+    dt_by_pid = {}
+    for proj in dt_projects:
+        pid = proj.get("property_id")
+        if not pid:
+            continue
+        # Prefer the most recent project per property
+        existing = dt_by_pid.get(pid)
+        if not existing or (proj.get("updated_at") or "") > (existing.get("updated_at") or ""):
+            dt_by_pid[pid] = proj
 
     items: list[dict] = []
     for p in props:
         pid = str(p["_id"])
         t = twin_by_pid.get(pid)
+        proj = dt_by_pid.get(pid)
         status_code = (t or {}).get("status") or "not_requested"
+        # If a DT project has a model_url, treat it as approved even if the legacy
+        # twins doc isn't there — the architect has shipped a viewable model.
+        if proj and proj.get("model_url"):
+            status_code = "approved"
         # Rough progress estimate based on status (frontend can render bar)
         progress = {
             "approved": 100,
@@ -182,7 +201,10 @@ async def my_digital_twins(user: dict = Depends(get_current_user)):
             "status": status_code,
             "status_label": _TWIN_STATUS_LABEL.get(status_code, status_code),
             "progress": progress,
-            "model_url": (t or {}).get("model_url"),
+            # DT project info — frontend opens the real 3D viewer when these are set
+            "dt_project_id": proj.get("id") if proj else None,
+            "dt_project_name": proj.get("name") if proj else None,
+            "model_url": (proj or {}).get("model_url"),
             "requested_at": (t or {}).get("requested_at"),
             "validated_at": (t or {}).get("validated_at"),
         })
