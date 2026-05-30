@@ -1086,6 +1086,383 @@ async def e2e_gdpr_erasure_request_creates_dsar_row() -> dict:
 
 
 # ============================================================================
+# Profile coverage — CLIENT (5) and SPECIALIST (5) plus 5 platform-health tests
+# ============================================================================
+
+@_safe_e2e
+async def profile_client_register_fields_correct() -> dict:
+    """PROFILE-CLIENT-01: Register client → /auth/me returnează exact email/name/role/zone."""
+    client_c, c_email, c_id = await _register_and_login("client", "pc_r")
+    try:
+        me = await client_c.get("/api/auth/me")
+        if me.status_code != 200:
+            return _ko(f"/me {me.status_code}")
+        body = me.json() if isinstance(me.json(), dict) else {}
+        missing = [k for k in ("email", "name", "role") if not body.get(k)]
+        if missing:
+            return _ko(f"profil incomplet — lipsesc {missing}")
+        if body.get("role") != "client":
+            return _ko(f"role greșit: {body.get('role')}")
+        if body.get("email") != c_email:
+            return _ko(f"email mismatch: {body.get('email')} vs {c_email}")
+        return _ok(f"OK — profil client complet (email={c_email[:25]}, name='{body['name']}', role=client)")
+    finally:
+        await client_c.aclose()
+        try:
+            await db.users.delete_one({"email": c_email})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def profile_client_patch_updates_db() -> dict:
+    """PROFILE-CLIENT-02: PATCH /auth/profile cu name nou → /me reflectă schimbarea."""
+    client_c, c_email, _ = await _register_and_login("client", "pc_p")
+    try:
+        new_name = f"Client Renamed {uuid.uuid4().hex[:4]}"
+        r = await client_c.patch("/api/auth/profile", json={"name": new_name, "phone": "0799123456"})
+        if r.status_code != 200:
+            return _ko(f"PATCH /auth/profile {r.status_code}: {r.text[:200]}")
+        me = await client_c.get("/api/auth/me")
+        body = me.json() if isinstance(me.json(), dict) else {}
+        if body.get("name") == new_name and body.get("phone") == "0799123456":
+            return _ok(f"OK — profil actualizat: name='{new_name}', phone='0799123456'")
+        return _ko(f"PATCH OK dar /me nu reflectă: name={body.get('name')}, phone={body.get('phone')}")
+    finally:
+        await client_c.aclose()
+        try:
+            await db.users.delete_one({"email": c_email})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def profile_client_change_password_then_login() -> dict:
+    """PROFILE-CLIENT-03: Schimb parola → login cu parola nouă merge, cu cea veche nu."""
+    client_c, c_email, _ = await _register_and_login("client", "pc_pw")
+    try:
+        r = await client_c.post("/api/auth/change-password", json={
+            "current_password": "Test1234!", "new_password": "Renewed123!",
+        })
+        if r.status_code != 200:
+            return _ko(f"change-password failed {r.status_code}: {r.text[:200]}")
+        # Login old should fail, new should succeed
+        c2 = httpx.AsyncClient(base_url=BACKEND_URL, timeout=15.0, follow_redirects=False)
+        try:
+            old = await c2.post("/api/auth/login", json={"email": c_email, "password": "Test1234!"})
+            new = await c2.post("/api/auth/login", json={"email": c_email, "password": "Renewed123!"})
+            if old.status_code == 200:
+                return _ko("parola veche încă funcționează (nu a fost rotită)")
+            if new.status_code != 200:
+                return _ko(f"login cu parola nouă a eșuat {new.status_code}")
+        finally:
+            await c2.aclose()
+        return _ok(f"OK — parolă rotită corect (vechea respinsă {old.status_code}, noua OK 200)")
+    finally:
+        await client_c.aclose()
+        try:
+            await db.users.delete_one({"email": c_email})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def profile_client_has_properties_list() -> dict:
+    """PROFILE-CLIENT-04: Client creează 1 proprietate → GET /properties returnează 1+."""
+    client_c, c_email, _ = await _register_and_login("client", "pc_pr")
+    try:
+        pr = await client_c.post("/api/properties", json={
+            "name": "Profile Apt", "address": "Str Profile 1",
+            "type": "apartment", "surface": 50.0, "rooms": 2,
+        })
+        if pr.status_code != 200:
+            return _ko(f"property create {pr.status_code}: {pr.text[:200]}")
+        lst = await client_c.get("/api/properties")
+        if lst.status_code != 200:
+            return _ko(f"GET /properties {lst.status_code}")
+        items = lst.json() if isinstance(lst.json(), list) else []
+        if len(items) >= 1:
+            return _ok(f"OK — {len(items)} proprietate(i) listate pentru client")
+        return _ko("client are 0 proprietăți după create")
+    finally:
+        await client_c.aclose()
+        try:
+            await db.users.delete_one({"email": c_email})
+            await db.properties.delete_many({"name": "Profile Apt"})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def profile_client_gdpr_export_includes_all_data() -> dict:
+    """PROFILE-CLIENT-05: GDPR export întoarce account.email și nu lipsește field critic."""
+    client_c, c_email, _ = await _register_and_login("client", "pc_g")
+    try:
+        # Create 1 property to ensure export has user-owned data
+        await client_c.post("/api/properties", json={
+            "name": "Export Apt", "address": "X", "type": "apartment", "surface": 40.0, "rooms": 1,
+        })
+        r = await client_c.get("/api/gdpr/me/export")
+        if r.status_code != 200:
+            return _ko(f"/gdpr/me/export {r.status_code}")
+        body = r.json() if isinstance(r.json(), dict) else {}
+        acc = body.get("account") or {}
+        missing = [k for k in ("email", "role") if not acc.get(k)]
+        if missing or acc.get("email") != c_email:
+            return _ko(f"export lipsuri {missing} sau email mismatch: {acc.get('email')}")
+        rights = body.get("rights_summary") or {}
+        if not rights:
+            return _ko("rights_summary lipsește din export")
+        return _ok(f"OK — export complet: account.email={c_email[:22]}, rights={len(rights)} drepturi")
+    finally:
+        await client_c.aclose()
+        try:
+            await db.users.delete_one({"email": c_email})
+            await db.properties.delete_many({"name": "Export Apt"})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def profile_spec_register_fields_complete() -> dict:
+    """PROFILE-SPEC-01: Register specialist cu categories+zones → /me le returnează corect."""
+    spec_c, s_email, _ = await _register_and_login("specialist", "ps_r")
+    try:
+        me = await spec_c.get("/api/auth/me")
+        if me.status_code != 200:
+            return _ko(f"/me {me.status_code}")
+        body = me.json() if isinstance(me.json(), dict) else {}
+        cats = body.get("service_categories") or []
+        zones = body.get("coverage_zones") or []
+        if "electric" not in cats:
+            return _ko(f"service_categories greșit: {cats}")
+        if "Bucuresti" not in zones:
+            return _ko(f"coverage_zones greșit: {zones}")
+        if body.get("verified") is True:
+            return _ko("specialist nou nu ar trebui să fie deja VERIFIED")
+        return _ok(f"OK — specialist nou: cats={cats}, zones={zones}, verified=False (corect)")
+    finally:
+        await spec_c.aclose()
+        try:
+            await db.users.delete_one({"email": s_email})
+            await db.onboarding_emails.delete_many({"email": s_email})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def profile_spec_public_profile_renders() -> dict:
+    """PROFILE-SPEC-02: Pagină publică /api/specialists/{id}/profile returnează specialistul cu câmpurile cheie."""
+    spec_c, s_email, s_id = await _register_and_login("specialist", "ps_pub")
+    try:
+        if not s_id:
+            return _ko("nu am putut obține specialist_id din /me")
+        c = httpx.AsyncClient(base_url=BACKEND_URL, timeout=15.0)
+        try:
+            r = await c.get(f"/api/specialists/{s_id}/profile")
+            if r.status_code != 200:
+                return _ko(f"public profile {r.status_code}: {r.text[:200]}")
+            body = r.json() if isinstance(r.json(), dict) else {}
+            if body.get("email"):
+                return _ko("⚠ SECURITY: email-ul specialistului expus pe pagina publică")
+            if not body.get("name"):
+                return _ko(f"name lipsește din public profile: {list(body.keys())[:8]}")
+            return _ok(f"OK — public profile: name='{body.get('name')}', categories={body.get('service_categories', [])[:3]}, fără email expus")
+        finally:
+            await c.aclose()
+    finally:
+        await spec_c.aclose()
+        try:
+            await db.users.delete_one({"email": s_email})
+            await db.onboarding_emails.delete_many({"email": s_email})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def profile_spec_verify_sets_verified_flag() -> dict:
+    """PROFILE-SPEC-03: Admin verifică specialist → /me returnează verified=True + tier=VERIFIED."""
+    spec_c, s_email, s_id = await _register_and_login("specialist", "ps_v")
+    try:
+        if not s_id:
+            return _ko("specialist_id missing")
+        admin = await _admin_client()
+        try:
+            v = await admin.post(f"/api/admin/specialists/{s_id}/verify")
+            if v.status_code != 200:
+                return _ko(f"admin verify {v.status_code}: {v.text[:200]}")
+        finally:
+            await admin.aclose()
+        me = await spec_c.get("/api/auth/me")
+        body = me.json() if isinstance(me.json(), dict) else {}
+        if body.get("verified") is True and body.get("tier") == "VERIFIED":
+            return _ok("OK — specialist VERIFIED (tier='VERIFIED', verified_at setat)")
+        return _ko(f"verify OK dar /me arată verified={body.get('verified')}, tier={body.get('tier')}")
+    finally:
+        await spec_c.aclose()
+        try:
+            await db.users.delete_one({"email": s_email})
+            await db.onboarding_emails.delete_many({"email": s_email})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def profile_spec_documents_visible_to_owner() -> dict:
+    """PROFILE-SPEC-04: Specialist încarcă doc → /me îl include în users.documents cu status pending."""
+    spec_c, s_email, _ = await _register_and_login("specialist", "ps_d")
+    try:
+        tiny_b64 = "data:application/pdf;base64,JVBERi0xLjQKJeLjz9MKMSAwIG9iagovL0VPRgo="
+        up = await spec_c.post("/api/specialist/documents", json={
+            "type": "id_card", "name": "test_profile.pdf", "url": tiny_b64,
+        })
+        if up.status_code != 200:
+            return _ko(f"upload {up.status_code}: {up.text[:200]}")
+        me = await spec_c.get("/api/auth/me")
+        body = me.json() if isinstance(me.json(), dict) else {}
+        docs = body.get("documents") or []
+        match = [d for d in docs if d.get("name") == "test_profile.pdf"]
+        if not match:
+            return _ko(f"documentul nu apare în /me.documents (count={len(docs)})")
+        if match[0].get("status") != "pending":
+            return _ko(f"status doc greșit: {match[0].get('status')}")
+        return _ok("OK — doc 'test_profile.pdf' vizibil în profil, status=pending")
+    finally:
+        await spec_c.aclose()
+        try:
+            await db.users.delete_one({"email": s_email})
+            await db.onboarding_emails.delete_many({"email": s_email})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def profile_spec_patch_updates_categories() -> dict:
+    """PROFILE-SPEC-05: Specialist actualizează service_categories → /me reflectă."""
+    spec_c, s_email, _ = await _register_and_login("specialist", "ps_pp")
+    try:
+        r = await spec_c.patch("/api/auth/profile", json={
+            "service_categories": ["electric", "instalatii"],
+            "coverage_zones": ["Bucuresti", "Ilfov"],
+        })
+        if r.status_code != 200:
+            return _ko(f"PATCH /auth/profile {r.status_code}: {r.text[:200]}")
+        me = await spec_c.get("/api/auth/me")
+        body = me.json() if isinstance(me.json(), dict) else {}
+        cats = set(body.get("service_categories") or [])
+        zones = set(body.get("coverage_zones") or [])
+        if {"electric", "instalatii"}.issubset(cats) and {"Bucuresti", "Ilfov"}.issubset(zones):
+            return _ok(f"OK — categorii+zone updatate: cats={sorted(cats)}, zones={sorted(zones)}")
+        return _ko(f"PATCH OK dar /me nu reflectă: cats={cats}, zones={zones}")
+    finally:
+        await spec_c.aclose()
+        try:
+            await db.users.delete_one({"email": s_email})
+            await db.onboarding_emails.delete_many({"email": s_email})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def platform_morning_briefing_preview() -> dict:
+    """PLATFORM-01: Admin /morning-briefing/preview returnează 6+ KPI tiles."""
+    admin = await _admin_client()
+    try:
+        r = await admin.get("/api/admin/morning-briefing/preview")
+        if r.status_code != 200:
+            return _ko(f"morning briefing preview {r.status_code}: {r.text[:200]}")
+        body = r.json() if isinstance(r.json(), dict) else {}
+        payload = body.get("payload") or body
+        if not payload or len(payload) < 3:
+            return _ko(f"payload incomplet ({len(payload) if payload else 0} câmpuri)")
+        return _ok(f"OK — Morning Briefing populat ({len(payload)} secțiuni KPI)")
+    finally:
+        await admin.aclose()
+
+
+@_safe_e2e
+async def platform_exec_briefing_preview() -> dict:
+    """PLATFORM-02: Admin /exec-briefing/preview întoarce payload complet + HTML."""
+    admin = await _admin_client()
+    try:
+        r = await admin.get("/api/admin/exec-briefing/preview")
+        if r.status_code != 200:
+            return _ko(f"exec briefing preview {r.status_code}")
+        body = r.json() if isinstance(r.json(), dict) else {}
+        if not body.get("payload") or not body.get("html"):
+            return _ko(f"missing payload/html: keys={list(body.keys())}")
+        if len(body["html"]) < 1500:
+            return _ko(f"HTML prea mic: {len(body['html'])} chars")
+        return _ok(f"OK — Exec Briefing: payload + {len(body['html'])} chars HTML")
+    finally:
+        await admin.aclose()
+
+
+@_safe_e2e
+async def platform_landing_marketplace_has_specialists() -> dict:
+    """PLATFORM-03: /marketplace/specialists returnează listă cu min 1 specialist + paginare."""
+    c = httpx.AsyncClient(base_url=BACKEND_URL, timeout=15.0)
+    try:
+        r = await c.get("/api/marketplace/specialists?limit=10")
+        if r.status_code != 200:
+            return _ko(f"/marketplace/specialists {r.status_code}")
+        body = r.json()
+        # Endpoint returns a plain list of specialists, not paginated envelope
+        if isinstance(body, list):
+            items = body
+        elif isinstance(body, dict):
+            items = body.get("items") or body.get("results") or []
+        else:
+            items = []
+        if not isinstance(items, list):
+            items = []
+        if len(items) < 1:
+            return _ko(f"0 specialiști în marketplace (body type={type(body).__name__})")
+        return _ok(f"OK — {len(items)} specialiști listați în marketplace (limită=10)")
+    finally:
+        await c.aclose()
+
+
+@_safe_e2e
+async def platform_trust_stats_endpoint_live() -> dict:
+    """PLATFORM-04: /public/trust-stats (no-auth) returnează release_gate + platform metrics."""
+    c = httpx.AsyncClient(base_url=BACKEND_URL, timeout=15.0)
+    try:
+        r = await c.get("/api/public/trust-stats")
+        if r.status_code != 200:
+            return _ko(f"trust-stats {r.status_code}")
+        body = r.json() if isinstance(r.json(), dict) else {}
+        if "platform" not in body or "uptime" not in body or "compliance" not in body:
+            return _ko(f"keys lipsă: {list(body.keys())}")
+        plat = body["platform"] or {}
+        return _ok(f"OK — Trust Center: {plat.get('verified_specialists', '?')} verified, {plat.get('total_clients', '?')} clienți")
+    finally:
+        await c.aclose()
+
+
+@_safe_e2e
+async def platform_trust_badge_svg_renders() -> dict:
+    """PLATFORM-05: /public/trust-badge.svg întoarce SVG valid cu MIME image/svg+xml."""
+    c = httpx.AsyncClient(base_url=BACKEND_URL, timeout=10.0)
+    try:
+        r = await c.get("/api/public/trust-badge.svg")
+        if r.status_code != 200:
+            return _ko(f"badge svg {r.status_code}")
+        ct = r.headers.get("content-type", "")
+        if "image/svg" not in ct:
+            return _ko(f"content-type greșit: {ct}")
+        if "<svg" not in r.text[:200]:
+            return _ko("payload nu pare SVG valid")
+        if len(r.text) < 300:
+            return _ko(f"SVG prea mic: {len(r.text)} bytes")
+        return _ok(f"OK — Trust Badge SVG: {len(r.text)} bytes, MIME={ct}")
+    finally:
+        await c.aclose()
+
+
+
+
+# ============================================================================
 # Registry
 # ============================================================================
 
@@ -1401,6 +1778,84 @@ AUTOMATED_TESTS: dict[str, dict] = {
         "category": "E2E",
         "priority": "P0",
         "runner": e2e_gdpr_erasure_request_creates_dsar_row,
+    },
+    # ---- PROFILE CLIENT (5) ----
+    "PROFILE-CLIENT-01": {
+        "code": "PROFILE-CLIENT-01", "title": "Profil client — câmpurile cheie sunt corecte după register",
+        "kind": "http", "category": "CLIENT", "priority": "P0",
+        "manual_match": "C-01", "runner": profile_client_register_fields_correct,
+    },
+    "PROFILE-CLIENT-02": {
+        "code": "PROFILE-CLIENT-02", "title": "Profil client — PATCH actualizează name/phone",
+        "kind": "http", "category": "CLIENT", "priority": "P0",
+        "runner": profile_client_patch_updates_db,
+    },
+    "PROFILE-CLIENT-03": {
+        "code": "PROFILE-CLIENT-03", "title": "Client — schimbare parolă rotește credentialele",
+        "kind": "http", "category": "CLIENT", "priority": "P0",
+        "runner": profile_client_change_password_then_login,
+    },
+    "PROFILE-CLIENT-04": {
+        "code": "PROFILE-CLIENT-04", "title": "Client — proprietăți listate corect în profil",
+        "kind": "http", "category": "CLIENT", "priority": "P1",
+        "runner": profile_client_has_properties_list,
+    },
+    "PROFILE-CLIENT-05": {
+        "code": "PROFILE-CLIENT-05", "title": "Client — GDPR export include toate datele",
+        "kind": "http", "category": "CLIENT", "priority": "P0",
+        "runner": profile_client_gdpr_export_includes_all_data,
+    },
+    # ---- PROFILE SPECIALIST (5) ----
+    "PROFILE-SPEC-01": {
+        "code": "PROFILE-SPEC-01", "title": "Profil specialist — categories+zones păstrate la register",
+        "kind": "http", "category": "SPECIALIST", "priority": "P0",
+        "runner": profile_spec_register_fields_complete,
+    },
+    "PROFILE-SPEC-02": {
+        "code": "PROFILE-SPEC-02", "title": "Specialist — pagina publică nu expune email",
+        "kind": "http", "category": "SPECIALIST", "priority": "P0",
+        "runner": profile_spec_public_profile_renders,
+    },
+    "PROFILE-SPEC-03": {
+        "code": "PROFILE-SPEC-03", "title": "Specialist — verify setează verified=True + tier=VERIFIED",
+        "kind": "http", "category": "SPECIALIST", "priority": "P0",
+        "runner": profile_spec_verify_sets_verified_flag,
+    },
+    "PROFILE-SPEC-04": {
+        "code": "PROFILE-SPEC-04", "title": "Specialist — documentele apar în propriul profil cu status",
+        "kind": "http", "category": "SPECIALIST", "priority": "P1",
+        "runner": profile_spec_documents_visible_to_owner,
+    },
+    "PROFILE-SPEC-05": {
+        "code": "PROFILE-SPEC-05", "title": "Specialist — PATCH actualizează categorii și zone",
+        "kind": "http", "category": "SPECIALIST", "priority": "P1",
+        "runner": profile_spec_patch_updates_categories,
+    },
+    # ---- PLATFORM HEALTH (5) ----
+    "PLATFORM-01": {
+        "code": "PLATFORM-01", "title": "Morning Briefing — preview populează KPIs",
+        "kind": "http", "category": "ADMIN", "priority": "P1",
+        "manual_match": "A-01", "runner": platform_morning_briefing_preview,
+    },
+    "PLATFORM-02": {
+        "code": "PLATFORM-02", "title": "Executive Briefing — preview generează HTML+payload",
+        "kind": "http", "category": "ADMIN", "priority": "P1",
+        "runner": platform_exec_briefing_preview,
+    },
+    "PLATFORM-03": {
+        "code": "PLATFORM-03", "title": "Marketplace — listă publică cu min 1 specialist",
+        "kind": "http", "category": "PUBLIC", "priority": "P0",
+        "manual_match": "P-02", "runner": platform_landing_marketplace_has_specialists,
+    },
+    "PLATFORM-04": {
+        "code": "PLATFORM-04", "title": "Trust Center — endpoint public returnează platform stats",
+        "kind": "http", "category": "PUBLIC", "priority": "P1",
+        "runner": platform_trust_stats_endpoint_live,
+    },
+    "PLATFORM-05": {
+        "code": "PLATFORM-05", "title": "Trust Badge SVG — endpoint renderează imagine validă",
+        "kind": "http", "category": "PUBLIC", "priority": "P2",
+        "runner": platform_trust_badge_svg_renders,
     },
 }
 

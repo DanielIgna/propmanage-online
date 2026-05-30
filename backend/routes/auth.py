@@ -456,11 +456,18 @@ class ProfileUpdateIn(BaseModel):
     phone: Optional[str] = Field(default=None, max_length=30)
     zone: Optional[str] = Field(default=None, max_length=80)
     avatar: Optional[str] = Field(default=None, max_length=2_000_000)
+    # Specialist-only fields — allowed only when current user has role=specialist (validated below)
+    service_categories: Optional[list[str]] = Field(default=None, max_length=20)
+    coverage_zones: Optional[list[str]] = Field(default=None, max_length=20)
 
 
 @router.patch("/auth/profile")
 async def update_profile(data: ProfileUpdateIn, user: dict = Depends(get_current_user)):
     update = {k: v for k, v in data.model_dump().items() if v is not None}
+    # Specialist-scope guard: refuse to set categories/zones on a non-specialist account
+    if user.get("role") != "specialist":
+        update.pop("service_categories", None)
+        update.pop("coverage_zones", None)
     if not update:
         raise HTTPException(400, "Niciun câmp de actualizat.")
     await db.users.update_one({"_id": ObjectId(user["id"])}, {"$set": update})

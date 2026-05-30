@@ -84,9 +84,12 @@ async def specialist_profile(spec_id: str):
     return {
         "id": str(spec["_id"]),
         "name": spec.get("name"),
-        "email": spec.get("email"),
+        # NOTE: email is PII — intentionally NOT exposed on public profile.
+        # Avatar is exposed only as a sanitized URL/base64 thumbnail.
         "picture": spec.get("picture"),
         "specialty": spec.get("specialty"),
+        "service_categories": spec.get("service_categories") or [],
+        "coverage_zones": spec.get("coverage_zones") or [],
         "rating": spec.get("rating"),
         "reviews_count": spec.get("reviews_count", 0),
         "tier": spec.get("tier"),

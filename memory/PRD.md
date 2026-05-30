@@ -1844,3 +1844,23 @@ User: „într-o secțiune scrie escrow, în alta cont blocat, în alta depozit 
 - 🔴 USER: webhook URLs + Stripe LIVE keys
 - 🟡 Twilio SMS, Lottie KB
 
+
+
+### Phase 47 — Pachet A: Profile coverage + Platform health (Feb 2026)
+
+**15 teste E2E noi adăugate** (5 client profile + 5 specialist profile + 5 platform):
+- PROFILE-CLIENT-01..05: register fields, PATCH name/phone, change password, properties list, GDPR export complet
+- PROFILE-SPEC-01..05: register cu categories/zones, public profile fără email, admin verify, documents în /me, PATCH categorii
+- PLATFORM-01..05: Morning Briefing, Exec Briefing, marketplace listing, Trust Center stats, Trust Badge SVG
+
+**Bug-uri reale găsite + rezolvate**:
+1. 🔴 **SECURITY FIX**: `/api/specialists/{id}/profile` expunea `email` (PII). Șters + adăugat service_categories/coverage_zones.
+2. 🟡 **API GAP**: `PATCH /auth/profile` nu accepta service_categories/coverage_zones — adăugat în schema cu guard role=specialist.
+
+**Rezultat preview**: `53/53 pass · 0 fail · verdict=READY` ✓ (creștere de la 38 la 53 = +40% coverage)
+
+### Backlog rămas
+- 🔴 USER: redeploy producție (Phase 46+47)
+- 🔴 USER: webhook URLs + Stripe LIVE keys
+- 🟡 Pachet B (escrow lifecycle, chat, browser tests) — după Stripe LIVE
+- 🟡 Twilio SMS, Lottie KB
