@@ -845,11 +845,13 @@ async def google_session_exchange(request: Request, response: Response):
     upstream_body = None
     last_err = None
     data = None
-    # Retry loop: 3 attempts, 30s timeout each, with light backoff.
-    for attempt in range(3):
+    # Retry loop: 2 attempts, 15s timeout each + 2s backoff between → max ~32s total.
+    # MUST stay under the Kubernetes ingress proxy timeout (typically 60s) or the
+    # browser sees a generic 502 Bad Gateway from the ingress instead of our 503.
+    for attempt in range(2):
         health_event["attempts"] = attempt + 1
         try:
-            async with httpx.AsyncClient(timeout=30) as http_client:
+            async with httpx.AsyncClient(timeout=15) as http_client:
                 r = await http_client.get(
                     "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
                     headers={"X-Session-ID": session_id}
@@ -860,7 +862,7 @@ async def google_session_exchange(request: Request, response: Response):
                 if r.status_code == 200:
                     data = r.json()
                     break
-                # 4xx → user-fixable (session expired, redirect URL not whitelisted)
+                # 4xx → user-fixable (session expired, redirect URL not whitelisted) — no retry
                 if 400 <= r.status_code < 500:
                     logger.warning(f"Emergent OAuth user error: status={upstream_status} body={upstream_body[:200]}")
                     health_event["outcome"] = "user_error"
@@ -875,17 +877,17 @@ async def google_session_exchange(request: Request, response: Response):
                     )
                 # 5xx upstream → transient, will retry
                 last_err = f"upstream HTTP {r.status_code}"
-                logger.warning(f"Emergent OAuth transient {r.status_code} (attempt {attempt+1}/3): {upstream_body[:120]}")
+                logger.warning(f"Emergent OAuth transient {r.status_code} (attempt {attempt+1}/2): {upstream_body[:120]}")
         except HTTPException:
             raise
         except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPError) as e:
             last_err = f"network: {type(e).__name__}: {e}"
-            logger.warning(f"Emergent OAuth network error (attempt {attempt+1}/3): {last_err}")
-        if attempt < 2:
-            await asyncio.sleep(1.5 * (attempt + 1))  # 1.5s, 3s
+            logger.warning(f"Emergent OAuth network error (attempt {attempt+1}/2): {last_err}")
+        if attempt < 1:
+            await asyncio.sleep(2)  # short backoff to stay under ingress timeout
     if data is None:
-        # All 3 attempts failed — return a SAFE 503 with JSON body so Cloudflare
-        # doesn't see an empty origin response (which would map to 520).
+        # Both attempts failed — return a SAFE 503 with JSON body so the browser
+        # gets an actionable detail instead of a generic ingress 502/520.
         logger.error(f"Emergent OAuth exhausted retries: {last_err}")
         health_event["outcome"] = "exhausted"
         health_event["final_status"] = 503
@@ -893,7 +895,7 @@ async def google_session_exchange(request: Request, response: Response):
         await _record_oauth_health(health_event, started_at)
         raise HTTPException(
             503,
-            f"Serverul Emergent OAuth nu răspunde (3 încercări, ultima: {last_err}). "
+            f"Serverul Emergent OAuth nu răspunde (2 încercări, ultima: {last_err}). "
             "Încearcă din nou peste 1-2 minute sau folosește email + parolă."
         )
 

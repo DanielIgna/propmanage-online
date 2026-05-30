@@ -45,20 +45,20 @@ export const AuthCallback = () => {
         navigate(`/${data.role || "client"}`, { replace: true });
       } catch (e) {
         const status = e?.response?.status;
+        const hasDetail = !!e?.response?.data?.detail;
         let detail = e?.response?.data?.detail || e.message || "Autentificare eșuată";
-        // Cloudflare-style empty-body 5xx (520/521/522/523/524) → no JSON detail,
-        // so axios shows the bare "Request failed with status code N" message. Give
-        // the user a more actionable explanation.
-        if (status && status >= 520 && status <= 524 && (!e?.response?.data?.detail)) {
-          detail = `Serverul Emergent OAuth (upstream) e momentan inaccesibil (HTTP ${status} de la Cloudflare — origin empty). ` +
+        // Gateway-style empty-body 5xx (502 Bad Gateway / 504 Gateway Timeout /
+        // 520-524 Cloudflare) → no JSON detail, axios shows the bare status code.
+        // Give the user a more actionable explanation.
+        if (status && !hasDetail && (status === 502 || status === 504 || (status >= 520 && status <= 524))) {
+          detail = `Serverul Emergent OAuth (upstream) e momentan inaccesibil sau prea lent (HTTP ${status} — ${status === 502 ? "Bad Gateway" : status === 504 ? "Gateway Timeout" : "Cloudflare origin empty"}). ` +
             "Încearcă din nou peste 30s-1min, sau folosește email + parolă mai jos.";
-        } else if (status === 503) {
+        } else if (status === 503 && hasDetail) {
           // Our own retry-exhausted response — already has a friendly detail.
-          detail = e.response.data.detail || detail;
+          detail = e.response.data.detail;
         }
         setError(`[${status || "network"}] ${detail}`);
         console.error("[GoogleOAuth] Failed:", status, detail, e);
-        // No auto-redirect — let user see the actual error and choose what to do.
       }
     })();
   }, [navigate, refreshUser]);
