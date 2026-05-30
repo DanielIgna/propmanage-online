@@ -2228,6 +2228,49 @@ Acoperire automată: **105/105 scenarios = 100%** (vs 38/105 la începutul ciclu
 **Bug Fix Critical: "Autentificare Google eșuată — [520] Request failed with status code 520" pe producție**
 - Root cause: backend `httpx.AsyncClient(timeout=10s)` la upstream `demobackend.emergentagent.com`. Când upstream are cold start sau e slow, timeout → backend răspunde 502 → Cloudflare-ul propmanage.ro mapează la HTTP 520 (empty origin response).
 - Fix backend (`/api/auth/google/session`):
+
+### Phase 61 — CSV Export + Email Alert Automation (Feb 2026)
+
+**Feature 1: Export CSV pe `/admin/auth-health`**
+- Nou endpoint: `GET /api/admin/auth-health/export.csv` (admin only, 401 fără auth)
+- Returnează `StreamingResponse` cu Content-Disposition attachment, filename `oauth-health-YYYYMMDD-HHMM.csv`
+- Coloane: started_at, outcome, final_status, upstream_status, attempts, duration_ms, email, ip, last_error
+- Buton verde "Export CSV (24h)" cu icoană Download în dashboard.
+
+**Feature 2: Email alert automat dacă success rate scade sub 80%**
+- Funcție `run_auth_health_alert_check()` în `auth.py`:
+  - Window: ultima oră
+  - Pragul: 80% success rate (sub → alertă)
+  - Min samples: 5 (evită noise pe trafic mic)
+  - Cooldown: 60min între alerte (evită spam)
+  - State persistent în colecția `system_alerts` cu cheie `auth_health_low`
+- Email Resend-format frumos cu: KPI ultimă oră, distribuție outcomes, P95 latency, CTA "Deschide Dashboard", link mailto:support@emergent.sh
+- Scheduler APScheduler: rulează **la fiecare 15 minute** (`minute="*/15"`)
+- Endpoint manual: `POST /api/admin/auth-health/test-alert` — forțează trigger (skip threshold + cooldown + min samples) pentru a verifica delivery email
+- Buton "Trimite test email alert" în UI (amber) cu confirm()
+
+**Helpers refactored:**
+- `_aggregate_auth_health(events, hours, raw_limit)` — pure function, refolosit de endpoint + scheduler
+- `_build_auth_health_payload(hours, raw_limit)` — DB query + agregare
+
+**Verified live:**
+- ✅ CSV export: 200 cu valid CSV (admin), 401 fără auth
+- ✅ Test alert: 3 admin recipients (`carlospacu@gmail.com`, `danieligna1@gmail.com`, `admin@propmanage.io`) primesc subject "⚠️ PropManage: Google OAuth degradat (X% success rate)"
+- ✅ În preview: EMAIL/CONSOLE log; pe propmanage.ro: Resend API real
+
+**Files:**
+- `/app/backend/routes/auth.py` — `_aggregate_auth_health`, `_build_auth_health_payload`, `/admin/auth-health/export.csv`, `run_auth_health_alert_check`, `/admin/auth-health/test-alert`
+- `/app/backend/server.py` — scheduler `auth_health_alert` la fiecare 15min
+- `/app/frontend/src/pages/admin/AdminAuthHealthPage.jsx` — butoane Export CSV + Test Alert
+
+**Backlog rămas:**
+- 🔴 USER: Save to GitHub ("Create Branch & Push") + redeploy producție
+- 🔴 USER: Stripe LIVE keys + Slack/Discord webhooks
+- 🟡 Aspose.3D Cloud API SKP→GLB direct ($0.04/conv)
+- 🟡 Lottie animations Knowledge Base
+- 🟡 Twilio SMS alerts nighttime (paralel cu email pentru critical only)
+- 🟢 Avatar S3/Cloudinary migration
+
   - Timeout crescut 10s → **30s per attempt**
   - **3 retry-uri automate** cu backoff (1.5s, 3s)
   - Distincție clară: 4xx upstream = user error (401) | 5xx upstream = transient (retry)

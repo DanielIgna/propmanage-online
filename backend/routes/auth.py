@@ -972,20 +972,7 @@ async def _record_oauth_health(event: dict, started_at: datetime) -> None:
         logger.warning(f"[oauth_health] write failed: {e}")
 
 
-@router.get("/admin/auth-health")
-async def admin_auth_health(user: dict = Depends(require_role("admin"))):
-    """Real-time Google OAuth health dashboard data.
-
-    Returns last-24h aggregated metrics + the most recent 20 raw events.
-    """
-    now = datetime.now(timezone.utc)
-    since = (now - timedelta(hours=24)).isoformat()
-    cursor = db.oauth_health.find({"started_at": {"$gte": since}}).sort("started_at", -1)
-    events: List[dict] = []
-    async for ev in cursor:
-        ev["_id"] = str(ev.get("_id"))
-        events.append(ev)
-
+def _aggregate_auth_health(events: List[dict], hours: int, raw_limit: int) -> dict:
     total = len(events)
     by_outcome: Dict[str, int] = {}
     durations: List[int] = []
@@ -1005,24 +992,175 @@ async def admin_auth_health(user: dict = Depends(require_role("admin"))):
                 "last_error": ev.get("last_error"),
                 "outcome": outcome,
             })
-
     success = by_outcome.get("success", 0)
     success_rate = round((success / total) * 100, 1) if total else None
     durations_sorted = sorted(durations)
     p50 = durations_sorted[len(durations_sorted) // 2] if durations_sorted else None
     p95 = durations_sorted[int(len(durations_sorted) * 0.95)] if durations_sorted else None
     p99 = durations_sorted[int(len(durations_sorted) * 0.99)] if durations_sorted else None
-
     return {
-        "window_hours": 24,
+        "window_hours": hours,
         "total_attempts": total,
         "success_rate_pct": success_rate,
         "outcomes": by_outcome,
         "latency_ms": {"p50": p50, "p95": p95, "p99": p99, "samples": len(durations)},
         "upstream_5xx_count": len(upstream_5xx),
         "recent_upstream_5xx": upstream_5xx[:10],
-        "recent_events": events[:20],
+        "recent_events": events[:raw_limit],
     }
+
+
+async def _build_auth_health_payload(hours: int = 24, raw_limit: int = 20) -> dict:
+    now = datetime.now(timezone.utc)
+    since = (now - timedelta(hours=hours)).isoformat()
+    cursor = db.oauth_health.find({"started_at": {"$gte": since}}).sort("started_at", -1)
+    events: List[dict] = []
+    async for ev in cursor:
+        ev["_id"] = str(ev.get("_id"))
+        events.append(ev)
+    return _aggregate_auth_health(events, hours, raw_limit)
+
+
+@router.get("/admin/auth-health")
+async def admin_auth_health(user: dict = Depends(require_role("admin"))):
+    """Real-time Google OAuth health dashboard data (last 24h)."""
+    return await _build_auth_health_payload(hours=24, raw_limit=20)
+
+
+@router.get("/admin/auth-health/export.csv")
+async def admin_auth_health_export_csv(user: dict = Depends(require_role("admin"))):
+    """Download last-24h OAuth events as CSV — useful for support@emergent.sh tickets."""
+    from fastapi.responses import StreamingResponse
+    now = datetime.now(timezone.utc)
+    since = (now - timedelta(hours=24)).isoformat()
+    cursor = db.oauth_health.find({"started_at": {"$gte": since}}).sort("started_at", -1)
+    buf = io.StringIO()
+    buf.write("started_at,outcome,final_status,upstream_status,attempts,duration_ms,email,ip,last_error\n")
+    async for ev in cursor:
+        row = [
+            (ev.get("started_at") or "").replace(",", " "),
+            (ev.get("outcome") or "").replace(",", " "),
+            str(ev.get("final_status") or ""),
+            str(ev.get("upstream_status") or ""),
+            str(ev.get("attempts") or ""),
+            str(ev.get("duration_ms") or ""),
+            (ev.get("email") or "").replace(",", " "),
+            (ev.get("ip") or "").replace(",", " "),
+            (ev.get("last_error") or "").replace(",", " ").replace("\n", " ")[:200],
+        ]
+        buf.write(",".join(row) + "\n")
+    buf.seek(0)
+    filename = f"oauth-health-{now.strftime('%Y%m%d-%H%M')}.csv"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ===== Early-warning email alert =====
+_AUTH_ALERT_COOLDOWN_MIN = 60
+_AUTH_ALERT_MIN_SAMPLES = 5
+_AUTH_ALERT_THRESHOLD_PCT = 80.0
+
+
+async def run_auth_health_alert_check() -> dict:
+    """Scheduled task: if Google OAuth success rate drops below 80% in last hour
+    AND we have ≥5 attempts AND no alert sent in last 60min → email all admins."""
+    now = datetime.now(timezone.utc)
+    since = (now - timedelta(hours=1)).isoformat()
+    cursor = db.oauth_health.find({"started_at": {"$gte": since}})
+    events = []
+    async for ev in cursor:
+        events.append(ev)
+    summary = _aggregate_auth_health(events, hours=1, raw_limit=0)
+    total = summary["total_attempts"]
+    rate = summary["success_rate_pct"]
+    if total < _AUTH_ALERT_MIN_SAMPLES:
+        return {"ok": True, "skipped": True, "reason": f"only {total} samples (<{_AUTH_ALERT_MIN_SAMPLES})"}
+    if rate is None or rate >= _AUTH_ALERT_THRESHOLD_PCT:
+        return {"ok": True, "skipped": True, "reason": f"healthy: {rate}%"}
+    last_alert = await db.system_alerts.find_one({"alert_key": "auth_health_low"})
+    if last_alert:
+        last_sent = last_alert.get("last_sent_at")
+        if last_sent:
+            try:
+                last_dt = datetime.fromisoformat(last_sent)
+                age_min = (now - last_dt).total_seconds() / 60
+                if age_min < _AUTH_ALERT_COOLDOWN_MIN:
+                    return {"ok": True, "skipped": True, "reason": f"cooldown {round(age_min)}min/{_AUTH_ALERT_COOLDOWN_MIN}min"}
+            except (ValueError, TypeError):
+                pass
+    admin_emails = []
+    async for adm in db.users.find({"role": "admin"}, {"email": 1}):
+        if adm.get("email"):
+            admin_emails.append(adm["email"])
+    if not admin_emails:
+        return {"ok": False, "reason": "no admin emails"}
+    lat = summary["latency_ms"]
+    outcomes_html = "".join(
+        f"<li><strong>{k}</strong>: {v}</li>" for k, v in (summary["outcomes"] or {}).items()
+    )
+    subject = f"⚠️ PropManage: Google OAuth degradat ({rate}% success rate)"
+    html = f"""
+    <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #fee2e2; border-left: 4px solid #dc2626; padding: 16px; border-radius: 8px;">
+        <h2 style="color: #dc2626; margin: 0 0 8px;">Alertă auth-health · {now.strftime('%Y-%m-%d %H:%M UTC')}</h2>
+        <p style="margin: 0; color: #7f1d1d;">Rata de succes Google OAuth a scăzut sub pragul de <strong>{_AUTH_ALERT_THRESHOLD_PCT}%</strong> în ultima oră.</p>
+      </div>
+      <h3>Sumar ultima oră:</h3>
+      <ul>
+        <li>Total atempturi: <strong>{total}</strong></li>
+        <li>Rata succes: <strong style="color: #dc2626;">{rate}%</strong></li>
+        <li>5xx upstream: {summary['upstream_5xx_count']}</li>
+        <li>P95 latency: {lat['p95']}ms</li>
+      </ul>
+      <h3>Distribuție rezultate:</h3>
+      <ul>{outcomes_html}</ul>
+      <p style="margin-top: 24px;">
+        <a href="https://propmanage.ro/admin/auth-health" style="display: inline-block; background: #d4ff3a; color: black; padding: 12px 24px; border-radius: 999px; text-decoration: none; font-weight: bold;">Deschide Dashboard</a>
+      </p>
+      <p style="font-size: 12px; color: #6b7280; margin-top: 24px;">
+        Cooldown: vei primi următoarea alertă cel mai devreme peste {_AUTH_ALERT_COOLDOWN_MIN} minute.<br/>
+        Dacă upstream Emergent OAuth e degradat, contactează <a href="mailto:support@emergent.sh">support@emergent.sh</a>.
+      </p>
+    </div>
+    """
+    from email_service import send_email as _send_email
+    try:
+        for em in admin_emails:
+            await _send_email(em, subject, html)
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[auth_health_alert] email send failed: {e}")
+        return {"ok": False, "error": str(e)}
+    await db.system_alerts.update_one(
+        {"alert_key": "auth_health_low"},
+        {"$set": {
+            "alert_key": "auth_health_low",
+            "last_sent_at": now.isoformat(),
+            "last_success_rate": rate,
+            "last_total": total,
+            "recipients": admin_emails,
+        }},
+        upsert=True,
+    )
+    logger.warning(f"[auth_health_alert] EMAIL SENT to {len(admin_emails)} admins: rate={rate}% total={total}")
+    return {"ok": True, "sent": True, "recipients": len(admin_emails), "rate": rate}
+
+
+@router.post("/admin/auth-health/test-alert")
+async def admin_auth_health_test_alert(user: dict = Depends(require_role("admin"))):
+    """Force-trigger the alert email (skips threshold, cooldown, min-samples). For testing email delivery."""
+    global _AUTH_ALERT_THRESHOLD_PCT, _AUTH_ALERT_COOLDOWN_MIN, _AUTH_ALERT_MIN_SAMPLES
+    orig_t, orig_c, orig_m = _AUTH_ALERT_THRESHOLD_PCT, _AUTH_ALERT_COOLDOWN_MIN, _AUTH_ALERT_MIN_SAMPLES
+    _AUTH_ALERT_THRESHOLD_PCT = 999.0
+    _AUTH_ALERT_COOLDOWN_MIN = 0
+    _AUTH_ALERT_MIN_SAMPLES = 0
+    try:
+        result = await run_auth_health_alert_check()
+    finally:
+        _AUTH_ALERT_THRESHOLD_PCT, _AUTH_ALERT_COOLDOWN_MIN, _AUTH_ALERT_MIN_SAMPLES = orig_t, orig_c, orig_m
+    return result
 
 
 # ============= DIGEST PREFERENCE & PREVIEW =============

@@ -45,6 +45,7 @@ from routes.root import router as root_router
 from routes.admin_console import router as admin_console_router, public_router as cms_public_router, run_due_preset_schedules, run_incident_spike_alert_check
 from routes.digital_twin import run_dt_auto_reminders
 from routes.admin_ai import router as admin_ai_router, run_daily_ai_digest, send_daily_ai_digest_email, run_ai_effectiveness_alert_check
+from routes.auth import run_auth_health_alert_check
 from routes.security_guard import router as security_guard_router
 from routes.concierge import router as concierge_router, admin_router as concierge_admin_router
 from routes.public import router as public_router, admin_router as public_admin_router, record_health_ping
@@ -198,6 +199,14 @@ async def startup():
             id="ai_effectiveness_low_alert",
             replace_existing=True,
             misfire_grace_time=3600,
+        )
+        # Google OAuth early-warning: check every 15 min, alert if success rate < 80% in last hour
+        scheduler.add_job(
+            run_auth_health_alert_check,
+            CronTrigger(minute="*/15", timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="auth_health_alert",
+            replace_existing=True,
+            misfire_grace_time=900,
         )
         scheduler.add_job(
             reset_demo_accounts,

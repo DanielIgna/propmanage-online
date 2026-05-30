@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
-import { Activity, AlertTriangle, ArrowLeft, CheckCircle2, Clock, RefreshCw, Users, Zap } from "lucide-react";
+import { Activity, AlertTriangle, ArrowLeft, CheckCircle2, Clock, Download, Mail, RefreshCw, Users, Zap } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -43,6 +43,25 @@ export const AdminAuthHealthPage = () => {
       setLoading(false);
     }
   };
+
+  const exportCsv = () => {
+    // Browser handles auth cookies; opens download dialog
+    window.open(`${API}/admin/auth-health/export.csv`, "_blank");
+  };
+
+  const sendTestAlert = async () => {
+    if (!window.confirm("Trimite un email de test către toți adminii?")) return;
+    try {
+      const r = await axios.post(`${API}/admin/auth-health/test-alert`);
+      alert(
+        r.data?.sent
+          ? `✓ Email trimis către ${r.data.recipients} admin(i).`
+          : `Skipped: ${r.data?.reason || "necunoscut"}`
+      );
+    } catch (e) {
+      alert("Eroare: " + (e?.response?.data?.detail || e.message));
+    }
+  };
   useEffect(() => {
     load();
     const t = setInterval(load, 30000);
@@ -73,6 +92,28 @@ export const AdminAuthHealthPage = () => {
           <button onClick={load} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-xs" data-testid="auth-health-refresh">
             <RefreshCw className="w-3 h-3" /> Refresh acum
           </button>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex flex-wrap gap-2 -mt-2">
+          <button
+            onClick={exportCsv}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-xs text-emerald-300"
+            data-testid="auth-health-export-csv"
+          >
+            <Download className="w-3 h-3" /> Export CSV (24h)
+          </button>
+          <button
+            onClick={sendTestAlert}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs text-amber-300"
+            data-testid="auth-health-test-alert"
+            title="Forțează un email de alertă către toți adminii (skip threshold + cooldown)"
+          >
+            <Mail className="w-3 h-3" /> Trimite test email alert
+          </button>
+          <div className="text-[10px] text-stone-500 self-center ml-2">
+            ⚙️ Alertă automată: email când success rate &lt; 80% în ultima oră (cooldown 60min)
+          </div>
         </div>
 
         {/* KPI cards */}
