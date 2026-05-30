@@ -201,13 +201,28 @@ async def logout(response: Response):
 @router.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
     # Load tutorial seen flag fresh from DB so it reflects across sessions
-    doc = await db.users.find_one({"_id": ObjectId(user["id"])}, {"tutorial_seen": 1, "ai_admin_tour_seen": 1, "dashboard_tour_completed": 1, "email": 1, "role": 1, "password_hash": 1, "google_auth": 1})
+    doc = await db.users.find_one(
+        {"_id": ObjectId(user["id"])},
+        {
+            "tutorial_seen": 1, "ai_admin_tour_seen": 1, "dashboard_tour_completed": 1,
+            "email": 1, "role": 1, "password_hash": 1, "google_auth": 1,
+            "dual_role_enabled": 1, "active_view": 1,
+            "avatar": 1, "avatar_source": 1, "picture": 1,
+        },
+    )
     user["tutorial_seen"] = bool((doc or {}).get("tutorial_seen", False))
     user["ai_admin_tour_seen"] = bool((doc or {}).get("ai_admin_tour_seen", False))
     user["dashboard_tour_completed"] = bool((doc or {}).get("dashboard_tour_completed", False))
     # `has_password` lets frontend show "Backup password" button only for Google-only accounts
     user["has_password"] = bool((doc or {}).get("password_hash"))
     user["google_auth"] = bool((doc or {}).get("google_auth"))
+    # Dual-role view state (multi-profile system)
+    user["dual_role_enabled"] = bool((doc or {}).get("dual_role_enabled", False))
+    user["active_view"] = (doc or {}).get("active_view") or user.get("role")
+    # Avatar metadata for source-aware UI (Google sync / uploaded)
+    user["avatar"] = (doc or {}).get("avatar") or user.get("avatar")
+    user["avatar_source"] = (doc or {}).get("avatar_source")
+    user["picture"] = (doc or {}).get("picture") or ""
     # Enforce admin whitelist on every /me call to catch direct DB tampering or stale tokens.
     if doc:
         fresh = {"_id": doc["_id"], "email": doc.get("email"), "role": doc.get("role")}
@@ -437,17 +452,112 @@ class SwitchViewIn(BaseModel):
 
 @router.post("/auth/switch-view")
 async def switch_view(data: SwitchViewIn, user: dict = Depends(get_current_user)):
-    """Verified specialists can toggle between specialist and client view."""
-    if user.get("role") != "specialist":
-        raise HTTPException(403, "Doar specialiștii pot comuta între profile.")
-    if not user.get("verified"):
-        raise HTTPException(403, "Doar specialiștii verificați pot accesa modul Client.")
+    """Toggle active view for users who have BOTH client + specialist profiles.
+
+    Eligibility: `dual_role_enabled=True` (set when client onboarded to specialist
+    via /auth/become-specialist) OR existing verified specialist (legacy path).
+    """
+    dual_enabled = bool(user.get("dual_role_enabled"))
+    is_legacy_verified_spec = user.get("role") == "specialist" and user.get("verified")
+    if not (dual_enabled or is_legacy_verified_spec):
+        raise HTTPException(
+            403,
+            "Profilul dublu nu este activ. Adaugă întâi profilul de Specialist din Setări → 'Devino Specialist'.",
+        )
     await db.users.update_one(
         {"_id": ObjectId(user["id"])},
         {"$set": {"active_view": data.view}}
     )
     refreshed = await db.users.find_one({"_id": ObjectId(user["id"])})
     return serialize_doc(refreshed)
+
+
+# ============= BECOME SPECIALIST (Client → dual-role upgrade) =============
+class BecomeSpecialistIn(BaseModel):
+    phone: str = Field(min_length=8, max_length=30)
+    service_categories: list[str] = Field(min_length=1, max_length=10)
+    coverage_zones: list[str] = Field(min_length=1, max_length=20)
+    bio: Optional[str] = Field(default=None, max_length=1000)
+
+
+@router.post("/auth/become-specialist")
+async def become_specialist(
+    data: BecomeSpecialistIn,
+    user: dict = Depends(get_current_user),
+):
+    """Promote a client account to ALSO be a specialist (dual-role).
+
+    - Keeps `role='client'` and `dual_role_enabled=True` so the user can switch
+      between views. The specialist features rely on `dual_role_enabled` OR role.
+    - Adds specialist fields: service_categories, coverage_zones, phone, bio.
+    - Does NOT auto-verify. Specialist must upload KYC docs to get `verified=True`.
+    - Enqueues 3-email onboarding drip (same as native specialist signup).
+    """
+    if user.get("role") not in ("client", "specialist"):
+        raise HTTPException(403, "Doar utilizatorii Client pot deveni Specialiști.")
+    if user.get("dual_role_enabled"):
+        raise HTTPException(400, "Ai deja un profil dual de Specialist activ.")
+
+    uid = ObjectId(user["id"])
+    now_iso = datetime.now(timezone.utc).isoformat()
+    patch = {
+        "dual_role_enabled": True,
+        "active_view": "specialist",  # New specialists start in specialist view
+        "service_categories": data.service_categories,
+        "coverage_zones": data.coverage_zones,
+        "phone": data.phone,
+        "bio": data.bio or "",
+        # Reset verification — KYC must be completed in specialist dashboard
+        "verified": False,
+        "tier": None,
+        "rating": user.get("rating"),
+        "reviews_count": user.get("reviews_count", 0),
+        # Wallet stays the same — no welcome bonus, since this is an upgrade
+        "specialist_onboarded_at": now_iso,
+    }
+    # Also set role='specialist' so existing require_role("specialist") guards work
+    # while keeping `dual_role_enabled` to allow swapping back to client view.
+    patch["role"] = "specialist"
+
+    await db.users.update_one({"_id": uid}, {"$set": patch})
+
+    # Enqueue specialist onboarding emails (best-effort)
+    try:
+        from onboarding_emails import enqueue_specialist_onboarding
+        await enqueue_specialist_onboarding(str(uid), user["email"], user.get("name", ""))
+    except Exception as _e:  # noqa: BLE001
+        logger.warning(f"[BecomeSpecialist] onboarding enqueue failed: {_e}")
+
+    refreshed = await db.users.find_one({"_id": uid})
+    return serialize_doc(refreshed)
+
+
+# ============= AVATAR FROM GOOGLE =============
+@router.post("/auth/refresh-google-avatar")
+async def refresh_google_avatar(user: dict = Depends(get_current_user)):
+    """Re-apply the stored Google profile picture as the user's avatar.
+
+    Only works for users who linked their Google account (`google_auth=True`)
+    AND haven't manually uploaded an avatar (`avatar_source != 'uploaded'`).
+    The picture URL is the one captured at the latest Google sign-in.
+    """
+    doc = await db.users.find_one({"_id": ObjectId(user["id"])})
+    if not doc:
+        raise HTTPException(404, "Utilizator inexistent.")
+    if not doc.get("google_auth"):
+        raise HTTPException(400, "Contul tău nu este conectat cu Google. Re-loghează-te cu Google ca să sincronizezi fotografia.")
+    picture = doc.get("picture") or ""
+    if not picture:
+        raise HTTPException(400, "Google nu a furnizat o fotografie la ultima autentificare.")
+    await db.users.update_one(
+        {"_id": doc["_id"]},
+        {"$set": {"avatar": picture, "avatar_source": "google"}},
+    )
+    refreshed = await db.users.find_one({"_id": doc["_id"]})
+    return serialize_doc(refreshed)
+
+
+# ============= DUAL-ROLE SWITCHER (legacy alias removed) =============
 
 
 # ============= PROFILE / PASSWORD =============
@@ -465,11 +575,16 @@ class ProfileUpdateIn(BaseModel):
 async def update_profile(data: ProfileUpdateIn, user: dict = Depends(get_current_user)):
     update = {k: v for k, v in data.model_dump().items() if v is not None}
     # Specialist-scope guard: refuse to set categories/zones on a non-specialist account
+    # (dual-role users with role=specialist already passes this check)
     if user.get("role") != "specialist":
         update.pop("service_categories", None)
         update.pop("coverage_zones", None)
     if not update:
         raise HTTPException(400, "Niciun câmp de actualizat.")
+    # Track avatar source: if user uploads an avatar, mark it as 'uploaded' so
+    # Google re-sync (or auto-refresh) doesn't override their choice.
+    if "avatar" in update:
+        update["avatar_source"] = "uploaded" if update["avatar"] else None
     await db.users.update_one({"_id": ObjectId(user["id"])}, {"$set": update})
     refreshed = await db.users.find_one({"_id": ObjectId(user["id"])})
     return serialize_doc(refreshed)
@@ -731,10 +846,14 @@ async def google_session_exchange(request: Request, response: Response):
 
     existing = await db.users.find_one({"email": email})
     if existing:
-        await db.users.update_one(
-            {"_id": existing["_id"]},
-            {"$set": {"picture": picture, "name": name, "google_auth": True}}
-        )
+        # Always refresh stored Google picture so the user can "Refresh from Google"
+        # later, but ONLY apply it as the active avatar if they haven't uploaded
+        # a custom one.
+        patch = {"picture": picture, "name": name, "google_auth": True}
+        if existing.get("avatar_source") != "uploaded":
+            patch["avatar"] = picture
+            patch["avatar_source"] = "google" if picture else None
+        await db.users.update_one({"_id": existing["_id"]}, {"$set": patch})
         user = await db.users.find_one({"_id": existing["_id"]})
         uid = str(user["_id"])
     else:
@@ -742,6 +861,8 @@ async def google_session_exchange(request: Request, response: Response):
             "email": email,
             "name": name,
             "picture": picture,
+            "avatar": picture or None,
+            "avatar_source": "google" if picture else None,
             "role": "client",
             "google_auth": True,
             "password_hash": "",

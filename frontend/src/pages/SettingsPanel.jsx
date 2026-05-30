@@ -46,8 +46,22 @@ export const SettingsPanel = () => {
     }
   };
 
-  const showDualRole = user.role === "specialist" && user.dual_role_enabled;
+  const refreshGoogleAvatar = async () => {
+    try {
+      await axios.post(`${API}/auth/refresh-google-avatar`);
+      await refreshUser();
+      alert("Fotografia de profil a fost actualizată din Google.");
+    } catch (e) {
+      alert(formatApiError(e));
+    }
+  };
+
+  // Dual-role visibility:
+  // - showDualRole = user already has both profiles (client+specialist active)
+  // - canBecomeSpecialist = user is currently a Client and doesn't have dual yet
+  const showDualRole = user.dual_role_enabled === true;
   const inClientView = user.active_view === "client";
+  const canBecomeSpecialist = user.role === "client" && !user.dual_role_enabled;
 
   const togglePush = async () => {
     try {
@@ -107,8 +121,15 @@ export const SettingsPanel = () => {
       {/* Profile header */}
       <div className="flex items-center gap-4 mb-8 pb-6 border-b border-white/5">
         <div className="relative">
-          {user.avatar ? (
-            <img src={user.avatar} alt={user.name} className="w-20 h-20 rounded-full object-cover" />
+          {(user.avatar || user.picture) ? (
+            <img
+              src={user.avatar || user.picture}
+              alt={user.name}
+              className="w-20 h-20 rounded-full object-cover"
+              referrerPolicy="no-referrer"
+              onError={(e) => { e.currentTarget.style.display = "none"; }}
+              data-testid="settings-avatar-img"
+            />
           ) : (
             <div className="w-20 h-20 rounded-full bg-gradient-to-br from-stone-600 to-stone-800 flex items-center justify-center font-serif text-2xl">
               {initials}
@@ -165,17 +186,37 @@ export const SettingsPanel = () => {
             tid="row-coverage"
           />
         )}
+        {canBecomeSpecialist && (
+          <Row
+            icon={RefreshCw}
+            title="Devino Specialist"
+            subtitle="Creează un profil de Specialist pe același cont. Vei putea primi lead-uri din marketplace și comuta între cele 2 profile oricând, fără logout."
+            onClick={() => setModal("become-specialist")}
+            tid="row-become-specialist"
+            accent
+          />
+        )}
         {showDualRole && (
           <Row
             icon={RefreshCw}
-            title={inClientView ? "Treci la profilul de profesionist" : "Treci la profilul de client"}
+            title={inClientView ? "Comută la profilul de Specialist" : "Comută la profilul de Client"}
             subtitle={
               inClientView
-                ? "Revino la dashboard-ul tău de specialist pentru a primi lead-uri."
-                : "Schimbă pe profilul de client pentru a solicita servicii pentru imobilul tău."
+                ? `Profil activ: CLIENT. Apasă pentru a trece la dashboard-ul de Specialist.`
+                : `Profil activ: SPECIALIST. Apasă pentru a trece la dashboard-ul de Client.`
             }
             onClick={switchView}
             tid="row-switch-view"
+            accent
+          />
+        )}
+        {user.google_auth && (user.avatar_source !== "uploaded" || !user.avatar) && (
+          <Row
+            icon={UserIcon}
+            title="Actualizează fotografia din Google"
+            subtitle="Re-sincronizează poza de profil din contul tău Google. Util când ai schimbat avatarul în Google."
+            onClick={refreshGoogleAvatar}
+            tid="row-refresh-google-avatar"
           />
         )}
         <Row
@@ -279,6 +320,7 @@ export const SettingsPanel = () => {
       {modal === "password" && <PasswordModal onClose={() => setModal(null)} />}
       {modal === "backup-password" && <BackupPasswordModal onClose={() => setModal(null)} />}
       {modal === "coverage" && <CoverageModal user={user} refreshUser={refreshUser} onClose={() => setModal(null)} />}
+      {modal === "become-specialist" && <BecomeSpecialistModal onClose={() => setModal(null)} refreshUser={refreshUser} />}
       {modal === "privacy" && <PrivacyModal onClose={() => setModal(null)} />}
       {modal === "referral" && <ReferralModal onClose={() => setModal(null)} />}
       {modal === "review-app" && <SimpleInfoModal title="Evaluează PropManage" onClose={() => setModal(null)}>
@@ -1007,6 +1049,165 @@ const FAQItem = ({ q, a }) => {
 
 
 // ============= COVERAGE MODAL (specialist's work scope + zones + response time) =============
+// ============= BECOME SPECIALIST MODAL =============
+// Lets a Client user create a Specialist profile on the same account.
+// On success the user gains `dual_role_enabled=true` and is redirected to /specialist.
+const BecomeSpecialistModal = ({ onClose, refreshUser }) => {
+  const [phone, setPhone] = useState("");
+  const [categories, setCategories] = useState([]);
+  const [zones, setZones] = useState([]);
+  const [bio, setBio] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [groupedZones, setGroupedZones] = useState([]);
+  const [zoneSearch, setZoneSearch] = useState("");
+
+  // 9 main service categories used across the platform
+  const SERVICE_OPTIONS = [
+    { id: "electric", label: "Electrician" },
+    { id: "plumbing", label: "Instalator" },
+    { id: "hvac", label: "Termo/HVAC" },
+    { id: "appliance", label: "Reparații electrocasnice" },
+    { id: "painter", label: "Zugrav / finisaje" },
+    { id: "carpenter", label: "Tâmplar" },
+    { id: "interior_design", label: "Designer interior" },
+    { id: "cleaning", label: "Curățenie" },
+    { id: "general", label: "Constructor general" },
+  ];
+
+  useEffect(() => {
+    axios.get(`${API}/regions/grouped`).then(r => setGroupedZones(r.data || [])).catch(() => setGroupedZones([]));
+  }, []);
+
+  const toggleCat = (id) => setCategories(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  const toggleZone = (z) => setZones(p => p.includes(z) ? p.filter(x => x !== z) : [...p, z]);
+
+  const submit = async () => {
+    if (!phone || phone.length < 8) { alert("Adaugă un număr de telefon valid (minim 8 cifre)."); return; }
+    if (categories.length === 0) { alert("Alege cel puțin o categorie de servicii."); return; }
+    if (zones.length === 0) { alert("Alege cel puțin o zonă de acoperire."); return; }
+    setBusy(true);
+    try {
+      await axios.post(`${API}/auth/become-specialist`, {
+        phone, service_categories: categories, coverage_zones: zones, bio,
+      });
+      await refreshUser();
+      // Redirect to specialist dashboard so the user lands directly in their new profile
+      window.location.href = "/specialist";
+    } catch (e) {
+      alert(formatApiError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const filteredZones = zoneSearch
+    ? groupedZones.map(g => ({
+        ...g,
+        zones: g.zones.filter(z => z.zone.toLowerCase().includes(zoneSearch.toLowerCase()) || g.city.toLowerCase().includes(zoneSearch.toLowerCase())),
+      })).filter(g => g.zones.length > 0)
+    : groupedZones;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-3" onClick={onClose}>
+      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={e => e.stopPropagation()}
+        className="bg-stone-950 border border-white/10 rounded-3xl p-5 w-full max-w-lg max-h-[90vh] overflow-y-auto" data-testid="become-specialist-modal">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-serif text-xl">Devino Specialist</h3>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center" data-testid="become-specialist-close"><X className="w-4 h-4" /></button>
+        </div>
+        <p className="text-xs text-stone-400 mb-4">
+          Creezi un profil de Specialist pe același cont. După salvare poți comuta între Client și Specialist
+          oricând din Setări. Pentru badge-ul "Verified" va trebui să încarci documente de identitate ulterior.
+        </p>
+
+        {/* Phone */}
+        <label className="block text-xs uppercase tracking-wider text-stone-500 mb-1">Telefon contact</label>
+        <input
+          type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+          placeholder="07XX XXX XXX"
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm mb-4 focus:border-[#d4ff3a]/40 outline-none"
+          data-testid="become-spec-phone"
+        />
+
+        {/* Categories */}
+        <label className="block text-xs uppercase tracking-wider text-stone-500 mb-2">Categorii servicii (1+ obligatoriu)</label>
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {SERVICE_OPTIONS.map(opt => {
+            const active = categories.includes(opt.id);
+            return (
+              <button
+                key={opt.id}
+                onClick={() => toggleCat(opt.id)}
+                className={`text-left text-xs px-3 py-2 rounded-lg border transition ${active ? "border-[#d4ff3a] bg-[#d4ff3a]/10 text-[#d4ff3a]" : "border-white/10 text-stone-300 hover:border-white/20"}`}
+                data-testid={`become-spec-cat-${opt.id}`}
+              >
+                {active ? "✓ " : ""}{opt.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Bio */}
+        <label className="block text-xs uppercase tracking-wider text-stone-500 mb-1">Descriere scurtă (opțional)</label>
+        <textarea
+          value={bio} onChange={e => setBio(e.target.value.slice(0, 1000))}
+          placeholder="Spune clienților în 2-3 propoziții cu ce te ocupi și de ce ești de încredere."
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm mb-4 focus:border-[#d4ff3a]/40 outline-none min-h-[70px]"
+          data-testid="become-spec-bio"
+        />
+
+        {/* Zones */}
+        <label className="block text-xs uppercase tracking-wider text-stone-500 mb-2">Zone de acoperire (1+ obligatoriu)</label>
+        <input
+          type="text" value={zoneSearch} onChange={e => setZoneSearch(e.target.value)}
+          placeholder="Caută oraș sau cartier..."
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm mb-2 outline-none"
+          data-testid="become-spec-zone-search"
+        />
+        <div className="max-h-[180px] overflow-y-auto border border-white/5 rounded-xl p-2 mb-4 space-y-1">
+          {filteredZones.length === 0 && <div className="text-xs text-stone-500 italic px-2 py-1">Nicio zonă disponibilă.</div>}
+          {filteredZones.map(g => (
+            <div key={g.city}>
+              <div className="text-[10px] uppercase tracking-wider text-stone-500 px-2 pt-1">{g.city}</div>
+              <div className="flex flex-wrap gap-1">
+                {g.zones.map(z => {
+                  const active = zones.includes(z.zone);
+                  return (
+                    <button
+                      key={z.zone} onClick={() => toggleZone(z.zone)}
+                      className={`text-[11px] px-2 py-1 rounded-full border transition ${active ? "border-[#d4ff3a] bg-[#d4ff3a]/10 text-[#d4ff3a]" : "border-white/10 text-stone-300 hover:border-white/20"}`}
+                      data-testid={`become-spec-zone-${z.zone}`}
+                    >
+                      {z.zone}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Summary + submit */}
+        <div className="text-[11px] text-stone-500 mb-3">
+          Selectate: <span className="text-stone-300">{categories.length}</span> categorii · <span className="text-stone-300">{zones.length}</span> zone
+        </div>
+        <button
+          onClick={submit} disabled={busy}
+          className="w-full bg-[#d4ff3a] text-stone-900 font-medium py-3 rounded-xl text-sm hover:bg-[#c8f520] transition disabled:opacity-50"
+          data-testid="become-spec-submit"
+        >
+          {busy ? "Se creează profilul..." : "Creează profil de Specialist"}
+        </button>
+        <p className="text-[10px] text-stone-600 mt-3 text-center">
+          După salvare vei fi redirecționat la dashboard-ul de Specialist. Poți reveni la profilul Client din Setări → Comută la profil Client.
+        </p>
+      </motion.div>
+    </div>
+  );
+};
+
+
+// ============= COVERAGE MODAL =============
 const CoverageModal = ({ user, refreshUser, onClose }) => {
   const isDesigner = (user.service_categories || []).includes("interior_design");
   const [scope, setScope] = useState(user.coverage_scope || "local");

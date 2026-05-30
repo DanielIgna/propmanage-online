@@ -61,13 +61,18 @@ def serialize_doc(doc):
     if "_id" in doc:
         doc["id"] = str(doc.pop("_id"))
     doc.pop("password_hash", None)
-    # Dual-role: ensure active_view + dual_role_enabled are always present
+    # Dual-role state — uses the explicit `dual_role_enabled` flag set when a
+    # client upgrades to specialist via /auth/become-specialist. Falls back to
+    # legacy "verified specialist = automatically dual" rule for backwards-compat.
     if doc.get("role") in ("client", "specialist", "admin", "operator"):
+        stored_dual = doc.get("dual_role_enabled")
         is_verified_spec = doc.get("role") == "specialist" and doc.get("verified") is True
-        doc["dual_role_enabled"] = is_verified_spec
-        av = doc.get("active_view")
-        if doc.get("role") == "specialist" and is_verified_spec and av == "client":
-            doc["active_view"] = "client"
+        dual = bool(stored_dual) if stored_dual is not None else is_verified_spec
+        doc["dual_role_enabled"] = dual
+        stored_view = doc.get("active_view")
+        # Honor stored active_view only when the user actually has dual access
+        if dual and stored_view in ("client", "specialist"):
+            doc["active_view"] = stored_view
         else:
             doc["active_view"] = doc.get("role")
     return doc

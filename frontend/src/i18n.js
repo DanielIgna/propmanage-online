@@ -48,7 +48,7 @@ const translations = {
     "cat.other": "Altele",
     // Landing - Hero
     "hero.badge": "PROPERTY OPERATING SYSTEM • V4.2",
-    "hero.title1": "Proprietatea ta,", "hero.title2": "perfecționată", "hero.title3": "digital.",
+    "hero.title1": "Proprietatea xxxx,", "hero.title2": "perfecționată", "hero.title3": "digital.",
     "hero.subtitle": "PropManage creează un Digital Twin de înaltă fidelitate al locuinței tale, monitorizând starea structurală și performanța financiară în timp real. Liniștea structurată pentru proprietarul modern.",
     "hero.cta1": "Explorează Demo", "hero.cta2": "Vezi Flux Complet",
     "hero.cta1.variant_a": "Explorează Demo", "hero.cta1.variant_b": "Începe gratuit acum",
