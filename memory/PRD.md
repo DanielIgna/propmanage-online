@@ -1864,3 +1864,59 @@ User: „într-o secțiune scrie escrow, în alta cont blocat, în alta depozit 
 - 🔴 USER: webhook URLs + Stripe LIVE keys
 - 🟡 Pachet B (escrow lifecycle, chat, browser tests) — după Stripe LIVE
 - 🟡 Twilio SMS, Lottie KB
+
+
+### Phase 48 — Pachet B: Payment edge cases · Dispute escalations · SEO heavy · Marketplace · Admin (Feb 2026)
+
+**25 teste E2E noi adăugate** (88 total în registry, 85 HTTP + 3 browser):
+
+**Payment / Escrow edge cases (8)**:
+- PAY-INSUFF — Specialist cu wallet 0 NU poate /accept (400)
+- PAY-CONFIRM-AUTHZ — Specialist NU poate /confirm (403, doar clientul)
+- PAY-START-AUTHZ — Alt specialist NU poate /start un job străin (404)
+- PAY-ESCROW-AUTHZ — Alt client NU poate alimenta escrow străin (404)
+- PAY-TX-LEAD — După /accept, tx 'lead_fee'=-45 RON e logată
+- PAY-TX-RELEASE — După /confirm, tx 'job_payment'=+950 RON (95%) e logată
+- PAY-FROZEN-NOCONF — Pe job disputat, /confirm e blocat (400)
+- PAY-COMPLETE-AUTHZ — Alt specialist NU poate /complete (404)
+
+**Dispute escalations (5)**:
+- DISP-NO-DUP — A 2-a dispută pe același request → 400
+- DISP-RESOLVE-AUTHZ — Client/specialist NU pot rezolva (403)
+- DISP-AFTER-RELEASE — După /confirm, dispute new → 400
+- DISP-EVID — evidence_urls persistate corect în DB
+- DISP-STATUS-OPEN — dispute.status=open + request.escrow_status=frozen
+
+**SEO heavy (5)**:
+- SEO-SITEMAP-COUNT — ≥30 URLs (în prod: 229)
+- SEO-SITEMAP-XML — Validare XML cu ET.parse + root urlset
+- SEO-LANDING-CITIES — Min 3 orașe în landings (în prod: 6)
+- SEO-GUIDES-IN-SITEMAP — Toate 6 ghiduri prezente
+- SEO-MKT-API — /api/marketplace/specialists no-auth returnează listă
+
+**Marketplace filters (3)**:
+- MKT-CAT — ?category=electric returnează doar electric
+- MKT-ZONE — ?zone=Bucuresti returnează specialiști din zonă
+- MKT-CITY-NORES — ?city=NoExist → [] (no leak)
+
+**Admin tooling (4)**:
+- ADMIN-USERS-LIST — items/total/skip/limit shape
+- ADMIN-INC-LIST — {items, count} shape
+- ADMIN-IMP-ADMIN-BLOCK — Admin NU poate impersona alt admin (403)
+- ADMIN-IMP-CLIENT — Admin impersonează client → redirect_to=/client
+
+**Bonus regression fix-uri** (3 teste stale reparate):
+1. **GDPR-03**: refactor să folosească `/auth/account-delete` (nu există admin anonymize)
+2. **ADMIN-BACKUP**: corectat path `/admin/backups` (nu `/status`)
+3. **ADMIN-AI-HEALTH**: corectat cheia `overall` (nu `score`) în response shape
+
+**Rezultat preview**: `85/85 HTTP tests pass · 0 fail · pytest validation 4/4 pass` ✓
+Creștere de la 53→88 teste (+66% coverage). Pachet B P0 count: 13/25.
+
+### Backlog rămas după Phase 48
+- 🔴 USER: redeploy producție (Phase 46+47+48)
+- 🔴 USER: Stripe LIVE keys + webhook URLs Slack/Discord
+- 🟡 Digital Twin 3D Module (Phase A-I) — `.glb`/`.gltf` upload + viewer
+- 🟡 Pachet C (~17 teste rămase) — operator flows, projects, notifications, browser E2E
+- 🟡 Refactor: split qa_automation.py (~2650 lines) în /backend/qa_tests/
+- 🟢 Twilio SMS, Lottie KB, S3/Cloudinary avatar migration
