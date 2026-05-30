@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { toast } from "sonner";
-import { CheckCircle2, Clock, Loader2, Mail, Play, Rocket, RotateCw, Sparkles, Wrench, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, Mail, MinusCircle, Play, Rocket, RotateCw, Sparkles, Wrench, XCircle } from "lucide-react";
 import { AdminCard, AdminBtn } from "../AdminLayoutMetronic";
 import { API, PRIO_BADGE } from "./shared";
 
@@ -93,7 +93,7 @@ export const ReleaseGateCard = () => {
         <div className="font-serif text-2xl font-bold" data-testid="qa-gate-verdict">{verdictLabel}</div>
         {last && (
           <div className="text-xs mt-1 opacity-90">
-            <span data-testid="qa-gate-last-summary">{last.summary.pass}/{last.summary.total} pass · {last.summary.fail} fail · {last.summary.p0_fail} P0 fail</span>
+            <span data-testid="qa-gate-last-summary">{last.summary.pass}/{last.summary.total} pass · {last.summary.fail} fail{last.summary.skip ? ` · ${last.summary.skip} skip` : ""} · {last.summary.p0_fail} P0 fail</span>
             {" · "}
             <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(last.started_at).toLocaleString("ro-RO")}</span>
             {last.email?.sent && (
@@ -104,8 +104,9 @@ export const ReleaseGateCard = () => {
       </div>
 
       <p className="text-xs text-slate-500 mt-3 mb-2">
-        Rulează cele 14 teste automate (11 HTTP + 3 Playwright) și trimite raportul detaliat pe email la admini.
+        Rulează toate testele automate (HTTP + Playwright) și trimite raportul detaliat pe email la admini.
         Folosește-l <strong>înainte de fiecare deploy în producție</strong> ca să prinzi regresii înainte ca utilizatorii să le vadă.
+        Testele de browser (Playwright) sunt marcate <strong>SKIPPED</strong> automat dacă mediul nu are Chromium instalat — nu sunt eșecuri.
       </p>
 
       <label className="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 mb-3 cursor-pointer">
@@ -170,18 +171,33 @@ export const ReleaseGateCard = () => {
             Vezi rezultatele detaliate ({last.results.length} teste)
           </summary>
           <div className="mt-2 space-y-1 max-h-[300px] overflow-y-auto pr-1">
-            {last.results.map((r) => (
-              <div key={r.code} className={`text-[11px] p-1.5 rounded border ${r.status === "pass" ? "border-emerald-200 bg-emerald-50 dark:bg-emerald-900/15 dark:border-emerald-800" : "border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-800"}`}>
-                <div className="flex items-center gap-2">
-                  {r.status === "pass" ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <XCircle className="w-3 h-3 text-red-600" />}
-                  <code className="font-mono">{r.code}</code>
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full border ${PRIO_BADGE[r.priority]}`}>{r.priority}</span>
-                  <span className="text-slate-500 ml-auto">{r.duration_ms}ms</span>
+            {last.results.map((r) => {
+              const isPass = r.status === "pass";
+              const isSkip = r.status === "skip";
+              const borderBg = isPass
+                ? "border-emerald-200 bg-emerald-50 dark:bg-emerald-900/15 dark:border-emerald-800"
+                : isSkip
+                  ? "border-slate-300 bg-slate-50 dark:bg-slate-800/40 dark:border-slate-700"
+                  : "border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-800";
+              const icon = isPass
+                ? <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                : isSkip
+                  ? <MinusCircle className="w-3 h-3 text-slate-400" />
+                  : <XCircle className="w-3 h-3 text-red-600" />;
+              return (
+                <div key={r.code} className={`text-[11px] p-1.5 rounded border ${borderBg}`} data-testid={`qa-gate-result-${r.code}`}>
+                  <div className="flex items-center gap-2">
+                    {icon}
+                    <code className="font-mono">{r.code}</code>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full border ${PRIO_BADGE[r.priority]}`}>{r.priority}</span>
+                    {isSkip && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300">SKIPPED</span>}
+                    <span className="text-slate-500 ml-auto">{r.duration_ms}ms</span>
+                  </div>
+                  <div className="text-slate-700 dark:text-slate-200 mt-0.5">{r.title}</div>
+                  <div className="text-slate-500 italic mt-0.5">📋 {r.note?.slice(0, 200)}</div>
                 </div>
-                <div className="text-slate-700 dark:text-slate-200 mt-0.5">{r.title}</div>
-                <div className="text-slate-500 italic mt-0.5">📋 {r.note?.slice(0, 200)}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </details>
       )}

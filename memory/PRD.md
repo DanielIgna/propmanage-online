@@ -1964,3 +1964,18 @@ Acoperire automată: **105/105 scenarios = 100%** (vs 38/105 la începutul ciclu
 - 🟡 Digital Twin 3D Module (Phase A-I) — `.glb`/`.gltf` upload + viewer  
 - 🟡 Refactor: split qa_automation.py (~3760 lines) în /backend/qa_tests/{tests_payment,tests_dispute,tests_seo,tests_operator,tests_projects}.py
 - 🟢 Twilio SMS, Lottie KB, S3/Cloudinary avatar migration
+
+
+### Phase 50 — Production hardening: read-after-write + Playwright skip rendering (Feb 2026)
+
+**Bug-uri reparate (post-deploy diagnostic):**
+1. **MongoDB Atlas read-after-write lag**: pe producție, HTTP register returna 200 dar `db.users.find_one(...)` imediat după ratează utilizatorul (replica lag). Adăugat helper `_wait_for_db()` cu polling 3s × 12 attempts. Aplicat pe ESCROW-01/02, DISPUTE-02, QUOTE-01, FILE-01, GDPR-02, `_seed_active_job`.
+2. **Playwright "Chromium not installed" → fail în UI**: skip-ul era setat corect în backend dar ReleaseGateCard.jsx randa orice non-pass ca roșu. Acum **3 stări**: pass=verde, skip=gri+badge "SKIPPED", fail=roșu.
+3. **LIFECYCLE-02 polling 3s → 7.5s** pentru a tolera onboarding cron lag pe prod.
+4. **Email release gate**: și el randa skip ca ❌. Acum diferențiat ✅/⏭️/❌.
+
+**De ce gate-ul producției rula doar 38 teste**: codul Phase 42-49 (Pachet A+B+C) nu fusese cuprins în deploy-ul anterior. Producția avea registry `AUTOMATED_TESTS` cu 38 entries (din Phase 41), dar `checklist_template` deja avea 105 items (deployat separat). **Soluția**: user trebuie să facă redeploy.
+
+**Verificat în preview:**
+- 9/9 tests folosind `_wait_for_db` polling → toate pass (ESCROW, DISPUTE, QUOTE, FILE, LIFECYCLE, GDPR, OP-FLAG, TIMELINE)
+- Lint Python + JS OK

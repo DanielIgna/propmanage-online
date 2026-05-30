@@ -519,10 +519,10 @@ async def lifecycle_specialist_register_then_onboarding_drip() -> dict:
         })
         if r.status_code != 200:
             return _ko(f"register failed {r.status_code}")
-    # Check that 3 onboarding rows were enqueued — allow small async write lag
+    # Check that 3 onboarding rows were enqueued — allow generous async write lag on prod
     from db import db
     rows = 0
-    for _ in range(10):
+    for _ in range(25):  # 25 × 0.3s = 7.5s total budget for prod Atlas
         rows = await db.onboarding_emails.count_documents({"email": email})
         if rows >= 3:
             break
@@ -532,7 +532,7 @@ async def lifecycle_specialist_register_then_onboarding_drip() -> dict:
     await db.users.delete_one({"email": email})
     if rows >= 3:
         return _ok(f"OK — specialist {email} a primit {rows} email-uri de onboarding")
-    return _ko(f"Doar {rows} email-uri enqueuate, așteptam ≥3 (după 3s polling)")
+    return _ko(f"Doar {rows} email-uri enqueuate, așteptam ≥3 (după 7.5s polling)")
 
 
 async def lifecycle_marketplace_search_returns_specialists() -> dict:
@@ -714,6 +714,21 @@ def _safe_e2e(fn):
     return wrapper
 
 
+async def _wait_for_db(collection_query_fn, *, max_attempts: int = 12, sleep_s: float = 0.25, label: str = "doc"):
+    """Poll DB for read-after-write consistency (MongoDB Atlas replica lag on prod).
+
+    `collection_query_fn` is an async callable returning the doc (or None).
+    Returns the doc on success, raises RuntimeError after timeout.
+    Total wait budget: max_attempts × sleep_s (default 3s).
+    """
+    for _ in range(max_attempts):
+        doc = await collection_query_fn()
+        if doc:
+            return doc
+        await asyncio.sleep(sleep_s)
+    raise RuntimeError(f"{label} not found in DB after {max_attempts * sleep_s:.1f}s polling (read-after-write delay?)")
+
+
 async def _seed_active_job(escrow_amount: float = 1000.0) -> dict:
     """Create a client + specialist + property + request fully assigned with escrow held.
 
@@ -722,6 +737,8 @@ async def _seed_active_job(escrow_amount: float = 1000.0) -> dict:
     """
     client_c, c_email, c_id = await _register_and_login("client", "e2e_c")
     spec_c, s_email, s_id = await _register_and_login("specialist", "e2e_s")
+    # Wait for specialist row to be visible (Atlas read-after-write lag on prod)
+    await _wait_for_db(lambda: db.users.find_one({"email": s_email}), label=f"specialist {s_email[:20]}")
     # Top-up specialist wallet so they can pay the 45 RON lead fee
     await db.users.update_one({"email": s_email}, {"$inc": {"wallet_balance": 200.0}})
 
@@ -821,9 +838,10 @@ async def e2e_escrow_funded_status_held() -> dict:
     """ESCROW-01: Client postează cerere → specialist acceptă → client alimentează escrow → status='held'."""
     env = await _seed_active_job(800.0)
     try:
-        req = await db.requests.find_one({"_id": ObjectId(env["request_id"])})
-        if not req:
-            return _ko(f"request {env['request_id']} not found in DB after seed")
+        req = await _wait_for_db(
+            lambda: db.requests.find_one({"_id": ObjectId(env["request_id"])}),
+            label=f"request {env['request_id'][:10]}",
+        )
         amt = req.get("escrow_amount")
         st = req.get("escrow_status")
         if st == "held" and amt == 800.0:
@@ -842,9 +860,10 @@ async def e2e_escrow_full_confirm_releases_split() -> dict:
         await env["spec_c"].post(f"/api/requests/{env['request_id']}/start")
         await env["spec_c"].post(f"/api/requests/{env['request_id']}/complete")
         # Snapshot specialist wallet
-        spec_before = await db.users.find_one({"email": env["specialist_email"]})
-        if not spec_before:
-            return _ko(f"specialist {env['specialist_email']} disappeared from DB")
+        spec_before = await _wait_for_db(
+            lambda: db.users.find_one({"email": env["specialist_email"]}),
+            label=f"specialist {env['specialist_email'][:20]}",
+        )
         bal_before = float(spec_before.get("wallet_balance") or 0)
         # Client confirms
         cf = await env["client_c"].post(f"/api/requests/{env['request_id']}/confirm")
@@ -902,18 +921,20 @@ async def e2e_dispute_resolves_refund_client() -> dict:
             return _ko(f"no dispute id in response (status={dp.status_code}): {dp.text[:200]}")
         # Admin resolves
         admin_c = await _admin_client()
-        client_before = await db.users.find_one({"email": env["client_email"]})
-        if not client_before:
-            return _ko("client missing from DB")
+        client_before = await _wait_for_db(
+            lambda: db.users.find_one({"email": env["client_email"]}),
+            label=f"client {env['client_email'][:20]}",
+        )
         bal_b = float(client_before.get("wallet_balance") or 0)
         rs = await admin_c.post(f"/api/admin/disputes/{dispute_id}/resolve", json={
             "resolution": "refund_client", "notes": "E2E test refund",
         })
         if rs.status_code != 200:
             return _ko(f"resolve failed {rs.status_code}: {rs.text[:200]}")
-        client_after = await db.users.find_one({"email": env["client_email"]})
-        if not client_after:
-            return _ko("client missing after resolve")
+        client_after = await _wait_for_db(
+            lambda: db.users.find_one({"email": env["client_email"]}),
+            label="client after resolve",
+        )
         delta = round(float(client_after.get("wallet_balance") or 0) - bal_b, 2)
         if abs(delta - 600.0) < 1.0:
             return _ok(f"OK — client rambursat {delta} RON din escrow")
@@ -931,6 +952,8 @@ async def e2e_quote_specialist_accept_charges_lead_fee() -> dict:
     spec_c, s_email, _ = await _register_and_login("specialist", "qf_s")
     pid = req_id = ""
     try:
+        # Wait for specialist row to be visible on prod (Atlas read lag)
+        await _wait_for_db(lambda: db.users.find_one({"email": s_email}), label=f"specialist {s_email[:20]}")
         await db.users.update_one({"email": s_email}, {"$inc": {"wallet_balance": 200.0}})
         pr = await client_c.post("/api/properties", json={
             "name": "Q Apt", "address": "Str Q 1", "type": "apartment", "surface": 50.0, "rooms": 2,
@@ -957,20 +980,14 @@ async def e2e_quote_specialist_accept_charges_lead_fee() -> dict:
         req_id = (rq_body or {}).get("id") if isinstance(rq_body, dict) else None
         if not req_id:
             return _ko(f"no request id (status={rq.status_code})")
-        before = await db.users.find_one({"email": s_email})
-        if not before:
-            return _ko("specialist not in DB after register")
+        before = await _wait_for_db(lambda: db.users.find_one({"email": s_email}), label="specialist before accept")
         bal_b = float(before.get("wallet_balance") or 0)
         ac = await spec_c.post(f"/api/requests/{req_id}/accept", json={})
         if ac.status_code != 200:
             return _ko(f"accept failed {ac.status_code}: {ac.text[:200]}")
-        after = await db.users.find_one({"email": s_email})
-        if not after:
-            return _ko("specialist disappeared after accept")
+        after = await _wait_for_db(lambda: db.users.find_one({"email": s_email}), label="specialist after accept")
         delta = round(bal_b - float(after.get("wallet_balance") or 0), 2)
-        req = await db.requests.find_one({"_id": ObjectId(req_id)})
-        if not req:
-            return _ko("request disappeared after accept")
+        req = await _wait_for_db(lambda: db.requests.find_one({"_id": ObjectId(req_id)}), label=f"request {req_id[:10]}")
         if abs(delta - 45.0) < 0.01 and req.get("status") == "assigned":
             return _ok(f"OK — lead fee 45 RON dedus, status='assigned' (specialist={s_email[:18]}...)")
         return _ko(f"delta={delta} RON (await 45), status={req.get('status')} (await assigned)")
@@ -1002,9 +1019,11 @@ async def e2e_specialist_kyc_upload_pending() -> dict:
         })
         if up.status_code != 200:
             return _ko(f"upload failed {up.status_code}: {up.text[:200]}")
-        spec = await db.users.find_one({"email": s_email})
-        if not spec:
-            return _ko("specialist not in DB after upload")
+        # Wait for the document write to land on prod Atlas
+        spec = await _wait_for_db(
+            lambda: db.users.find_one({"email": s_email, "documents.name": "buletin_e2e.pdf"}),
+            label=f"specialist with doc {s_email[:20]}",
+        )
         docs = spec.get("documents") or []
         match = [d for d in docs if d.get("name") == "buletin_e2e.pdf" and d.get("status") == "pending"]
         if match:
@@ -1064,15 +1083,14 @@ async def e2e_gdpr_erasure_request_creates_dsar_row() -> dict:
         if r.status_code != 200:
             return _ko(f"erasure failed {r.status_code}: {r.text[:200]}")
         # Allow tiny write delay (transaction commit on prod can lag a few ms)
-        import asyncio as _asyncio
-        row = None
-        for _ in range(8):
-            row = await db.dsar_requests.find_one({"user_email": c_email, "type": "erasure"})
-            if row:
-                break
-            await _asyncio.sleep(0.25)
-        if not row:
-            return _ko("no dsar_requests row created after 2s polling")
+        try:
+            row = await _wait_for_db(
+                lambda: db.dsar_requests.find_one({"user_email": c_email, "type": "erasure"}),
+                max_attempts=20, sleep_s=0.3,
+                label=f"dsar_requests row {c_email[:18]}",
+            )
+        except RuntimeError as e:
+            return _ko(str(e))
         if row.get("status") != "new" or not row.get("sla_due_at"):
             return _ko(f"row malformed: status={row.get('status')}, sla={row.get('sla_due_at')}")
         return _ok(f"OK — erasure DSAR creat, status=new, SLA={row['sla_due_at'][:10]} (30 zile)")
@@ -3588,8 +3606,13 @@ def _gate_email_html(payload: dict) -> dict:
     for r in results:
         status = r["status"]
         is_pass = status == "pass"
-        bg = "#34d39915" if is_pass else "#ef444415"
-        icon = "✅" if is_pass else "❌"
+        is_skip = status == "skip"
+        if is_pass:
+            bg, icon = "#34d39915", "✅"
+        elif is_skip:
+            bg, icon = "#9ca3af15", "⏭️"
+        else:
+            bg, icon = "#ef444415", "❌"
         prio_color = {"P0": "#ef4444", "P1": "#fbbf24", "P2": "#60a5fa"}.get(r["priority"], "#9ca3af")
         rows_html.append(f"""
           <tr style="background:{bg};">
