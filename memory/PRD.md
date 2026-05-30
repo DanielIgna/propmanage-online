@@ -2017,3 +2017,44 @@ Acoperire automată: **105/105 scenarios = 100%** (vs 38/105 la începutul ciclu
 - 🟡 Digital Twin 3D Module (Phase A-I)
 - 🟡 Refactor split qa_automation.py (~3800 lines)
 - 🟢 Complexity remaining: `send_weekly_velocity_email()`, `create_backup()`, `email_backup()` — deferred to next sprint
+
+
+### Phase 52 — Multi-Role (Client+Specialist) + Google Avatar sync (Feb 2026)
+
+**🎯 Sistemul Multi-Role complet implementat:**
+
+**Backend (4 endpoint-uri noi/modificate):**
+- `POST /api/auth/become-specialist` — Client upgradează la dual-role. Body: `{phone, service_categories[], coverage_zones[], bio?}`. Setează `role='specialist'`, `dual_role_enabled=True`, `active_view='specialist'`, `verified=False`. Enqueue 3-email onboarding. Cleanup-guard împotriva duble-onboarding și conturi specialist deja existente (HTTP 400 cu mesaj clar).
+- `POST /api/auth/switch-view` — refactored: acceptă `dual_role_enabled=True` SAU specialist legacy verified (back-compat). Aruncă 403 cu mesaj despre "Devino Specialist" pentru clienții puri.
+- `POST /api/auth/refresh-google-avatar` — Re-aplică `picture` stocat din Google ca avatar. Cere `google_auth=True`.
+- `PATCH /api/auth/profile` — Setează `avatar_source='uploaded'` când userul își încarcă avatarul propriu (prioritar față de Google).
+- `GET /api/auth/me` — Acum expune `dual_role_enabled`, `active_view`, `avatar`, `avatar_source`, `picture`.
+- `core_utils.serialize_doc` — Folosește `dual_role_enabled` stocat (NU mai face fallback automat la verified-spec dacă flag-ul e setat explicit).
+- `google_session_exchange` — Login Google păstrează avatarul manual (`avatar_source='uploaded'`); altfel aplică `picture` din Google ca avatar și marchează `avatar_source='google'`.
+
+**Frontend:**
+- `SettingsPanel.jsx`:
+  - Secțiune nouă "Devino Specialist" — vizibil DOAR pentru clienți puri (`role='client' && !dual_role_enabled`)
+  - Modal `BecomeSpecialistModal` — formular cu phone, 9 categorii servicii, zone de acoperire (cu căutare), bio opțional. La submit: redirect spre `/specialist`.
+  - Secțiunea "Profil activ" — afișează butonul "Comută la Client/Specialist" pentru users dual-role
+  - Buton nou "Actualizează fotografia din Google" — vizibil pentru users Google fără avatar manual
+  - Avatar fallback: `user.avatar || user.picture || initials`
+- `DashShared.jsx` (Header):
+  - Badge "Profil activ: Client/Specialist" pentru dual-role users
+  - Buton quick-switch "Schimbă la Specialist/Client" în header (icon `ArrowLeftRight`)
+  - Avatar fallback chain identic (uploaded → Google picture → initials), cu `onError` graceful
+
+**Verification:**
+- 12/12 tests `test_phase52_multirole.py` pass (Testing Agent V3 + pytest local)
+- 8/8 tests `test_phase42_pachet_b.py` pass (no regression)
+- 9/9 tests core (LIFECYCLE, QUOTE, ESCROW, DISPUTE, GDPR, OP-FLAG, REFERRAL, WALLET-TOPUP, PROJ-CREATE) pass
+- Manual curl flow verificat: client → become-specialist → switch-view ↔ → blocked properly when not allowed
+
+**Notă pe Google "happy path":** Testul `/auth/refresh-google-avatar` pentru un user real Google nu a fost testat automat (necesită OAuth real). Trebuie verificat manual o dată după redeploy.
+
+### Backlog rămas
+- 🔴 USER: redeploy producție pentru Phases 50/51/52
+- 🔴 USER: Stripe LIVE keys + webhook URLs Slack/Discord
+- 🟡 Digital Twin 3D Module (Phase A-I)
+- 🟡 Refactor split qa_automation.py (~3800 lines)
+- 🟢 Complexity remaining: `send_weekly_velocity_email`, `create_backup`, `email_backup`

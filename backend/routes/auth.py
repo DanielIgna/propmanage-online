@@ -497,6 +497,11 @@ async def become_specialist(
         raise HTTPException(403, "Doar utilizatorii Client pot deveni Specialiști.")
     if user.get("dual_role_enabled"):
         raise HTTPException(400, "Ai deja un profil dual de Specialist activ.")
+    # Reject native specialists who haven't opted into dual-mode — their account is
+    # already a specialist account. Dual-mode is for clients who additionally want
+    # to offer services.
+    if user.get("role") == "specialist":
+        raise HTTPException(400, "Contul tău este deja un cont de Specialist. Profilul dual este pentru clienții care vor să devină și specialiști.")
 
     uid = ObjectId(user["id"])
     now_iso = datetime.now(timezone.utc).isoformat()

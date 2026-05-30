@@ -14,7 +14,29 @@ import uuid
 import requests
 import pytest
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
+def _get_base_url() -> str:
+    """Read REACT_APP_BACKEND_URL from env, falling back to backend/.env or frontend/.env."""
+    url = os.environ.get("REACT_APP_BACKEND_URL")
+    if url:
+        return url.rstrip("/")
+    # Look for the frontend .env (preview env URL — required for cookie-based auth)
+    for envfile in (
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "frontend", ".env"),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"),
+    ):
+        try:
+            with open(envfile) as f:
+                for line in f:
+                    if line.startswith("REACT_APP_BACKEND_URL"):
+                        val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                        if val:
+                            return val.rstrip("/")
+        except FileNotFoundError:
+            continue
+    return "http://localhost:8001"
+
+
+BASE_URL = _get_base_url()
 API = f"{BASE_URL}/api"
 
 CLIENT = {"email": "client@propmanage.io", "password": "Client123!"}
