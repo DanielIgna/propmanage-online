@@ -1460,6 +1460,268 @@ async def platform_trust_badge_svg_renders() -> dict:
         await c.aclose()
 
 
+# ============================================================================
+# PACHET B — Escrow lifecycle + Dispute variants + Chat + Admin tools
+# ============================================================================
+
+@_safe_e2e
+async def lifecycle_specialist_start_sets_in_progress() -> dict:
+    """LIFE-START: După /start, status='in_progress', started_at este populat."""
+    env = await _seed_active_job(500.0)
+    try:
+        r = await env["spec_c"].post(f"/api/requests/{env['request_id']}/start")
+        if r.status_code != 200:
+            return _ko(f"/start failed {r.status_code}: {r.text[:200]}")
+        req = await db.requests.find_one({"_id": ObjectId(env["request_id"])})
+        if not req:
+            return _ko("request not found after start")
+        if req.get("status") == "in_progress" and req.get("started_at"):
+            return _ok(f"OK — status=in_progress, started_at={req['started_at'][:19]}")
+        return _ko(f"status={req.get('status')}, started_at={req.get('started_at')}")
+    finally:
+        await _cleanup_e2e(env)
+
+
+@_safe_e2e
+async def lifecycle_specialist_complete_sets_pending_confirmation() -> dict:
+    """LIFE-COMPLETE: După /complete, status='completed' și awaiting client confirm."""
+    env = await _seed_active_job(700.0)
+    try:
+        await env["spec_c"].post(f"/api/requests/{env['request_id']}/start")
+        r = await env["spec_c"].post(f"/api/requests/{env['request_id']}/complete")
+        if r.status_code != 200:
+            return _ko(f"/complete failed {r.status_code}: {r.text[:200]}")
+        req = await db.requests.find_one({"_id": ObjectId(env["request_id"])})
+        if not req:
+            return _ko("request missing after complete")
+        # `completed` here means specialist marked as done — client must confirm to release funds
+        if req.get("status") in ("completed", "pending_confirmation") and req.get("completed_at"):
+            esc = req.get("escrow_status")
+            return _ok(f"OK — status={req.get('status')}, completed_at={req['completed_at'][:19]}, escrow={esc}")
+        return _ko(f"status={req.get('status')}, completed_at={req.get('completed_at')}")
+    finally:
+        await _cleanup_e2e(env)
+
+
+@_safe_e2e
+async def lifecycle_unauthorized_start_blocked() -> dict:
+    """LIFE-AUTHZ: Un alt specialist NU poate da /start pe job asignat altcuiva."""
+    env = await _seed_active_job(400.0)
+    attacker_c, attacker_email, _ = await _register_and_login("specialist", "atk")
+    try:
+        r = await attacker_c.post(f"/api/requests/{env['request_id']}/start")
+        if r.status_code in (401, 403, 404):
+            return _ok(f"OK — atac respins corect cu HTTP {r.status_code}")
+        return _ko(f"⚠ SECURITY: alt specialist a putut /start (HTTP {r.status_code})")
+    finally:
+        await attacker_c.aclose()
+        try:
+            await db.users.delete_one({"email": attacker_email})
+            await db.onboarding_emails.delete_many({"email": attacker_email})
+        except Exception:
+            pass
+        await _cleanup_e2e(env)
+
+
+@_safe_e2e
+async def dispute_resolve_pay_specialist_splits_95_5() -> dict:
+    """DISPUTE-PAY: Admin rezolvă pay_specialist → specialist primește 95% din escrow."""
+    env = await _seed_active_job(1000.0)
+    admin_c = None
+    try:
+        await env["spec_c"].post(f"/api/requests/{env['request_id']}/start")
+        dp = await env["client_c"].post(f"/api/requests/{env['request_id']}/dispute",
+                                         json={"reason": "test pay_specialist resolution"})
+        if dp.status_code != 200:
+            return _ko(f"open dispute {dp.status_code}")
+        try:
+            dispute_id = (dp.json() or {}).get("id")
+        except Exception:
+            return _ko("dispute response not JSON")
+        if not dispute_id:
+            return _ko("no dispute id")
+        spec_before = await db.users.find_one({"email": env["specialist_email"]})
+        if not spec_before:
+            return _ko("spec missing from DB")
+        bal_b = float(spec_before.get("wallet_balance") or 0)
+        admin_c = await _admin_client()
+        rs = await admin_c.post(f"/api/admin/disputes/{dispute_id}/resolve",
+                                 json={"resolution": "pay_specialist", "notes": "E2E"})
+        if rs.status_code != 200:
+            return _ko(f"resolve {rs.status_code}: {rs.text[:200]}")
+        spec_after = await db.users.find_one({"email": env["specialist_email"]})
+        delta = round(float(spec_after.get("wallet_balance") or 0) - bal_b, 2)
+        if abs(delta - 950.0) < 1.0:
+            return _ok(f"OK — specialist primit {delta} RON (95% × 1000 = 950)")
+        return _ko(f"delta={delta}, așteptam ~950")
+    finally:
+        if admin_c:
+            await admin_c.aclose()
+        await _cleanup_e2e(env)
+
+
+@_safe_e2e
+async def dispute_resolve_split_60_40() -> dict:
+    """DISPUTE-SPLIT: Admin rezolvă split cu client_pct=60 → client 600, specialist 380 (95% din 400)."""
+    env = await _seed_active_job(1000.0)
+    admin_c = None
+    try:
+        await env["spec_c"].post(f"/api/requests/{env['request_id']}/start")
+        dp = await env["client_c"].post(f"/api/requests/{env['request_id']}/dispute",
+                                         json={"reason": "test split resolution"})
+        if dp.status_code != 200:
+            return _ko(f"open dispute {dp.status_code}")
+        dispute_id = (dp.json() or {}).get("id") if dp.json() else None
+        if not dispute_id:
+            return _ko("no dispute id")
+        c_before = await db.users.find_one({"email": env["client_email"]})
+        s_before = await db.users.find_one({"email": env["specialist_email"]})
+        if not c_before or not s_before:
+            return _ko("users missing")
+        c_b, s_b = float(c_before.get("wallet_balance") or 0), float(s_before.get("wallet_balance") or 0)
+        admin_c = await _admin_client()
+        rs = await admin_c.post(f"/api/admin/disputes/{dispute_id}/resolve",
+                                 json={"resolution": "split", "client_pct": 60, "notes": "E2E"})
+        if rs.status_code != 200:
+            return _ko(f"resolve {rs.status_code}: {rs.text[:200]}")
+        c_after = await db.users.find_one({"email": env["client_email"]})
+        s_after = await db.users.find_one({"email": env["specialist_email"]})
+        c_delta = round(float(c_after.get("wallet_balance") or 0) - c_b, 2)
+        s_delta = round(float(s_after.get("wallet_balance") or 0) - s_b, 2)
+        # 1000 RON, 60% client = 600 → client +600, specialist (400 * 0.95) = +380
+        if abs(c_delta - 600.0) < 1.0 and abs(s_delta - 380.0) < 1.0:
+            return _ok(f"OK — split 60/40: client +{c_delta} RON, specialist +{s_delta} RON")
+        return _ko(f"split greșit: client +{c_delta} (await 600), spec +{s_delta} (await 380)")
+    finally:
+        if admin_c:
+            await admin_c.aclose()
+        await _cleanup_e2e(env)
+
+
+@_safe_e2e
+async def chat_unauthorized_user_blocked() -> dict:
+    """CHAT-AUTHZ: Un utilizator străin NU vede chat-ul altui job."""
+    env = await _seed_active_job(300.0)
+    intruder_c, intruder_email, _ = await _register_and_login("client", "int")
+    try:
+        r = await intruder_c.get(f"/api/chat/{env['request_id']}/messages")
+        if r.status_code in (401, 403, 404):
+            return _ok(f"OK — chat protejat corect (HTTP {r.status_code})")
+        return _ko(f"⚠ SECURITY: alt client a accesat chat (HTTP {r.status_code})")
+    finally:
+        await intruder_c.aclose()
+        try:
+            await db.users.delete_one({"email": intruder_email})
+        except Exception:
+            pass
+        await _cleanup_e2e(env)
+
+
+@_safe_e2e
+async def gdpr_anonymize_scrambles_email() -> dict:
+    """GDPR-03: Admin POST /admin/users/{id}/anonymize → email-ul user-ului devine anonimizat."""
+    client_c, c_email, c_id = await _register_and_login("client", "anon")
+    admin_c = None
+    try:
+        if not c_id:
+            return _ko("client id missing")
+        admin_c = await _admin_client()
+        # Try canonical endpoint first
+        r = await admin_c.post(f"/api/admin/users/{c_id}/anonymize")
+        if r.status_code == 404:
+            # Try alternative path used in some admin routers
+            r = await admin_c.post(f"/api/admin/gdpr/users/{c_id}/anonymize")
+        if r.status_code != 200:
+            return _ko(f"anonymize {r.status_code}: {r.text[:200]}")
+        u = await db.users.find_one({"_id": ObjectId(c_id)})
+        if not u:
+            return _ko("user vanished after anonymize")
+        new_email = u.get("email") or ""
+        if new_email == c_email:
+            return _ko("email NU s-a schimbat după anonymize")
+        # Common patterns: anonymized@*, deleted_*, anon_*, hash@anonymized
+        if any(tag in new_email.lower() for tag in ("anon", "deleted", "removed", "scram")):
+            return _ok(f"OK — anonymize: {c_email[:25]} → {new_email[:35]}")
+        return _ok(f"OK — email rotit la anonymize: {c_email[:18]} → {new_email[:30]}")
+    finally:
+        await client_c.aclose()
+        if admin_c:
+            await admin_c.aclose()
+        try:
+            await db.users.delete_one({"_id": ObjectId(c_id) if c_id else c_email})
+            await db.users.delete_one({"email": c_email})
+        except Exception:
+            pass
+
+
+@_safe_e2e
+async def admin_disputes_listing_works() -> dict:
+    """ADMIN-DISP-LIST: GET /api/admin/disputes returnează lista cu disputele active + structură validă."""
+    env = await _seed_active_job(500.0)
+    admin_c = None
+    dispute_id = None
+    try:
+        await env["spec_c"].post(f"/api/requests/{env['request_id']}/start")
+        dp = await env["client_c"].post(f"/api/requests/{env['request_id']}/dispute",
+                                         json={"reason": "E2E listing test"})
+        if dp.status_code != 200:
+            return _ko(f"open dispute {dp.status_code}")
+        dispute_id = (dp.json() or {}).get("id")
+        admin_c = await _admin_client()
+        r = await admin_c.get("/api/admin/disputes")
+        if r.status_code != 200:
+            return _ko(f"GET /admin/disputes {r.status_code}: {r.text[:200]}")
+        body = r.json()
+        items = body if isinstance(body, list) else (body.get("items") or [])
+        found = any(d.get("id") == dispute_id or d.get("_id") == dispute_id for d in items if isinstance(d, dict))
+        if found:
+            return _ok(f"OK — admin vede {len(items)} dispute(s), inclusiv {dispute_id[:12]}")
+        return _ko(f"admin nu găsește dispute {dispute_id[:12]} în lista de {len(items)} items")
+    finally:
+        if admin_c:
+            await admin_c.aclose()
+        await _cleanup_e2e(env)
+
+
+@_safe_e2e
+async def admin_backup_status_endpoint() -> dict:
+    """ADMIN-BACKUP: GET /admin/backups/status returnează ultimul backup (sau notă că nu există încă)."""
+    admin_c = await _admin_client()
+    try:
+        r = await admin_c.get("/api/admin/backups/status")
+        if r.status_code != 200:
+            return _ko(f"backup status {r.status_code}: {r.text[:200]}")
+        body = r.json() if isinstance(r.json(), dict) else {}
+        # Either a populated record or an explicit "no backups yet"
+        if body.get("status") or body.get("last_backup") or "no" in str(body).lower():
+            return _ok(f"OK — backup status accesibil ({list(body.keys())[:5]})")
+        return _ko(f"răspuns neașteptat: {list(body.keys())}")
+    finally:
+        await admin_c.aclose()
+
+
+@_safe_e2e
+async def admin_ai_health_score_endpoint() -> dict:
+    """ADMIN-AI-HEALTH: GET /admin/ai/health-score returnează 0-100 (eventual cu cache)."""
+    admin_c = await _admin_client()
+    try:
+        # Try canonical first
+        r = await admin_c.get("/api/admin/ai/health-score")
+        if r.status_code == 404:
+            r = await admin_c.get("/api/admin/ai-health/score")
+        if r.status_code != 200:
+            return _ko(f"ai-health {r.status_code}: {r.text[:200]}")
+        body = r.json() if isinstance(r.json(), dict) else {}
+        score = body.get("score") or (body.get("health") or {}).get("score")
+        if score is None:
+            return _ko(f"score lipsește din response (keys={list(body.keys())[:6]})")
+        if not (0 <= score <= 100):
+            return _ko(f"score în afara intervalului 0-100: {score}")
+        return _ok(f"OK — AI Health Score: {score}/100")
+    finally:
+        await admin_c.aclose()
+
+
 
 
 # ============================================================================
@@ -1856,6 +2118,57 @@ AUTOMATED_TESTS: dict[str, dict] = {
         "code": "PLATFORM-05", "title": "Trust Badge SVG — endpoint renderează imagine validă",
         "kind": "http", "category": "PUBLIC", "priority": "P2",
         "runner": platform_trust_badge_svg_renders,
+    },
+    # ---- PACHET B · Lifecycle / Dispute variants / Chat / Admin (10) ----
+    "LIFE-START": {
+        "code": "LIFE-START", "title": "Specialist /start → status=in_progress, started_at populat",
+        "kind": "http", "category": "E2E", "priority": "P0",
+        "runner": lifecycle_specialist_start_sets_in_progress,
+    },
+    "LIFE-COMPLETE": {
+        "code": "LIFE-COMPLETE", "title": "Specialist /complete → status=completed, awaiting client confirm",
+        "kind": "http", "category": "E2E", "priority": "P0",
+        "runner": lifecycle_specialist_complete_sets_pending_confirmation,
+    },
+    "LIFE-AUTHZ": {
+        "code": "LIFE-AUTHZ", "title": "SECURITY: alt specialist NU poate /start pe job altcuiva",
+        "kind": "http", "category": "E2E", "priority": "P0",
+        "runner": lifecycle_unauthorized_start_blocked,
+    },
+    "DISPUTE-PAY": {
+        "code": "DISPUTE-PAY", "title": "Admin resolve pay_specialist → 95% din escrow la specialist",
+        "kind": "http", "category": "E2E", "priority": "P0",
+        "runner": dispute_resolve_pay_specialist_splits_95_5,
+    },
+    "DISPUTE-SPLIT": {
+        "code": "DISPUTE-SPLIT", "title": "Admin resolve split 60/40 → calcul corect ambele părți",
+        "kind": "http", "category": "E2E", "priority": "P0",
+        "runner": dispute_resolve_split_60_40,
+    },
+    "CHAT-AUTHZ": {
+        "code": "CHAT-AUTHZ", "title": "SECURITY: chat-ul unui job NU e accesibil unui străin",
+        "kind": "http", "category": "E2E", "priority": "P0",
+        "runner": chat_unauthorized_user_blocked,
+    },
+    "GDPR-03": {
+        "code": "GDPR-03", "title": "Admin anonymize user → email rotat / scrambled",
+        "kind": "http", "category": "E2E", "priority": "P0",
+        "runner": gdpr_anonymize_scrambles_email,
+    },
+    "ADMIN-DISP-LIST": {
+        "code": "ADMIN-DISP-LIST", "title": "Admin vede lista disputelor active",
+        "kind": "http", "category": "ADMIN", "priority": "P1",
+        "runner": admin_disputes_listing_works,
+    },
+    "ADMIN-BACKUP": {
+        "code": "ADMIN-BACKUP", "title": "Backup status endpoint accesibil admin",
+        "kind": "http", "category": "ADMIN", "priority": "P1",
+        "runner": admin_backup_status_endpoint,
+    },
+    "ADMIN-AI-HEALTH": {
+        "code": "ADMIN-AI-HEALTH", "title": "AI Health Score 0-100 disponibil",
+        "kind": "http", "category": "ADMIN", "priority": "P1",
+        "runner": admin_ai_health_score_endpoint,
     },
 }
 
