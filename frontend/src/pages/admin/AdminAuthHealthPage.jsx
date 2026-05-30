@@ -1,0 +1,184 @@
+// /admin/auth-health — real-time Google OAuth health metrics.
+// Admin only. Auto-refresh every 30s.
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import { Link } from "react-router-dom";
+import { Activity, AlertTriangle, ArrowLeft, CheckCircle2, Clock, RefreshCw, Users, Zap } from "lucide-react";
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+const OUTCOME_LABEL = {
+  success: { label: "Reușite", color: "emerald" },
+  user_error: { label: "Eroare user", color: "amber" },
+  upstream_5xx: { label: "5xx upstream", color: "orange" },
+  network: { label: "Rețea", color: "red" },
+  exhausted: { label: "Retry epuizat", color: "red" },
+  unknown: { label: "Necunoscut", color: "stone" },
+};
+
+const ColorChip = ({ color, children, "data-testid": testId }) => {
+  const cls = {
+    emerald: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+    amber: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+    orange: "bg-orange-500/15 text-orange-300 border-orange-500/30",
+    red: "bg-red-500/15 text-red-300 border-red-500/30",
+    stone: "bg-stone-500/15 text-stone-300 border-stone-500/30",
+  }[color] || "bg-stone-500/15 text-stone-300 border-stone-500/30";
+  return <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider border ${cls}`} data-testid={testId}>{children}</span>;
+};
+
+export const AdminAuthHealthPage = () => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+
+  const load = async () => {
+    try {
+      const r = await axios.get(`${API}/admin/auth-health`);
+      setData(r.data);
+      setErr(null);
+    } catch (e) {
+      setErr(e?.response?.data?.detail || e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  if (loading) return <div className="min-h-screen bg-stone-950 text-stone-400 flex items-center justify-center" data-testid="auth-health-loading">Se încarcă…</div>;
+  if (err) return <div className="min-h-screen bg-stone-950 text-red-300 p-8" data-testid="auth-health-error">Eroare: {err}</div>;
+
+  const succRate = data.success_rate_pct;
+  const succColor = succRate === null ? "stone" : succRate >= 95 ? "emerald" : succRate >= 80 ? "amber" : "red";
+  const lat = data.latency_ms || {};
+
+  return (
+    <div className="min-h-screen bg-stone-950 text-white p-6 lg:p-10" data-testid="admin-auth-health-page">
+      <div className="max-w-6xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <Link to="/admin" className="inline-flex items-center gap-2 text-xs text-stone-500 hover:text-white mb-2">
+              <ArrowLeft className="w-3 h-3" /> Admin Dashboard
+            </Link>
+            <h1 className="font-serif text-3xl flex items-center gap-3" data-testid="auth-health-title">
+              <Activity className="w-7 h-7 text-[#d4ff3a]" />
+              Google OAuth · Sănătate Auth
+            </h1>
+            <p className="text-stone-500 text-sm mt-1">Statistici real-time pentru endpoint-ul <code className="text-stone-400">/api/auth/google/session</code> · refresh la 30s</p>
+          </div>
+          <button onClick={load} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-xs" data-testid="auth-health-refresh">
+            <RefreshCw className="w-3 h-3" /> Refresh acum
+          </button>
+        </div>
+
+        {/* KPI cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-5" data-testid="kpi-total">
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-stone-500"><Users className="w-3 h-3" /> Total 24h</div>
+            <div className="text-3xl font-serif mt-2">{data.total_attempts}</div>
+          </div>
+          <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-5" data-testid="kpi-success">
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-stone-500"><CheckCircle2 className="w-3 h-3" /> Rata succes</div>
+            <div className={`text-3xl font-serif mt-2 ${succColor === "emerald" ? "text-emerald-300" : succColor === "amber" ? "text-amber-300" : succColor === "red" ? "text-red-300" : "text-stone-300"}`}>
+              {succRate === null ? "—" : `${succRate}%`}
+            </div>
+            <div className="text-[10px] text-stone-500 mt-1">{data.outcomes?.success || 0} din {data.total_attempts}</div>
+          </div>
+          <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-5" data-testid="kpi-p95">
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-stone-500"><Clock className="w-3 h-3" /> P95 latență</div>
+            <div className="text-3xl font-serif mt-2">{lat.p95 != null ? `${lat.p95}ms` : "—"}</div>
+            <div className="text-[10px] text-stone-500 mt-1">P50: {lat.p50 ?? "—"}ms · P99: {lat.p99 ?? "—"}ms</div>
+          </div>
+          <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-5" data-testid="kpi-5xx">
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-stone-500"><AlertTriangle className="w-3 h-3" /> Erori 5xx upstream</div>
+            <div className={`text-3xl font-serif mt-2 ${data.upstream_5xx_count > 0 ? "text-orange-300" : "text-stone-300"}`}>{data.upstream_5xx_count}</div>
+            <div className="text-[10px] text-stone-500 mt-1">Emergent OAuth instabilitate</div>
+          </div>
+        </div>
+
+        {/* Outcomes breakdown */}
+        <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-5">
+          <h2 className="text-sm font-medium text-stone-300 mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-[#d4ff3a]" /> Distribuție rezultate</h2>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(data.outcomes || {}).length === 0 && <span className="text-xs text-stone-500">Niciun event în ultimele 24h.</span>}
+            {Object.entries(data.outcomes || {}).map(([key, count]) => {
+              const meta = OUTCOME_LABEL[key] || OUTCOME_LABEL.unknown;
+              return (
+                <ColorChip key={key} color={meta.color} data-testid={`outcome-${key}`}>
+                  <span>{meta.label}</span>
+                  <span className="font-mono ml-1">{count}</span>
+                </ColorChip>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Recent 5xx incidents */}
+        {data.recent_upstream_5xx?.length > 0 && (
+          <div className="rounded-2xl bg-orange-500/5 border border-orange-500/20 p-5" data-testid="upstream-5xx-list">
+            <h2 className="text-sm font-medium text-orange-300 mb-3 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" /> Erori Emergent OAuth 5xx (ultimele 10)
+            </h2>
+            <table className="w-full text-xs">
+              <thead className="text-stone-500 uppercase text-[10px]">
+                <tr className="border-b border-white/5">
+                  <th className="text-left py-1.5">Timp</th>
+                  <th className="text-left py-1.5">Status</th>
+                  <th className="text-left py-1.5">Încercări</th>
+                  <th className="text-left py-1.5">Rezultat final</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.recent_upstream_5xx.map((e, i) => (
+                  <tr key={i} className="border-b border-white/5 last:border-b-0">
+                    <td className="py-1.5 text-stone-400">{new Date(e.started_at).toLocaleString("ro-RO")}</td>
+                    <td className="py-1.5 text-orange-300 font-mono">HTTP {e.upstream_status}</td>
+                    <td className="py-1.5 text-stone-400">{e.attempts}/3</td>
+                    <td className="py-1.5"><ColorChip color={OUTCOME_LABEL[e.outcome]?.color || "stone"}>{OUTCOME_LABEL[e.outcome]?.label || e.outcome}</ColorChip></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Recent events */}
+        <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-5" data-testid="recent-events-list">
+          <h2 className="text-sm font-medium text-stone-300 mb-3">Ultimele 20 events</h2>
+          {data.recent_events?.length === 0 ? (
+            <div className="text-xs text-stone-500">Niciun event în ultimele 24h.</div>
+          ) : (
+            <table className="w-full text-xs">
+              <thead className="text-stone-500 uppercase text-[10px]">
+                <tr className="border-b border-white/5">
+                  <th className="text-left py-1.5">Timp</th>
+                  <th className="text-left py-1.5">Rezultat</th>
+                  <th className="text-left py-1.5">Status</th>
+                  <th className="text-left py-1.5">Durată</th>
+                  <th className="text-left py-1.5">Email</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.recent_events.map((e, i) => (
+                  <tr key={e._id || i} className="border-b border-white/5 last:border-b-0">
+                    <td className="py-1.5 text-stone-400 whitespace-nowrap">{new Date(e.started_at).toLocaleString("ro-RO")}</td>
+                    <td className="py-1.5"><ColorChip color={OUTCOME_LABEL[e.outcome]?.color || "stone"}>{OUTCOME_LABEL[e.outcome]?.label || e.outcome}</ColorChip></td>
+                    <td className="py-1.5 text-stone-400 font-mono">{e.final_status || "—"}</td>
+                    <td className="py-1.5 text-stone-400">{e.duration_ms != null ? `${e.duration_ms}ms` : "—"}</td>
+                    <td className="py-1.5 text-stone-500 truncate max-w-[200px]">{e.email || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AdminAuthHealthPage;

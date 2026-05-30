@@ -28,6 +28,7 @@ import { AIConciergeBubble } from "./components/AIConciergeBubble";
 import { BookDemoModal } from "./pages/BookDemoModal";
 import { LandingDemo3D } from "./components/LandingDemo3D";
 import { PublicDemoPage } from "./pages/PublicDemoPage";
+import { AdminAuthHealthPage } from "./pages/admin/AdminAuthHealthPage";
 import { PrivacyPage, TermsPage, CookiePolicyPage } from "./pages/LegalPages";
 import { TrustCenterPage } from "./pages/TrustCenterPage";
 import { PrivacyNoticesPage } from "./pages/PrivacyNoticesPage";
@@ -1481,6 +1482,7 @@ function App() {
               <Route path="/client" element={<ClientDashboard />} />
               <Route path="/specialist" element={<SpecialistDashboard />} />
               <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/auth-health" element={<AdminAuthHealthPage />} />
               <Route path="/operator" element={<OperatorDashboard />} />
               <Route path="/projects/:id" element={<ProjectWorkspace />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />

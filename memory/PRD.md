@@ -2198,6 +2198,31 @@ Acoperire automată: **105/105 scenarios = 100%** (vs 38/105 la începutul ciclu
 - 🟢 Refactor qa_automation.py (~3800 lines)
 
 
+### Phase 60 — Admin Auth Health Dashboard (Feb 2026)
+
+**Feature: `/admin/auth-health` — real-time Google OAuth health monitoring**
+- Backend: nouă colecție MongoDB `oauth_health` cu structură `{event_type, started_at, outcome, attempts, upstream_status, duration_ms, ip, email}`. Fiecare apel la `/api/auth/google/session` înregistrează automat un event (best-effort, nu blochează request-ul).
+- Endpoint `GET /api/admin/auth-health` (admin only, 403 pentru alți useri): agregare 24h cu:
+  - KPI-uri: total atempturi, success rate %, distribuție outcomes (success / user_error / upstream_5xx / network / exhausted)
+  - Latențe P50, P95, P99 ms din toate request-urile (success + fail)
+  - Count 5xx upstream Emergent OAuth + lista ultimelor 10 incidente
+  - Lista ultimelor 20 events raw cu timp, outcome, status, durată, email
+- Frontend: pagină `/admin/auth-health` cu auto-refresh la 30s, KPI cards color-coded (verde/galben/roșu pe success rate), tabel evenimente, alertă orange pentru 5xx upstream.
+- Route înregistrat în App.js sub `<Route path="/admin/auth-health">`.
+
+**De ce contează:**
+- Diagnoza instantă dacă bug-ul 520 reapare după redeploy producție
+- Vizualizare trend success rate (target ≥95%)
+- P95 latency vizibilă — dacă crește peste ~5000ms, upstream Emergent OAuth e degradat
+
+**Files:**
+- `/app/backend/routes/auth.py` — `_record_oauth_health()` helper + `admin_auth_health()` endpoint + tracking în `google_session_exchange()`
+- `/app/frontend/src/pages/admin/AdminAuthHealthPage.jsx` — UI dashboard
+- `/app/frontend/src/App.js` — route înregistrat
+
+**Tests:** ✅ Backend testat live cu curl (KPI complet, 403 pentru non-admin)
+
+
 ### Phase 59 — Production Auth Fix (HTTP 520) + Engagement Toast + R3F Resolution (Feb 2026)
 
 **Bug Fix Critical: "Autentificare Google eșuată — [520] Request failed with status code 520" pe producție**
