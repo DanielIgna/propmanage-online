@@ -2196,3 +2196,20 @@ Acoperire automată: **105/105 scenarios = 100%** (vs 38/105 la începutul ciclu
 - 🟡 Twilio SMS Alerts pentru nighttime failures
 - 🟢 Avatar upload migration base64 → S3/Cloudinary
 - 🟢 Refactor qa_automation.py (~3800 lines)
+
+
+### Phase 58 — Public Demo Showcase + Impersonation Fix + R3F Patch (Feb 2026)
+
+**Bug Fix: banner roșu "Vizionezi ca Lucian Stan" rămas blocat**
+- Cauză: la închidere browser fără "Ieși din impersonare", cookie `admin_access_token` (stash) rămâne valabil 2h. La next login admin vede banner-ul ghost.
+- Fix: `POST /api/auth/login` șterge explicit `admin_access_token` la fresh login.
+
+**Feature: Public Demo Showcase**
+- Secțiune nouă în landing (`LandingDemo3D`): poster SVG animat + CTA către `/demo`
+- Route public `/demo` cu viewer Three.js complet: DemoHouse procedurale, toggle Realist/X-Ray/Wireframe, panel layers, CTA LiDAR
+
+**Bug Fix Critical: R3F crash în preview dev**
+- Plugin `@emergentbase/visual-edits` injecta `x-line-number` pe primitive R3F → applyProps crash
+- Fix: `scripts/patch-visual-edits.js` (postinstall) skip-uiește 60+ primitive R3F în babel plugin
+
+**Files:** auth.py · LandingDemo3D.jsx · PublicDemoPage.jsx · DemoCanvas.jsx · MountOnce.jsx · scripts/patch-visual-edits.js · package.json (postinstall)

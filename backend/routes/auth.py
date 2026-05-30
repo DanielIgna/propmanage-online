@@ -186,6 +186,11 @@ async def login(data: LoginIn, request: Request, response: Response):
     access = create_access_token(uid, email, user.get("role", "client"))
     refresh = create_refresh_token(uid)
     set_auth_cookies(response, access, refresh)
+    # Clean any leftover impersonation stash cookie so a fresh login never
+    # auto-resumes a previous "View as User" session. Without this, an admin
+    # who closed the browser mid-impersonation would re-open the app and still
+    # see the red "Vizionezi ca …" banner from the past session.
+    response.delete_cookie("admin_access_token", path="/")
     return serialize_doc(user)
 
 

@@ -26,6 +26,8 @@ import { TutorialOverlay } from "./pages/TutorialOverlay";
 import { RoleTour } from "./pages/RoleTour";
 import { AIConciergeBubble } from "./components/AIConciergeBubble";
 import { BookDemoModal } from "./pages/BookDemoModal";
+import { LandingDemo3D } from "./components/LandingDemo3D";
+import { PublicDemoPage } from "./pages/PublicDemoPage";
 import { PrivacyPage, TermsPage, CookiePolicyPage } from "./pages/LegalPages";
 import { TrustCenterPage } from "./pages/TrustCenterPage";
 import { PrivacyNoticesPage } from "./pages/PrivacyNoticesPage";
@@ -1418,6 +1420,7 @@ const LandingPage = () => {
       <SpecialistJourney />
       <WalletEcosystem />
       <DigitalTwin />
+      <LandingDemo3D onBookDemo={() => setDemoOpen(true)} />
       {showSection("landing_show_admin_trust", false) && <AdminTrust />}
       {showSection("landing_show_business_model", false) && <BusinessModel />}
       {showSection("landing_show_value_proposition", true) && <ValueProp />}
@@ -1457,6 +1460,7 @@ function App() {
               <ImpersonationBanner />
               <Routes>
               <Route path="/" element={<LandingPage />} />
+              <Route path="/demo" element={<PublicDemoPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/privacy/notices" element={<PrivacyNoticesPage />} />
               <Route path="/digital-twin" element={<DigitalTwinPage />} />
