@@ -2058,3 +2058,38 @@ Acoperire automată: **105/105 scenarios = 100%** (vs 38/105 la începutul ciclu
 - 🟡 Digital Twin 3D Module (Phase A-I)
 - 🟡 Refactor split qa_automation.py (~3800 lines)
 - 🟢 Complexity remaining: `send_weekly_velocity_email`, `create_backup`, `email_backup`
+
+
+### Phase 53 — Digital Twin 3D în Setări Client (Feb 2026)
+
+**Backend:**
+- `GET /api/me/digital-twins` (în `routes/operator_twins.py`) — Returnează summary cross-property pentru toate imobilele user-ului:
+  - `has_any`, `has_available`, `primary` (twin cu cel mai bun status), `twins[]` (toate, sortate descrescător după rank)
+  - Per twin: `property_id, property_name, twin_id, status, status_label (RO), progress 0-100, model_url, requested_at, validated_at`
+  - 5 status-uri: `approved` (Disponibil), `draft` (În generare), `pending_validation` (În procesare), `needs_revision` (Eșuat), `not_requested` (Inexistent)
+- Ownership enforced via `properties.owner_id == user.id`
+- Fixed wildcard import in `operator_twins.py` (Phase 51 cleanup deferred)
+
+**Frontend (SettingsPanel.jsx):**
+- Componentă nouă `DigitalTwinCard` — vizibilă DOAR pentru client view (`active_view='client' || role='client'`)
+- Render în partea de sus, înainte de "Profilul meu"
+- 3 stări UI:
+  1. **No properties** → CTA "Adaugă o proprietate" → redirect `/client?tab=properties`
+  2. **Has property + twin approved** → buton "Vezi Digital Twin 3D" deschide `ClientTwinViewerModal` (refolosit)
+  3. **Has property + twin în generare** → buton disabled cu spinner "În generare — revino în curând"
+  4. **Has property + no twin** → CTA "Creează Digital Twin"
+- Badge status colorat (verde/indigo/galben/roșu/gri) cu dot + label RO
+- Progress bar pentru statusuri intermediare (30-70%)
+- Collapsible `<details>` cu lista celorlalte imobile + status fiecare
+
+**Verification:**
+- 4/4 tests `test_phase53_digital_twin.py` pass: auth required, empty case, with-property case, full shape validation
+- 12/12 tests Phase 52 (multi-role) + 8/8 tests Phase 42 (Pachet B+C) — zero regresii
+- Screenshot manual: card apare cu "Status: Disponibil", buton "Vezi Digital Twin 3D" funcțional, details collapsible cu 33 celelalte imobile
+
+### Backlog rămas după Phase 53
+- 🔴 USER: redeploy producție pentru Phases 50/51/52/53
+- 🔴 USER: Stripe LIVE keys + webhook URLs Slack/Discord
+- 🟡 Digital Twin 3D Module **Phase A-I (upload GLB/GLTF real)** — Phase 53 a expus DOAR existing twin data, încă nu permite upload de modele 3D reale
+- 🟡 Refactor split qa_automation.py (~3800 lines)
+- 🟢 Complexity remaining: `send_weekly_velocity_email`, `create_backup`, `email_backup`

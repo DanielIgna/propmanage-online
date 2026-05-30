@@ -2,16 +2,18 @@
 // Includes: Profile edit, Change password, Dual-role switcher, Referrals, Support,
 // Contact, Data & Privacy (GDPR).
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import axios from "axios";
 import {
   User as UserIcon, Settings as SettingsIcon, RefreshCw, Share2, Heart,
   LifeBuoy, MessageCircle, Lock, ChevronRight, X, Mail, Phone, MapPin as MapPinIcon,
   Download, Trash2, AlertTriangle, CheckCircle2, Shield, BellRing, BellOff,
-  Sun, Eye, Globe, Clock, KeyRound,
+  Sun, Eye, Globe, Clock, KeyRound, Box, Loader2, Sparkles,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { API } from "./DashShared";
+import { ClientTwinViewerModal } from "./ClientTwinViewer";
 import { pushSupported, getPushStatus, subscribeToPush, unsubscribeFromPush, ensureServiceWorker } from "../push";
 
 // ============= MAIN PANEL =============
@@ -20,6 +22,9 @@ export const SettingsPanel = () => {
   const [modal, setModal] = useState(null);
   const [pushStatus, setPushStatus] = useState("unsupported");
   const [digestEnabled, setDigestEnabled] = useState(true);
+  // Digital Twin summary (loaded only for client view)
+  const [twinSummary, setTwinSummary] = useState(null);
+  const [twinViewerProp, setTwinViewerProp] = useState(null);
 
   useEffect(() => {
     if (!pushSupported()) return;
@@ -28,6 +33,18 @@ export const SettingsPanel = () => {
 
   useEffect(() => {
     if (user) setDigestEnabled(!user.digest_disabled);
+  }, [user]);
+
+  // Load DT summary only when user is in Client view (avoids noise for specialists/admins)
+  useEffect(() => {
+    if (!user) return;
+    const inClient = user.active_view === "client" || user.role === "client";
+    if (!inClient) return;
+    let cancelled = false;
+    axios.get(`${API}/me/digital-twins`)
+      .then(r => { if (!cancelled) setTwinSummary(r.data); })
+      .catch(() => { if (!cancelled) setTwinSummary({ has_any: false, twins: [], primary: null }); });
+    return () => { cancelled = true; };
   }, [user]);
 
   if (!user) return null;
@@ -151,6 +168,14 @@ export const SettingsPanel = () => {
           </div>
         </div>
       </div>
+
+      {/* Digital Twin 3D — visible only for client view */}
+      {(user.active_view === "client" || user.role === "client") && twinSummary !== null && (
+        <DigitalTwinCard
+          summary={twinSummary}
+          onView={(prop) => setTwinViewerProp(prop)}
+        />
+      )}
 
       <div className="space-y-0">
         <Row
@@ -321,6 +346,13 @@ export const SettingsPanel = () => {
       {modal === "backup-password" && <BackupPasswordModal onClose={() => setModal(null)} />}
       {modal === "coverage" && <CoverageModal user={user} refreshUser={refreshUser} onClose={() => setModal(null)} />}
       {modal === "become-specialist" && <BecomeSpecialistModal onClose={() => setModal(null)} refreshUser={refreshUser} />}
+      {twinViewerProp && (
+        <ClientTwinViewerModal
+          propertyId={twinViewerProp.property_id}
+          propertyName={twinViewerProp.property_name}
+          onClose={() => setTwinViewerProp(null)}
+        />
+      )}
       {modal === "privacy" && <PrivacyModal onClose={() => setModal(null)} />}
       {modal === "referral" && <ReferralModal onClose={() => setModal(null)} />}
       {modal === "review-app" && <SimpleInfoModal title="Evaluează PropManage" onClose={() => setModal(null)}>
@@ -343,6 +375,143 @@ export const SettingsPanel = () => {
     </div>
   );
 };
+
+// ============= DIGITAL TWIN 3D CARD =============
+// Compact, prominent surface in Settings showing the user's Digital Twin status
+// across all owned properties. Click opens the existing ClientTwinViewerModal.
+const TWIN_STATUS_TONE = {
+  approved:           { bg: "bg-emerald-500/10",  border: "border-emerald-500/30", text: "text-emerald-300", dot: "bg-emerald-400" },
+  draft:              { bg: "bg-indigo-500/10",   border: "border-indigo-500/30",  text: "text-indigo-300",  dot: "bg-indigo-400" },
+  pending_validation: { bg: "bg-amber-500/10",    border: "border-amber-500/30",   text: "text-amber-300",   dot: "bg-amber-400" },
+  needs_revision:     { bg: "bg-red-500/10",      border: "border-red-500/30",     text: "text-red-300",     dot: "bg-red-400" },
+  not_requested:      { bg: "bg-stone-500/10",    border: "border-stone-500/30",   text: "text-stone-300",   dot: "bg-stone-400" },
+};
+
+const DigitalTwinCard = ({ summary, onView }) => {
+  const navigate = useNavigate();
+  // No property at all → CTA to create one
+  if (!summary?.has_any) {
+    return (
+      <div className="mb-6 rounded-2xl bg-gradient-to-br from-[#d4ff3a]/5 to-emerald-500/5 border border-[#d4ff3a]/20 p-5" data-testid="dt-card-empty">
+        <div className="flex items-start gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl bg-[#d4ff3a]/15 border border-[#d4ff3a]/30 flex items-center justify-center shrink-0">
+            <Box className="w-5 h-5 text-[#d4ff3a]" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-serif text-lg text-stone-100">Digital Twin 3D</h3>
+            <p className="text-xs text-stone-400 mt-1">Adaugă prima ta proprietate ca să poți genera modelul Digital Twin.</p>
+          </div>
+        </div>
+        <button
+          onClick={() => navigate("/client?tab=properties")}
+          className="w-full bg-[#d4ff3a] text-stone-900 font-medium py-2.5 rounded-xl text-sm hover:bg-[#c8f520] transition flex items-center justify-center gap-2"
+          data-testid="dt-create-btn"
+        >
+          <Sparkles className="w-4 h-4" /> Adaugă o proprietate
+        </button>
+      </div>
+    );
+  }
+
+  const primary = summary.primary;
+  const tone = TWIN_STATUS_TONE[primary?.status] || TWIN_STATUS_TONE.not_requested;
+  const otherCount = (summary.twins?.length || 0) - 1;
+  const isApproved = primary?.status === "approved";
+  const canView = isApproved; // The existing viewer reads rooms/assets — only meaningful when approved
+
+  return (
+    <div className="mb-6 rounded-2xl bg-gradient-to-br from-[#d4ff3a]/5 to-emerald-500/5 border border-[#d4ff3a]/20 p-5" data-testid="dt-card">
+      <div className="flex items-start gap-3 mb-3">
+        <div className="w-10 h-10 rounded-xl bg-[#d4ff3a]/15 border border-[#d4ff3a]/30 flex items-center justify-center shrink-0">
+          <Box className="w-5 h-5 text-[#d4ff3a]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-serif text-lg text-stone-100">Digital Twin 3D</h3>
+          <p className="text-xs text-stone-400 mt-1">Vizualizează și gestionează modelul tău Digital Twin.</p>
+        </div>
+      </div>
+
+      {/* Primary twin status */}
+      <div className={`rounded-xl ${tone.bg} ${tone.border} border p-3 mb-3`} data-testid="dt-primary-status">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="text-xs uppercase tracking-wider text-stone-500">Imobil principal</div>
+          <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${tone.bg} ${tone.text} ${tone.border} border inline-flex items-center gap-1`} data-testid="dt-status-badge">
+            <span className={`w-1.5 h-1.5 rounded-full ${tone.dot}`} />
+            Status: {primary?.status_label || "Inexistent"}
+          </span>
+        </div>
+        <div className="text-sm text-stone-200 truncate" title={primary?.property_name}>{primary?.property_name}</div>
+        {/* Progress bar — show when in flight (draft / pending) */}
+        {primary && primary.progress > 0 && primary.progress < 100 && (
+          <div className="mt-2">
+            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div className={`h-full ${tone.dot} transition-all`} style={{ width: `${primary.progress}%` }} />
+            </div>
+            <div className="text-[10px] text-stone-500 mt-1">{primary.progress}% finalizat</div>
+          </div>
+        )}
+      </div>
+
+      {/* Primary action */}
+      {canView ? (
+        <button
+          onClick={() => onView(primary)}
+          className="w-full bg-[#d4ff3a] text-stone-900 font-medium py-2.5 rounded-xl text-sm hover:bg-[#c8f520] transition flex items-center justify-center gap-2"
+          data-testid="dt-view-btn"
+        >
+          <Box className="w-4 h-4" /> Vezi Digital Twin 3D
+        </button>
+      ) : primary?.status === "pending_validation" || primary?.status === "draft" ? (
+        <button
+          disabled
+          className="w-full bg-white/5 text-stone-400 font-medium py-2.5 rounded-xl text-sm cursor-not-allowed inline-flex items-center justify-center gap-2"
+          data-testid="dt-pending-btn"
+        >
+          <Loader2 className="w-4 h-4 animate-spin" /> În generare — revino în curând
+        </button>
+      ) : (
+        <button
+          onClick={() => navigate("/client?tab=properties")}
+          className="w-full bg-[#d4ff3a] text-stone-900 font-medium py-2.5 rounded-xl text-sm hover:bg-[#c8f520] transition inline-flex items-center justify-center gap-2"
+          data-testid="dt-create-btn"
+        >
+          <Sparkles className="w-4 h-4" /> Creează Digital Twin
+        </button>
+      )}
+
+      {/* Secondary twins list (if user has >1 property) */}
+      {otherCount > 0 && (
+        <details className="mt-3">
+          <summary className="text-[11px] text-stone-500 cursor-pointer hover:text-stone-300" data-testid="dt-others-toggle">
+            Vezi celelalte {otherCount} imobil{otherCount > 1 ? "e" : ""}
+          </summary>
+          <div className="mt-2 space-y-1.5">
+            {summary.twins.slice(1).map((t) => {
+              const otone = TWIN_STATUS_TONE[t.status] || TWIN_STATUS_TONE.not_requested;
+              const otherApproved = t.status === "approved";
+              return (
+                <button
+                  key={t.property_id}
+                  onClick={() => otherApproved && onView(t)}
+                  disabled={!otherApproved}
+                  className={`w-full text-left flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg ${otone.bg} ${otone.border} border ${otherApproved ? "hover:bg-white/[0.06]" : "opacity-70 cursor-not-allowed"}`}
+                  data-testid={`dt-other-${t.property_id}`}
+                >
+                  <span className="text-xs text-stone-200 truncate flex-1">{t.property_name}</span>
+                  <span className={`text-[10px] ${otone.text} inline-flex items-center gap-1`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${otone.dot}`} />
+                    {t.status_label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+};
+
 
 // ============= PROFILE EDIT MODAL =============
 const ProfileModal = ({ onClose }) => {
