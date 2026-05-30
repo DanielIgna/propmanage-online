@@ -44,12 +44,15 @@ const ViewerOverlay = ({ faceStyle, layersHidden, layersTotal, tool, pinCount })
   </div>
 );
 
-export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, onOpenPlans, embedded = false, compactSidebar = false, highlightPinId = null, onPinSelect = null }) => {
+export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, onOpenPlans, embedded = false, compactSidebar = false, highlightPinId = null, onPinSelect = null, trimbleEmbedUrl: trimbleEmbedUrlProp = null }) => {
   const [faceStyle, setFaceStyle] = useState("shaded");
   const [hiddenLayers, setHiddenLayers] = useState(new Set());
   const [layers, setLayers] = useState([]);
   const [resetTick, setResetTick] = useState(0);
   const [error] = useState(null);
+  const [trimbleEmbedUrl, setTrimbleEmbedUrl] = useState(trimbleEmbedUrlProp);
+  // "three" = our viewer (default), "trimble" = SketchUp Connect iframe
+  const [viewMode, setViewMode] = useState("three");
 
   // Phase D — Tool mode + section + measure
   const [tool, setTool] = useState("orbit");
@@ -87,6 +90,14 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
       .then(r => setPins(r.data.items || []))
       .catch(() => setPins([]));
   }, [projectId]);
+
+  // Fetch Trimble Connect embed URL if not provided via prop
+  useEffect(() => {
+    if (trimbleEmbedUrlProp || !projectId) return;
+    axios.get(`${API}/digital-twin/projects/${projectId}`)
+      .then(r => setTrimbleEmbedUrl(r.data.trimble_embed_url || null))
+      .catch(() => {});
+  }, [projectId, trimbleEmbedUrlProp]);
 
   // Phase 56 — Multi-layer: fetch all uploaded .glb models for the project so
   // we can render the X-Ray "glass walls" overlay (electric + plumbing + structure).
@@ -464,6 +475,42 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
             Eroare la încărcarea modelului: {error}
           </div>
         )}
+
+        {/* View mode toggle: Three.js (intern) vs Trimble Connect (SketchUp nativ) */}
+        {trimbleEmbedUrl && (
+          <div className="absolute top-3 right-3 z-20 flex items-center gap-1 bg-stone-900/90 backdrop-blur border border-white/10 rounded-full p-1" data-testid="viewer-mode-toggle">
+            <button
+              onClick={() => setViewMode("three")}
+              className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${viewMode === "three" ? "bg-emerald-500 text-white" : "text-stone-400 hover:text-white"}`}
+              data-testid="viewer-mode-three"
+            >
+              ✦ PropManage 3D
+            </button>
+            <button
+              onClick={() => setViewMode("trimble")}
+              className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${viewMode === "trimble" ? "bg-emerald-500 text-white" : "text-stone-400 hover:text-white"}`}
+              data-testid="viewer-mode-trimble"
+            >
+              🛠️ SketchUp Native
+            </button>
+          </div>
+        )}
+
+        {viewMode === "trimble" && trimbleEmbedUrl ? (
+          <div className="absolute inset-0 bg-black" data-testid="trimble-iframe-wrap">
+            <iframe
+              src={trimbleEmbedUrl}
+              title="Trimble Connect 3D Viewer"
+              className="w-full h-full border-0"
+              allow="fullscreen; xr-spatial-tracking"
+              allowFullScreen
+              data-testid="trimble-iframe"
+            />
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-stone-900/85 backdrop-blur border border-white/10 text-[11px] text-stone-300">
+              🛠️ Viewer SketchUp nativ via <a href={trimbleEmbedUrl} target="_blank" rel="noreferrer" className="text-emerald-400 underline">Trimble Connect</a> — X-Ray, layers, secțiuni native
+            </div>
+          </div>
+        ) : (
         <Canvas
           camera={{ position: [12, 9, 14], fov: 50, near: 0.1, far: 2000 }}
           gl={{ antialias: true, localClippingEnabled: true, preserveDrawingBuffer: true }}
@@ -519,13 +566,16 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
           <ResetCamera resetTrigger={resetTick} />
           <CanvasCapture captureFnRef={captureFnRef} />
         </Canvas>
-        <ViewerOverlay
-          faceStyle={faceStyle}
-          layersHidden={hiddenLayers.size}
-          layersTotal={layers.length}
-          tool={tool}
-          pinCount={pins.length}
-        />
+        )}
+        {viewMode === "three" && (
+          <ViewerOverlay
+            faceStyle={faceStyle}
+            layersHidden={hiddenLayers.size}
+            layersTotal={layers.length}
+            tool={tool}
+            pinCount={pins.length}
+          />
+        )}
       </div>
 
       {pinDraft && (

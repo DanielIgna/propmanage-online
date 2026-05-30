@@ -111,6 +111,7 @@ const GrantAccessModal = ({ onClose, onGranted }) => {
 const CreateProjectModal = ({ client, onClose, onCreated }) => {
   const [name, setName] = useState(`Digital Twin — ${client.client_name || "Client"}`);
   const [desc, setDesc] = useState("");
+  const [trimbleUrl, setTrimbleUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
 
@@ -119,6 +120,7 @@ const CreateProjectModal = ({ client, onClose, onCreated }) => {
     try {
       const { data } = await axios.post(`${API}/operator/digital-twin/clients/${client.client_id}/projects`, {
         client_id: client.client_id, name, description: desc,
+        trimble_embed_url: trimbleUrl.trim() || null,
       });
       onCreated?.(data);
     } catch (e) {
@@ -162,6 +164,23 @@ const CreateProjectModal = ({ client, onClose, onCreated }) => {
           />
         </div>
 
+        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3 space-y-1.5">
+          <label className="text-[10px] uppercase text-emerald-300 font-bold flex items-center gap-1.5">
+            <Box className="w-3 h-3" /> Trimble Connect — viewer SketchUp nativ (opțional)
+          </label>
+          <input
+            value={trimbleUrl}
+            onChange={(e) => setTrimbleUrl(e.target.value)}
+            placeholder="https://web.connect.trimble.com/projects/.../viewer/..."
+            maxLength={2000}
+            className="w-full bg-white/5 border border-emerald-500/20 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-stone-600"
+            data-testid="create-project-trimble"
+          />
+          <p className="text-[10px] text-stone-500 leading-relaxed">
+            🔗 Lipește aici link-ul de share din Trimble Connect → clientul vede modelul SketchUp cu X-Ray nativ, layers, secțiuni. Poți seta și mai târziu.
+          </p>
+        </div>
+
         {err && <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-2">{err}</div>}
 
         <div className="flex gap-2 pt-1">
@@ -183,13 +202,29 @@ const CreateProjectModal = ({ client, onClose, onCreated }) => {
 
 // ============= UPLOAD FILES MODAL =============
 const UploadFilesModal = ({ project, client, onClose, onUploaded }) => {
-  const [tab, setTab] = useState("3d"); // 3d | 2d
+  const [tab, setTab] = useState("3d"); // 3d | 2d | trimble
   const [model, setModel] = useState(null);
   const [plan, setPlan] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [history, setHistory] = useState({ models: [], plans: [] });
+  const [trimbleUrl, setTrimbleUrl] = useState(project.trimble_embed_url || "");
+  const [savingTrimble, setSavingTrimble] = useState(false);
   const [err, setErr] = useState(null);
+
+  const saveTrimble = async () => {
+    setSavingTrimble(true); setErr(null);
+    try {
+      await axios.patch(`${API}/operator/digital-twin/projects/${project.id}/trimble`, {
+        trimble_embed_url: trimbleUrl.trim() || null,
+      });
+      onUploaded?.();
+    } catch (e) {
+      setErr(e?.response?.data?.detail || e.message);
+    } finally {
+      setSavingTrimble(false);
+    }
+  };
 
   const loadHistory = async () => {
     try {
@@ -282,7 +317,7 @@ const UploadFilesModal = ({ project, client, onClose, onUploaded }) => {
             className={`flex-1 py-1.5 rounded text-xs font-medium ${tab === "3d" ? "bg-emerald-500/20 text-emerald-300" : "text-stone-400"}`}
             data-testid="upload-tab-3d"
           >
-            <Box className="w-3.5 h-3.5 inline mr-1" />Model 3D (.glb / .gltf / .skp)
+            <Box className="w-3.5 h-3.5 inline mr-1" />Model 3D
           </button>
           <button
             onClick={() => setTab("2d")}
@@ -290,6 +325,13 @@ const UploadFilesModal = ({ project, client, onClose, onUploaded }) => {
             data-testid="upload-tab-2d"
           >
             <FileText className="w-3.5 h-3.5 inline mr-1" />Plan 2D (PDF)
+          </button>
+          <button
+            onClick={() => setTab("trimble")}
+            className={`flex-1 py-1.5 rounded text-xs font-medium ${tab === "trimble" ? "bg-emerald-500/20 text-emerald-300" : "text-stone-400"}`}
+            data-testid="upload-tab-trimble"
+          >
+            <Wand2 className="w-3.5 h-3.5 inline mr-1" />Trimble Connect
           </button>
         </div>
 
@@ -299,7 +341,7 @@ const UploadFilesModal = ({ project, client, onClose, onUploaded }) => {
             <label className="block border-2 border-dashed border-white/10 hover:border-emerald-500/50 rounded-xl p-6 text-center cursor-pointer transition-colors">
               <input
                 type="file"
-                accept=".glb,.gltf,.skp"
+                accept=".glb,.gltf,.skp,.dae,.obj,.fbx,.stl,.ply"
                 onChange={(e) => setModel(e.target.files[0])}
                 className="hidden"
                 data-testid="upload-3d-input"
@@ -313,7 +355,11 @@ const UploadFilesModal = ({ project, client, onClose, onUploaded }) => {
               ) : (
                 <div>
                   <div className="text-sm text-stone-300">Trage fișierul aici sau click</div>
-                  <div className="text-[11px] text-stone-500 mt-1">.glb / .gltf (vizualizabil 3D) sau .skp (SketchUp — descărcabil)</div>
+                  <div className="text-[11px] text-stone-500 mt-1 leading-relaxed">
+                    <strong className="text-emerald-400">.glb / .gltf</strong> — vizualizabil instant<br/>
+                    <strong className="text-amber-400">.dae / .obj / .fbx / .stl / .ply</strong> — auto-conversie via Blender ⚡<br/>
+                    <strong className="text-stone-400">.skp</strong> — SketchUp (doar descărcabil; exportă .dae pentru viewer)
+                  </div>
                 </div>
               )}
             </label>
@@ -342,21 +388,23 @@ const UploadFilesModal = ({ project, client, onClose, onUploaded }) => {
                 <div className="text-[10px] uppercase tracking-wider text-stone-500 font-bold">Versiuni încărcate</div>
                 {history.models.map(m => {
                   const isArchive = m.kind === "archive";
+                  const isSource = m.kind === "source"; // DAE/OBJ/FBX/STL/PLY — auto-converts to .glb
                   const cstatus = m.conversion_status;
                   const cpct = m.conversion_percent || 0;
-                  const isConverting = isArchive && cstatus && !["completed", "failed", "n/a"].includes(cstatus);
+                  const isConverting = (isArchive || isSource) && cstatus && !["completed", "failed", "n/a"].includes(cstatus);
+                  const engine = m.conversion_engine === "blender" ? "Blender ⚡" : "CloudConvert ☁️";
                   const conversionLabel = {
-                    pending: "În așteptare…",
-                    uploading: "Trimit la CloudConvert…",
-                    converting: "Se convertește SKP → GLB…",
-                    downloading: "Descarc rezultatul…",
+                    pending: `${engine} · În așteptare…`,
+                    uploading: `${engine} · Trimit…`,
+                    converting: `${engine} · Se convertește…`,
+                    downloading: `${engine} · Finalizez…`,
                     completed: "Convertit ✓",
                     failed: "Conversie eșuată",
                   }[cstatus] || null;
                   return (
                     <div key={m.id} className="bg-white/[0.03] border border-white/5 rounded-lg p-2 text-xs space-y-1.5" data-testid={`model-row-${m.id}`}>
                       <div className="flex items-center gap-2">
-                        {isArchive ? <FileText className="w-3.5 h-3.5 text-amber-400" /> : <Box className="w-3.5 h-3.5 text-emerald-400" />}
+                        {isArchive ? <FileText className="w-3.5 h-3.5 text-amber-400" /> : (isSource ? <Wand2 className="w-3.5 h-3.5 text-blue-400" /> : <Box className="w-3.5 h-3.5 text-emerald-400" />)}
                         <div className="flex-1 min-w-0">
                           <div className="text-white truncate">{m.filename}</div>
                           <div className="text-stone-500 text-[10px]">
@@ -365,6 +413,7 @@ const UploadFilesModal = ({ project, client, onClose, onUploaded }) => {
                           </div>
                         </div>
                         {isArchive && !cstatus && <span className="text-[9px] uppercase text-amber-400">Descărcabil</span>}
+                        {isSource && !cstatus && <span className="text-[9px] uppercase text-blue-400">Sursă</span>}
                         {cstatus === "completed" && <span className="text-[9px] uppercase text-emerald-400 flex items-center gap-1"><Wand2 className="w-3 h-3"/>GLB Gata</span>}
                       </div>
                       {isConverting && (
@@ -452,6 +501,58 @@ const UploadFilesModal = ({ project, client, onClose, onUploaded }) => {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Trimble Connect tab */}
+        {tab === "trimble" && (
+          <div className="space-y-3" data-testid="trimble-tab-content">
+            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 space-y-2">
+              <div className="flex items-start gap-2">
+                <Wand2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-sm text-white font-medium">Viewer SketchUp nativ via Trimble Connect</div>
+                  <p className="text-[11px] text-stone-400 leading-relaxed mt-1">
+                    Clientul vede modelul în viewer-ul oficial SketchUp, direct în PropManage — cu X-Ray, layers,
+                    secțiuni, măsurători nativi. Zero conversie, zero pierderi.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] uppercase text-stone-500 font-semibold flex items-center justify-between">
+                <span>URL Trimble Connect</span>
+                {project.trimble_embed_url && <span className="text-emerald-400 normal-case">● Setat</span>}
+              </label>
+              <input
+                value={trimbleUrl}
+                onChange={(e) => setTrimbleUrl(e.target.value)}
+                placeholder="https://web.connect.trimble.com/projects/.../viewer/..."
+                maxLength={2000}
+                className="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-stone-600 font-mono"
+                data-testid="trimble-url-input"
+              />
+            </div>
+
+            <button
+              onClick={saveTrimble}
+              disabled={savingTrimble}
+              className="w-full py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white text-sm font-medium flex items-center justify-center gap-2"
+              data-testid="trimble-save"
+            >
+              {savingTrimble ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              {savingTrimble ? "Se salvează…" : (project.trimble_embed_url ? "Actualizează link" : "Salvează link")}
+            </button>
+
+            <details className="bg-stone-950/50 border border-white/5 rounded-lg p-3 text-[11px] text-stone-400">
+              <summary className="cursor-pointer text-stone-300 font-medium">📘 Cum obții link-ul Trimble Connect (3 pași)</summary>
+              <ol className="mt-2 space-y-1.5 pl-4 list-decimal leading-relaxed">
+                <li>Mergi pe <a href="https://web.connect.trimble.com/" target="_blank" rel="noreferrer" className="text-emerald-400 underline">web.connect.trimble.com</a> și loghează-te (gratuit, 10GB).</li>
+                <li>Creează un proiect → urcă fișierul <code className="text-amber-300">.skp</code> → așteaptă procesarea automată.</li>
+                <li>Click dreapta pe model → <strong>Share</strong> → setează <em>"Anyone with link"</em> → copiază URL-ul și lipește-l aici.</li>
+              </ol>
+            </details>
           </div>
         )}
 
