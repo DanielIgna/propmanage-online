@@ -974,16 +974,49 @@ async def _record_oauth_health(event: dict, started_at: datetime) -> None:
         logger.warning(f"[oauth_health] write failed: {e}")
 
 
+class GatewayBeaconIn(BaseModel):
+    """Posted by the frontend AuthCallback when it catches a gateway error
+    (502 / 504 / 520-524) so we can track ingress-level failures that never
+    reached our backend retry loop."""
+    status_code: int = Field(..., ge=400, le=599)
+    where: Optional[str] = Field(None, max_length=128)  # "auth_callback" etc.
+    note: Optional[str] = Field(None, max_length=512)
+
+
+@router.post("/auth/health-beacon")
+async def post_health_beacon(payload: GatewayBeaconIn, request: Request):
+    """Public endpoint. Browser pings this when it sees a 5xx that didn't carry
+    a JSON body (i.e. ingress-level failure, NOT our backend response). This
+    fills the gap in oauth_health where we have no server-side event because
+    the request was killed at the proxy.
+    """
+    now = datetime.now(timezone.utc)
+    await db.oauth_health.insert_one({
+        "event_type": "gateway_error_observed",
+        "started_at": now.isoformat(),
+        "outcome": "gateway_error",
+        "final_status": payload.status_code,
+        "upstream_status": None,
+        "attempts": 0,
+        "duration_ms": 0,
+        "ip": request.client.host if request.client else None,
+        "where": payload.where or "unknown",
+        "note": payload.note or "",
+    })
+    return {"ok": True}
+
+
 def _aggregate_auth_health(events: List[dict], hours: int, raw_limit: int) -> dict:
     total = len(events)
     by_outcome: Dict[str, int] = {}
     durations: List[int] = []
     upstream_5xx: List[dict] = []
+    gateway_errors: List[dict] = []  # 502/504/520-524 observed by browser
     for ev in events:
         outcome = ev.get("outcome", "unknown")
         by_outcome[outcome] = by_outcome.get(outcome, 0) + 1
         d = ev.get("duration_ms")
-        if isinstance(d, (int, float)):
+        if isinstance(d, (int, float)) and d > 0:
             durations.append(int(d))
         us = ev.get("upstream_status")
         if isinstance(us, int) and 500 <= us < 600:
@@ -994,12 +1027,27 @@ def _aggregate_auth_health(events: List[dict], hours: int, raw_limit: int) -> di
                 "last_error": ev.get("last_error"),
                 "outcome": outcome,
             })
+        # Gateway errors come from frontend beacon (502/504/520-524) — these
+        # never reached the backend retry loop, so they signal ingress / Cloudflare /
+        # K8s proxy issues, NOT upstream Emergent issues.
+        fs = ev.get("final_status")
+        if outcome == "gateway_error" and isinstance(fs, int) and fs in (502, 504) or (isinstance(fs, int) and 520 <= fs <= 524 and outcome == "gateway_error"):
+            gateway_errors.append({
+                "started_at": ev.get("started_at"),
+                "status": fs,
+                "where": ev.get("where"),
+            })
     success = by_outcome.get("success", 0)
     success_rate = round((success / total) * 100, 1) if total else None
     durations_sorted = sorted(durations)
     p50 = durations_sorted[len(durations_sorted) // 2] if durations_sorted else None
     p95 = durations_sorted[int(len(durations_sorted) * 0.95)] if durations_sorted else None
     p99 = durations_sorted[int(len(durations_sorted) * 0.99)] if durations_sorted else None
+    # 1h gateway error count — for prominent dashboard alert
+    now = datetime.now(timezone.utc)
+    one_hr_ago = (now - timedelta(hours=1)).isoformat()
+    gateway_errors_1h = sum(1 for g in gateway_errors if g["started_at"] >= one_hr_ago)
+    upstream_5xx_1h = sum(1 for u in upstream_5xx if u["started_at"] >= one_hr_ago)
     return {
         "window_hours": hours,
         "total_attempts": total,
@@ -1007,7 +1055,11 @@ def _aggregate_auth_health(events: List[dict], hours: int, raw_limit: int) -> di
         "outcomes": by_outcome,
         "latency_ms": {"p50": p50, "p95": p95, "p99": p99, "samples": len(durations)},
         "upstream_5xx_count": len(upstream_5xx),
+        "upstream_5xx_count_1h": upstream_5xx_1h,
         "recent_upstream_5xx": upstream_5xx[:10],
+        "gateway_errors_count": len(gateway_errors),
+        "gateway_errors_count_1h": gateway_errors_1h,
+        "recent_gateway_errors": gateway_errors[:10],
         "recent_events": events[:raw_limit],
     }
 

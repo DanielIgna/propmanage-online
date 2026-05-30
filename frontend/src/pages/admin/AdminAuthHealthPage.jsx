@@ -213,7 +213,7 @@ export const AdminAuthHealthPage = () => {
         <Sparkline24h buckets={buckets} />
 
         {/* KPI cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-5" data-testid="kpi-total">
             <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-stone-500"><Users className="w-3 h-3" /> Total 24h</div>
             <div className="text-3xl font-serif mt-2">{data.total_attempts}</div>
@@ -230,12 +230,38 @@ export const AdminAuthHealthPage = () => {
             <div className="text-3xl font-serif mt-2">{lat.p95 != null ? `${lat.p95}ms` : "—"}</div>
             <div className="text-[10px] text-stone-500 mt-1">P50: {lat.p50 ?? "—"}ms · P99: {lat.p99 ?? "—"}ms</div>
           </div>
-          <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-5" data-testid="kpi-5xx">
-            <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-stone-500"><AlertTriangle className="w-3 h-3" /> Erori 5xx upstream</div>
+          <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-5" data-testid="kpi-5xx" title="Erori 5xx primite de la upstream Emergent OAuth — pot indica probleme la providerul de autentificare">
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-stone-500"><AlertTriangle className="w-3 h-3" /> Upstream 5xx</div>
             <div className={`text-3xl font-serif mt-2 ${data.upstream_5xx_count > 0 ? "text-orange-300" : "text-stone-300"}`}>{data.upstream_5xx_count}</div>
-            <div className="text-[10px] text-stone-500 mt-1">Emergent OAuth instabilitate</div>
+            <div className="text-[10px] text-stone-500 mt-1">
+              <span className={data.upstream_5xx_count_1h > 0 ? "text-orange-400" : ""}>{data.upstream_5xx_count_1h || 0} în ultima oră</span> · Emergent OAuth
+            </div>
+          </div>
+          <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-5" data-testid="kpi-gateway" title="Gateway errors (502/504/520-524) observate de browser-ul utilizatorilor — indică probleme la Kubernetes ingress / Cloudflare pe propmanage.ro, NU la upstream Emergent">
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-stone-500"><AlertTriangle className="w-3 h-3" /> Gateway errs</div>
+            <div className={`text-3xl font-serif mt-2 ${data.gateway_errors_count > 0 ? "text-red-300" : "text-stone-300"}`}>{data.gateway_errors_count || 0}</div>
+            <div className="text-[10px] text-stone-500 mt-1">
+              <span className={data.gateway_errors_count_1h > 0 ? "text-red-400" : ""}>{data.gateway_errors_count_1h || 0} în ultima oră</span> · K8s/Cloudflare
+            </div>
           </div>
         </div>
+
+        {/* Diagnostic banner when gateway errors present */}
+        {data.gateway_errors_count_1h > 0 && (
+          <div className="rounded-2xl bg-red-500/5 border border-red-500/30 p-4 flex items-start gap-3" data-testid="gateway-alert-banner">
+            <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+            <div className="flex-1 text-sm">
+              <div className="text-red-300 font-medium mb-1">
+                ⚠️ {data.gateway_errors_count_1h} gateway error{data.gateway_errors_count_1h !== 1 ? "s" : ""} în ultima oră
+              </div>
+              <p className="text-stone-400 text-xs leading-relaxed">
+                Utilizatorii primesc 502/504/520-524 înainte ca request-ul să ajungă la backend.
+                <strong className="text-red-300"> Problema NU e la Emergent OAuth — e la ingress-ul tău Kubernetes sau la Cloudflare pe propmanage.ro.</strong>
+                {" "}Acțiuni: verifică <code className="text-stone-300 bg-white/5 px-1 rounded">kubectl get pods</code>, restartează backend pod dacă e crash-loop, sau verifică status.cloudflare.com.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Outcomes breakdown */}
         <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-5">

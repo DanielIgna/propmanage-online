@@ -49,12 +49,18 @@ export const AuthCallback = () => {
         let detail = e?.response?.data?.detail || e.message || "Autentificare eșuată";
         // Gateway-style empty-body 5xx (502 Bad Gateway / 504 Gateway Timeout /
         // 520-524 Cloudflare) → no JSON detail, axios shows the bare status code.
-        // Give the user a more actionable explanation.
-        if (status && !hasDetail && (status === 502 || status === 504 || (status >= 520 && status <= 524))) {
+        const isGatewayErr = status && !hasDetail && (status === 502 || status === 504 || (status >= 520 && status <= 524));
+        if (isGatewayErr) {
           detail = `Serverul Emergent OAuth (upstream) e momentan inaccesibil sau prea lent (HTTP ${status} — ${status === 502 ? "Bad Gateway" : status === 504 ? "Gateway Timeout" : "Cloudflare origin empty"}). ` +
             "Încearcă din nou peste 30s-1min, sau folosește email + parolă mai jos.";
+          // Ping a beacon so /admin/auth-health can track ingress-level failures
+          // that didn't reach the backend retry loop. Fire-and-forget.
+          axios.post(`${API}/auth/health-beacon`, {
+            status_code: status,
+            where: "auth_callback",
+            note: (e.message || "").slice(0, 200),
+          }).catch(() => {});
         } else if (status === 503 && hasDetail) {
-          // Our own retry-exhausted response — already has a friendly detail.
           detail = e.response.data.detail;
         }
         setError(`[${status || "network"}] ${detail}`);
