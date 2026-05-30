@@ -2154,3 +2154,45 @@ Acoperire automată: **105/105 scenarios = 100%** (vs 38/105 la începutul ciclu
 - 🟡 Refactor split qa_automation.py (~3800 lines)
 - 🟢 Specialist Onboarding Wizard (KYC docs after become-specialist)
 - 🟢 DT freshness indicator (badge "Actualizat acum X zile")
+
+
+### Phase 57 — Digital Twin: Trimble Connect Embed + Blender Headless Conversion (Feb 2026)
+**Context**: User cerea conversie automată `.skp → .glb` pentru randare în browser. Am descoperit live că **CloudConvert NU suportă deloc SKP sau GLB** (verificat 2104 formate). Solution: **opțiunea C — implementare hibridă a 2 alternative**:
+
+**A. Trimble Connect Embed** (viewer SketchUp nativ via iframe)
+- Backend: nou câmp `trimble_embed_url` pe `digital_twin_projects`. Validare URL: doar `https://*.trimble.com/*` sau `https://*.sketchup.com/*`.
+- Endpoints: `PATCH /api/operator/digital-twin/projects/{id}/trimble` (operator/admin only), URL inclus în `ProjectCreate/Update`.
+- Frontend: `UploadFilesModal` are tab nou "Trimble Connect" cu input URL + ghid pas cu pas. `CreateProjectModal` acceptă URL Trimble la crearea proiectului.
+- `DigitalTwinViewer.jsx`: prop `trimbleEmbedUrl` + state `viewMode` ('three'|'trimble') + toggle UI (pill button sus-dreapta) + `<iframe>` la fullscreen când e activ Trimble.
+- UX: Client vede toggle "✦ PropManage 3D / 🛠️ SketchUp Native" → comutare instantă între viewer-ul nostru (cu pin-uri, layers, X-Ray) și viewer-ul SketchUp oficial (cu features-urile native).
+
+**B. Blender Headless Conversion** (DAE/OBJ/FBX/STL/PLY → GLB)
+- ⚠️ SketchUp NU lansează SDK pentru Linux → SKP direct imposibil. Soluția: arhitectul exportă `.dae` (Collada) din SketchUp Desktop în 1 click, noi convertim server-side.
+- `blender 3.4.1` instalat via apt (~500MB).
+- `/app/backend/blender_convert.py` — script Python care rulează în Blender background mode. Importă DAE/OBJ/FBX/STL/PLY, exportă GLB cu materiale + animații.
+- `/app/backend/blender_service.py` — wrapper async cu `asyncio.create_subprocess_exec`. **Fix critic**: trec explicit `PYTHONPATH=/root/.venv/lib/python3.11/site-packages` la subprocess, altfel Blender's gltf exporter crashează cu `ModuleNotFoundError: numpy` (under asyncio context env is stripped).
+- Backend: `ALLOWED_EXTS` extins la `{.glb .gltf .skp .dae .obj .fbx .stl .ply}`. `BLENDER_CONVERT_EXTS={.dae .obj .fbx .stl .ply}` — declanșează `_run_blender_conversion()` async fire-and-forget.
+- Schema model_doc nouă: `kind="source"` pentru DAE/OBJ/etc, `conversion_engine="blender"|"cloudconvert"`, `conversion_status`, `conversion_percent`, `converted_model_id` (link la GLB nou inserat).
+- Frontend: indicator de progres în card model (gradient bar 0-100%, label `Blender ⚡ · Se convertește…`). Auto-poll `/conversions/{id}/status` la 5s. Buton "Reîncearcă" la failed.
+
+**Endpoint-uri noi:**
+- `GET /api/digital-twin/conversions/{model_id}/status` (polling endpoint)
+- `POST /api/digital-twin/conversions/{model_id}/retry` (auto-detect engine: blender vs cloudconvert)
+- `PATCH /api/operator/digital-twin/projects/{id}/trimble`
+
+**Verified live:**
+- ✅ Blender OBJ→GLB end-to-end via curl: 1.7KB GLB cu magic bytes `glTF` v2
+- ✅ Conversie sub 1 secundă pentru fișiere mici, sub 1 min pentru fișiere mari (zeci de MB)
+- ✅ Cheie CloudConvert salvată în `.env` (păstrată — utilă pentru DWG→PDF în viitor)
+
+**Tests:**
+- 19/19 pytest backend tests passed (Blender conversion, Trimble validation, permissions, multi-format upload)
+
+**Backlog rămas după Phase 57:**
+- 🔴 USER: redeploy producție pt Phases 50-57
+- 🔴 USER: Stripe LIVE keys + Slack/Discord webhooks
+- 🟡 Setup Aspose.3D Cloud API ($0.04/conv) ca alternativă paid pentru SKP direct (dacă user nu are SketchUp Desktop)
+- 🟡 Lottie animation integration for Knowledge Base
+- 🟡 Twilio SMS Alerts pentru nighttime failures
+- 🟢 Avatar upload migration base64 → S3/Cloudinary
+- 🟢 Refactor qa_automation.py (~3800 lines)
