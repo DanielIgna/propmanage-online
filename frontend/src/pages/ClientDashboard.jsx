@@ -42,6 +42,9 @@ export const ClientDashboard = () => {
   const [filterStatus, setFilterStatus] = useState("");
   const [showDesign, setShowDesign] = useState(false);
   const [showTwinViewer, setShowTwinViewer] = useState(false);
+  // When opening a twin from anywhere other than the currently-selected property,
+  // we override the property used by the viewer. null = use currently selected `prop`.
+  const [twinPropOverride, setTwinPropOverride] = useState(null);
   const [newReqCategory, setNewReqCategory] = useState(null);
   const [designPhasesFor, setDesignPhasesFor] = useState(null);
   const [timelineRequestId, setTimelineRequestId] = useState(null);
@@ -168,11 +171,22 @@ export const ClientDashboard = () => {
 
       {showNewReq && <NewRequestModal onClose={() => { setShowNewReq(false); setNewReqCategory(null); }} property={prop} initialCategory={newReqCategory} onCreated={r => setRequests([r, ...requests])} />}
       {chatRequest && <ChatPanel requestId={chatRequest} onClose={() => setChatRequest(null)} />}
-      {showPropManager && <PropertyManagerModal properties={properties} onClose={() => setShowPropManager(false)} onChange={setProperties} />}
+      {showPropManager && <PropertyManagerModal
+        properties={properties}
+        onClose={() => setShowPropManager(false)}
+        onChange={setProperties}
+        onOpenTwin={(p) => { setTwinPropOverride(p); setShowPropManager(false); setShowTwinViewer(true); }}
+      />}
       {timelineFor && <PropertyTimelineModal propertyId={timelineFor} onClose={() => setTimelineFor(null)} />}
       {disputeFor && <OpenDisputeModal requestId={disputeFor.id} requestTitle={disputeFor.title} onClose={() => setDisputeFor(null)} onOpened={() => loadRequests()} />}
       {showDesign && <InteriorDesignModal onClose={() => setShowDesign(false)} onCreated={() => loadRequests()} />}
-      {showTwinViewer && prop && <ClientTwinViewerModal propertyId={prop.id} propertyName={prop.name} onClose={() => setShowTwinViewer(false)} />}
+      {showTwinViewer && (twinPropOverride || prop) && (
+        <ClientTwinViewerModal
+          propertyId={(twinPropOverride || prop).id}
+          propertyName={(twinPropOverride || prop).name}
+          onClose={() => { setShowTwinViewer(false); setTwinPropOverride(null); }}
+        />
+      )}
       {designPhasesFor && <DesignPhasesViewer request={designPhasesFor} onClose={() => setDesignPhasesFor(null)} onUpdate={() => { loadRequests(); refreshUser(); }} />}
       {timelineRequestId && <RequestTimelineModal requestId={timelineRequestId} onClose={() => setTimelineRequestId(null)} />}
       {show2FA && <TwoFASetupModal onClose={() => setShow2FA(false)} currentlyEnabled={false} />}

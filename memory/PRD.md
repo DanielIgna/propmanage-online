@@ -2093,3 +2093,26 @@ Acoperire automată: **105/105 scenarios = 100%** (vs 38/105 la începutul ciclu
 - 🟡 Digital Twin 3D Module **Phase A-I (upload GLB/GLTF real)** — Phase 53 a expus DOAR existing twin data, încă nu permite upload de modele 3D reale
 - 🟡 Refactor split qa_automation.py (~3800 lines)
 - 🟢 Complexity remaining: `send_weekly_velocity_email`, `create_backup`, `email_backup`
+
+
+### Phase 54 — 3D Quick-Access Buttons în lista imobilelor (Feb 2026)
+
+**Frontend doar (zero backend changes):**
+- `Components.jsx` — `PropertyManagerModal` accept opțional prop `onOpenTwin`
+- Fiecare row de imobil are acum iconiță **"3D"** cu cub (Box) lângă Edit/Delete
+- Pre-fetch al status-urilor twin via `/api/me/digital-twins` la deschiderea modalului (1 call batch)
+- 3 stări vizuale ale butonului 3D:
+  - **Verde aprins** (`bg-emerald-500/15`) — twin status=approved → click deschide viewer
+  - **Galben transparent** (`bg-amber-500/10` cursor-not-allowed) — twin status=draft/pending_validation → "Digital Twin în generare — revino în curând"
+  - **Gri** (default) — twin status=not_requested/needs_revision → "Digital Twin indisponibil"
+- `ClientDashboard.jsx` — adăugat state `twinPropOverride` care permite viewer-ului să arate twin-ul oricărei proprietăți, nu doar a celei selectate. Reset on close.
+
+**Verification:**
+- Screenshot manual: 34 properties listate cu buton 3D fiecare, 1 enabled (Skyline Loft A4 cu twin approved), 33 disabled
+- 24/24 pytest pass (Phase 42 + 52 + 53) — zero regresii
+- ESLint OK
+
+**Beneficii UX:**
+- Click count redus: 1 click în loc de 2 (Setări → Card DT → Vezi)
+- Discoverability: utilizatorul vede butonul 3D direct în lista de imobile
+- Vizual immediat care imobile au DT disponibil (verde) vs în lucru (galben) vs lipsă (gri)
