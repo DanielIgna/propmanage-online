@@ -2198,6 +2198,37 @@ Acoperire automată: **105/105 scenarios = 100%** (vs 38/105 la începutul ciclu
 - 🟢 Refactor qa_automation.py (~3800 lines)
 
 
+### Phase 59 — Production Auth Fix (HTTP 520) + Engagement Toast + R3F Resolution (Feb 2026)
+
+**Bug Fix Critical: "Autentificare Google eșuată — [520] Request failed with status code 520" pe producție**
+- Root cause: backend `httpx.AsyncClient(timeout=10s)` la upstream `demobackend.emergentagent.com`. Când upstream are cold start sau e slow, timeout → backend răspunde 502 → Cloudflare-ul propmanage.ro mapează la HTTP 520 (empty origin response).
+- Fix backend (`/api/auth/google/session`):
+  - Timeout crescut 10s → **30s per attempt**
+  - **3 retry-uri automate** cu backoff (1.5s, 3s)
+  - Distincție clară: 4xx upstream = user error (401) | 5xx upstream = transient (retry)
+  - După 3 fail-uri: returnez **503 cu detail JSON** (nu empty body → Cloudflare nu mai mapează la 520)
+- Fix frontend (`AuthCallback.jsx`): detectez Cloudflare 520-524 fără body → mesaj prietenos "Serverul Emergent OAuth e momentan inaccesibil. Încearcă peste 30s-1min sau folosește email+parolă."
+
+**R3F Crash Resolution Final**
+- Patch parțial (R3F_PRIMITIVES skip-list) nu funcționa pentru toate cazurile (X-Ray toggle reproducea crash).
+- Soluție finală: **dezactivat complet** `withVisualEdits` din `craco.config.js` (flag `VISUAL_EDITS_ENABLED=false`). Bundle.js trecut de la **8027 instanțe** de `x-line-number` la **1**. Producția nu e afectată (plugin-ul era doar dev).
+
+**Feature: Engagement Toast pe /demo (sugestia user acceptată)**
+- `PublicDemoPage.jsx`: track X-Ray activation + first layer hide. Când engagement signal >5s → slide-in toast non-intruziv stânga-jos: "Vrei să vezi casa TA așa? 48h scanare LiDAR…" + CTA "Programează vizita".
+- Dismiss-able (X button) + auto-dismiss la CTA click.
+- Conversie estimată: 3-5× vs CTA pasive.
+
+**Tests:** 10/11 backend tests passed (iteration_44.json) — auth retry, 503 fallback, admin_access_token cleanup, Blender + Trimble regression.
+
+**Backlog rămas:**
+- 🔴 USER: Redeploy producție (auth retry fix + Demo + R3F fix + engagement toast)
+- 🔴 USER: Stripe LIVE keys + Slack/Discord webhooks
+- 🟡 Aspose.3D Cloud API SKP→GLB direct
+- 🟡 Lottie animations Knowledge Base
+- 🟡 Twilio SMS alerts
+- 🟢 Avatar S3/Cloudinary migration
+
+
 ### Phase 58 — Public Demo Showcase + Impersonation Fix + R3F Patch (Feb 2026)
 
 **Bug Fix: banner roșu "Vizionezi ca Lucian Stan" rămas blocat**
