@@ -11,7 +11,8 @@ import base64 as b64
 import httpx
 import pyotp
 import qrcode
-from typing import Optional, Dict, List, Literal
+from typing import Optional, Dict, List, Literal, Any
+import uuid
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -693,26 +694,124 @@ class ContactIn(BaseModel):
 
 @router.post("/support/contact")
 async def support_contact(data: ContactIn, user: dict = Depends(get_current_user)):
-    admin_email = os.environ.get("SUPPORT_EMAIL", "admin@propmanage.io")
+    """Save contact message to DB + email all admin/operator users so they can respond.
+
+    Persisted in `support_messages` collection for the admin/operator inbox.
+    Configure recipients via env `SUPPORT_EMAIL` (fallback) — but ALL admin + operator
+    accounts are notified by default so no message is missed.
+    """
     safe_subject = data.subject.strip()
-    safe_message = data.message.strip().replace("\n", "<br/>")
+    safe_message_html = data.message.strip().replace("\n", "<br/>")
+    msg_id = uuid.uuid4().hex
+    now_iso = datetime.now(timezone.utc).isoformat()
+    # 1) Persist in DB so admin/operator inbox UI can list it
+    doc = {
+        "id": msg_id,
+        "user_id": user.get("id") or str(user.get("_id")),
+        "user_name": user.get("name") or "—",
+        "user_email": user.get("email") or "—",
+        "user_role": user.get("role") or "client",
+        "subject": safe_subject[:200],
+        "message": data.message.strip()[:5000],
+        "status": "new",  # new | in_progress | resolved
+        "assigned_to": None,
+        "resolved_at": None,
+        "resolved_by": None,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+    await db.support_messages.insert_one(doc)
+    # 2) Collect all admin + operator emails so they all see the inbox notification
+    recipients: List[str] = []
+    async for u in db.users.find({"role": {"$in": ["admin", "operator"]}}, {"email": 1}):
+        if u.get("email"):
+            recipients.append(u["email"])
+    fallback = os.environ.get("SUPPORT_EMAIL", "admin@propmanage.io")
+    if not recipients:
+        recipients = [fallback]
+    # 3) Send notifications (fire-and-forget)
     body_admin = (
-        f"<h2>Mesaj nou contact</h2>"
-        f"<p><b>De la:</b> {user.get('name','—')} ({user.get('email','—')})</p>"
-        f"<p><b>Rol:</b> {user.get('role','—')}</p>"
+        f"<h2>Mesaj nou de contact · #{msg_id[:8]}</h2>"
+        f"<p><b>De la:</b> {doc['user_name']} ({doc['user_email']})</p>"
+        f"<p><b>Rol:</b> {doc['user_role']}</p>"
         f"<p><b>Subiect:</b> {safe_subject}</p>"
-        f"<hr/><div>{safe_message}</div>"
+        f"<hr/><div>{safe_message_html}</div>"
+        f"<hr/><p style='font-size:11px;color:#666'>Răspunde direct pe email la <b>{doc['user_email']}</b> sau gestionează din "
+        f"<a href='https://propmanage.ro/admin/support-inbox'>Admin Inbox</a>.</p>"
     )
+    for em in recipients:
+        asyncio.create_task(send_email(em, f"[PropManage Contact] {safe_subject}", body_admin))
+    # 4) Confirmation to sender
     body_user = (
         f"<h2>Mesajul tău a fost primit</h2>"
         f"<p>Salut {user.get('name','')},</p>"
         f"<p>Confirmăm primirea mesajului tău cu subiectul: <b>{safe_subject}</b>.</p>"
-        f"<p>Echipa PropManage îți va răspunde în maximum 24h pe adresa <b>{user.get('email','')}</b>.</p>"
+        f"<p>Echipa PropManage îți va răspunde în maximum 24h pe adresa <b>{doc['user_email']}</b>.</p>"
+        f"<p style='font-size:11px;color:#666'>ID ticket: <code>#{msg_id[:8]}</code></p>"
     )
-    asyncio.create_task(send_email(admin_email, f"[PropManage Contact] {safe_subject}", body_admin))
     if user.get("email"):
         asyncio.create_task(send_email(user["email"], "Am primit mesajul tău - PropManage", body_user))
+    return {"ok": True, "id": msg_id}
+
+
+# ============= ADMIN / OPERATOR SUPPORT INBOX =============
+@router.get("/support/inbox")
+async def support_inbox_list(
+    status: Optional[str] = None,
+    limit: int = 100,
+    user: dict = Depends(require_role("admin", "operator")),
+):
+    """List contact messages. Filter by status (new / in_progress / resolved)."""
+    q: Dict[str, Any] = {}
+    if status in ("new", "in_progress", "resolved"):
+        q["status"] = status
+    cursor = db.support_messages.find(q).sort("created_at", -1).limit(min(max(int(limit), 1), 500))
+    items = []
+    async for m in cursor:
+        m["_id"] = str(m.get("_id"))
+        items.append(m)
+    # Counters
+    counts = {"new": 0, "in_progress": 0, "resolved": 0}
+    async for c in db.support_messages.aggregate([{"$group": {"_id": "$status", "n": {"$sum": 1}}}]):
+        if c.get("_id") in counts:
+            counts[c["_id"]] = c.get("n", 0)
+    return {"items": items, "counts": counts, "total": len(items)}
+
+
+class SupportStatusUpdate(BaseModel):
+    status: str = Field(..., description="new | in_progress | resolved")
+
+
+@router.patch("/support/inbox/{msg_id}")
+async def support_inbox_update(
+    msg_id: str,
+    payload: SupportStatusUpdate,
+    user: dict = Depends(require_role("admin", "operator")),
+):
+    if payload.status not in ("new", "in_progress", "resolved"):
+        raise HTTPException(400, "Status invalid.")
+    update = {
+        "status": payload.status,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if payload.status == "resolved":
+        update["resolved_at"] = update["updated_at"]
+        update["resolved_by"] = user.get("email") or user.get("id")
+    if payload.status == "in_progress":
+        update["assigned_to"] = user.get("email") or user.get("id")
+    r = await db.support_messages.update_one({"id": msg_id}, {"$set": update})
+    if r.matched_count == 0:
+        raise HTTPException(404, "Mesaj inexistent.")
     return {"ok": True}
+
+
+@router.get("/support/contact-info")
+async def support_contact_info():
+    """Public: returns the support email shown in the Contact modal so users can
+    also write directly without using the in-app form. Configured via env
+    SUPPORT_CONTACT_EMAIL (preferred) or SUPPORT_EMAIL (fallback)."""
+    email = os.environ.get("SUPPORT_CONTACT_EMAIL") or os.environ.get("SUPPORT_EMAIL") or "contact@propmanage.ro"
+    return {"email": email, "response_time": "24h"}
 
 
 # ============= WEB PUSH SUBSCRIPTIONS =============

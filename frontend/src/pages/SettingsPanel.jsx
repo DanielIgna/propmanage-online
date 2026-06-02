@@ -1103,6 +1103,11 @@ const ContactModal = ({ onClose }) => {
   const [form, setForm] = useState({ subject: "", message: "" });
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [contactInfo, setContactInfo] = useState({ email: "contact@propmanage.ro", response_time: "24h" });
+
+  useEffect(() => {
+    axios.get(`${API}/support/contact-info`).then(r => setContactInfo(r.data)).catch(() => {});
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -1124,31 +1129,40 @@ const ContactModal = ({ onClose }) => {
         <div className="text-center py-8" data-testid="contact-sent">
           <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
           <div className="font-serif text-xl">Mesaj trimis</div>
-          <p className="text-sm text-stone-400 mt-2">Vei primi un răspuns în maxim 24h pe email-ul tău.</p>
+          <p className="text-sm text-stone-400 mt-2">Vei primi un răspuns în maxim {contactInfo.response_time} pe email-ul tău.</p>
         </div>
       ) : (
-        <form onSubmit={submit} className="space-y-4">
-          <Field label="Subiect">
-            <input
-              required
-              value={form.subject}
-              onChange={(e) => setForm({ ...form, subject: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm"
-              data-testid="contact-subject"
-            />
-          </Field>
-          <Field label="Mesaj">
-            <textarea
-              required
-              rows={5}
-              value={form.message}
-              onChange={(e) => setForm({ ...form, message: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm resize-none"
-              data-testid="contact-message"
-            />
-          </Field>
-          <button type="submit" disabled={loading} className="w-full btn-accent py-3 rounded-xl text-sm font-medium" data-testid="contact-send">{loading ? "Se trimite..." : "Trimite mesaj"}</button>
-        </form>
+        <>
+          <div className="mb-4 p-3 rounded-xl bg-[#d4ff3a]/5 border border-[#d4ff3a]/20" data-testid="contact-email-info">
+            <div className="text-[10px] uppercase tracking-wider text-[#d4ff3a] mb-1">Sau scrie-ne direct la</div>
+            <a href={`mailto:${contactInfo.email}`} className="text-sm text-white font-medium hover:underline break-all" data-testid="contact-email-link">
+              {contactInfo.email}
+            </a>
+            <div className="text-[10px] text-stone-500 mt-1">Răspuns garantat în {contactInfo.response_time}</div>
+          </div>
+          <form onSubmit={submit} className="space-y-4">
+            <Field label="Subiect">
+              <input
+                required
+                value={form.subject}
+                onChange={(e) => setForm({ ...form, subject: e.target.value })}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm"
+                data-testid="contact-subject"
+              />
+            </Field>
+            <Field label="Mesaj">
+              <textarea
+                required
+                rows={5}
+                value={form.message}
+                onChange={(e) => setForm({ ...form, message: e.target.value })}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm resize-none"
+                data-testid="contact-message"
+              />
+            </Field>
+            <button type="submit" disabled={loading} className="w-full btn-accent py-3 rounded-xl text-sm font-medium" data-testid="contact-send">{loading ? "Se trimite..." : "Trimite mesaj"}</button>
+          </form>
+        </>
       )}
     </ModalShell>
   );
