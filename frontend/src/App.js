@@ -48,6 +48,8 @@ import AdminDocumentation from "./pages/admin/AdminDocumentation";
 import QACopilotPage from "./pages/admin/QACopilotPage";
 import AIControlCenterPage from "./pages/admin/AIControlCenterPage";
 import DocsAIPage from "./pages/DocsAIPage";
+import AIDevTeamPage from "./pages/admin/AIDevTeamPage";
+import AISecurityCenterPage from "./pages/admin/AISecurityCenterPage";
 import { trackPageView } from "@/lib/analytics";
 import { useDynamicSEO } from "@/lib/useDynamicSEO";
 
@@ -1578,6 +1580,8 @@ function App() {
               <Route path="/admin/qa-copilot" element={<QACopilotPage />} />
               <Route path="/admin/ai-control" element={<AIControlCenterPage />} />
               <Route path="/ai-docs" element={<DocsAIPage />} />
+              <Route path="/admin/ai-dev-team" element={<AIDevTeamPage />} />
+              <Route path="/admin/ai-security" element={<AISecurityCenterPage />} />
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />
               <Route path="/ghiduri" element={<GhiduriIndex />} />
               <Route path="/ghiduri/:slug" element={<GhidPage />} />

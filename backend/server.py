@@ -74,6 +74,8 @@ from routes.qa_copilot import router as qa_copilot_router
 from routes.ai_control import router as ai_control_router
 from routes.digital_twin_qa import router as dt_qa_router
 from routes.docs_ai import router as docs_ai_router
+from routes.ai_dev_team import router as ai_dev_team_router
+from routes.ai_security import router as ai_security_router
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
@@ -153,6 +155,8 @@ for r in (
     ai_control_router,
     dt_qa_router,
     docs_ai_router,
+    ai_dev_team_router,
+    ai_security_router,
 ):
     app.include_router(r)
 
