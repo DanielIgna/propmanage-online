@@ -61,6 +61,7 @@ const NAV_SECTIONS = [
       { id: "docs_train", label: "Documentație & Training", icon: FileText, badge: "NEW", href: "/admin/documentation" },
       { id: "qa_copilot", label: "QA Copilot · AI Testing", icon: Sparkles, badge: "NEW", href: "/admin/qa-copilot" },
       { id: "ai_control", label: "AI Control Center", icon: Sparkles, badge: "NEW", href: "/admin/ai-control" },
+      { id: "ai_docs", label: "Document Intelligence", icon: FileText, badge: "NEW", href: "/ai-docs" },
     ],
   },
   {

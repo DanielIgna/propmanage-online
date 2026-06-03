@@ -167,12 +167,17 @@ const FindingCard = ({ finding, idx, onDelete }) => {
         <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
           {a.suspected_files?.length > 0 && (
             <div>
-              <div className="text-[10px] uppercase tracking-wider text-[#d4ff3a] mb-1.5 flex items-center gap-1"><FileText className="w-3 h-3" /> Fișiere suspecte</div>
+              <div className="text-[10px] uppercase tracking-wider text-[#d4ff3a] mb-1.5 flex items-center gap-1"><FileText className="w-3 h-3" /> Fișiere suspecte {a.code_aware && <span className="text-stone-500 normal-case">· verificate vs cod real</span>}</div>
               <div className="flex flex-wrap gap-1.5">
                 {a.suspected_files.map((f, i) => (
                   <code key={i} className="text-[11px] bg-white/5 border border-white/10 rounded px-2 py-0.5 text-stone-300 font-mono">{f}</code>
                 ))}
               </div>
+            </div>
+          )}
+          {a.invalid_paths_filtered?.length > 0 && (
+            <div className="text-[11px] text-amber-400/80">
+              ⚠ AI a propus {a.invalid_paths_filtered.length} path-uri inexistente, filtrate automat: <span className="font-mono text-stone-500">{a.invalid_paths_filtered.join(", ")}</span>
             </div>
           )}
           {a.suggested_next_tests?.length > 0 && (

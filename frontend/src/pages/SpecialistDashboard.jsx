@@ -30,6 +30,7 @@ export const SpecialistDashboard = () => {
   const [showNewProject, setShowNewProject] = useState(false);
   const [tab, setTab] = useState("opportunities");
   const [searchQ, setSearchQ] = useState("");
+  const [urgentOnly, setUrgentOnly] = useState(false);
   const [acceptingReq, setAcceptingReq] = useState(null);  // {id, title} for ScheduleProposalModal
   const [timelineRequestId, setTimelineRequestId] = useState(null);
 
@@ -50,7 +51,18 @@ export const SpecialistDashboard = () => {
 
   const open = requests.filter(r => r.status === "open");
   const mine = requests.filter(r => r.specialist_id === user?.id);
-  const filtered = (list) => searchQ ? list.filter(r => (r.title + r.description + (r.category || "")).toLowerCase().includes(searchQ.toLowerCase())) : list;
+  const filtered = (list) => {
+    let out = list;
+    if (urgentOnly) out = out.filter(r => r.priority === "urgent");
+    if (searchQ) out = out.filter(r => (r.title + r.description + (r.category || "")).toLowerCase().includes(searchQ.toLowerCase()));
+    // Auto-sort: urgent first, then newest
+    return [...out].sort((a, b) => {
+      const ua = a.priority === "urgent" ? 1 : 0;
+      const ub = b.priority === "urgent" ? 1 : 0;
+      if (ua !== ub) return ub - ua;
+      return (b.created_at || "").localeCompare(a.created_at || "");
+    });
+  };
   const unreadNotifs = notifs.filter(n => !n.read).length;
 
   const tabs = [
@@ -92,7 +104,7 @@ export const SpecialistDashboard = () => {
             <Stat icon={Briefcase} label="Active" value={mine.filter(r => r.status !== "confirmed").length} sub="In progress" color="cyan" tid="spec-stat-active" />
             <Stat icon={Award} label="Tier" value={user?.tier || "ENTRY"} sub={user?.verified ? "Verified" : "Pending"} tid="spec-stat-tier" />
           </div>
-          <FilterBar searchQ={searchQ} setSearchQ={setSearchQ} />
+          <FilterBar searchQ={searchQ} setSearchQ={setSearchQ} urgentOnly={urgentOnly} setUrgentOnly={setUrgentOnly} urgentCount={open.filter(r => r.priority === "urgent").length} />
           <div className="space-y-3 mt-4 max-w-3xl mx-auto" data-tour="specialist-leads">
             <div className="text-xs uppercase tracking-wider text-stone-500 px-1">{filtered(open).length} oportunități</div>
             {filtered(open).length === 0 && (
@@ -103,7 +115,7 @@ export const SpecialistDashboard = () => {
               </div>
             )}
             {filtered(open).map(r => (
-              <div key={r.id} className="bg-white/5 rounded-2xl p-4" data-testid={`open-${r.id}`}>
+              <div key={r.id} className={`bg-white/5 rounded-2xl p-4 ${r.priority === "urgent" ? "ring-2 ring-red-500/40 animate-pulse-soft" : ""}`} data-testid={`open-${r.id}`}>
                 <div className="flex justify-between items-start mb-2 gap-3">
                   <div className="min-w-0">
                     <div className="font-medium text-sm">{r.title}</div>
@@ -146,7 +158,7 @@ export const SpecialistDashboard = () => {
               <ProjectListSection title="Proiectele tale de coordonare" />
             </div>
           )}
-          <FilterBar searchQ={searchQ} setSearchQ={setSearchQ} />
+          <FilterBar searchQ={searchQ} setSearchQ={setSearchQ} urgentOnly={urgentOnly} setUrgentOnly={setUrgentOnly} urgentCount={open.filter(r => r.priority === "urgent").length} />
           <div className="space-y-3 mt-4 max-w-3xl mx-auto">
             <div className="text-xs uppercase tracking-wider text-stone-500 px-1">{filtered(mine).length} lucrări</div>
             {filtered(mine).length === 0 && (
@@ -322,16 +334,26 @@ const NewProjectModal = ({ onClose }) => {
   );
 };
 
-const FilterBar = ({ searchQ, setSearchQ }) => (
+const FilterBar = ({ searchQ, setSearchQ, urgentOnly, setUrgentOnly, urgentCount = 0 }) => (
   <div className="max-w-3xl mx-auto sticky top-[72px] z-10">
     <div className="glass rounded-2xl p-3 bg-[#0a0a0b]/80 backdrop-blur">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
-        <input
-          type="text" placeholder="Caută..." value={searchQ} onChange={e => setSearchQ(e.target.value)}
-          className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-3 py-2.5 text-sm focus:outline-none focus:border-[#d4ff3a]/50"
-          data-testid="spec-search"
-        />
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
+          <input
+            type="text" placeholder="Caută..." value={searchQ} onChange={e => setSearchQ(e.target.value)}
+            className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-3 py-2.5 text-sm focus:outline-none focus:border-[#d4ff3a]/50"
+            data-testid="spec-search"
+          />
+        </div>
+        <button
+          onClick={() => setUrgentOnly?.(!urgentOnly)}
+          className={`shrink-0 px-3 py-2 rounded-xl text-xs font-medium border transition-colors flex items-center gap-1.5 ${urgentOnly ? "bg-red-500/20 border-red-500/50 text-red-300" : "bg-white/5 border-white/10 text-stone-400 hover:text-white"}`}
+          data-testid="spec-urgent-toggle"
+          title={urgentOnly ? "Click pentru a vedea toate joburile" : "Click pentru a vedea doar joburile urgente"}
+        >
+          🔥 Urgent {urgentCount > 0 && <span className="ml-0.5 text-[10px] bg-red-500 text-white rounded-full px-1.5">{urgentCount}</span>}
+        </button>
       </div>
     </div>
   </div>

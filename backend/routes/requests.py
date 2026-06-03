@@ -50,12 +50,14 @@ async def create_request(data: RequestIn, user: dict = Depends(require_role("cli
         # Notify specialists with matching specialty OR no specialty set
         spec_query = {"role": "specialist", "$or": [{"specialty": data.category}, {"specialty": None}]}
     specs = await db.users.find(spec_query).to_list(50)
+    is_urgent = (data.priority or "").lower() == "urgent"
+    title_prefix = "[URGENT] " if is_urgent else ""
     for s in specs:
         await notify(
             str(s["_id"]),
-            f"Lead nou: {data.title}",
+            f"{title_prefix}Lead nou: {data.title}",
             f"Solicitare {data.priority} în categoria {data.category}. Buget estimat: {data.budget_estimate or '—'} RON",
-            type_="lead",
+            type_="lead_urgent" if is_urgent else "lead",
             link=f"/specialist"
         )
     return doc

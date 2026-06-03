@@ -72,6 +72,8 @@ from routes.verified_estate import router as verified_estate_router, seed_demo_l
 from routes.app_settings import router as app_settings_router, public_router as app_settings_public_router
 from routes.qa_copilot import router as qa_copilot_router
 from routes.ai_control import router as ai_control_router
+from routes.digital_twin_qa import router as dt_qa_router
+from routes.docs_ai import router as docs_ai_router
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
@@ -149,6 +151,8 @@ for r in (
     app_settings_public_router,
     qa_copilot_router,
     ai_control_router,
+    dt_qa_router,
+    docs_ai_router,
 ):
     app.include_router(r)
 

@@ -1,0 +1,38 @@
+{
+  "summary": "Phase 71 mega-sprint (urgency UX + QA Copilot code-aware + Twin Q&A + Document Intelligence) tested end-to-end. Backend: 14/14 pytest PASS. Frontend: every required testid + Romanian phrase + integration confirmed live.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin sidebar", "issues": ["'Document Intelligence' entry is rendered as a <button> with programmatic onClick navigation, not an <a href='/ai-docs'>. It WORKS (navigates correctly when clicked) and the NEW badge is visible, but the original spec wording said 'linking to /ai-docs' which usually implies an anchor. Minor — recommend switching to <NavLink to='/ai-docs'> for: (a) cmd-click/middle-click new tab support, (b) keyboard accessibility consistency with other sidebar items, (c) right-click → copy link."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase71.py",
+    "/app/test_reports/pytest/phase71_results.xml"
+  ],
+  "action_items": [
+    "(Polish, non-blocking) Convert the 'Document Intelligence' sidebar entry in AdminLayoutMetronic.jsx from <button onClick=navigate('/ai-docs')> to a real <NavLink to='/ai-docs'> for accessibility + middle-click open-in-new-tab parity with the other sidebar items."
+  ],
+  "critical_code_review_comments": [
+    "routes/docs_ai.py::upload_doc — File is fully read into memory before size check. For a 10MB limit this is fine, but if the limit ever grows, switch to streaming read with a counter, otherwise an attacker could send a 1GB upload and the 413 check arrives only after read completes.",
+    "routes/docs_ai.py::ask_docs — `cur = db.ai_doc_chunks.find(flt).limit(2000)` is OK for MVP, but as chunks grow, this becomes O(N) per question per user. Once >5k chunks/user, add a Mongo text index on `tokens` (already indexed in ai_memories pattern) and use $text or pre-filter by at least one query token: {tokens: {$in: list(query_tokens)}}.",
+    "routes/digital_twin_qa.py::ask — When project has no models/plans/pins, returns a graceful answer (verified). Good. However, `member_ok = user.get('id') in (project.get('members') or [])` does a string-in-list check that will fail if `members` stores ObjectIds — verify all writer paths normalize to str(id). (Non-blocking; same caveat as Phase 70 KG fix.)",
+    "ai_core/code_index.py::list_paths — Cached for 10min, but on cold start the first finding (~200ms walk of /app/backend + /app/frontend/src) blocks the request. Consider warming on FastAPI startup() hook so the very first user-visible analyze call is fast.",
+    "ai_core/memory.py::_tokenize — Stemmer strips suffix only if remaining stem >=4 chars. This means 4-letter Romanian roots that happen to end in 'ul' (e.g. 'casa→cas' uses 'a' stem too short) won't stem. Acceptable for MVP but the test ['suprafata livingului' → 'liv...'] still works because the noun is long enough. Worth noting for future tuning.",
+    "routes/docs_ai.py::delete_doc — Correctly returns 404 if not found and 403 if not owner. Good.",
+    "Phase 70 carryover STILL OPEN: knowledge_graph.for_user does not match users by email (only by ObjectId or `id`). Reported in iteration_49.json; not re-checked here as it is outside Phase 71 scope, but flagging it remains unresolved."
+  ],
+  "updated_files": ["/app/backend/tests/test_phase71.py (new — 14 tests)"],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100% — all required testids render, Romanian helper note + 'verificate vs cod real' phrase + sidebar entry all confirmed live; only the sidebar element type (<button> instead of <a>) is a minor polish."},
+  "test_credentials": "Admin admin@propmanage.io / Admin123! · Client client@propmanage.io / Client123! · Specialist specialist@propmanage.io / Spec123!",
+  "seed_data_creation": "1 transient request (TEST_phase71 urgent leak, hvac, urgent) created by client during pytest, 1 transient ai_documents doc created+deleted by client, 1 transient QA Copilot session 'TEST_phase71 code-aware' created+deleted, ecosystem toggle off→on cycled. Final state: no leftover test data except the transient request (which has minimal impact; can be deleted manually).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Phase 71 is GREEN. The 14 backend tests are at /app/backend/tests/test_phase71.py and they exercise: [A] urgent request creation triggers [URGENT] notification on HVAC specialists + priority=urgent filter, [B] QA Copilot /findings ai_analysis.code_aware=true + invalid_paths_filtered present + every suspected_files path validated against the actual filesystem via os.path.exists, [C] Twin Q&A history without cookie returns 401/403, nonexistent project returns 404, ecosystem-disabled returns graceful 200 with 'dezactivat' message, [D] /ai-docs upload+list+ask (Romanian stemmer: 'Cat este suprafata livingului' → answer contains '28' citing source; 'Unde este tabloul electric' → answer contains 'hol' or 'intrare') + admin /stats + client 403 on /stats + 413 on 11MB upload + delete. FE verified live: spec-urgent-toggle clickable (tutorial overlay needs dismissal via localStorage hack), client modal Urgent button shows red helper note 'Joburile urgente apar primele în lista specialiștilor și declanșează notificare instant cu prefix [URGENT].', QA Copilot session card shows 'FIȘIERE SUSPECTE - verificate vs cod real' label with real backend/frontend paths, /ai-docs full RAG flow works (uploaded sample → asked 'Cate camere are apartamentul?' → got answer '3 camere' with 2 sources cited). Sidebar admin shows Document Intelligence with NEW badge but is a <button> not <a> — flagged as minor polish.",
+  "rca of the issue": "No bugs found in Phase 71 scope. The only carry-over open item is the Phase 70 knowledge_graph email lookup (already documented in iteration_49.json action_items). Sidebar Document Intelligence as button vs anchor is a tiny accessibility polish, not a functional break."
+}

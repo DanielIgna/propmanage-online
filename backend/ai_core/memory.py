@@ -30,11 +30,26 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+_DIACRITICS = str.maketrans("ăâîșțĂÂÎȘȚ", "aaistAAIST")
+_RO_SUFFIXES = ("ului", "elor", "ilor", "lor", "ele", "ile", "uri", "lui", "ul", "ii", "ea", "ie", "ia")
+
+
+def _stem(token: str) -> str:
+    """Light Romanian stemmer — strip common suffixes if word stays >= 4 chars."""
+    if len(token) <= 5:
+        return token
+    for suf in _RO_SUFFIXES:
+        if token.endswith(suf) and len(token) - len(suf) >= 4:
+            return token[:-len(suf)]
+    return token
+
+
 def _tokenize(text: str) -> list[str]:
     if not text:
         return []
+    text = text.translate(_DIACRITICS)
     toks = re.findall(r"[a-zA-Z0-9]{3,}", text.lower())
-    return [t for t in toks if t not in _STOPWORDS]
+    return [_stem(t) for t in toks if t not in _STOPWORDS]
 
 
 def _score(query_tokens: set, memory_tokens_counter: Counter) -> float:
