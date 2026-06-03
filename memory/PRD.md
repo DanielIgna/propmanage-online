@@ -4,6 +4,12 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 ## Recent additions (Feb 2026)
+- **Phase 65 — Verified Estate Incremental (Real Sell Flow + Emails + Map)** ✅
+  - **Auto-draft listing from paid order**: After successful demo Stripe checkout, backend auto-creates a `draft` listing in admin Kanban with: title="Imobil în pregătire · <address>", owner_email/name/phone from order, pending_services flags ({audit, twin} based on package), source_order_id for traceability. Gates all start as failing — agent populates them later.
+  - **Email notifications via Resend**: 3 hooks added — admin email on inquiry (`[Imobile Verificate] <intent> · <name>`), admin email on external audit request, admin email on paid order + buyer confirmation email. All fire-and-forget through `asyncio.create_task` so checkout/inquiry latency isn't impacted. Uses `ADMIN_NOTIFY_EMAIL` env or falls back to `SUPPORT_CONTACT_EMAIL`.
+  - **Leaflet Map View**: `/imobile-verificate` now has Grid ↔ Hartă toggle. Dark CartoDB tiles, custom lime SVG markers, popups with title/city/price + "Vezi detalii →" link. Listings need `lat`/`lng` (now seeded for the 2 demos: Aviatorilor 44.4632/26.0894 + Pipera 44.5215/26.1278). Auto-fit bounds when 2+ markers.
+  - **Tested**: 100% backend (27/27 — 6 new + 21 regression), 100% frontend (view-toggle, markers, popups, draft auto-create end-to-end).
+
 - **Phase 64 — Verified Estate ETAPA 1+2+3+4 COMPLET** ✅
   - **ETAPA 1**: Modul izolat `routes/verified_estate.py` + 3 pagini frontend (`/imobile-verificate`, detail, sell landing). 4 quality gates strict. Feature flag `FEATURE_VERIFIED_ESTATE=true`. 2 listings demo seeded.
   - **ETAPA 2**: Stripe checkout (audit 350 / twin 950 / bundle 1300 RON) cu fallback DEMO mode. 4-step wizard în Sell page. Admin Kanban moderation panel (`/admin/imobile-verificate`) cu 4 coloane (Draft/Pending/Published/Archived), 6 stat cards, 4 tabs (Kanban/Inquiries/External/Orders). Gates strict-enforced la publish.
