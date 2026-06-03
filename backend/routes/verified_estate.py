@@ -31,6 +31,7 @@ from pydantic import BaseModel, Field
 from db import db
 from deps import get_current_user, require_role
 from core_utils import serialize_doc
+from email_service import send_email
 
 logger = logging.getLogger("propmanage.verified_estate")
 
@@ -42,6 +43,65 @@ PRICE_TWIN_RON = float(os.environ.get("VE_PRICE_TWIN_RON", "950"))
 COMMISSION_PCT = float(os.environ.get("VE_COMMISSION_PCT", "2.5"))
 
 router = APIRouter(prefix="/api/verified-estate", tags=["verified-estate"])
+
+ADMIN_NOTIFY_EMAIL = os.environ.get("ADMIN_NOTIFY_EMAIL") or os.environ.get("SUPPORT_CONTACT_EMAIL") or "contact@propmanage.ro"
+
+
+async def _notify_admin(subject: str, body_html: str):
+    """Fire-and-forget admin notification."""
+    try:
+        import asyncio
+        asyncio.create_task(send_email(ADMIN_NOTIFY_EMAIL, subject, body_html))
+    except Exception as e:
+        logger.warning(f"Admin notify failed: {e}")
+
+
+async def _create_draft_listing_from_order(order: dict):
+    """After a successful paid order, auto-create a draft listing for admin review."""
+    pkg = order.get("package", "")
+    has_audit = pkg in ("audit", "bundle")
+    has_twin = pkg in ("twin", "bundle")
+    now = datetime.now(timezone.utc)
+    addr = order.get("property_address", "")
+    title_prefix = "Imobil în pregătire"
+    listing_doc = {
+        "_id": ObjectId(),
+        "title": f"{title_prefix} · {addr[:60]}",
+        "city": (addr.split(",")[-1].strip()[:80]) or "—",
+        "address": addr,
+        "price_ron": 0.0,
+        "rooms": 0,
+        "surface_sqm": 0.0,
+        "floor": "",
+        "year_built": None,
+        "description": f"Listing creat automat după plata pachetului '{pkg}'. "
+                       f"Așteaptă programare audit/twin și completare detalii de către agentul atribuit.\n\n"
+                       f"Contact proprietar: {order.get('contact_name', '')} <{order.get('contact_email', '')}> {order.get('contact_phone', '')}\n"
+                       f"Notițe: {order.get('notes', '')}",
+        "transaction_type": "sale",
+        "digital_twin_id": None,
+        "audit_report_id": None,
+        "audit_report_url": None,
+        "cover_image_url": None,
+        "gallery": [],
+        "recommendations_total": 0,
+        "recommendations_accepted": 0,
+        "status": "draft",
+        "created_at": now,
+        "updated_at": now,
+        "published_at": None,
+        "view_count": 0,
+        "inquiry_count": 0,
+        "source_order_id": str(order.get("_id")),
+        "owner_email": order.get("contact_email"),
+        "owner_name": order.get("contact_name"),
+        "owner_phone": order.get("contact_phone", ""),
+        "pending_services": {"audit": has_audit, "twin": has_twin},
+        "gates_status": _evaluate_gates({"audit_report_id": None, "digital_twin_id": None, "recommendations_total": 0, "recommendations_accepted": 0}),
+    }
+    await db.verified_estate_listings.insert_one(listing_doc)
+    return str(listing_doc["_id"])
+
 
 
 def _ensure_enabled():
@@ -62,6 +122,9 @@ class ListingCreate(BaseModel):
     year_built: Optional[int] = None
     description: str = Field("", max_length=4000)
     transaction_type: str = Field("sale", pattern="^(sale|rent)$")
+    # Geo coordinates (optional)
+    lat: Optional[float] = None
+    lng: Optional[float] = None
     # Twin & audit linkage (mandatory for publish)
     digital_twin_id: Optional[str] = None
     audit_report_id: Optional[str] = None
@@ -228,6 +291,19 @@ async def create_inquiry(body: InquiryCreate):
         {"_id": listing["_id"]},
         {"$inc": {"inquiry_count": 1}},
     )
+    # Notify admin
+    intent_label = {"viewing": "Programare vizionare", "buy": "Intenție de cumpărare", "info": "Cerere informații"}.get(body.intent, body.intent)
+    await _notify_admin(
+        f"[Imobile Verificate] {intent_label} · {body.name}",
+        f"""<h2>Cerere nouă pe Imobile Verificate</h2>
+        <p><strong>Tip:</strong> {intent_label}</p>
+        <p><strong>Imobil:</strong> {listing.get('title', '')}</p>
+        <p><strong>Nume:</strong> {body.name}<br/>
+        <strong>Email:</strong> {body.email}<br/>
+        <strong>Telefon:</strong> {body.phone or '—'}</p>
+        <p><strong>Mesaj:</strong></p>
+        <blockquote>{body.message or '(fără mesaj)'}</blockquote>"""
+    )
     return {"ok": True, "inquiry_id": str(doc["_id"])}
 
 
@@ -250,6 +326,16 @@ async def create_external_audit_request(body: ExternalAuditCreate):
         "created_at": now,
     }
     await db.verified_estate_external_requests.insert_one(doc)
+    await _notify_admin(
+        f"[Imobile Verificate] Cerere audit EXTERN · {body.contact_name}",
+        f"""<h2>Cerere audit pentru imobil extern</h2>
+        <p><strong>URL imobil:</strong> <a href="{body.external_listing_url}">{body.external_listing_url}</a></p>
+        <p><strong>Adresă:</strong> {body.property_address}</p>
+        <p><strong>Contact:</strong> {body.contact_name} · {body.contact_email} · {body.contact_phone or '—'}</p>
+        <p><strong>Buget:</strong> {body.budget_ron or '—'} RON</p>
+        <p><strong>Notițe:</strong></p>
+        <blockquote>{body.notes or '(fără notițe)'}</blockquote>"""
+    )
     return {"ok": True, "request_id": str(doc["_id"])}
 
 
@@ -503,6 +589,35 @@ async def create_checkout(body: CheckoutRequest, request: Request):
             "paid_at": now,
         })
         await db.verified_estate_orders.insert_one(base_order)
+        # Auto-create draft listing for admin moderation
+        try:
+            draft_id = await _create_draft_listing_from_order(base_order)
+            await db.verified_estate_orders.update_one({"_id": base_order["_id"]}, {"$set": {"draft_listing_id": draft_id}})
+        except Exception as e:
+            logger.warning(f"Auto-create draft failed: {e}")
+        # Notify admin + send confirmation to buyer
+        await _notify_admin(
+            f"[Imobile Verificate] Plată DEMO · {body.package} · {amount} RON",
+            f"""<h2>Comandă nouă (mod DEMO)</h2>
+            <p><strong>Pachet:</strong> {label}</p>
+            <p><strong>Sumă:</strong> {amount:.0f} RON</p>
+            <p><strong>Client:</strong> {body.contact_name} · {body.contact_email} · {body.contact_phone or '—'}</p>
+            <p><strong>Adresă proprietate:</strong> {body.property_address}</p>
+            <p><strong>Notițe:</strong> {body.notes or '—'}</p>
+            <p><em>Listing draft creat automat în Admin Kanban.</em></p>"""
+        )
+        try:
+            import asyncio
+            asyncio.create_task(send_email(
+                body.contact_email,
+                f"Confirmare comandă · {label} · {amount:.0f} RON",
+                f"""<h2>Mulțumim, {body.contact_name}!</h2>
+                <p>Am primit comanda ta pentru <strong>{label}</strong> (mod DEMO — fără tranzacție reală).</p>
+                <p>Echipa noastră te va contacta în maxim 24h pentru a programa auditul la <strong>{body.property_address}</strong>.</p>
+                <p>— Echipa PropManage Imobile Verificate</p>"""
+            ))
+        except Exception:
+            pass
         return {
             "checkout_url": f"{origin}/imobile-verificate/sell?paid=1&session_id={fake_session}&demo=1",
             "session_id": fake_session,
@@ -585,6 +700,8 @@ async def seed_demo_listings():
             "surface_sqm": 92.0,
             "floor": "4/8",
             "year_built": 2019,
+            "lat": 44.4632,
+            "lng": 26.0894,
             "description": "Apartament complet renovat, vedere parc, finisaje premium. "
                            "Audit tehnic complet realizat: instalații electrice 2024, "
                            "hidraulice 2023, fără reparații necesare. Digital Twin disponibil "
@@ -622,6 +739,8 @@ async def seed_demo_listings():
             "surface_sqm": 240.0,
             "floor": "P+1",
             "year_built": 2017,
+            "lat": 44.5215,
+            "lng": 26.1278,
             "description": "Vilă individuală cu curte 320 m², garaj dublu, sistem inteligent "
                            "smart-home preinstalat. Audit complet: structură A+, instalații A, "
                            "izolație termică B+ (recomandare panouri solare acceptată de proprietar). "

@@ -3,9 +3,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Building2, MapPin, Bed, Maximize2, ShieldCheck, Box, ArrowRight,
-  Search, Sparkles, ExternalLink, X, CheckCircle2
+  Search, Sparkles, ExternalLink, X, CheckCircle2, LayoutGrid, Map as MapIcon
 } from "lucide-react";
 import axios from "axios";
+import { EstateMapView } from "./EstateMapView";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -173,6 +174,7 @@ export const EstateBrowse = () => {
   const [filterPriceMax, setFilterPriceMax] = useState("");
   const [filterTransaction, setFilterTransaction] = useState("");
   const [showExtModal, setShowExtModal] = useState(false);
+  const [viewMode, setViewMode] = useState("grid"); // grid | map
 
   useEffect(() => {
     let active = true;
@@ -293,17 +295,31 @@ export const EstateBrowse = () => {
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
                 <h2 className="font-serif text-3xl" data-testid="estate-count">{items.length} {items.length === 1 ? "imobil verificat" : "imobile verificate"}</h2>
-                <div className="text-xs text-stone-400 hidden md:block">Toate cu audit + Digital Twin</div>
+                <div className="flex items-center gap-3">
+                  <div className="text-xs text-stone-400 hidden md:block">Toate cu audit + Digital Twin</div>
+                  <div className="inline-flex bg-white/5 rounded-full p-1" data-testid="view-toggle">
+                    <button onClick={() => setViewMode("grid")} className={`px-3 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition-colors ${viewMode === "grid" ? "bg-[#d4ff3a] text-black" : "text-stone-400 hover:text-white"}`} data-testid="view-grid">
+                      <LayoutGrid className="w-3.5 h-3.5" /> Grid
+                    </button>
+                    <button onClick={() => setViewMode("map")} className={`px-3 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition-colors ${viewMode === "map" ? "bg-[#d4ff3a] text-black" : "text-stone-400 hover:text-white"}`} data-testid="view-map">
+                      <MapIcon className="w-3.5 h-3.5" /> Hartă
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {items.map((it, i) => (
-                  <motion.div key={it.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: i * 0.05 }}>
-                    <ListingCard item={it} />
-                  </motion.div>
-                ))}
-              </div>
+              {viewMode === "grid" ? (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {items.map((it, i) => (
+                    <motion.div key={it.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: i * 0.05 }}>
+                      <ListingCard item={it} />
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <EstateMapView items={items} />
+              )}
             </>
           )}
         </div>
