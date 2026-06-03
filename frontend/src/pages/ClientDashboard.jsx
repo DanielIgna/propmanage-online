@@ -646,7 +646,14 @@ const JobsZone = ({ requests, searchQ, setSearchQ, filterCat, setFilterCat, filt
             <div className="text-xs text-stone-400 mb-2 line-clamp-2">{r.description}</div>
             <div className="flex items-center justify-between text-[10px] text-stone-500">
               <span>{r.category} · {r.priority}</span>
-              {r.specialist_name && <span className="text-[#d4ff3a]">{r.specialist_name}</span>}
+              {r.specialist_name && (
+                <span className="text-[#d4ff3a] flex items-center gap-1" title={`${r.specialist_specialty || ""}${r.specialist_city ? " · " + r.specialist_city : ""}`}>
+                  {r.specialist_name}
+                  {r.specialist_specialty && <span className="text-stone-400 normal-case">· {r.specialist_specialty}</span>}
+                  {r.specialist_city && <span className="text-stone-500">· {r.specialist_city}</span>}
+                  {r.specialist_verified && <span className="ml-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full px-1.5 py-0.5 text-[8px] uppercase tracking-wider font-medium">✓</span>}
+                </span>
+              )}
             </div>
             <LastActionBanner event={r.last_event} onClick={() => setTimelineRequestId(r.id)} />
             <div className="flex gap-2 mt-3">

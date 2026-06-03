@@ -171,6 +171,9 @@ async def accept_request(req_id: str, data: Optional[AcceptRequestIn] = None, us
         "status": "assigned",
         "specialist_id": user["id"],
         "specialist_name": user["name"],
+        "specialist_specialty": specialist.get("specialty") or specialist.get("category") or "",
+        "specialist_city": specialist.get("city") or specialist.get("location") or "",
+        "specialist_verified": bool(specialist.get("verified")),
         "assigned_at": datetime.now(timezone.utc).isoformat(),
     }
     # Schedule proposal

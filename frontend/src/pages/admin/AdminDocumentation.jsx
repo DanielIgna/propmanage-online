@@ -8,6 +8,74 @@ import {
 
 const TOPICS = [
   {
+    id: "qa-copilot",
+    icon: Sparkles,
+    title: "QA Copilot · Testare AI-asistată",
+    summary: "Cum folosești modulul nou de testare manuală",
+    content: [
+      {
+        h: "Conceptul",
+        p: "QA Copilot (`/admin/qa-copilot`) e un asistent AI (Claude Sonnet 4.5) care te ajută la testarea manuală a platformei. Tu descrii ce vezi în limbaj natural, AI clasifică (bug/UX/data/feature), atribuie severitate (P0-P3), identifică fișiere suspecte și sugerează următoarele teste. La final compilează un prompt structurat pe care îl copiezi în chat-ul cu Emergent ca să mă pui la treabă cu fix-ul exact."
+      },
+      {
+        h: "Cum începi o sesiune",
+        p: "1. Mergi la /admin/qa-copilot. 2. Click 'Sesiune nouă'. 3. Dă titlu (ex: 'Test rol specialist Mihai Ionescu'), alege rolul testat (client/specialist/operator/admin), specifică modulul (ex: 'Match specialist + Chat'), descrie obiectivul. 4. Click 'Creează'."
+      },
+      {
+        h: "Cum adaugi constatări",
+        p: "În sesiunea activă scrii în limbaj natural ce ai văzut. Ex: 'Specialistul Mihai Ionescu este din București, dar apare ca match pentru o cerere din Cluj. Nu se respectă filtrul geografic.' Opțional atașezi screenshot. Click 'Trimite & analizează' → AI răspunde în 5-10 secunde cu: categoria, severitatea, fișierele suspecte, 4 sugestii de teste de follow-up, conexiuni cu constatări anterioare din alte sesiuni."
+      },
+      {
+        h: "Memorie persistentă",
+        p: "Toate sesiunile rămân salvate în sidebar-ul stâng. Când adaugi o constatare nouă, AI vede ultimele 30 constatări din sesiunea curentă + ultimele 10 din toate sesiunile vechi. Astfel poate identifica regresiuni ('Am mai văzut asta în sesiunea X acum 3 zile')."
+      },
+      {
+        h: "Generează prompt pentru Emergent",
+        p: "După ce ai 1-10 constatări, apasă 'Generează prompt'. AI compilează totul într-un Markdown structurat: titlu, lista numerotată cu pași de reproducere + expected vs actual + fișiere suspecte + severitate, prioritizare recomandată, frază de încheiere pentru workflow corect. Click 'Copiază' → lipesti în chat cu mine. Eu îl interpretez direct, propun planul și execut fix-urile."
+      },
+      {
+        h: "Workflow recomandat",
+        p: "1. Testează manual o secțiune (ex: marketplace match). 2. Notează 3-5 lucruri neașteptate. 3. Generează prompt. 4. Trimite-l în chat cu mine. 5. După fix, rulează testarea din nou și creează sesiune nouă 'Regresie post-fix' pentru verificare. Avantaj: ai un audit trail complet, nu mai depinzi de memoria ta."
+      },
+    ],
+  },
+  {
+    id: "launch-playbook",
+    icon: Rocket,
+    title: "Playbook Lansare · Primii 7 pași",
+    summary: "Ghid concret pentru primele zile post-deploy",
+    content: [
+      {
+        h: "Ziua 1 · Verificări tehnice",
+        p: "1. Verifică https://phased-document.emergent.host răspunde 200. 2. Login admin → /admin/settings-control: confirmă prețurile (350/950/2.5%). 3. Setează 1-2 link-uri sociale reale dacă ai. 4. Verifică /api/app-settings/public răspunde corect (Network tab). 5. Postează în Facebook Sharing Debugger (developers.facebook.com/tools/debug) URL-ul prod ca să Facebook actualizeze cache-ul OG."
+      },
+      {
+        h: "Ziua 2 · LinkedIn Launch Post",
+        p: "Postare: 'După 6 luni de construcție, lansez PropManage — primul model imobiliar din România unde fiecare imobil are AUDIT + DIGITAL TWIN obligatorii. Nu un alt site de anunțuri. O platformă unde vezi exact ce cumperi, înainte de prima vizionare. Comision 2.5%. https://propmanage.ro/de-ce-noi #imobiliare #proptech #romania' Image: screenshot din /imobile-verificate cu Map View."
+      },
+      {
+        h: "Ziua 3 · Facebook · Post de educație",
+        p: "Carousel 5 slides: Slide 1: 'Cum verificăm un apartament în 3 zile' Slide 2: Audit tehnic (foto auditor) Slide 3: Digital Twin 3D (screenshot din Trimble) Slide 4: Raport detaliat (foto raport) Slide 5: 'Vezi tu' CTA spre /imobile-verificate. Buget recomandat: 50-100€ pentru boost local București/Cluj."
+      },
+      {
+        h: "Ziua 4 · Instagram Reel",
+        p: "Reel 30 sec: 'Cum am cumpărat apartament fără să fac 5 vizionări' — auditor în acțiune + zoom în Digital Twin 3D + statistici pe ecran. Hashtag: #imobilverificat #auditimobiliar #propmanage #imobiliarebucuresti. Postează miercuri 18:00 sau sâmbătă 11:00."
+      },
+      {
+        h: "Ziua 5 · YouTube · Studiu de caz",
+        p: "Video 5-8 min: 'Andrei a cumpărat un apartament în Pipera fără să-l vadă fizic. Iată cum.' Include: interviu Andrei (2 min) + tur Digital Twin pe ecran (2 min) + raport audit (1 min) + CTA spre platformă (30s). Titlu YouTube optimizat SEO: 'Cum cumperi apartament fără riscuri în 2026 - Audit + Digital Twin'."
+      },
+      {
+        h: "Ziua 6 · Newsletter pilot",
+        p: "Trimite prin Admin → 'Trimite newsletter acum' (POST /api/verified-estate/admin/run-newsletter-now) către primii 50-100 utilizatori înregistrați. Conține top 5 imobile noi + linkul către /de-ce-noi. Monitorizează open rate în Resend dashboard."
+      },
+      {
+        h: "Ziua 7 · Retrospectivă & Iterație",
+        p: "Verifică în GA4 (după ce activezi Measurement ID): pagini top 5, surse trafic, bounce rate /imobile-verificate. Compară cu obiectivele tale (ex: 100 vizite unice → realist pentru ziua 7). Notează ce a mers, ce nu, ajustează planificarea săptămânii 2. Folosește QA Copilot pentru bug-uri descoperite de useri reali."
+      },
+    ],
+  },
+  {
     id: "verified-estate",
     icon: Building2,
     title: "Imobile Verificate · End-to-end",
@@ -219,7 +287,7 @@ const TopicCard = ({ topic, open, onToggle }) => (
 );
 
 export const AdminDocumentation = () => {
-  const [openId, setOpenId] = useState("verified-estate");
+  const [openId, setOpenId] = useState("qa-copilot");
   return (
     <div className="min-h-screen bg-[#0a0a0b] text-white">
       <div className="max-w-5xl mx-auto px-6 pt-28 pb-16">
