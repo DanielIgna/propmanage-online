@@ -1,0 +1,40 @@
+{
+  "summary": "Tested PropManage Verified Estate (Imobile Verificate) module end-to-end: 21/21 backend pytest cases pass (public listings, filters, detail, inquiries, external audit, pricing, Stripe demo checkout, admin auth gate, stats, lists, gate-enforced publish, archive). Frontend browse + filters + detail + inquiry form + external audit modal + sell wizard step 1-2-3 + admin panel (6 stat cards, 4 tabs, Kanban columns, Plăți with DEMO badges) all render correctly. One issue found in Stripe demo redirect domain.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/verified-estate/checkout", "issue": "Redirect URL is built from request `Origin` header verbatim — in some browser contexts (e.g. preview frame), origin is the internal cluster domain (https://phased-document.cluster-5.preview.emergentcf.cloud), which returns 403 Forbidden to the user when the browser follows the redirect. Backend should prefer FRONTEND_PUBLIC_URL env var (already present in backend/.env) over the raw Origin header for building checkout success/cancel URLs."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Sell wizard step 3 → step 4", "issue": "After clicking 'Plătește cu Stripe', the demo redirect resolved to https://phased-document.cluster-5.preview.emergentcf.cloud/imobile-verificate/sell?paid=1&demo=1 which returns 403 Forbidden. Backend echoed the Origin header. Step 4 success screen is therefore not reachable in this preview environment. URL params (paid=1, session_id, demo=1) are however set correctly.", "affected_selectors": ["step-4 success message"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_verified_estate.py",
+    "/app/test_reports/pytest/verified_estate_results.xml"
+  ],
+  "action_items": [
+    "[Sell wizard / checkout] In /app/backend/routes/verified_estate.py `create_checkout`, replace `origin = request.headers.get('origin') or request.headers.get('referer', '').rstrip('/')` with `origin = os.environ.get('FRONTEND_PUBLIC_URL') or request.headers.get('origin') or request.headers.get('referer', '').rstrip('/')`. This guarantees the Stripe (and demo) redirect lands on the public-facing URL, not the internal cluster domain."
+  ],
+  "critical_code_review_comments": [
+    "verified_estate.py L466-468: Origin header used as redirect base — should prefer env-configured FRONTEND_PUBLIC_URL to avoid cluster-internal URLs leaking into redirects.",
+    "verified_estate.py L194 / L207 / L302 / L324 / L357: ObjectId(...) try/except is repeated 5x — extract to a small `_oid(listing_id)` helper that raises 404 to DRY up the module.",
+    "verified_estate.py overall ~646 lines — still under 700-line threshold, but pricing/checkout/orders sub-section (L416-555) could later be split into a `verified_estate_payments.py` to keep concerns separated.",
+    "Inquiry endpoint stores `email` lower-cased but does not update `inquiry_count` on the listing doc (defined as 0 in seed); consider `$inc: {inquiry_count: 1}` for admin analytics.",
+    "Trust-score logic (L122-132) thresholds: A+ requires pct >= 100 AND has_twin AND has_audit — fine; B requires pct >= 90 AND has_twin (audit not required) which is inconsistent with the 'audit + twin mandatory' promise; consider requiring audit for B too."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_verified_estate.py (new)"
+  ],
+  "success_rate": {"backend": "100% (21/21)", "frontend": "~93% (1 integration issue: sell step 4 unreachable due to redirect domain)"},
+  "test_credentials": "Admin admin@propmanage.io / Admin123! (cookie-based auth, verified via /api/auth/me)",
+  "seed_data_creation": "Demo listings auto-seeded by backend on startup (2 published). During tests created 1 inquiry (TEST_Buyer), 1 external request (TEST_External), 1 paid demo bundle order (TEST_Seller). Admin gate test created a TEST_Draft listing in Cluj-Napoca and archived it. Archive test archived & re-published one of the 2 demo listings (kanban shows 2 published + 1 archived as a result).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend test file /app/backend/tests/test_verified_estate.py is the regression suite — runs in ~7s, all 21 pass. The single integration issue is the Stripe demo redirect domain: backend echoes Origin header; in iframe/preview contexts this is the cluster-5 internal URL which returns 403. Fix: prefer FRONTEND_PUBLIC_URL env var. After fix, re-test sell wizard step-3 → step-4 via UI. All testids referenced in the request (estate-hero-title, listing-card-*, trust-badge, detail-title, inquiry-form-viewing, external-audit-modal, sell-hero-title, pkg-bundle, step-1/2/3/4, admin-ve-title, admin-tab-*, kanban-col-*, kanban-card-*, toggle-sale/rent/all) are all present and selectable in the DOM.",
+  "rca of the issue": "Sell wizard step 4 unreachable in preview: In create_checkout (verified_estate.py L466), the backend builds the demo redirect using `request.headers.get('origin') or request.headers.get('referer','')`. When a browser loads the Sell page via the public emergent preview URL, certain caching/iframe paths cause the actual fetch Origin to be the internal `cluster-5.preview.emergentcf.cloud` host. The backend echoes that host into the redirect URL, the browser navigates there, and the cluster CF host serves a hard 403 Forbidden (intentional — only the public preview host is publicly accessible). Mitigation: prefer the configured `FRONTEND_PUBLIC_URL` (already set to https://phased-document.preview.emergentagent.com in backend/.env) as the canonical base for redirect URLs, falling back to Origin/Referer only if env var is missing."
+}

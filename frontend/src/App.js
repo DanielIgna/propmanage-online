@@ -41,6 +41,7 @@ import ReportApprovalPage from "./pages/ReportApprovalPage";
 import { EstateBrowse } from "./pages/verified-estate/EstateBrowse";
 import { EstateDetail } from "./pages/verified-estate/EstateDetail";
 import { SellMyProperty } from "./pages/verified-estate/SellMyProperty";
+import { VerifiedEstateAdmin } from "./pages/verified-estate/VerifiedEstateAdmin";
 import { ImpersonationBanner } from "./components/ImpersonationBanner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./App.css";
@@ -1482,6 +1483,7 @@ function App() {
               <Route path="/marketplace/:slug" element={<MarketplaceLanding />} />
               <Route path="/imobile-verificate" element={<EstateBrowse />} />
               <Route path="/imobile-verificate/sell" element={<SellMyProperty />} />
+              <Route path="/admin/imobile-verificate" element={<VerifiedEstateAdmin />} />
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />
               <Route path="/ghiduri" element={<GhiduriIndex />} />
               <Route path="/ghiduri/:slug" element={<GhidPage />} />

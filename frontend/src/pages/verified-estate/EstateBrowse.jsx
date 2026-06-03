@@ -110,6 +110,11 @@ const ExternalAuditModal = ({ open, onClose }) => {
   );
 };
 
+const TrustBadge = ({ score }) => {
+  const cls = score === "A+" ? "pm-trust-A-plus" : score === "A" ? "pm-trust-A" : score === "B" ? "pm-trust-B" : "pm-trust-C";
+  return <span className={`pm-trust-badge ${cls}`} data-testid="trust-badge">Trust {score}</span>;
+};
+
 const ListingCard = ({ item }) => (
   <Link
     to={`/imobile-verificate/${item.id}`}
@@ -122,9 +127,19 @@ const ListingCard = ({ item }) => (
       ) : (
         <div className="w-full h-full flex items-center justify-center text-stone-700"><Building2 className="w-20 h-20" /></div>
       )}
-      <div className="absolute top-3 left-3"><VerifiedBadge /></div>
-      <div className="absolute top-3 right-3 bg-black/60 backdrop-blur px-2.5 py-1 rounded-full flex items-center gap-1 text-[10px] text-stone-200">
-        <Box className="w-3 h-3" /> 3D Twin
+      <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+        <VerifiedBadge />
+        {item.trust_score && <TrustBadge score={item.trust_score} />}
+      </div>
+      <div className="absolute top-3 right-3 flex flex-col gap-1.5 items-end">
+        <div className="bg-black/60 backdrop-blur px-2.5 py-1 rounded-full flex items-center gap-1 text-[10px] text-stone-200">
+          <Box className="w-3 h-3" /> 3D Twin
+        </div>
+        {item.transaction_type && (
+          <div className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${item.transaction_type === "rent" ? "bg-cyan-500/20 text-cyan-300" : "bg-violet-500/20 text-violet-300"}`}>
+            {item.transaction_type === "rent" ? "Închiriere" : "Vânzare"}
+          </div>
+        )}
       </div>
     </div>
     <div className="p-5">
@@ -156,6 +171,7 @@ export const EstateBrowse = () => {
   const [filterCity, setFilterCity] = useState("");
   const [filterRooms, setFilterRooms] = useState("");
   const [filterPriceMax, setFilterPriceMax] = useState("");
+  const [filterTransaction, setFilterTransaction] = useState("");
   const [showExtModal, setShowExtModal] = useState(false);
 
   useEffect(() => {
@@ -165,12 +181,13 @@ export const EstateBrowse = () => {
     if (filterCity) params.city = filterCity;
     if (filterRooms) params.rooms = Number(filterRooms);
     if (filterPriceMax) params.price_max = Number(filterPriceMax);
+    if (filterTransaction) params.transaction_type = filterTransaction;
     axios.get(`${API}/api/verified-estate/listings`, { params })
       .then(r => { if (active) setItems(r.data?.items || []); })
       .catch(() => { if (active) setItems([]); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [filterCity, filterRooms, filterPriceMax]);
+  }, [filterCity, filterRooms, filterPriceMax, filterTransaction]);
 
   return (
     <div className="min-h-screen bg-[#0a0a0b] text-white">
@@ -211,34 +228,53 @@ export const EstateBrowse = () => {
 
       {/* Filters */}
       <section className="px-6 py-8 border-t border-white/5">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-3">
-          <div className="relative md:col-span-2">
-            <Search className="w-4 h-4 text-stone-500 absolute left-4 top-1/2 -translate-y-1/2" />
+        <div className="max-w-7xl mx-auto">
+          {/* Sale/Rent Toggle */}
+          <div className="inline-flex bg-white/5 rounded-full p-1 mb-4" data-testid="transaction-toggle">
+            {[
+              { v: "", l: "Toate" },
+              { v: "sale", l: "Vânzare" },
+              { v: "rent", l: "Închiriere" },
+            ].map(opt => (
+              <button
+                key={opt.v}
+                onClick={() => setFilterTransaction(opt.v)}
+                className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors ${filterTransaction === opt.v ? "bg-[#d4ff3a] text-black" : "text-stone-400 hover:text-white"}`}
+                data-testid={`toggle-${opt.v || "all"}`}
+              >
+                {opt.l}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="relative md:col-span-2">
+              <Search className="w-4 h-4 text-stone-500 absolute left-4 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Caută după oraș (ex: București)"
+                value={filterCity}
+                onChange={e => setFilterCity(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-4 py-3 text-sm"
+                data-testid="filter-city"
+              />
+            </div>
+            <select value={filterRooms} onChange={e => setFilterRooms(e.target.value)} className="bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm" data-testid="filter-rooms">
+              <option value="">Camere (orice)</option>
+              <option value="1">1 cam.</option>
+              <option value="2">2 cam.</option>
+              <option value="3">3 cam.</option>
+              <option value="4">4 cam.</option>
+              <option value="5">5+ cam.</option>
+            </select>
             <input
-              type="text"
-              placeholder="Caută după oraș (ex: București)"
-              value={filterCity}
-              onChange={e => setFilterCity(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-4 py-3 text-sm"
-              data-testid="filter-city"
+              type="number"
+              placeholder="Preț max (RON)"
+              value={filterPriceMax}
+              onChange={e => setFilterPriceMax(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm"
+              data-testid="filter-price-max"
             />
           </div>
-          <select value={filterRooms} onChange={e => setFilterRooms(e.target.value)} className="bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm" data-testid="filter-rooms">
-            <option value="">Camere (orice)</option>
-            <option value="1">1 cam.</option>
-            <option value="2">2 cam.</option>
-            <option value="3">3 cam.</option>
-            <option value="4">4 cam.</option>
-            <option value="5">5+ cam.</option>
-          </select>
-          <input
-            type="number"
-            placeholder="Preț max (RON)"
-            value={filterPriceMax}
-            onChange={e => setFilterPriceMax(e.target.value)}
-            className="bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm"
-            data-testid="filter-price-max"
-          />
         </div>
       </section>
 

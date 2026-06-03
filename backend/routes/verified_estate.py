@@ -25,7 +25,7 @@ import logging
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from db import db
@@ -35,6 +35,11 @@ from core_utils import serialize_doc
 logger = logging.getLogger("propmanage.verified_estate")
 
 FEATURE_FLAG = os.environ.get("FEATURE_VERIFIED_ESTATE", "true").lower() == "true"
+
+# Pricing (RON) — admin-configurable via env vars
+PRICE_AUDIT_RON = float(os.environ.get("VE_PRICE_AUDIT_RON", "350"))
+PRICE_TWIN_RON = float(os.environ.get("VE_PRICE_TWIN_RON", "950"))
+COMMISSION_PCT = float(os.environ.get("VE_COMMISSION_PCT", "2.5"))
 
 router = APIRouter(prefix="/api/verified-estate", tags=["verified-estate"])
 
@@ -112,7 +117,19 @@ def _serialize_listing(doc: dict) -> dict:
     # Compute helpful derived fields
     total = out.get("recommendations_total") or 0
     accepted = out.get("recommendations_accepted") or 0
-    out["recommendations_pct"] = round((accepted / total * 100), 1) if total > 0 else 0.0
+    pct = round((accepted / total * 100), 1) if total > 0 else 0.0
+    out["recommendations_pct"] = pct
+    # Trust score: A+ if 100% + has twin + has audit; A if >=95%; B if >=90%; C otherwise
+    has_twin = bool(out.get("digital_twin_id"))
+    has_audit = bool(out.get("audit_report_id"))
+    if pct >= 100 and has_twin and has_audit:
+        out["trust_score"] = "A+"
+    elif pct >= 95 and has_twin and has_audit:
+        out["trust_score"] = "A"
+    elif pct >= 90 and has_twin:
+        out["trust_score"] = "B"
+    else:
+        out["trust_score"] = "C"
     return out
 
 
@@ -394,6 +411,147 @@ async def admin_stats(user: dict = Depends(require_role("admin", "operator"))):
         "external_requests_new": external_open,
         "feature_enabled": FEATURE_FLAG,
     }
+
+
+# ----------------- Pricing / Stripe Checkout (ETAPA 2) -----------------
+
+@router.get("/pricing")
+async def get_pricing():
+    """Public pricing for audit + Twin + commission."""
+    _ensure_enabled()
+    return {
+        "audit_ron": PRICE_AUDIT_RON,
+        "twin_ron": PRICE_TWIN_RON,
+        "commission_pct": COMMISSION_PCT,
+        "currency": "ron",
+        "bundle_ron": PRICE_AUDIT_RON + PRICE_TWIN_RON,
+        "notes": "La finalizarea vânzării, costul Digital Twin se scade din comision.",
+    }
+
+
+class CheckoutRequest(BaseModel):
+    package: str = Field(..., pattern="^(audit|twin|bundle)$")
+    contact_name: str = Field(..., min_length=2, max_length=120)
+    contact_email: str = Field(..., min_length=4, max_length=180)
+    contact_phone: Optional[str] = ""
+    property_address: str = Field(..., min_length=4, max_length=300)
+    notes: Optional[str] = ""
+
+
+@router.post("/checkout")
+async def create_checkout(body: CheckoutRequest, request: Request):
+    """Create Stripe Checkout session for audit/twin/bundle.
+    Falls back to DEMO mode if Stripe key is the emergent placeholder.
+    Stores order intent in `verified_estate_orders` collection."""
+    _ensure_enabled()
+
+    # lazy imports to keep module isolated
+    import stripe as _stripe
+    from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
+
+    STRIPE_KEY = os.environ.get("STRIPE_API_KEY", "sk_test_emergent")
+    demo_mode = (STRIPE_KEY == "sk_test_emergent") or not STRIPE_KEY.startswith(("sk_test_", "sk_live_"))
+    _stripe.api_key = STRIPE_KEY
+
+    if body.package == "audit":
+        amount = PRICE_AUDIT_RON
+        label = "Audit complet imobil"
+    elif body.package == "twin":
+        amount = PRICE_TWIN_RON
+        label = "Digital Twin creation"
+    else:
+        amount = PRICE_AUDIT_RON + PRICE_TWIN_RON
+        label = "Bundle: Audit + Digital Twin"
+
+    origin = request.headers.get("origin") or request.headers.get("referer", "").rstrip("/")
+    if not origin:
+        raise HTTPException(400, "Missing origin header")
+
+    now = datetime.now(timezone.utc)
+    order_id = str(ObjectId())
+
+    base_order = {
+        "_id": ObjectId(order_id),
+        "package": body.package,
+        "amount_ron": amount,
+        "label": label,
+        "contact_name": body.contact_name,
+        "contact_email": body.contact_email.lower().strip(),
+        "contact_phone": body.contact_phone or "",
+        "property_address": body.property_address,
+        "notes": body.notes or "",
+        "status": "pending",
+        "demo_mode": demo_mode,
+        "created_at": now,
+    }
+
+    if demo_mode:
+        # Simulate immediate success
+        fake_session = f"cs_demo_ve_{uuid.uuid4().hex[:16]}"
+        base_order.update({
+            "session_id": fake_session,
+            "status": "paid",
+            "paid_at": now,
+        })
+        await db.verified_estate_orders.insert_one(base_order)
+        return {
+            "checkout_url": f"{origin}/imobile-verificate/sell?paid=1&session_id={fake_session}&demo=1",
+            "session_id": fake_session,
+            "demo_mode": True,
+            "order_id": order_id,
+        }
+
+    # REAL Stripe
+    webhook_url = f"{origin}/api/webhook/stripe"
+    checkout = StripeCheckout(api_key=STRIPE_KEY, webhook_url=webhook_url)
+    success_url = f"{origin}/imobile-verificate/sell?paid=1&session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{origin}/imobile-verificate/sell?cancelled=1"
+    checkout_req = CheckoutSessionRequest(
+        amount=amount,
+        currency="ron",
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata={
+            "verified_estate_order_id": order_id,
+            "package": body.package,
+            "contact_email": body.contact_email,
+        },
+    )
+    try:
+        session = await checkout.create_checkout_session(checkout_req)
+    except Exception as e:
+        raise HTTPException(500, f"Stripe error: {e}")
+
+    base_order.update({"session_id": session.session_id})
+    await db.verified_estate_orders.insert_one(base_order)
+    return {"checkout_url": session.url, "session_id": session.session_id, "order_id": order_id}
+
+
+@router.get("/checkout/status/{session_id}")
+async def get_checkout_status(session_id: str):
+    """Polled by frontend after redirect to confirm payment."""
+    _ensure_enabled()
+    order = await db.verified_estate_orders.find_one({"session_id": session_id})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    return serialize_doc(order)
+
+
+@router.get("/admin/orders")
+async def admin_list_orders(
+    status: Optional[str] = Query(None, pattern="^(pending|paid|failed)$"),
+    limit: int = Query(50, ge=1, le=200),
+    skip: int = Query(0, ge=0),
+    user: dict = Depends(require_role("admin", "operator")),
+):
+    _ensure_enabled()
+    query = {}
+    if status:
+        query["status"] = status
+    cursor = db.verified_estate_orders.find(query).sort("created_at", -1).skip(skip).limit(limit)
+    items = [serialize_doc(d) async for d in cursor]
+    total = await db.verified_estate_orders.count_documents(query)
+    return {"items": items, "total": total, "skip": skip, "limit": limit}
 
 
 # ----------------- Seed helper (called from server startup) -----------------
