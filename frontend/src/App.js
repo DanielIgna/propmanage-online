@@ -46,6 +46,7 @@ import WhyUsPage from "./pages/WhyUsPage";
 import AdminSettingsControl from "./pages/admin/AdminSettingsControl";
 import AdminDocumentation from "./pages/admin/AdminDocumentation";
 import QACopilotPage from "./pages/admin/QACopilotPage";
+import AIControlCenterPage from "./pages/admin/AIControlCenterPage";
 import { trackPageView } from "@/lib/analytics";
 import { useDynamicSEO } from "@/lib/useDynamicSEO";
 
@@ -1574,6 +1575,7 @@ function App() {
               <Route path="/admin/settings-control" element={<AdminSettingsControl />} />
               <Route path="/admin/documentation" element={<AdminDocumentation />} />
               <Route path="/admin/qa-copilot" element={<QACopilotPage />} />
+              <Route path="/admin/ai-control" element={<AIControlCenterPage />} />
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />
               <Route path="/ghiduri" element={<GhiduriIndex />} />
               <Route path="/ghiduri/:slug" element={<GhidPage />} />

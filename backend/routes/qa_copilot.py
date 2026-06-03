@@ -21,6 +21,7 @@ from typing import Optional
 from deps import require_role
 from db import db
 from qa_copilot_engine import analyze_finding, generate_emergent_prompt
+from ai_core import memory as ai_memory
 
 logger = logging.getLogger("propmanage.qa_copilot")
 
@@ -180,6 +181,22 @@ async def add_finding(sid: str, payload: FindingCreate, admin=Depends(require_ro
         {"id": sid},
         {"$push": {"findings": finding}, "$set": {"updated_at": _now_iso()}},
     )
+    # Cross-module memory: persist a compact summary so other AI agents (Concierge, future Client Agent)
+    # can recall this finding when chatting with the same admin user. Fire-and-forget.
+    try:
+        summary_for_mem = (
+            f"[QA] {analysis.get('severity', 'P?')}/{analysis.get('category', '?')}: "
+            f"{analysis.get('summary') or payload.text[:140]}"
+        )
+        await ai_memory.remember(
+            user_id=admin.get("email") or admin.get("id") or "admin",
+            scope="qa_copilot",
+            content=summary_for_mem,
+            summary=summary_for_mem[:280],
+            source=f"qa_session:{sid}",
+        )
+    except Exception:  # noqa: BLE001
+        pass
     return finding
 
 
