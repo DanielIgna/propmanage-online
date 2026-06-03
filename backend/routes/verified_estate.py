@@ -526,14 +526,27 @@ async def admin_run_drip_now(user: dict = Depends(require_role("admin", "operato
 
 @router.get("/pricing")
 async def get_pricing():
-    """Public pricing for audit + Twin + commission."""
+    """Public pricing for audit + Twin + commission.
+    Reads from app_settings doc if present, falls back to env vars."""
     _ensure_enabled()
+    audit = PRICE_AUDIT_RON
+    twin = PRICE_TWIN_RON
+    comm = COMMISSION_PCT
+    try:
+        s = await db.app_settings.find_one({"_id": "app_settings"})
+        if s and s.get("pricing"):
+            p = s["pricing"]
+            audit = float(p.get("audit_ron", audit))
+            twin = float(p.get("twin_ron", twin))
+            comm = float(p.get("commission_pct", comm))
+    except Exception:
+        pass
     return {
-        "audit_ron": PRICE_AUDIT_RON,
-        "twin_ron": PRICE_TWIN_RON,
-        "commission_pct": COMMISSION_PCT,
+        "audit_ron": audit,
+        "twin_ron": twin,
+        "commission_pct": comm,
         "currency": "ron",
-        "bundle_ron": PRICE_AUDIT_RON + PRICE_TWIN_RON,
+        "bundle_ron": audit + twin,
         "notes": "La finalizarea vânzării, costul Digital Twin se scade din comision.",
     }
 
@@ -571,6 +584,19 @@ async def create_checkout(body: CheckoutRequest, request: Request):
     else:
         amount = PRICE_AUDIT_RON + PRICE_TWIN_RON
         label = "Bundle: Audit + Digital Twin"
+    # Override with settings if available
+    try:
+        s = await db.app_settings.find_one({"_id": "app_settings"})
+        if s and s.get("pricing"):
+            p = s["pricing"]
+            if body.package == "audit":
+                amount = float(p.get("audit_ron", amount))
+            elif body.package == "twin":
+                amount = float(p.get("twin_ron", amount))
+            else:
+                amount = float(p.get("audit_ron", PRICE_AUDIT_RON)) + float(p.get("twin_ron", PRICE_TWIN_RON))
+    except Exception:
+        pass
 
     origin = (
         os.environ.get("FRONTEND_PUBLIC_URL")

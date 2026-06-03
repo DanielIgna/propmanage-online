@@ -56,6 +56,8 @@ const NAV_SECTIONS = [
       { id: "trust", label: "Trust Score Weights", icon: Award },
       { id: "audit", label: "Audit Log", icon: FileText },
       { id: "settings", label: "Setări Platformă", icon: Settings },
+      { id: "settings_control", label: "Control Administrare", icon: Settings, badge: "NEW", href: "/admin/settings-control" },
+      { id: "ve_admin", label: "Imobile Verificate", icon: Award, badge: "NEW", href: "/admin/imobile-verificate" },
     ],
   },
   {
@@ -338,7 +340,10 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
                 return (
                   <button
                     key={it.id}
-                    onClick={() => { onChange(it.id); setSidebarOpen(false); }}
+                    onClick={() => {
+                      if (it.href) { navigate(it.href); setSidebarOpen(false); return; }
+                      onChange(it.id); setSidebarOpen(false);
+                    }}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
                       isActive
                         ? "bg-blue-50 text-blue-600 font-medium dark:bg-blue-500/10 dark:text-blue-400"

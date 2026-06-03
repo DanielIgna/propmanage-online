@@ -4,6 +4,16 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 ## Recent additions (Feb 2026)
+- **Phase 68 — Admin Settings Control Panel + Dynamic Footer + LinkedIn** ✅
+  - New API `routes/app_settings.py`: single doc `app_settings` (social/pricing/contact/company sections), GET/PUT/RESET endpoints
+  - Public subset endpoint `/api/app-settings/public` for Footer
+  - Frontend page `/admin/settings-control` cu 4 secțiuni configurabile fără cod
+  - **LinkedIn** added with SVG icon + URL field
+  - **Footer DYNAMIC**: fetch settings → render social links live. Linkuri goale = placeholder "(în curând)".
+  - **VE pricing & checkout** citesc din settings (env fallback). Edit price în Admin → reflectă instant pe Sell + `/de-ce-noi` calculator.
+  - Admin sidebar: 2 noi entry-uri "Control Administrare" + "Imobile Verificate" cu badge NEW.
+  - Tested: PUT 400/1000 → pricing endpoint reflectă instant. LinkedIn salvat.
+
 - **Phase 67 — Brand softening + Social media + Analytics + Email sequences** ✅
   - **`/de-ce-noi` refactored** to discrete tone: removed ALL "Imobiliare.ro" mentions, replaced with "Platforme clasice" / "altă platformă". Hero now reads "Facem lucrurile *altfel*" (subtle, non-confrontational).
   - **Footer Social Section** with 5 SVG-icon links: Facebook PropManage (active: https://www.facebook.com/share/1GEh9j9wDF/), + 4 placeholders styled with "(în curând)" badges (Facebook Imobile Verificate, Instagram x2, YouTube). Easy to activate when user provides URLs.
