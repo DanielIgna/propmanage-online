@@ -4,6 +4,14 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 ## Recent additions (Feb 2026)
+- **Phase 66 — SEO Landing "De ce noi?"** ✅
+  - Pagină marketing premium la `/de-ce-noi` (PropManage vs Imobiliare.ro)
+  - 7 secțiuni: Hero, 3 Pilon-cards, Comparison Table (10 criterii), Savings Calculator interactiv (slider RON 50K-2M), 3 Testimoniale, 5 FAQ, Final CTA
+  - SEO complet: meta tags + Open Graph + Schema.org Service JSON-LD
+  - Calculator real-time: la X RON preț → afișează comision PropManage 2.5% vs piață 5.5% + savings
+  - Link în nav: "De ce noi?" alături de "Imobile Verificate"
+  - Folosește sistemul unificat `.pm-btn-*` și `.gradient-text`
+
 - **Phase 65 — Verified Estate Incremental (Real Sell Flow + Emails + Map)** ✅
   - **Auto-draft listing from paid order**: After successful demo Stripe checkout, backend auto-creates a `draft` listing in admin Kanban with: title="Imobil în pregătire · <address>", owner_email/name/phone from order, pending_services flags ({audit, twin} based on package), source_order_id for traceability. Gates all start as failing — agent populates them later.
   - **Email notifications via Resend**: 3 hooks added — admin email on inquiry (`[Imobile Verificate] <intent> · <name>`), admin email on external audit request, admin email on paid order + buyer confirmation email. All fire-and-forget through `asyncio.create_task` so checkout/inquiry latency isn't impacted. Uses `ADMIN_NOTIFY_EMAIL` env or falls back to `SUPPORT_CONTACT_EMAIL`.

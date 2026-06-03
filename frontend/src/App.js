@@ -42,6 +42,7 @@ import { EstateBrowse } from "./pages/verified-estate/EstateBrowse";
 import { EstateDetail } from "./pages/verified-estate/EstateDetail";
 import { SellMyProperty } from "./pages/verified-estate/SellMyProperty";
 import { VerifiedEstateAdmin } from "./pages/verified-estate/VerifiedEstateAdmin";
+import WhyUsPage from "./pages/WhyUsPage";
 import { ImpersonationBanner } from "./components/ImpersonationBanner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./App.css";
@@ -69,6 +70,7 @@ const Nav = () => {
     { href: "#twin", label: t("nav.twin") },
     { href: "/marketplace", label: "Marketplace", external: true },
     { href: "/imobile-verificate", label: "Imobile Verificate", external: true },
+    { href: "/de-ce-noi", label: "De ce noi?", external: true },
   ];
 
   return (
@@ -1482,6 +1484,7 @@ function App() {
               <Route path="/marketplace" element={<PublicMarketplace />} />
               <Route path="/marketplace/:slug" element={<MarketplaceLanding />} />
               <Route path="/imobile-verificate" element={<EstateBrowse />} />
+              <Route path="/de-ce-noi" element={<WhyUsPage />} />
               <Route path="/imobile-verificate/sell" element={<SellMyProperty />} />
               <Route path="/admin/imobile-verificate" element={<VerifiedEstateAdmin />} />
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />
