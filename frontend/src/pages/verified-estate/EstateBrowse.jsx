@@ -1,0 +1,303 @@
+import React, { useEffect, useState, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import {
+  Building2, MapPin, Bed, Maximize2, ShieldCheck, Box, ArrowRight,
+  Search, Sparkles, ExternalLink, X, CheckCircle2
+} from "lucide-react";
+import axios from "axios";
+
+const API = process.env.REACT_APP_BACKEND_URL;
+
+const formatPrice = (ron) => {
+  if (!ron) return "—";
+  return new Intl.NumberFormat("ro-RO", { maximumFractionDigits: 0 }).format(ron) + " RON";
+};
+
+const VerifiedBadge = ({ size = "md" }) => (
+  <div
+    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#d4ff3a]/15 border border-[#d4ff3a]/40 text-[#d4ff3a] ${size === "lg" ? "text-sm" : "text-[10px]"} font-semibold tracking-wide`}
+    data-testid="verified-badge"
+  >
+    <ShieldCheck className={size === "lg" ? "w-4 h-4" : "w-3 h-3"} />
+    <span>VERIFIED TWIN</span>
+  </div>
+);
+
+const ExternalAuditModal = ({ open, onClose }) => {
+  const [form, setForm] = useState({
+    external_listing_url: "",
+    property_address: "",
+    contact_name: "",
+    contact_email: "",
+    contact_phone: "",
+    notes: "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+
+  if (!open) return null;
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await axios.post(`${API}/api/verified-estate/external-audit-request`, form);
+      setDone(true);
+    } catch (err) {
+      alert(err?.response?.data?.detail || "Eroare la trimitere.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur flex items-center justify-center p-4" data-testid="external-audit-modal">
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-[#0e0e10] border border-white/10 rounded-3xl max-w-lg w-full p-8 max-h-[90vh] overflow-y-auto"
+      >
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h3 className="font-serif text-2xl mb-1">Solicită audit & Digital Twin</h3>
+            <p className="text-sm text-stone-400">Pentru un imobil identificat în altă parte (Imobiliare.ro, Storia, OLX etc.)</p>
+          </div>
+          <button onClick={onClose} className="text-stone-400 hover:text-white" data-testid="ext-audit-close"><X className="w-5 h-5" /></button>
+        </div>
+        {done ? (
+          <div className="text-center py-8">
+            <CheckCircle2 className="w-14 h-14 text-[#d4ff3a] mx-auto mb-4" />
+            <h4 className="font-serif text-xl mb-2">Cerere primită ✓</h4>
+            <p className="text-sm text-stone-400 mb-6">Echipa noastră îți va contacta în maxim 24 de ore pentru a programa auditul.</p>
+            <button onClick={onClose} className="btn-accent px-6 py-2.5 rounded-full text-sm" data-testid="ext-audit-done">Închide</button>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="space-y-3">
+            <div>
+              <label className="text-xs text-stone-400 uppercase tracking-wider">Link imobil extern *</label>
+              <input required type="url" placeholder="https://www.imobiliare.ro/..." value={form.external_listing_url} onChange={e => setForm({ ...form, external_listing_url: e.target.value })} className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" data-testid="ext-audit-url" />
+            </div>
+            <div>
+              <label className="text-xs text-stone-400 uppercase tracking-wider">Adresă proprietate *</label>
+              <input required value={form.property_address} onChange={e => setForm({ ...form, property_address: e.target.value })} className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" data-testid="ext-audit-address" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-stone-400 uppercase tracking-wider">Nume *</label>
+                <input required value={form.contact_name} onChange={e => setForm({ ...form, contact_name: e.target.value })} className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" data-testid="ext-audit-name" />
+              </div>
+              <div>
+                <label className="text-xs text-stone-400 uppercase tracking-wider">Telefon</label>
+                <input value={form.contact_phone} onChange={e => setForm({ ...form, contact_phone: e.target.value })} className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" data-testid="ext-audit-phone" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-stone-400 uppercase tracking-wider">Email *</label>
+              <input required type="email" value={form.contact_email} onChange={e => setForm({ ...form, contact_email: e.target.value })} className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" data-testid="ext-audit-email" />
+            </div>
+            <div>
+              <label className="text-xs text-stone-400 uppercase tracking-wider">Notițe</label>
+              <textarea rows={3} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Ex: vreau să cumpăr, am buget până la 200.000 RON" className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm resize-none" data-testid="ext-audit-notes" />
+            </div>
+            <button type="submit" disabled={submitting} className="w-full btn-accent py-3 rounded-full font-medium mt-2 disabled:opacity-50" data-testid="ext-audit-submit">
+              {submitting ? "Se trimite..." : "Trimite cererea"}
+            </button>
+          </form>
+        )}
+      </motion.div>
+    </div>
+  );
+};
+
+const ListingCard = ({ item }) => (
+  <Link
+    to={`/imobile-verificate/${item.id}`}
+    className="group relative bg-[#0e0e10] border border-white/10 rounded-3xl overflow-hidden hover:border-[#d4ff3a]/40 transition-all"
+    data-testid={`listing-card-${item.id}`}
+  >
+    <div className="aspect-[4/3] relative overflow-hidden bg-gradient-to-br from-stone-900 to-stone-800">
+      {item.cover_image_url ? (
+        <img src={item.cover_image_url} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-stone-700"><Building2 className="w-20 h-20" /></div>
+      )}
+      <div className="absolute top-3 left-3"><VerifiedBadge /></div>
+      <div className="absolute top-3 right-3 bg-black/60 backdrop-blur px-2.5 py-1 rounded-full flex items-center gap-1 text-[10px] text-stone-200">
+        <Box className="w-3 h-3" /> 3D Twin
+      </div>
+    </div>
+    <div className="p-5">
+      <div className="flex items-center gap-1.5 text-xs text-stone-400 mb-2">
+        <MapPin className="w-3 h-3" />{item.city} {item.address ? `· ${item.address}` : ""}
+      </div>
+      <h3 className="font-serif text-xl mb-3 leading-snug line-clamp-2 group-hover:text-[#d4ff3a] transition-colors">{item.title}</h3>
+      <div className="flex items-center justify-between text-xs text-stone-400 mb-4">
+        <span className="flex items-center gap-1"><Bed className="w-3.5 h-3.5" /> {item.rooms} cam.</span>
+        <span className="flex items-center gap-1"><Maximize2 className="w-3.5 h-3.5" /> {item.surface_sqm} m²</span>
+        <span className="flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" /> {item.recommendations_pct}% reco</span>
+      </div>
+      <div className="flex items-center justify-between pt-4 border-t border-white/5">
+        <div>
+          <div className="text-[10px] text-stone-500 uppercase tracking-wider">Preț</div>
+          <div className="font-serif text-2xl">{formatPrice(item.price_ron)}</div>
+        </div>
+        <div className="text-[#d4ff3a] flex items-center gap-1 text-xs">
+          Detalii <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+        </div>
+      </div>
+    </div>
+  </Link>
+);
+
+export const EstateBrowse = () => {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filterCity, setFilterCity] = useState("");
+  const [filterRooms, setFilterRooms] = useState("");
+  const [filterPriceMax, setFilterPriceMax] = useState("");
+  const [showExtModal, setShowExtModal] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    const params = {};
+    if (filterCity) params.city = filterCity;
+    if (filterRooms) params.rooms = Number(filterRooms);
+    if (filterPriceMax) params.price_max = Number(filterPriceMax);
+    axios.get(`${API}/api/verified-estate/listings`, { params })
+      .then(r => { if (active) setItems(r.data?.items || []); })
+      .catch(() => { if (active) setItems([]); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [filterCity, filterRooms, filterPriceMax]);
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0b] text-white">
+      {/* Hero */}
+      <section className="relative pt-32 pb-16 px-6 overflow-hidden">
+        <div className="absolute inset-0 dotted-bg opacity-30" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full bg-[#d4ff3a] blur-[150px] opacity-10" />
+        <div className="max-w-7xl mx-auto relative">
+          <Link to="/" className="text-xs text-stone-400 hover:text-white inline-flex items-center gap-1 mb-6">
+            ← Înapoi la PropManage
+          </Link>
+          <div className="flex flex-wrap items-center gap-3 mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 glass rounded-full" data-testid="estate-hero-badge">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#d4ff3a]" />
+              <span className="text-xs tracking-wide text-stone-300">Imobile Verificate · 100% cu Digital Twin</span>
+            </div>
+          </div>
+          <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl tracking-tight leading-[0.95] mb-6 max-w-5xl" data-testid="estate-hero-title">
+            Imobile <span className="italic gradient-text">Verificate</span>.<br />
+            Zero surprize.
+          </h1>
+          <p className="text-lg text-stone-400 max-w-2xl mb-10">
+            Fiecare imobil listat aici a trecut prin <strong className="text-white">audit tehnic complet</strong>,
+            are <strong className="text-white">Digital Twin</strong> propriu și a obținut minimum
+            <strong className="text-white"> 90% recomandări acceptate</strong> de proprietar.
+            Cumperi cu încredere. Vinzi cu credibilitate.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link to="/imobile-verificate/sell" className="btn-accent px-8 py-3.5 rounded-full font-medium inline-flex items-center justify-center gap-2" data-testid="estate-sell-cta">
+              <Building2 className="w-4 h-4" /> Vinde-ți imobilul cu noi
+            </Link>
+            <button onClick={() => setShowExtModal(true)} className="glass px-8 py-3.5 rounded-full font-medium inline-flex items-center justify-center gap-2 hover:bg-white/10 transition-colors" data-testid="estate-external-cta">
+              <ExternalLink className="w-4 h-4" /> Audit pentru imobil din altă platformă
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Filters */}
+      <section className="px-6 py-8 border-t border-white/5">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="relative md:col-span-2">
+            <Search className="w-4 h-4 text-stone-500 absolute left-4 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Caută după oraș (ex: București)"
+              value={filterCity}
+              onChange={e => setFilterCity(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-4 py-3 text-sm"
+              data-testid="filter-city"
+            />
+          </div>
+          <select value={filterRooms} onChange={e => setFilterRooms(e.target.value)} className="bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm" data-testid="filter-rooms">
+            <option value="">Camere (orice)</option>
+            <option value="1">1 cam.</option>
+            <option value="2">2 cam.</option>
+            <option value="3">3 cam.</option>
+            <option value="4">4 cam.</option>
+            <option value="5">5+ cam.</option>
+          </select>
+          <input
+            type="number"
+            placeholder="Preț max (RON)"
+            value={filterPriceMax}
+            onChange={e => setFilterPriceMax(e.target.value)}
+            className="bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm"
+            data-testid="filter-price-max"
+          />
+        </div>
+      </section>
+
+      {/* Listings grid */}
+      <section className="px-6 py-12">
+        <div className="max-w-7xl mx-auto">
+          {loading ? (
+            <div className="text-center text-stone-400 py-20" data-testid="estate-loading">Se încarcă imobilele...</div>
+          ) : items.length === 0 ? (
+            <div className="text-center py-20" data-testid="estate-empty">
+              <Building2 className="w-16 h-16 text-stone-700 mx-auto mb-4" />
+              <h3 className="font-serif text-2xl mb-2">Nu am găsit imobile cu aceste filtre</h3>
+              <p className="text-sm text-stone-400 max-w-md mx-auto">
+                Verifică din nou mai târziu. Adăugăm imobile noi după ce trec prin toate verificările noastre.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-serif text-3xl" data-testid="estate-count">{items.length} {items.length === 1 ? "imobil verificat" : "imobile verificate"}</h2>
+                <div className="text-xs text-stone-400 hidden md:block">Toate cu audit + Digital Twin</div>
+              </div>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {items.map((it, i) => (
+                  <motion.div key={it.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: i * 0.05 }}>
+                    <ListingCard item={it} />
+                  </motion.div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+
+      {/* Why Verified Section */}
+      <section className="px-6 py-20 border-t border-white/5">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="font-serif text-4xl md:text-5xl mb-12 text-center">De ce <span className="italic gradient-text">Imobile Verificate</span>?</h2>
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              { icon: ShieldCheck, t: "Audit complet", d: "Fiecare imobil trece printr-un audit tehnic detaliat realizat de specialiștii noștri verificați înainte de listare." },
+              { icon: Box, t: "Digital Twin obligatoriu", d: "Tur virtual 3D pentru fiecare imobil. Vezi exact ce cumperi înainte să te deplasezi." },
+              { icon: Sparkles, t: "90% recomandări acceptate", d: "Listăm doar imobile unde proprietarul a acceptat și implementat minimum 90% din recomandările noastre." },
+            ].map((b, i) => (
+              <div key={i} className="glass-strong p-8 rounded-3xl" data-testid={`why-card-${i}`}>
+                <div className="w-12 h-12 rounded-2xl bg-[#d4ff3a]/10 border border-[#d4ff3a]/30 flex items-center justify-center mb-5">
+                  <b.icon className="w-5 h-5 text-[#d4ff3a]" />
+                </div>
+                <h3 className="font-serif text-2xl mb-3">{b.t}</h3>
+                <p className="text-sm text-stone-400 leading-relaxed">{b.d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <ExternalAuditModal open={showExtModal} onClose={() => setShowExtModal(false)} />
+    </div>
+  );
+};
+
+export default EstateBrowse;

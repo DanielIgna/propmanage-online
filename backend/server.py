@@ -68,6 +68,7 @@ from routes.admin_onboarding import router as admin_onboarding_router
 from routes.admin_qa_playbook import router as admin_qa_playbook_router
 from routes.admin_content_audit import router as admin_content_audit_router
 from routes.admin_term_audit import router as admin_term_audit_router
+from routes.verified_estate import router as verified_estate_router, seed_demo_listings as seed_verified_estate_demo
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
@@ -140,6 +141,7 @@ for r in (
     admin_qa_playbook_router,
     admin_content_audit_router,
     admin_term_audit_router,
+    verified_estate_router,
 ):
     app.include_router(r)
 
@@ -150,6 +152,10 @@ scheduler = AsyncIOScheduler(timezone=pytz.timezone(BUCHAREST_TZ_NAME))
 @app.on_event("startup")
 async def startup():
     await seed()
+    try:
+        await seed_verified_estate_demo()
+    except Exception as e:
+        logger.warning(f"Verified Estate demo seed failed: {e}")
     if not scheduler.running:
         scheduler.add_job(
             run_daily_digests,

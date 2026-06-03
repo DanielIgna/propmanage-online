@@ -38,6 +38,9 @@ import { GDPRAuditBadge } from "./components/GDPRAuditBadge";
 import { TrustStrip } from "./components/TrustStrip";
 import DigitalTwinPage from "./pages/DigitalTwinPage";
 import ReportApprovalPage from "./pages/ReportApprovalPage";
+import { EstateBrowse } from "./pages/verified-estate/EstateBrowse";
+import { EstateDetail } from "./pages/verified-estate/EstateDetail";
+import { SellMyProperty } from "./pages/verified-estate/SellMyProperty";
 import { ImpersonationBanner } from "./components/ImpersonationBanner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./App.css";
@@ -64,6 +67,7 @@ const Nav = () => {
     { href: "#journey", label: t("nav.journey") },
     { href: "#twin", label: t("nav.twin") },
     { href: "/marketplace", label: "Marketplace", external: true },
+    { href: "/imobile-verificate", label: "Imobile Verificate", external: true },
   ];
 
   return (
@@ -1476,6 +1480,9 @@ function App() {
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/marketplace" element={<PublicMarketplace />} />
               <Route path="/marketplace/:slug" element={<MarketplaceLanding />} />
+              <Route path="/imobile-verificate" element={<EstateBrowse />} />
+              <Route path="/imobile-verificate/sell" element={<SellMyProperty />} />
+              <Route path="/imobile-verificate/:id" element={<EstateDetail />} />
               <Route path="/ghiduri" element={<GhiduriIndex />} />
               <Route path="/ghiduri/:slug" element={<GhidPage />} />
               <Route path="/help/:token" element={<HelpPage />} />
