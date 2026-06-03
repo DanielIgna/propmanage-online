@@ -78,7 +78,7 @@ export const SpecialistDashboard = () => {
               <div className="text-xs text-stone-400">Încarcă documentele pentru a primi badge "VERIFIED" și acces complet.</div>
             </div>
           </div>
-          <button onClick={() => setShowDocs(true)} className="btn-accent px-4 py-2 rounded-full text-xs font-medium" data-testid="upload-docs-cta">
+          <button onClick={() => setShowDocs(true)} className="pm-btn pm-btn-primary pm-btn-sm" data-testid="upload-docs-cta">
             Încarcă documente
           </button>
         </div>
@@ -114,7 +114,7 @@ export const SpecialistDashboard = () => {
                 <p className="text-xs text-stone-400 mb-3 line-clamp-2">{r.description}</p>
                 <div className="flex justify-between items-center gap-2">
                   <div className="text-xs text-stone-400">Estimat: <span className="text-white">{r.budget_estimate} RON</span></div>
-                  <button onClick={() => openAccept(r)} className="btn-accent px-4 py-2 rounded-full text-xs font-medium shrink-0" data-testid={`accept-${r.id}`}>
+                  <button onClick={() => openAccept(r)} className="pm-btn pm-btn-primary pm-btn-sm shrink-0" data-testid={`accept-${r.id}`}>
                     Acceptă (45 RON)
                   </button>
                 </div>
@@ -175,7 +175,7 @@ export const SpecialistDashboard = () => {
                     <button onClick={() => start(r.id)} className="flex-1 bg-white/10 hover:bg-white/15 py-2 rounded-lg text-xs min-w-[100px]" data-testid={`start-${r.id}`}>Pornește</button>
                   )}
                   {r.status === "in_progress" && (
-                    <button onClick={() => complete(r.id)} className="flex-1 btn-accent py-2 rounded-lg text-xs font-medium min-w-[100px]" data-testid={`complete-${r.id}`}>Marchează completă</button>
+                    <button onClick={() => complete(r.id)} className="pm-btn pm-btn-primary pm-btn-sm flex-1 min-w-[100px]" data-testid={`complete-${r.id}`}>Marchează completă</button>
                   )}
                   {["assigned","in_progress","completed"].includes(r.status) && (
                     <button onClick={() => setChatRequest(r.id)} className="bg-white/10 hover:bg-white/15 py-2 px-3 rounded-lg text-xs flex items-center gap-1" data-testid={`spec-chat-${r.id}`}>
@@ -313,7 +313,7 @@ const NewProjectModal = ({ onClose }) => {
         </div>
         <div className="flex gap-2 pt-2">
           <button type="button" onClick={onClose} className="flex-1 py-2 bg-white/5 rounded-full text-sm">Anulează</button>
-          <button type="submit" disabled={busy || !form.client_id} className="flex-1 py-2 btn-accent rounded-full text-sm disabled:opacity-40" data-testid="new-proj-submit">
+          <button type="submit" disabled={busy || !form.client_id} className="pm-btn pm-btn-primary flex-1" data-testid="new-proj-submit">
             {busy ? "..." : "Creează proiect"}
           </button>
         </div>
