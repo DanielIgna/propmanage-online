@@ -4,6 +4,17 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 ## Recent additions (Feb 2026)
+- **Phase 70 — AI Foundation (Ecosystem Phase 1)** ✅ (Feb 3 2026)
+  - **Package `/app/backend/ai_core/`**: 4 modules — `provider.py` (multi-LLM abstraction: Claude/OpenAI/Gemini active via Emergent LLM Key, Ollama stub for Phase 5), `memory.py` (persistent cross-session memory with BM25-ish scoring, 5 scopes: concierge/qa_copilot/client_agent/admin_agent/tech_agent), `bug_memory.py` (unified search across qa_sessions.findings + admin_ai_findings), `knowledge_graph.py` (read-only entity graph for user → properties → requests → specialists → listings).
+  - **Mongo collection**: `ai_memories` (id, user_id, scope, content, summary, tokens, source, created_at, expires_at). Default TTL 180 days.
+  - **Feature flag**: `app_settings.ai_ecosystem.enabled` (default true) — kill-switch. When false, memory.remember/recall short-circuit; legacy modules (Concierge, AI Investigator, QA Copilot) continue working independently.
+  - **AI Control Center** page at `/admin/ai-control` — unified UI with 4 stat cards (model, memories, bugs, agents), provider/model/temperature/max_tokens config + save, agents list (6 active: Concierge, AI Investigator, QA Copilot, Memory Engine, Bug Memory, Knowledge Graph), memory browser with user/scope filters + delete + reset, bug search across all sources, knowledge graph viewer per user.
+  - **QA Copilot integration**: every finding now auto-persists a compact summary to `ai_memories` (scope=qa_copilot, source=qa_session:{id}) — fire-and-forget, doesn't block flow on failure.
+  - **Knowledge Graph email lookup**: `for_user()` matches by `_id` ObjectId OR `id` field OR `email` field (fixed post-test).
+  - **Tailwind safelist**: 30+ dynamic color classes safelisted.
+  - **Security**: All endpoints require admin role; reset memories supports per-user or global wipe with confirm dialog in UI.
+  - Tested: iteration_49 → 18/18 backend pytest, ~95% frontend (config save/toggle/agents/memory filter/bug search/sidebar all PASS).
+
 - **Phase 69 — AI QA Copilot + Specialist badges + Launch Playbook** ✅ (Feb 3 2026)
   - **AI QA Copilot** (`/admin/qa-copilot`): New module that turns manual exploratory testing into structured bug reports via Claude Sonnet 4.5. User creates sessions (role + area + goal), describes findings in natural language, AI returns category (UI_UX/DATA/LOGIC_BUG/MISSING_FEATURE/INTEGRATION/PERFORMANCE/SECURITY), severity (P0-P3), suspected files, follow-up tests, and cross-references prior findings from other sessions (regression memory). One-click "Generează prompt pentru Emergent" compiles all findings into a Markdown prompt ready to paste into chat with the dev agent.
   - **Backend**: `qa_copilot_engine.py` (Claude integration, JSON-mode), `routes/qa_copilot.py` (CRUD on sessions + findings + prompt generation). Collection: `qa_sessions`.

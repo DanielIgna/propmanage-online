@@ -17,10 +17,12 @@ async def for_user(user_id: str, depth: int = 1) -> dict:
         return {"nodes": [], "edges": []}
 
     from bson import ObjectId
+    or_clauses = [{"id": user_id}, {"email": user_id}]
     try:
-        uid_query = {"$or": [{"_id": ObjectId(user_id)}, {"id": user_id}]}
+        or_clauses.insert(0, {"_id": ObjectId(user_id)})
     except Exception:
-        uid_query = {"id": user_id}
+        pass
+    uid_query = {"$or": or_clauses}
 
     user = await db.users.find_one(uid_query)
     if not user:
