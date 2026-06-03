@@ -4,6 +4,16 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 ## Recent additions (Feb 2026)
+- **Phase 67 — Brand softening + Social media + Analytics + Email sequences** ✅
+  - **`/de-ce-noi` refactored** to discrete tone: removed ALL "Imobiliare.ro" mentions, replaced with "Platforme clasice" / "altă platformă". Hero now reads "Facem lucrurile *altfel*" (subtle, non-confrontational).
+  - **Footer Social Section** with 5 SVG-icon links: Facebook PropManage (active: https://www.facebook.com/share/1GEh9j9wDF/), + 4 placeholders styled with "(în curând)" badges (Facebook Imobile Verificate, Instagram x2, YouTube). Easy to activate when user provides URLs.
+  - **Google Analytics 4 (GA4)** via `lib/analytics.js` — set `REACT_APP_GA4_MEASUREMENT_ID=G-XXXXXXX` in `.env`. Auto-tracks page views on every route change via `AnalyticsRouteTracker`. Anonymize IP enabled. No-op if env var missing.
+  - **Email Lifecycle Sequences** via `backend/email_sequences.py`:
+    - **Drip Reminder** — every 6h scans `verified_estate_orders` for paid orders >48h with no follow-up, sends admin reminder (idempotent via `drip_reminded_at` flag).
+    - **Weekly Newsletter** — Mondays 09:00 EU/Bucharest, sends digest of top 5 newest published listings to all subscribers (`digest_disabled != true`).
+    - Admin manual triggers: `POST /api/verified-estate/admin/run-newsletter-now` and `POST /api/verified-estate/admin/run-drip-now`.
+  - Registered in APScheduler at server startup. Logs confirm: `[email_sequences] Registered drip + newsletter jobs`.
+
 - **Phase 66 — SEO Landing "De ce noi?"** ✅
   - Pagină marketing premium la `/de-ce-noi` (PropManage vs Imobiliare.ro)
   - 7 secțiuni: Hero, 3 Pilon-cards, Comparison Table (10 criterii), Savings Calculator interactiv (slider RON 50K-2M), 3 Testimoniale, 5 FAQ, Final CTA

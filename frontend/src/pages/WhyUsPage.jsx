@@ -70,7 +70,7 @@ const FAQ_ITEMS = [
     a: "Fiecare imobil trece prin 4 gate-uri obligatorii: (1) audit tehnic complet realizat de specialiști acreditați, (2) Digital Twin 3D al imobilului, (3) minimum 90% recomandări acceptate și implementate de proprietar, (4) aprobare manuală de echipa noastră. Niciun imobil nu este listat fără aceste verificări.",
   },
   {
-    q: "De ce ar plăti cineva comision dacă pune anunț gratis pe Imobiliare.ro?",
+    q: "De ce ar plăti cineva comision dacă pune anunț gratis pe altă platformă?",
     a: "Pentru că un imobil cu audit + Digital Twin se vinde MAI REPEDE și la un PREȚ MAI MARE. Cumpărătorii știu exact ce cumpără (zero surprize) → încredere → ofertă apropiată de prețul cerut. Plus, scoți costul auditului din comision la finalizarea vânzării.",
   },
   {
@@ -240,8 +240,8 @@ export const WhyUsPage = () => {
   return (
     <div className="min-h-screen bg-[#0a0a0b] text-white">
       <SEO
-        title="De ce PropManage vs Imobiliare.ro · Audit + Digital Twin · Comision 2.5%"
-        description="Singura platformă imobiliară din România cu audit tehnic + Digital Twin obligatorii pentru fiecare imobil. Comision 2.5% (vs 5-6% standard). Cumpără cu încredere. Vinde cu credibilitate."
+        title="De ce PropManage · Imobile cu Audit + Digital Twin · Comision 2.5%"
+        description="O platformă imobiliară unde fiecare imobil are audit tehnic + Digital Twin obligatorii. Comision 2.5%. Cumpără cu încredere. Vinde cu credibilitate."
       />
 
       {/* HERO */}
@@ -254,16 +254,15 @@ export const WhyUsPage = () => {
           </Link>
           <div className="inline-flex items-center gap-2 px-4 py-2 glass rounded-full mb-8" data-testid="hero-badge">
             <Sparkles className="w-3.5 h-3.5 text-[#d4ff3a]" />
-            <span className="text-xs tracking-wide text-stone-300">Comparație: PropManage vs Platforme imobiliare clasice</span>
+            <span className="text-xs tracking-wide text-stone-300">O abordare diferită pentru piața imobiliară</span>
           </div>
           <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl tracking-tight leading-[0.9] mb-8 max-w-5xl" data-testid="why-hero-title">
-            De ce <span className="italic gradient-text">PropManage</span><br />
-            nu este Imobiliare.ro.
+            Facem lucrurile <span className="italic gradient-text">altfel</span>.
           </h1>
           <p className="text-base md:text-xl text-stone-400 max-w-3xl mb-10 leading-relaxed">
-            Sunt mii de anunțuri pe site-urile clasice. Multe minciuni. Multe surprize.
-            <strong className="text-white"> Noi am construit altceva</strong>: o platformă unde fiecare imobil
-            trece prin audit tehnic și are Digital Twin 3D. Zero surprize. Maxim încredere.
+            Piața imobiliară din România are deja multe opțiuni. Noi nu am vrut să fim încă una.
+            <strong className="text-white"> Am construit un model diferit</strong>: o platformă unde fiecare imobil
+            trece prin audit tehnic și are Digital Twin 3D. Mai puține surprize. Mai multă încredere.
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <Link to="/imobile-verificate" className="pm-btn pm-btn-primary pm-btn-lg" data-testid="hero-cta-browse">
@@ -279,8 +278,8 @@ export const WhyUsPage = () => {
       {/* 3 PILLARS */}
       <section className="px-6 py-20 border-t border-white/5">
         <div className="max-w-6xl mx-auto">
-          <h2 className="font-serif text-4xl md:text-5xl mb-3 text-center">3 motive pentru care suntem <span className="italic gradient-text">diferiți</span></h2>
-          <p className="text-center text-sm md:text-base text-stone-400 mb-14 max-w-2xl mx-auto">Nu suntem un site mai mare. Suntem un model fundamental nou.</p>
+          <h2 className="font-serif text-4xl md:text-5xl mb-3 text-center">Ce face <span className="italic gradient-text">PropManage</span> aparte</h2>
+          <p className="text-center text-sm md:text-base text-stone-400 mb-14 max-w-2xl mx-auto">Un model fundamental nou, nu o variație a celor existente.</p>
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
@@ -329,20 +328,20 @@ export const WhyUsPage = () => {
       {/* COMPARISON TABLE */}
       <section className="px-6 py-20 border-t border-white/5">
         <div className="max-w-6xl mx-auto">
-          <h2 className="font-serif text-4xl md:text-5xl mb-3 text-center">Comparație <span className="italic gradient-text">directă</span></h2>
-          <p className="text-center text-sm md:text-base text-stone-400 mb-12 max-w-2xl mx-auto">10 criterii care fac diferența între platforme.</p>
+          <h2 className="font-serif text-4xl md:text-5xl mb-3 text-center">Ce primești <span className="italic gradient-text">la noi</span></h2>
+          <p className="text-center text-sm md:text-base text-stone-400 mb-12 max-w-2xl mx-auto">10 elemente care fac diferența. Tu alegi ce contează pentru tine.</p>
           <div className="bg-[#0e0e10] border border-white/10 rounded-3xl overflow-hidden">
             <table className="w-full" data-testid="comparison-table">
               <thead>
                 <tr className="border-b border-white/10 bg-white/[0.02]">
-                  <th className="py-4 px-4 md:px-6 text-left text-xs uppercase tracking-wider text-stone-500">Criteriu</th>
+                  <th className="py-4 px-4 md:px-6 text-left text-xs uppercase tracking-wider text-stone-500">Element</th>
                   <th className="py-4 px-4 md:px-6 text-center bg-[#d4ff3a]/[0.08]">
                     <div className="font-serif text-base md:text-lg text-[#d4ff3a]">PropManage</div>
                     <div className="text-[10px] text-stone-400">Imobile Verificate</div>
                   </th>
                   <th className="py-4 px-4 md:px-6 text-center">
-                    <div className="font-serif text-base md:text-lg text-stone-300">Imobiliare.ro</div>
-                    <div className="text-[10px] text-stone-500">& similare</div>
+                    <div className="font-serif text-base md:text-lg text-stone-300">Platforme clasice</div>
+                    <div className="text-[10px] text-stone-500">model anunțuri standard</div>
                   </th>
                 </tr>
               </thead>

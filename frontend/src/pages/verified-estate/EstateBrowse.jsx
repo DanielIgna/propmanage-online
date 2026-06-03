@@ -62,7 +62,7 @@ const ExternalAuditModal = ({ open, onClose }) => {
         <div className="flex items-start justify-between mb-6">
           <div>
             <h3 className="font-serif text-2xl mb-1">Solicită audit & Digital Twin</h3>
-            <p className="text-sm text-stone-400">Pentru un imobil identificat în altă parte (Imobiliare.ro, Storia, OLX etc.)</p>
+            <p className="text-sm text-stone-400">Pentru un imobil identificat pe altă platformă</p>
           </div>
           <button onClick={onClose} className="text-stone-400 hover:text-white" data-testid="ext-audit-close"><X className="w-5 h-5" /></button>
         </div>
@@ -77,7 +77,7 @@ const ExternalAuditModal = ({ open, onClose }) => {
           <form onSubmit={submit} className="space-y-3">
             <div>
               <label className="text-xs text-stone-400 uppercase tracking-wider">Link imobil extern *</label>
-              <input required type="url" placeholder="https://www.imobiliare.ro/..." value={form.external_listing_url} onChange={e => setForm({ ...form, external_listing_url: e.target.value })} className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" data-testid="ext-audit-url" />
+              <input required type="url" placeholder="https://..." value={form.external_listing_url} onChange={e => setForm({ ...form, external_listing_url: e.target.value })} className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" data-testid="ext-audit-url" />
             </div>
             <div>
               <label className="text-xs text-stone-400 uppercase tracking-wider">Adresă proprietate *</label>

@@ -506,6 +506,24 @@ async def admin_stats(user: dict = Depends(require_role("admin", "operator"))):
 
 # ----------------- Pricing / Stripe Checkout (ETAPA 2) -----------------
 
+@router.post("/admin/run-newsletter-now")
+async def admin_run_newsletter_now(user: dict = Depends(require_role("admin", "operator"))):
+    """Manual trigger for weekly newsletter (for admin testing)."""
+    _ensure_enabled()
+    from email_sequences import run_weekly_newsletter
+    sent = await run_weekly_newsletter()
+    return {"ok": True, "emails_sent": sent}
+
+
+@router.post("/admin/run-drip-now")
+async def admin_run_drip_now(user: dict = Depends(require_role("admin", "operator"))):
+    """Manual trigger for drip reminder job."""
+    _ensure_enabled()
+    from email_sequences import run_drip_reminder_for_pending_orders
+    sent = await run_drip_reminder_for_pending_orders()
+    return {"ok": True, "reminders_sent": sent}
+
+
 @router.get("/pricing")
 async def get_pricing():
     """Public pricing for audit + Twin + commission."""

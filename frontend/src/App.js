@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Home, Wrench, Shield, Wallet, Box, Users, AlertTriangle, CheckCircle2,
@@ -43,6 +43,15 @@ import { EstateDetail } from "./pages/verified-estate/EstateDetail";
 import { SellMyProperty } from "./pages/verified-estate/SellMyProperty";
 import { VerifiedEstateAdmin } from "./pages/verified-estate/VerifiedEstateAdmin";
 import WhyUsPage from "./pages/WhyUsPage";
+import { trackPageView } from "@/lib/analytics";
+
+const AnalyticsRouteTracker = () => {
+  const location = useLocation();
+  React.useEffect(() => {
+    trackPageView(location.pathname + location.search);
+  }, [location.pathname, location.search]);
+  return null;
+};
 import { ImpersonationBanner } from "./components/ImpersonationBanner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./App.css";
@@ -1343,26 +1352,71 @@ const CTA = () => {
   );
 };
 
+const SOCIAL_LINKS = [
+  { href: "https://www.facebook.com/share/1GEh9j9wDF/", label: "Facebook · PropManage", icon: "facebook" },
+  { href: "#", label: "Facebook · Imobile Verificate", icon: "facebook", placeholder: true },
+  { href: "#", label: "Instagram · PropManage", icon: "instagram", placeholder: true },
+  { href: "#", label: "Instagram · Imobile Verificate", icon: "instagram", placeholder: true },
+  { href: "#", label: "YouTube", icon: "youtube", placeholder: true },
+];
+
+const SocialIcon = ({ icon }) => {
+  const common = "w-4 h-4";
+  if (icon === "facebook") return (
+    <svg className={common} viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+  );
+  if (icon === "instagram") return (
+    <svg className={common} viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+  );
+  if (icon === "youtube") return (
+    <svg className={common} viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+  );
+  return null;
+};
+
 const Footer = () => (
   <footer className="border-t border-white/5 py-12 px-6">
-    <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between gap-6">
-      <div className="flex items-center gap-2">
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#d4ff3a] to-[#a8e028] flex items-center justify-center">
-          <Building2 className="w-3.5 h-3.5 text-black" strokeWidth={2.5} />
+    <div className="max-w-7xl mx-auto">
+      <div className="flex flex-col md:flex-row justify-between gap-6 mb-8">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#d4ff3a] to-[#a8e028] flex items-center justify-center">
+            <Building2 className="w-3.5 h-3.5 text-black" strokeWidth={2.5} />
+          </div>
+          <span className="font-serif text-lg">PropManage</span>
+          <span className="text-xs text-stone-500 ml-2">© 2026 · Property Operating System</span>
         </div>
-        <span className="font-serif text-lg">PropManage</span>
-        <span className="text-xs text-stone-500 ml-2">© 2026 · Property Operating System</span>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-stone-500">
+          <Link to="/terms" className="hover:text-white transition-colors" data-testid="footer-terms">Termeni</Link>
+          <Link to="/privacy" className="hover:text-white transition-colors" data-testid="footer-privacy">Confidențialitate</Link>
+          <Link to="/cookies" className="hover:text-white transition-colors" data-testid="footer-cookies">Cookies</Link>
+          <Link to="/trust" className="hover:text-white transition-colors" data-testid="footer-trust">Trust Center</Link>
+          <Link to="/status" className="hover:text-white transition-colors inline-flex items-center gap-1" data-testid="footer-status">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Status
+          </Link>
+          <GDPRAuditBadge variant="footer" />
+          <a href="mailto:contact@propmanage.ro" className="hover:text-white transition-colors">Contact</a>
+        </div>
       </div>
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-stone-500">
-        <Link to="/terms" className="hover:text-white transition-colors" data-testid="footer-terms">Termeni</Link>
-        <Link to="/privacy" className="hover:text-white transition-colors" data-testid="footer-privacy">Confidențialitate</Link>
-        <Link to="/cookies" className="hover:text-white transition-colors" data-testid="footer-cookies">Cookies</Link>
-        <Link to="/trust" className="hover:text-white transition-colors" data-testid="footer-trust">Trust Center</Link>
-        <Link to="/status" className="hover:text-white transition-colors inline-flex items-center gap-1" data-testid="footer-status">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Status
-        </Link>
-        <GDPRAuditBadge variant="footer" />
-        <a href="mailto:contact@propmanage.ro" className="hover:text-white transition-colors">Contact</a>
+      <div className="border-t border-white/5 pt-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="text-[11px] text-stone-500 uppercase tracking-wider">Urmărește-ne</div>
+        <div className="flex flex-wrap gap-2" data-testid="footer-socials">
+          {SOCIAL_LINKS.map((s, i) => (
+            <a
+              key={i}
+              href={s.href}
+              target={s.placeholder ? undefined : "_blank"}
+              rel={s.placeholder ? undefined : "noopener noreferrer"}
+              onClick={s.placeholder ? (e) => e.preventDefault() : undefined}
+              className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-colors ${s.placeholder ? "bg-white/[0.03] text-stone-500 cursor-not-allowed" : "bg-white/5 text-stone-300 hover:bg-white/10 hover:text-white"}`}
+              title={s.placeholder ? "Link în curând" : s.label}
+              data-testid={`social-${i}`}
+            >
+              <SocialIcon icon={s.icon} />
+              <span className="hidden sm:inline">{s.label}</span>
+              {s.placeholder && <span className="text-[10px] text-stone-500 italic ml-1">(în curând)</span>}
+            </a>
+          ))}
+        </div>
       </div>
     </div>
   </footer>
@@ -1467,6 +1521,7 @@ function App() {
           <BrowserRouter>
             <ErrorBoundary>
               <ImpersonationBanner />
+              <AnalyticsRouteTracker />
               <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/demo" element={<PublicDemoPage />} />

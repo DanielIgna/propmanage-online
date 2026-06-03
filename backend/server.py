@@ -235,6 +235,12 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=3600,
         )
+        # Email lifecycle sequences: drip reminders + weekly newsletter (Phase 67)
+        try:
+            from email_sequences import register_email_sequence_jobs
+            register_email_sequence_jobs(scheduler)
+        except Exception as e:
+            logger.warning(f"Failed to register email sequence jobs: {e}")
         # Smoke Test auto-monitor — runs every 30 min, alerts admins on failure
         scheduler.add_job(
             run_smoke_test_monitor_tick,
