@@ -6,6 +6,7 @@ import {
   Facebook, Instagram, Youtube, Linkedin, Sparkles, Building2, Mail, Phone, MapPin,
   Search, BookOpen
 } from "lucide-react";
+import { invalidateSEOCache } from "@/lib/useDynamicSEO";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -77,6 +78,7 @@ export const AdminSettingsControl = () => {
         seo: data.seo,
       }, { withCredentials: true });
       setData(res.data);
+      invalidateSEOCache();
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e) {
@@ -93,6 +95,7 @@ export const AdminSettingsControl = () => {
     try {
       const res = await axios.post(`${API}/api/admin/app-settings/reset`, {}, { withCredentials: true });
       setData(res.data);
+      invalidateSEOCache();
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e) {

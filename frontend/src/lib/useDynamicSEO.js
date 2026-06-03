@@ -52,3 +52,9 @@ export function useDynamicSEO(pageKey, fallback = {}) {
     return () => { cancelled = true; };
   }, [pageKey, fallback.title, fallback.description, fallback.ogImage]);
 }
+
+/** Clear cached app settings — call after admin saves SEO to force fresh fetch on next navigation. */
+export function invalidateSEOCache() {
+  _cache = null;
+  _cachePromise = null;
+}

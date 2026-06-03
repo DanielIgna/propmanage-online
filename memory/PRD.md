@@ -4,6 +4,14 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 ## Recent additions (Feb 2026)
+- **Phase 68b — Dynamic SEO + Admin Documentation + CTA refactor** ✅ (Feb 3 2026)
+  - **`useDynamicSEO(pageKey)`** hook (`/app/frontend/src/lib/useDynamicSEO.js`) reads `app_settings.seo` and applies `<title>`, meta description, OG title/description/image. Module-level cache with `invalidateSEOCache()` exposed; admin save/reset auto-invalidates.
+  - Hooked on: home (App.js), `/imobile-verificate` (estate), `/de-ce-noi` (whyus), `/imobile-verificate/sell` (sell).
+  - **AdminSettingsControl**: SEO section added with per-page title+description fields (home, estate, whyus, sell, client, specialist) + OG image URL. Reset-to-defaults button with confirm dialog → POST `/api/admin/app-settings/reset`. Documentation shortcut button next to Reset.
+  - **AdminDocumentation** page at `/admin/documentation` — 7 expandable topics (verified-estate, admin-kanban, control-admin, seo, social-campaigns, analytics, emails). Linked in admin sidebar (AdminLayoutMetronic) with NEW badge.
+  - **CTA refactor**: 4 buttons in ClientDashboard + 4 buttons in SpecialistDashboard migrated from `btn-accent` to `pm-btn pm-btn-primary` (unified token system from Phase 64 ETAPA 3).
+  - Tested: iteration_47 → 8/8 backend pytest + frontend save+persist+reset, all 7 docs topics expand, refactored CTAs render correctly.
+
 - **Phase 68 — Admin Settings Control Panel + Dynamic Footer + LinkedIn** ✅
   - New API `routes/app_settings.py`: single doc `app_settings` (social/pricing/contact/company sections), GET/PUT/RESET endpoints
   - Public subset endpoint `/api/app-settings/public` for Footer
