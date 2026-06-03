@@ -63,6 +63,16 @@ function init() {
     return origFetch(input, init);
   };
 
+  // Patch XMLHttpRequest — axios uses XHR in the browser by default.
+  // This is the CRITICAL patch that makes axios requests work.
+  const OrigOpen = window.XMLHttpRequest.prototype.open;
+  window.XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+    if (typeof url === "string" && url.startsWith(_rewriteFrom)) {
+      url = _rewriteTo + url.slice(_rewriteFrom.length);
+    }
+    return OrigOpen.call(this, method, url, ...rest);
+  };
+
   // Patch axios (lazy — only if axios is already imported)
   try {
     // eslint-disable-next-line global-require
