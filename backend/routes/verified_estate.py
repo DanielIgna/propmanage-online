@@ -126,7 +126,7 @@ def _serialize_listing(doc: dict) -> dict:
         out["trust_score"] = "A+"
     elif pct >= 95 and has_twin and has_audit:
         out["trust_score"] = "A"
-    elif pct >= 90 and has_twin:
+    elif pct >= 90 and has_twin and has_audit:
         out["trust_score"] = "B"
     else:
         out["trust_score"] = "C"
@@ -223,6 +223,11 @@ async def create_inquiry(body: InquiryCreate):
         "created_at": now,
     }
     await db.verified_estate_inquiries.insert_one(doc)
+    # increment inquiry counter for admin analytics
+    await db.verified_estate_listings.update_one(
+        {"_id": listing["_id"]},
+        {"$inc": {"inquiry_count": 1}},
+    )
     return {"ok": True, "inquiry_id": str(doc["_id"])}
 
 
@@ -463,7 +468,11 @@ async def create_checkout(body: CheckoutRequest, request: Request):
         amount = PRICE_AUDIT_RON + PRICE_TWIN_RON
         label = "Bundle: Audit + Digital Twin"
 
-    origin = request.headers.get("origin") or request.headers.get("referer", "").rstrip("/")
+    origin = (
+        os.environ.get("FRONTEND_PUBLIC_URL")
+        or request.headers.get("origin")
+        or request.headers.get("referer", "").rstrip("/")
+    )
     if not origin:
         raise HTTPException(400, "Missing origin header")
 

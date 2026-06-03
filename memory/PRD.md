@@ -4,20 +4,41 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 ## Recent additions (Feb 2026)
-- **Phase 64 — Verified Estate (Imobile Verificate) ETAPA 1** ✅
-  - New isolated module: `routes/verified_estate.py` + frontend `/imobile-verificate`
-  - 4 quality gates enforced (audit_report_id + digital_twin_id + ≥90% recommendations + admin approval)
-  - Public browse page with filters (city, rooms, price_max)
-  - Detail page with gallery, Twin embed slot, audit PDF, inquiry form (viewing/buy)
-  - External audit request flow (Traseu C — buyer found property elsewhere)
-  - Admin endpoints (stats, listings, inquiries, external requests) — role-gated
-  - 2 demo listings seeded (Aviatorilor + Pipera) with 100% recommendations accepted
-  - Feature flag: `FEATURE_VERIFIED_ESTATE=true` in backend/.env
-  - "Imobile Verificate" menu link added in nav
-  - Commission strategy: 2.5% (Digital Twin cost deducted as bonus on completion)
-  - Tested: public browse + detail + inquiry + external-audit + admin stats all 200 OK
+- **Phase 64 — Verified Estate ETAPA 1+2+3+4 COMPLET** ✅
+  - **ETAPA 1**: Modul izolat `routes/verified_estate.py` + 3 pagini frontend (`/imobile-verificate`, detail, sell landing). 4 quality gates strict. Feature flag `FEATURE_VERIFIED_ESTATE=true`. 2 listings demo seeded.
+  - **ETAPA 2**: Stripe checkout (audit 350 / twin 950 / bundle 1300 RON) cu fallback DEMO mode. 4-step wizard în Sell page. Admin Kanban moderation panel (`/admin/imobile-verificate`) cu 4 coloane (Draft/Pending/Published/Archived), 6 stat cards, 4 tabs (Kanban/Inquiries/External/Orders). Gates strict-enforced la publish.
+  - **ETAPA 3**: Sistem unificat CSS tokens `.pm-btn-*` (primary/secondary/ghost/danger/success + size variants), `.pm-stat-card`, `.pm-trust-badge` (A+/A/B/C) aplicat în toate paginile verified-estate.
+  - **ETAPA 4**: Sale/Rent toggle în filters + transaction_type badges pe cards. Trust Score badge (A+/A/B/C) cu reguli: A+ requires 100%+twin+audit, A requires 95%+twin+audit, B requires 90%+twin+audit, C otherwise.
+  - **Fixes post-testing** (iteration_45 RCA):
+    - Origin redirect now prefers `FRONTEND_PUBLIC_URL` env var (prevents cluster-internal URLs in Stripe redirect)
+    - Trust Score B now requires audit (consistency with "audit + twin mandatory")
+    - Inquiry creation `$inc inquiry_count` on listing doc
+  - **Tested 21/21 backend pytest + frontend Step 1-4 wizard end-to-end** ✅
 
-- Earlier phases:
+## Endpoints Verified Estate
+```
+PUBLIC:
+  GET  /api/verified-estate/listings                       (browse + filters)
+  GET  /api/verified-estate/listings/{id}                  (detail)
+  GET  /api/verified-estate/pricing                        (audit/twin/bundle prices)
+  POST /api/verified-estate/inquiries                      (interested in property)
+  POST /api/verified-estate/external-audit-request         (audit for external listing)
+  POST /api/verified-estate/checkout                       (Stripe demo)
+  GET  /api/verified-estate/checkout/status/{session_id}   (poll payment)
+
+ADMIN (require_role admin/operator):
+  GET  /api/verified-estate/admin/stats
+  GET  /api/verified-estate/admin/listings
+  POST /api/verified-estate/admin/listings
+  PATCH /api/verified-estate/admin/listings/{id}
+  POST /api/verified-estate/admin/listings/{id}/publish
+  POST /api/verified-estate/admin/listings/{id}/archive
+  GET  /api/verified-estate/admin/inquiries
+  GET  /api/verified-estate/admin/external-requests
+  GET  /api/verified-estate/admin/orders
+```
+
+## Earlier phases
   - Trimble Connect SKP iframe viewer
   - Blender 3.4 headless DAE/OBJ/FBX → GLB conversion
   - Google OAuth resilience (K8s ingress timeout fix)
