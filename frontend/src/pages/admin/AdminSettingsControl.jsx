@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import {
   Settings, Save, RefreshCcw, AlertCircle, CheckCircle2, Loader2,
-  Facebook, Instagram, Youtube, Linkedin, Sparkles, Building2, Mail, Phone, MapPin
+  Facebook, Instagram, Youtube, Linkedin, Sparkles, Building2, Mail, Phone, MapPin,
+  Search, BookOpen
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -73,12 +74,29 @@ export const AdminSettingsControl = () => {
         },
         contact: data.contact,
         company: data.company,
+        seo: data.seo,
       }, { withCredentials: true });
       setData(res.data);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e) {
       setError(e?.response?.data?.detail || "Eroare la salvare");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetToDefaults = async () => {
+    if (!window.confirm("Sigur vrei să resetezi TOATE setările la valorile implicite? Această acțiune nu poate fi anulată.")) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await axios.post(`${API}/api/admin/app-settings/reset`, {}, { withCredentials: true });
+      setData(res.data);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      setError(e?.response?.data?.detail || "Eroare la reset");
     } finally {
       setSaving(false);
     }
@@ -109,6 +127,16 @@ export const AdminSettingsControl = () => {
           <button onClick={save} disabled={saving} className="pm-btn pm-btn-primary pm-btn-lg" data-testid="settings-save">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
             {saving ? "Se salvează..." : saved ? "Salvat ✓" : "Salvează modificările"}
+          </button>
+        </div>
+
+        {/* Action bar: Documentation + Reset */}
+        <div className="flex flex-wrap gap-2 mb-6">
+          <Link to="/admin/documentation" className="pm-btn pm-btn-secondary pm-btn-sm" data-testid="open-docs">
+            <BookOpen className="w-3.5 h-3.5" /> Documentație & Training
+          </Link>
+          <button onClick={resetToDefaults} disabled={saving} className="pm-btn pm-btn-danger pm-btn-sm" data-testid="settings-reset">
+            <RefreshCcw className="w-3.5 h-3.5" /> Reset la valori implicite
           </button>
         </div>
 
@@ -156,6 +184,29 @@ export const AdminSettingsControl = () => {
           <SectionCard icon={Settings} title="Identitate Companie" description="Nume + tagline afișate în footer și pagina principală.">
             <TextField label="Nume companie" value={data.company?.name} onChange={v => updateField("company", "name", v)} placeholder="PropManage" testid="company-name" />
             <TextField label="Tagline" value={data.company?.tagline} onChange={v => updateField("company", "tagline", v)} placeholder="Property Operating System" testid="company-tagline" />
+          </SectionCard>
+
+          {/* SEO */}
+          <SectionCard icon={Search} title="SEO · Meta Tags pentru Google" description="Titlu + descriere pentru fiecare pagină. Apar în Google search results și când partajezi link-uri.">
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3 text-xs text-amber-200 flex items-start gap-2">
+              <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
+              <span><strong>Tip pro:</strong> titlu &lt; 60 caractere, descriere 140-160 caractere. Include cuvinte cheie naturale (audit imobiliar, digital twin, vânzare apartament).</span>
+            </div>
+            {[
+              { key: "home", label: "Pagina principală (`/`)" },
+              { key: "estate", label: "Imobile Verificate (`/imobile-verificate`)" },
+              { key: "whyus", label: "De ce noi (`/de-ce-noi`)" },
+              { key: "sell", label: "Vinde-ți imobilul (`/sell`)" },
+              { key: "client", label: "Dashboard Client" },
+              { key: "specialist", label: "Dashboard Specialist" },
+            ].map(p => (
+              <div key={p.key} className="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-3" data-testid={`seo-block-${p.key}`}>
+                <div className="text-xs text-stone-300 font-medium">{p.label}</div>
+                <TextField label="Title (≤60 caractere)" value={data.seo?.[`${p.key}_title`]} onChange={v => updateField("seo", `${p.key}_title`, v)} testid={`seo-${p.key}-title`} />
+                <TextField label="Meta Description (140-160 caractere)" value={data.seo?.[`${p.key}_description`]} onChange={v => updateField("seo", `${p.key}_description`, v)} testid={`seo-${p.key}-desc`} />
+              </div>
+            ))}
+            <TextField label="OG Image URL (preview pe Facebook/LinkedIn)" value={data.seo?.og_image} onChange={v => updateField("seo", "og_image", v)} placeholder="https://..." testid="seo-og-image" hint="Imaginea care apare când link-ul e share-uit pe rețele sociale (recomandare 1200×630px)" />
           </SectionCard>
 
           {/* Last Updated */}

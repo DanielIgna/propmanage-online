@@ -46,6 +46,21 @@ DEFAULT_SETTINGS = {
         "name": "PropManage",
         "tagline": "Property Operating System",
     },
+    "seo": {
+        "home_title": "PropManage · Proprietatea ta, perfecționată digital",
+        "home_description": "Audit tehnic + Digital Twin 3D pentru fiecare imobil. Comision 2.5%. Cumpără cu încredere. Vinde cu credibilitate.",
+        "estate_title": "Imobile Verificate · Audit + Digital Twin · PropManage",
+        "estate_description": "Imobile premium cu audit tehnic și Digital Twin 3D. Vezi exact ce cumperi înainte de prima vizionare.",
+        "whyus_title": "De ce PropManage · Imobile cu Audit + Digital Twin · Comision 2.5%",
+        "whyus_description": "O platformă imobiliară unde fiecare imobil are audit + Digital Twin obligatorii. Comision 2.5%. Mai puține surprize.",
+        "sell_title": "Vinde-ți imobilul cu PropManage · Comision 2.5%",
+        "sell_description": "Audit + Digital Twin + listing public verificat. Te ajutăm să vinzi mai repede și la preț corect. Comision avantajos.",
+        "client_title": "Spațiul tău · PropManage",
+        "client_description": "Gestionează-ți proprietățile, urmărește audituri și Digital Twin-uri, vezi rapoartele tale.",
+        "specialist_title": "Workspace Specialist · PropManage",
+        "specialist_description": "Programări audituri, creare Digital Twin, raporte și recomandări către clienți.",
+        "og_image": "",
+    },
     "updated_at": None,
     "updated_by": None,
 }
@@ -103,11 +118,28 @@ class CompanySettings(BaseModel):
     tagline: Optional[str] = ""
 
 
+class SEOSettings(BaseModel):
+    home_title: Optional[str] = None
+    home_description: Optional[str] = None
+    estate_title: Optional[str] = None
+    estate_description: Optional[str] = None
+    whyus_title: Optional[str] = None
+    whyus_description: Optional[str] = None
+    sell_title: Optional[str] = None
+    sell_description: Optional[str] = None
+    client_title: Optional[str] = None
+    client_description: Optional[str] = None
+    specialist_title: Optional[str] = None
+    specialist_description: Optional[str] = None
+    og_image: Optional[str] = None
+
+
 class AppSettingsUpdate(BaseModel):
     social: Optional[SocialLinks] = None
     pricing: Optional[PricingSettings] = None
     contact: Optional[ContactSettings] = None
     company: Optional[CompanySettings] = None
+    seo: Optional[SEOSettings] = None
 
 
 # ---------- Public (read-only safe subset) ----------
@@ -121,6 +153,7 @@ async def get_public_settings():
         "pricing": doc.get("pricing", {}),
         "contact": {"email": doc.get("contact", {}).get("email", "")},
         "company": doc.get("company", {}),
+        "seo": doc.get("seo", {}),
     }
 
 

@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import { EstateMapView } from "./EstateMapView";
+import { useDynamicSEO } from "@/lib/useDynamicSEO";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -167,6 +168,7 @@ const ListingCard = ({ item }) => (
 );
 
 export const EstateBrowse = () => {
+  useDynamicSEO("estate", { title: "Imobile Verificate · PropManage" });
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterCity, setFilterCity] = useState("");

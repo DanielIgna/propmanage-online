@@ -6,6 +6,7 @@ import {
   TrendingUp, Calculator, Star, Award, Eye, Layers, Building2, ChevronDown,
   Zap, Heart, Quote
 } from "lucide-react";
+import { useDynamicSEO } from "@/lib/useDynamicSEO";
 
 const SEO = ({ title, description }) => {
   React.useEffect(() => {
@@ -237,6 +238,10 @@ const FAQItem = ({ q, a, idx }) => {
 };
 
 export const WhyUsPage = () => {
+  useDynamicSEO("whyus", {
+    title: "De ce PropManage · Imobile cu Audit + Digital Twin · Comision 2.5%",
+    description: "O platformă imobiliară unde fiecare imobil are audit tehnic + Digital Twin obligatorii. Comision 2.5%."
+  });
   return (
     <div className="min-h-screen bg-[#0a0a0b] text-white">
       <SEO

@@ -5,6 +5,7 @@ import {
   CheckCircle2, CreditCard, AlertCircle, Loader2, Building2
 } from "lucide-react";
 import axios from "axios";
+import { useDynamicSEO } from "@/lib/useDynamicSEO";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -40,6 +41,7 @@ const PackageCard = ({ id, title, price, features, badge, selected, onSelect }) 
 );
 
 export const SellMyProperty = () => {
+  useDynamicSEO("sell", { title: "Vinde-ți imobilul · PropManage" });
   const [pricing, setPricing] = useState(null);
   const [step, setStep] = useState(1);
   const [selectedPackage, setSelectedPackage] = useState("bundle");

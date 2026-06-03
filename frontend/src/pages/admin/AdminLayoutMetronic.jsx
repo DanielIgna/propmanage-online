@@ -58,6 +58,7 @@ const NAV_SECTIONS = [
       { id: "settings", label: "Setări Platformă", icon: Settings },
       { id: "settings_control", label: "Control Administrare", icon: Settings, badge: "NEW", href: "/admin/settings-control" },
       { id: "ve_admin", label: "Imobile Verificate", icon: Award, badge: "NEW", href: "/admin/imobile-verificate" },
+      { id: "docs_train", label: "Documentație & Training", icon: FileText, badge: "NEW", href: "/admin/documentation" },
     ],
   },
   {

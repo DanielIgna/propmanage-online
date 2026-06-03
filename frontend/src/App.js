@@ -44,7 +44,9 @@ import { SellMyProperty } from "./pages/verified-estate/SellMyProperty";
 import { VerifiedEstateAdmin } from "./pages/verified-estate/VerifiedEstateAdmin";
 import WhyUsPage from "./pages/WhyUsPage";
 import AdminSettingsControl from "./pages/admin/AdminSettingsControl";
+import AdminDocumentation from "./pages/admin/AdminDocumentation";
 import { trackPageView } from "@/lib/analytics";
+import { useDynamicSEO } from "@/lib/useDynamicSEO";
 
 const AnalyticsRouteTracker = () => {
   const location = useLocation();
@@ -1467,6 +1469,7 @@ const PromoBanner = () => {
 
 // ============= LANDING PAGE =============
 const LandingPage = () => {
+  useDynamicSEO("home", { title: "PropManage · Property Operating System" });
   const { t, showSection, isPreview } = useI18n();
   const promoText = t("landing.promo_banner");
   const hasPromo = !!promoText && promoText !== "landing.promo_banner" && sessionStorage.getItem("pm_promo_dismissed") !== "1";
@@ -1568,6 +1571,7 @@ function App() {
               <Route path="/imobile-verificate/sell" element={<SellMyProperty />} />
               <Route path="/admin/imobile-verificate" element={<VerifiedEstateAdmin />} />
               <Route path="/admin/settings-control" element={<AdminSettingsControl />} />
+              <Route path="/admin/documentation" element={<AdminDocumentation />} />
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />
               <Route path="/ghiduri" element={<GhiduriIndex />} />
               <Route path="/ghiduri/:slug" element={<GhidPage />} />
