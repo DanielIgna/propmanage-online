@@ -4,6 +4,14 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 ## Recent additions (Feb 2026)
+- **Phase 69 — AI QA Copilot + Specialist badges + Launch Playbook** ✅ (Feb 3 2026)
+  - **AI QA Copilot** (`/admin/qa-copilot`): New module that turns manual exploratory testing into structured bug reports via Claude Sonnet 4.5. User creates sessions (role + area + goal), describes findings in natural language, AI returns category (UI_UX/DATA/LOGIC_BUG/MISSING_FEATURE/INTEGRATION/PERFORMANCE/SECURITY), severity (P0-P3), suspected files, follow-up tests, and cross-references prior findings from other sessions (regression memory). One-click "Generează prompt pentru Emergent" compiles all findings into a Markdown prompt ready to paste into chat with the dev agent.
+  - **Backend**: `qa_copilot_engine.py` (Claude integration, JSON-mode), `routes/qa_copilot.py` (CRUD on sessions + findings + prompt generation). Collection: `qa_sessions`.
+  - **Specialist badges**: `requests.py` accept_request now writes `specialist_specialty`, `specialist_city`, `specialist_verified` on assignment. ClientDashboard displays them next to specialist name with VERIFIED checkmark.
+  - **AdminDocumentation**: 2 new topics — "QA Copilot · Testare AI-asistată" (how to use the new module) and "Playbook Lansare · Primii 7 pași" (concrete Day 1-7 actions: LinkedIn post, Facebook carousel, Instagram Reel, YouTube case study, newsletter pilot, retrospective).
+  - **Tailwind safelist**: 28 dynamic category color classes safelisted to prevent JIT purge in production build.
+  - Tested: iteration_48 → 11/11 backend pytest, frontend QA Copilot full flow PASS (modal create → AI analysis in ~6s → prompt generation 1324 chars Romanian Markdown). Visual badge re-test pending seed of assigned request.
+
 - **Phase 68b — Dynamic SEO + Admin Documentation + CTA refactor** ✅ (Feb 3 2026)
   - **`useDynamicSEO(pageKey)`** hook (`/app/frontend/src/lib/useDynamicSEO.js`) reads `app_settings.seo` and applies `<title>`, meta description, OG title/description/image. Module-level cache with `invalidateSEOCache()` exposed; admin save/reset auto-invalidates.
   - Hooked on: home (App.js), `/imobile-verificate` (estate), `/de-ce-noi` (whyus), `/imobile-verificate/sell` (sell).

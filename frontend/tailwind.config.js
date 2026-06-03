@@ -5,6 +5,12 @@ module.exports = {
     "./src/**/*.{js,jsx,ts,tsx}",
     "./public/index.html"
   ],
+  safelist: [
+    // QA Copilot dynamic category colors — keep ALL variants used in QACopilotPage.jsx
+    ...['cyan', 'amber', 'red', 'violet', 'blue', 'orange', 'rose'].flatMap(c => [
+      `bg-${c}-500/15`, `border-${c}-500/30`, `text-${c}-400`, `text-${c}-300`,
+    ]),
+  ],
   theme: {
   	extend: {
   		borderRadius: {

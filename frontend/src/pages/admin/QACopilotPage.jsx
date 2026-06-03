@@ -294,7 +294,19 @@ export const QACopilotPage = () => {
 
   const copyPrompt = async () => {
     if (!active?.generated_prompt) return;
-    await navigator.clipboard.writeText(active.generated_prompt);
+    try {
+      await navigator.clipboard.writeText(active.generated_prompt);
+    } catch (_) {
+      // Fallback for insecure contexts / denied permissions
+      const ta = document.createElement("textarea");
+      ta.value = active.generated_prompt;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch (__) { /* swallow */ }
+      document.body.removeChild(ta);
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
