@@ -68,7 +68,18 @@ export default function AIDevTeamPage() {
   };
 
   const copyAction = async (text, key) => {
-    await navigator.clipboard.writeText(text);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (_) {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch (__) { /* swallow */ }
+      document.body.removeChild(ta);
+    }
     setCopied(key);
     setTimeout(() => setCopied(""), 2500);
   };

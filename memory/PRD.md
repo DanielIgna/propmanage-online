@@ -4,6 +4,21 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 ## Recent additions (Feb 2026)
+- **Phase 72 — AI Dev Team + AI Security Center** ✅ (Feb 4 2026)
+  - **AI Dev Team READ-ONLY** at `/admin/ai-dev-team` — 4 specialized Claude agents (frontend/backend/qa/security) analyze any indexed file → return JSON with summary, issues (P0-P3 severity), improvements, security_concerns, next_actions (copy-paste prompts for Emergent chat). Defense-in-depth path validation: blocks `..`, absolute paths, `.env/.git/secrets/node_modules`, plus enforces file must be in code_index. Max 12000 chars/file to keep within Cloudflare 60s timeout.
+  - **AI Security Center** at `/admin/ai-security` — read-only threat dashboard:
+    - Heuristic score 0-100 (100 base − penalties for severity/burst IPs)
+    - Threat level: SCĂZUT (≥85) / MEDIU (≥65) / RIDICAT (≥40) / CRITIC (<40)
+    - Stats: events_24h, failed_logins_24h, unique IPs, active incidents, burst IPs
+    - AI-powered recommendations via Claude analyzing recent audit_log/security_events/incidents
+    - Window selector: 1h / 6h / 24h / 3 days / 7 days
+    - NEVER auto-blocks IPs — all actions are suggestions for admin
+  - **Mongo collection**: `security_ai_runs` (history of AI security analyses).
+  - **Tailwind safelist extended**: bg-{color}-500/20 + text-{color}-200 added for security level color cycling.
+  - **Sidebar Admin**: 2 new entries with NEW badges (Code2 icon for Dev Team, Shield icon for Security).
+  - **Phase 5 (Ollama/Qwen/DeepSeek live) skipped** — stub already exists from Phase 70; activate when user supplies keys.
+  - Tested: iteration_51 → 16/16 backend pytest PASS + 100% frontend. Claude returned valid Romanian summary on backend file in ~12s; security analysis returns graceful "Niciun eveniment..." on clean DB.
+
 - **Phase 71 — Urgency UX + QA Code-Aware + Twin Q&A + Document Intelligence** ✅ (Feb 4 2026)
   - **Marketplace urgency upgrades**: Specialist Dashboard now has `🔥 Urgent` filter toggle with live count badge + auto-sort (urgent first, then newest) + red pulse-soft ring animation on urgent cards. Client Dashboard "Cerere nouă" modal shows red helper note when Urgent selected. Backend `routes/requests.py` notify() prepends `[URGENT]` prefix to email subject + uses `type_=lead_urgent` so future channels can route differently.
   - **QA Copilot Code-Aware Mode**: New `ai_core/code_index.py` (file path indexer, 10min cache) injected into the Claude system prompt + post-validation of `suspected_files`. Cuts hallucinations to ~0 in tests. UI now shows "verificate vs cod real" label and warns about filtered invalid paths.

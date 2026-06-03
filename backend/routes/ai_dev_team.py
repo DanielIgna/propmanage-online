@@ -31,6 +31,6 @@ async def get_files(kind: Optional[str] = Query(default=None, regex="^(frontend|
 @router.post("/analyze")
 async def analyze(payload: AnalyzeIn, admin=Depends(require_role("admin"))):
     result = await analyze_file(payload.file, agent=payload.agent)
-    if "error" in result and "summary" not in result:
+    if result.get("error"):
         raise HTTPException(400, result["error"])
     return result
