@@ -327,7 +327,7 @@ export const AdminTodoBoard = () => {
           <div className="text-center py-10 text-stone-400 text-sm italic" data-testid="todo-empty">
             {filterDone === "open"
               ? "Niciun task deschis. Felicitări! 🎉"
-              : "Nicio rezultat pentru filtrele curente."}
+              : "Niciun rezultat pentru filtrele curente."}
           </div>
         )}
 

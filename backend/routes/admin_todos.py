@@ -75,12 +75,17 @@ async def update_todo(todo_id: str, payload: TodoPatch, user=Depends(require_rol
         update["priority"] = payload.priority
     if payload.done is not None:
         update["done"] = bool(payload.done)
-        update["done_at"] = datetime.now(timezone.utc).isoformat() if payload.done else None
-    if not update:
+        if payload.done:
+            update["done_at"] = datetime.now(timezone.utc).isoformat()
+        # On un-toggle, clear done_at instead of setting it to None
+    if not update and not (payload.done is False):
         raise HTTPException(400, "Nothing to update")
     update["updated_at"] = datetime.now(timezone.utc).isoformat()
+    mongo_op = {"$set": update}
+    if payload.done is False:
+        mongo_op["$unset"] = {"done_at": ""}
     res = await db.admin_todos.find_one_and_update(
-        {"id": todo_id}, {"$set": update}, projection={"_id": 0}, return_document=True,
+        {"id": todo_id}, mongo_op, projection={"_id": 0}, return_document=True,
     )
     if not res:
         raise HTTPException(404, "Todo not found")

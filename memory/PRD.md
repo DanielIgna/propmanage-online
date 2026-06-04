@@ -4,6 +4,20 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 ## Recent additions (Feb 2026)
+- **Phase 79 — AI Assistant Context-Aware + ToDo Board** ✅ (Feb 6 2026)
+  - **AI Assistant inline_context**: extins `POST /api/ai-docs/ask` cu params `inline_context` (max 40000 chars) + `inline_context_label`. Când e prezent, bypassează RAG complet și răspunde STRICT din manualul injectat (cu mențiunea "Nu am găsit în manual" dacă lipsește). System prompt în română, concise (max 6 propoziții).
+  - **Frontend integration**: `AdminDocumentation.askAssistant` trimite acum tot manualul (titlu + status + content per topic) ca inline_context — răspunsurile devin precise platformei, nu generice.
+  - **ToDo Board centralizat** la `/admin/todo`:
+    - Agregă TODO-urile read-only din `TOPICS` (30 task-uri din documentație) + custom todos persistate via `/api/admin/todos`
+    - Stats: Total / Deschise / Finalizate / Din manual / Custom
+    - Filtre Deschise/Finalizate/Toate + per-topic navigation jos
+    - Custom todos: prioritate editabilă (Ridicat/Mediu/Scăzut), text editabil, delete
+    - Documented todos: toggle done (persistat în `admin_todo_state.doc_done_ids`), fără delete
+    - Linkat din Documentation header + sidebar Admin
+  - **Backend** `routes/admin_todos.py`: 5 endpoints (GET, POST, PUT, DELETE, doc-done) + cleanup `done_at` la un-toggle
+  - **Bug fix cosmetic**: "Nicio rezultat" → "Niciun rezultat" (Romanian grammar)
+  - Testing iter 59: 18/18 backend pytest + frontend complete
+
 - **Phase 78 — Weekly AI Briefing (Email Săptămânal)** ✅ (Feb 6 2026)
   - **Backend**: `routes/ai_weekly_briefing.py` cu 4 endpoints (`GET/PUT /config`, `POST /send-now`, `GET /history`) + helper `send_weekly_briefing()` + scheduler job
   - **APScheduler cron**: Luni 09:00 Europe/Bucharest (`weekly_ai_briefing`) — silent dacă `enabled=false` sau `recipients=[]`
