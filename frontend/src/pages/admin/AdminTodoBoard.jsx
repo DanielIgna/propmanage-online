@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import {
   ListChecks, Loader2, Plus, Trash2, CheckCircle2, Square,
-  Filter, BookOpen, X, Sparkles, AlertCircle, Wand2, Copy,
+  Filter, BookOpen, X, Sparkles, AlertCircle, Wand2, Copy, Send,
 } from "lucide-react";
 import { TOPICS } from "./AdminDocumentation";
 
@@ -96,6 +96,7 @@ const TodoRow = ({ todo, onToggle, onDelete, onChangePriority, onGeneratePrompt 
 
 const PromptModal = ({ todo, prompt, loading, error, onClose }) => {
   const [copied, setCopied] = useState(false);
+  const [sentToChat, setSentToChat] = useState(false);
   if (!todo) return null;
 
   const copyPrompt = async () => {
@@ -104,6 +105,29 @@ const PromptModal = ({ todo, prompt, loading, error, onClose }) => {
     } catch (_) { /* clipboard API missing or blocked — silently ignore */ }
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const sendToEmergentChat = async () => {
+    // 1) Copy to clipboard (always — fallback for any case)
+    try {
+      await navigator.clipboard.writeText(prompt);
+    } catch (_) { /* swallow */ }
+    // 2) Best-effort: postMessage to parent (works when the app is embedded
+    //    in the Emergent IDE iframe — the parent listens to 'emergent.chat.inject').
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(
+          {
+            type: "emergent.chat.inject",
+            source: "propmanage-todo-board",
+            payload: { text: prompt, topic: todo.topic_title || "", priority: todo.priority || "medium" },
+          },
+          "*"
+        );
+      }
+    } catch (_) { /* swallow */ }
+    setSentToChat(true);
+    setTimeout(() => setSentToChat(false), 4000);
   };
 
   return (
@@ -146,19 +170,37 @@ const PromptModal = ({ todo, prompt, loading, error, onClose }) => {
             <div className="bg-black/40 border border-white/10 rounded-xl p-4 font-mono text-xs text-stone-200 whitespace-pre-wrap leading-relaxed" data-testid="todo-prompt-output">
               {prompt}
             </div>
+            {sentToChat && (
+              <div className="mt-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2.5 text-xs text-emerald-300 flex items-start gap-2" data-testid="todo-prompt-sent-banner">
+                <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+                <div>
+                  <strong>Trimis spre chat Emergent.</strong> Prompt-ul este copiat în clipboard. Dă click în chat-ul Emergent și apasă <kbd className="px-1.5 py-0.5 bg-black/50 rounded border border-white/10 font-mono">Ctrl+V</kbd> ca să-l lipești. (Dacă rulezi în modul standalone, IDE-ul îl va prelua automat când îl detectează.)
+                </div>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-2 mt-4 flex-wrap">
               <div className="text-[11px] text-stone-500">
-                💡 Copiază mai jos și lipește în chat cu Emergent ca să implementez automat.
+                💡 Folosește 'Trimite în chat' pentru workflow rapid sau 'Copiază' clasic.
               </div>
-              <button
-                onClick={copyPrompt}
-                className={`pm-btn pm-btn-sm ${copied ? "pm-btn-secondary" : "pm-btn-primary"}`}
-                data-testid="todo-prompt-copy"
-              >
-                {copied
-                  ? <><CheckCircle2 className="w-3.5 h-3.5" /> Copiat!</>
-                  : <><Copy className="w-3.5 h-3.5" /> Copiază prompt</>}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={copyPrompt}
+                  className={`pm-btn pm-btn-sm ${copied ? "pm-btn-secondary" : "pm-btn-secondary"}`}
+                  data-testid="todo-prompt-copy"
+                >
+                  {copied
+                    ? <><CheckCircle2 className="w-3.5 h-3.5" /> Copiat!</>
+                    : <><Copy className="w-3.5 h-3.5" /> Copiază</>}
+                </button>
+                <button
+                  onClick={sendToEmergentChat}
+                  className="pm-btn pm-btn-primary pm-btn-sm"
+                  data-testid="todo-prompt-send-chat"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  {sentToChat ? "Trimis!" : "Trimite în chat"}
+                </button>
+              </div>
             </div>
           </>
         )}

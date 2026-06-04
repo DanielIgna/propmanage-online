@@ -3,7 +3,40 @@
 ## Original problem statement
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
+## 🔁 Agent Convention — Auto-Backfill ToDo Board (since Feb 6 2026)
+
+**REGULĂ STRICTĂ pentru orice agent care lucrează pe acest cod:**
+
+La FIECARE `finish` tool call, dacă există muncă neîncheiată / parțială / sugerată user-ului dar care NU s-a executat, agentul TREBUIE să injecteze acele item-uri ca TODO custom în Board.
+
+**Cum**: prin `POST /api/admin/todos/bulk` cu body `{items: [{text, priority, source, topic_title}]}`.
+
+**Tipuri de leftovers care trebuie injectate**:
+- Sugestii făcute user-ului (la sfârșit de finish) dar pe care nu le-a acceptat / amânate
+- Task-uri parțial implementate (ex: backend OK dar UI lipsă)
+- Bug-uri descoperite în testing dar fixate doar parțial
+- Tasks din `Future/Backlog` mentions care nu sunt deja în TOPICS docs
+- `Action Items` din test_reports cu `retest_needed=true`
+- Promises (ex: "voi face X la următoarea iterație") trecute fără să fie executate
+
+**Field-uri**:
+- `source`: identificator scurt ("leftover_phase81", "suggestion_not_picked", "bug_partial_fix", etc.)
+- `priority`: high/medium/low — folosește judecata: blocker pentru o feature live = high
+- `topic_title`: modulul afectat (folosește titlu real din TOPICS dacă există)
+
+**Anti-spam**: endpoint-ul de-duplichează după text (case-insensitive), deci poți chema sigur.
+
+Această regulă a fost cerută explicit de user pentru a evita "drift"-ul în care lucruri amânate dispar din vedere.
+
+---
+
 ## Recent additions (Feb 2026)
+- **Phase 81 — "Send to Emergent Chat" + Auto-Backfill ToDo Board** ✅ (Feb 6 2026)
+  - **Buton "Trimite în chat"** în PromptModal: copiază prompt + `postMessage` la `window.parent` cu `type=emergent.chat.inject` (best-effort pentru IDE embedding) + banner verde cu instrucțiuni Ctrl+V
+  - **Backend `POST /api/admin/todos/bulk`** pentru batch-creation cu de-duplicare după text
+  - **16 leftover items injectate automat** din ultimele 20h: Faza A4 (Auto-Tune), A5.1-A5.5 (Financial/Vendor/Predictive/Strategy/Auditor), Marketplace M1+M5, Trust Page, Twilio SMS, Design unification, briefing schedule custom, Slack webhook, CSV export, DNS Rackhost
+  - **Convenție agent permanentă** documentată în PRD (vezi secțiunea de sus): orice agent viitor TREBUIE să facă auto-backfill la finish
+
 - **Phase 80 — Per-Task Emergent Prompt Generator** ✅ (Feb 6 2026)
   - **Backend**: `POST /api/admin/todos/generate-prompt` cu Pydantic `GeneratePromptIn`, Claude Sonnet 4.5 generează prompt structurat (Obiectiv/Fișiere suspecte/Pași concreți/Criterii de validare/Risc), fallback determinist
   - **Anti-spam**: cooldown 5s per-admin (răspunde 429 dacă click prea des)

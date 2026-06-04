@@ -72,6 +72,59 @@ async def create_todo(payload: TodoIn, user=Depends(require_role("admin"))):
     return doc
 
 
+@router.post("/bulk")
+async def bulk_create(payload: dict = Body(...), user=Depends(require_role("admin"))):
+    """Bulk-create custom todos. Useful for leftover work backfill.
+
+    Body: {items: [{text, priority?, source?, topic_title?}]}
+    De-duplicates against existing todos with the same text.
+    """
+    items = payload.get("items") or []
+    if not isinstance(items, list):
+        raise HTTPException(400, "items must be a list")
+    if len(items) > 100:
+        raise HTTPException(400, "max 100 items per bulk call")
+
+    existing_texts = set()
+    async for d in db.admin_todos.find({}, {"text": 1, "_id": 0}):
+        existing_texts.add((d.get("text") or "").strip().lower())
+
+    created = []
+    skipped = []
+    for it in items:
+        text = str(it.get("text") or "").strip()
+        if len(text) < 2:
+            skipped.append({"text": text, "reason": "too_short"})
+            continue
+        if text.lower() in existing_texts:
+            skipped.append({"text": text, "reason": "duplicate"})
+            continue
+        priority = it.get("priority") or "medium"
+        if priority not in ALLOWED_PRIORITIES:
+            priority = "medium"
+        doc = {
+            "id": str(uuid.uuid4()),
+            "text": text,
+            "priority": priority,
+            "done": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_by": user["id"],
+            "source": str(it.get("source") or "manual_bulk"),
+            "topic_title": str(it.get("topic_title") or ""),
+        }
+        await db.admin_todos.insert_one(doc)
+        existing_texts.add(text.lower())
+        doc.pop("_id", None)
+        created.append(doc)
+
+    return {
+        "created_count": len(created),
+        "skipped_count": len(skipped),
+        "created": created,
+        "skipped": skipped,
+    }
+
+
 @router.put("/{todo_id}")
 async def update_todo(todo_id: str, payload: TodoPatch, user=Depends(require_role("admin"))):
     update = {}
