@@ -110,7 +110,7 @@ async def _score_technical() -> dict:
     total_smoke = await db.smoke_test_runs.count_documents({"started_at": {"$gte": since_7d.isoformat()}})
     passed_smoke = await db.smoke_test_runs.count_documents({
         "started_at": {"$gte": since_7d.isoformat()},
-        "overall_status": "pass",
+        "ok": True,
     })
     smoke_pass_pct = _pct(passed_smoke, total_smoke, fallback=70.0)
 
@@ -132,11 +132,15 @@ async def _score_technical() -> dict:
         except Exception:
             snap_freshness_pct = 50.0
 
-    # Signal 3: release gate pass rate (last 4 runs)
-    cursor = db.release_gates.find({}, {"overall_status": 1}).sort("started_at", -1).limit(4)
+    # Signal 3: release gate pass rate (last 4 runs) — "pass" = not blocked + no P0 failures
+    cursor = db.release_gates.find({}, {"summary": 1}).sort("started_at", -1).limit(4)
     gates = [g async for g in cursor]
     if gates:
-        gate_pass = sum(1 for g in gates if g.get("overall_status") == "pass")
+        gate_pass = sum(
+            1 for g in gates
+            if not (g.get("summary") or {}).get("blocked", True)
+            and ((g.get("summary") or {}).get("p0_fail", 1)) == 0
+        )
         gate_pass_pct = _pct(gate_pass, len(gates))
     else:
         gate_pass_pct = 60.0  # neutral when no data
@@ -216,11 +220,15 @@ async def _score_dev() -> dict:
     """Dev autonomy = automated quality gates + AI dev team findings."""
     since_30d = datetime.now(timezone.utc) - timedelta(days=30)
 
-    # Signal 1: release gates passed (30 days)
-    cursor = db.release_gates.find({"started_at": {"$gte": since_30d.isoformat()}}, {"overall_status": 1})
+    # Signal 1: release gates passed (30 days) — "pass" = not blocked + no P0 failures
+    cursor = db.release_gates.find({"started_at": {"$gte": since_30d.isoformat()}}, {"summary": 1})
     gates = [g async for g in cursor]
     if gates:
-        gate_pass = sum(1 for g in gates if g.get("overall_status") == "pass")
+        gate_pass = sum(
+            1 for g in gates
+            if not (g.get("summary") or {}).get("blocked", True)
+            and ((g.get("summary") or {}).get("p0_fail", 1)) == 0
+        )
         gate_pct = _pct(gate_pass, len(gates))
     else:
         gate_pct = 50.0  # neutral default when nothing ran yet
@@ -239,7 +247,7 @@ async def _score_dev() -> dict:
     since_7d = datetime.now(timezone.utc) - timedelta(days=7)
     fail_runs = await db.smoke_test_runs.count_documents({
         "started_at": {"$gte": since_7d.isoformat()},
-        "overall_status": {"$ne": "pass"},
+        "ok": False,
     })
     stability_score = _clamp(100.0 - (fail_runs * 3.0))
 
