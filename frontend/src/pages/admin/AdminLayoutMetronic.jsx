@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, ShieldCheck, Scale, Wallet, FolderKanban,
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
   LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, Sparkles, Bot, Zap, Inbox,
-  UserCheck, Home, Wrench, Briefcase, Code2, Shield
+  UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { API } from "../DashShared";
@@ -74,6 +74,12 @@ const NAV_SECTIONS = [
     items: [
       { id: "gdpr", label: "GDPR Pack", icon: ShieldCheck, badge: "NEW" },
       { id: "impersonation", label: "Impersonări", icon: ShieldCheck, badge: "NEW" },
+    ],
+  },
+  {
+    title: "STRATEGIE & R&D",
+    items: [
+      { id: "future_ideas", label: "Idei Dezvoltare Viitoare", icon: Lightbulb, badge: "REVIEW", href: "/admin/future-ideas" },
     ],
   },
   {

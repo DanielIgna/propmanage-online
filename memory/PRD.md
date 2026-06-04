@@ -28,6 +28,18 @@ La FIECARE `finish` tool call, dacă există muncă neîncheiată / parțială /
 
 Această regulă a fost cerută explicit de user pentru a evita "drift"-ul în care lucruri amânate dispar din vedere.
 
+## 💡 Strategic R&D — Future Ideas Vault (since Feb 6 2026)
+
+A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts strategic proposals that need explicit business validation BEFORE any implementation. **This catalog is intentionally NOT synced with the ToDo Board** — moving a proposal to "Approved" here triggers no automatic dev work. Founder must explicitly schedule phases in the ToDo Board when ready.
+
+**First proposal stored**: Experience Spaces V2 (Business Operating System) — full technical breakdown across 8 tabs (Overview, Phases, Backend Spec, Frontend Spec, DB Schema, Risks, AI Touchpoints, Cost vs Revenue). Status defaults to `pending_validation`.
+
+**Backend**: `routes/future_ideas.py` — GET/PUT `/api/admin/future-ideas[/{id}]` — persists only status + notes + cost/revenue estimates per idea (content is static in `/app/frontend/src/data/futureIdeas.js`).
+
+**Convention**: Any future strategic proposal goes here first. The ToDo Board is for execution, this vault is for evaluation.
+
+
+
 ---
 
 ## Recent additions (Feb 2026)
