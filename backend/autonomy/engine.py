@@ -284,15 +284,31 @@ async def _score_ai() -> dict:
     else:
         closure_pct = 50.0  # neutral
 
-    # Memoize collection list once
-    coll_names = set(await db.list_collection_names())
+    # Memoize collection list once (defensive: list_collection_names can be
+    # restricted on some Atlas serverless tiers — degrade gracefully)
+    coll_names: set
+    try:
+        coll_names = set(await db.list_collection_names())
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"list_collection_names unavailable, falling back: {e}")
+        coll_names = {"ai_memories", "ai_documents"}  # assume present; counts will be 0 if not
 
     # Signal 2: AI memories accumulated (proxy for learning) — > 50 = mature
-    memories = await db.ai_memories.count_documents({}) if "ai_memories" in coll_names else 0
+    memories = 0
+    if "ai_memories" in coll_names:
+        try:
+            memories = await db.ai_memories.count_documents({})
+        except Exception:
+            memories = 0
     maturity_pct = _clamp((memories / 200.0) * 100.0)
 
     # Signal 3: docs RAG ingest count (proxy for knowledge base) — > 10 docs = good
-    docs_count = await db.ai_documents.count_documents({}) if "ai_documents" in coll_names else 0
+    docs_count = 0
+    if "ai_documents" in coll_names:
+        try:
+            docs_count = await db.ai_documents.count_documents({})
+        except Exception:
+            docs_count = 0
     knowledge_pct = _clamp((docs_count / 20.0) * 100.0)
 
     score = closure_pct * 0.50 + maturity_pct * 0.25 + knowledge_pct * 0.25
