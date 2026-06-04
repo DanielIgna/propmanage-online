@@ -123,7 +123,15 @@ class OperatorResolveIn(BaseModel):
 @router.post("/generate")
 async def generate(payload: GenerateIn, user: dict = Depends(get_current_user)):
     """Generate a contract from a request. Client OR specialist OR admin can trigger."""
-    req = await db.requests.find_one({"id": payload.request_id})
+    from bson import ObjectId
+    # Dual lookup: try ObjectId (Mongo _id) first, fall back to string id field.
+    req = None
+    try:
+        req = await db.requests.find_one({"_id": ObjectId(payload.request_id)})
+    except Exception:
+        pass
+    if not req:
+        req = await db.requests.find_one({"id": payload.request_id})
     if not req:
         raise HTTPException(404, "Solicitarea nu a fost găsită")
 
@@ -177,9 +185,12 @@ async def generate(payload: GenerateIn, user: dict = Depends(get_current_user)):
     ctx["contract_id"] = contract_id
     body_html = _render(template, ctx)
 
+    # Normalize request_id to string for stable lookups via /by-request/{request_id}
+    request_id_str = str(req.get("_id") or req.get("id") or payload.request_id)
+
     doc = {
         "id": contract_id,
-        "request_id": payload.request_id,
+        "request_id": request_id_str,
         "client_id": str(req.get("client_id")) if req.get("client_id") else None,
         "client_email": ctx["client_email"],
         "specialist_id": str(req.get("specialist_id")) if req.get("specialist_id") else None,
@@ -268,7 +279,14 @@ async def operator_resolve(cid: str, payload: OperatorResolveIn, user: dict = De
 
 @router.get("/by-request/{request_id}")
 async def by_request(request_id: str, user: dict = Depends(get_current_user)):
+    # Try direct match first; if not found and request_id is a uuid form, also try ObjectId
     c = await db.service_contracts.find_one({"request_id": request_id})
+    if not c:
+        from bson import ObjectId
+        try:
+            c = await db.service_contracts.find_one({"request_id": str(ObjectId(request_id))})
+        except Exception:
+            pass
     if not c:
         return {"contract": None}
     uid = str(user.get("id"))
