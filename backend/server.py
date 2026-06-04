@@ -24,7 +24,7 @@ from routes.requests import router as requests_router
 from routes.operator import router as operator_nonconformity_router
 from routes.operator_twins import router as operator_twins_router
 from routes.wallet import router as wallet_router
-from routes.admin import router as admin_router
+from routes.admin import router as admin_router, run_auto_match_cron_tick
 from routes.specialist_docs import router as specialist_docs_router
 from routes.disputes import router as disputes_router
 from routes.design import router as design_router
@@ -198,6 +198,15 @@ async def startup():
             id="autonomy_snapshot_daily",
             replace_existing=True,
             misfire_grace_time=3600,
+        )
+        # Auto-match cron tick — runs hourly, executes only when due
+        # per `auto_match_schedule` config (enabled + interval_hours).
+        scheduler.add_job(
+            run_auto_match_cron_tick,
+            CronTrigger(minute=23, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="auto_match_cron_tick",
+            replace_existing=True,
+            misfire_grace_time=600,
         )
         scheduler.add_job(
             auto_release_warranty_holds,

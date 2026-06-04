@@ -560,12 +560,28 @@ async def auto_match_run(
         "dry_run": false        # if true, returns plan without writing
       }
     """
-    from routes.matching import find_matching_specialists
-
     limit = int(payload.get("limit") or 50)
     min_rating = float(payload.get("min_rating") or 0.0)
     dry_run = bool(payload.get("dry_run") or False)
+    return await execute_auto_match(
+        limit=limit, min_rating=min_rating, dry_run=dry_run,
+        triggered_by={"id": user["id"], "kind": "admin_manual", "label": user.get("email")},
+    )
 
+
+async def execute_auto_match(
+    limit: int = 50,
+    min_rating: float = 0.0,
+    dry_run: bool = False,
+    triggered_by: Optional[dict] = None,
+) -> dict:
+    """Core auto-match logic — usable from HTTP handler or scheduler.
+
+    triggered_by: {"id": "...", "kind": "admin_manual"|"cron", "label": "..."}
+    """
+    from routes.matching import find_matching_specialists
+
+    triggered_by = triggered_by or {"id": "system", "kind": "cron", "label": "cron"}
     cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
     cursor = db.requests.find({
         "status": "open",
@@ -621,31 +637,32 @@ async def auto_match_run(
                 "specialist_city": spec.get("city") or spec.get("location") or "",
                 "specialist_verified": bool(spec.get("verified")),
                 "assigned_at": datetime.now(timezone.utc).isoformat(),
-                "auto_assigned_by_admin": user["id"],
+                "auto_assigned_by_admin": triggered_by.get("id"),
                 "auto_assigned_at": datetime.now(timezone.utc).isoformat(),
+                "auto_assigned_via": triggered_by.get("kind"),
             }
             await db.requests.update_one({"_id": req["_id"]}, {"$set": update})
 
-            # Notifications (best-effort, never block bulk on a single failure)
             try:
                 await notify(
                     req["client_id"],
                     f"Specialist alocat automat: {spec.get('name')}",
-                    f"Admin a alocat un specialist potrivit pentru '{req.get('title','')}'. Verifică detaliile.",
+                    f"{'Cron' if triggered_by.get('kind') == 'cron' else 'Admin'} a alocat un specialist potrivit pentru '{req.get('title','')}'. Verifică detaliile.",
                     type_="assignment", link="/client",
                 )
                 await notify(
                     best["id"],
-                    "Cerere alocată de admin",
-                    f"Ai primit o cerere de la admin: {req.get('title','')}. Lead fee gratuit (admin-driven).",
+                    "Cerere alocată automat",
+                    f"Ai primit o cerere via auto-match: {req.get('title','')}. Lead fee gratuit (admin-driven).",
                     type_="assignment", link="/specialist",
                 )
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"[auto-match] notify failed for {req['_id']}: {e}")
 
+            actor = {"id": triggered_by.get("id"), "name": triggered_by.get("label") or triggered_by.get("kind")}
             try:
-                await log_event(str(req["_id"]), "request.auto_assigned", actor=user,
-                                payload={"specialist_id": best["id"], "via": "admin_bulk"})
+                await log_event(str(req["_id"]), "request.auto_assigned", actor=actor,
+                                payload={"specialist_id": best["id"], "via": triggered_by.get("kind")})
             except Exception:
                 pass
 
@@ -661,12 +678,129 @@ async def auto_match_run(
                 "reason": f"error: {str(e)[:120]}",
             })
 
-    return {
+    result = {
         "ok": True,
         "dry_run": dry_run,
         "assigned_count": len(assigned),
         "skipped_count": len(skipped),
         "assigned": assigned,
         "skipped": skipped,
+        "triggered_by": triggered_by,
+        "executed_at": datetime.now(timezone.utc).isoformat(),
     }
+
+    # Persist run history (skip dry-runs to avoid noise)
+    if not dry_run:
+        try:
+            await db.auto_match_runs.insert_one({
+                "executed_at": result["executed_at"],
+                "triggered_by": triggered_by,
+                "assigned_count": result["assigned_count"],
+                "skipped_count": result["skipped_count"],
+                "limit": limit,
+                "min_rating": min_rating,
+            })
+            # Keep only last 200 runs
+            cur = db.auto_match_runs.find({}, {"_id": 1}).sort("executed_at", -1).skip(200)
+            old_ids = [d["_id"] async for d in cur]
+            if old_ids:
+                await db.auto_match_runs.delete_many({"_id": {"$in": old_ids}})
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[auto-match] failed to persist run history: {e}")
+
+    return result
+
+
+# ============================================================================
+# AUTO-MATCH SCHEDULE (config + cron tick)
+# ============================================================================
+DEFAULT_AUTO_MATCH_SCHEDULE = {
+    "enabled": False,
+    "interval_hours": 6,
+    "min_rating": 0.0,
+    "limit": 100,
+}
+
+
+async def _load_auto_match_schedule() -> dict:
+    doc = await db.auto_match_schedule.find_one({"_id": "config"})
+    if not doc:
+        return DEFAULT_AUTO_MATCH_SCHEDULE.copy()
+    return {
+        "enabled": bool(doc.get("enabled", False)),
+        "interval_hours": int(doc.get("interval_hours") or 6),
+        "min_rating": float(doc.get("min_rating") or 0.0),
+        "limit": int(doc.get("limit") or 100),
+    }
+
+
+@router.get("/admin/auto-match/schedule")
+async def get_auto_match_schedule(user: dict = Depends(require_role("admin"))):
+    cfg = await _load_auto_match_schedule()
+    last_run = await db.auto_match_runs.find_one({}, sort=[("executed_at", -1)])
+    last_cron = await db.auto_match_runs.find_one({"triggered_by.kind": "cron"}, sort=[("executed_at", -1)])
+    if last_run:
+        last_run.pop("_id", None)
+    if last_cron:
+        last_cron.pop("_id", None)
+    return {
+        "schedule": cfg,
+        "last_run": last_run,
+        "last_cron_run": last_cron,
+    }
+
+
+@router.put("/admin/auto-match/schedule")
+async def update_auto_match_schedule(
+    payload: dict = Body(...),
+    user: dict = Depends(require_role("admin")),
+):
+    cfg = await _load_auto_match_schedule()
+    if "enabled" in payload:
+        cfg["enabled"] = bool(payload["enabled"])
+    if "interval_hours" in payload:
+        h = int(payload["interval_hours"])
+        if h < 1 or h > 24:
+            raise HTTPException(400, "interval_hours must be between 1 and 24")
+        cfg["interval_hours"] = h
+    if "min_rating" in payload:
+        cfg["min_rating"] = float(payload["min_rating"])
+    if "limit" in payload:
+        cfg["limit"] = int(payload["limit"])
+    cfg["updated_at"] = datetime.now(timezone.utc).isoformat()
+    cfg["updated_by"] = user["id"]
+    await db.auto_match_schedule.update_one({"_id": "config"}, {"$set": cfg}, upsert=True)
+    return await _load_auto_match_schedule()
+
+
+async def run_auto_match_cron_tick() -> dict:
+    """APScheduler callback — runs every hour, executes auto-match only when due.
+
+    Reads `auto_match_schedule.enabled` and `interval_hours` from MongoDB and
+    skips if disabled or if the last cron run was within interval_hours.
+    """
+    try:
+        cfg = await _load_auto_match_schedule()
+        if not cfg["enabled"]:
+            return {"skipped": "disabled"}
+        last = await db.auto_match_runs.find_one(
+            {"triggered_by.kind": "cron"}, sort=[("executed_at", -1)],
+        )
+        now = datetime.now(timezone.utc)
+        if last and last.get("executed_at"):
+            try:
+                last_ts = datetime.fromisoformat(last["executed_at"].replace("Z", "+00:00"))
+                if (now - last_ts) < timedelta(hours=cfg["interval_hours"]):
+                    return {"skipped": "not_due", "next_due_in_sec": int((timedelta(hours=cfg["interval_hours"]) - (now - last_ts)).total_seconds())}
+            except Exception:
+                pass
+        result = await execute_auto_match(
+            limit=cfg["limit"], min_rating=cfg["min_rating"], dry_run=False,
+            triggered_by={"id": "system", "kind": "cron", "label": f"cron@{cfg['interval_hours']}h"},
+        )
+        logger.info(f"[auto-match-cron] assigned={result['assigned_count']} skipped={result['skipped_count']}")
+        return result
+    except Exception as e:  # noqa: BLE001
+        logger.exception(f"[auto-match-cron] failed: {e}")
+        return {"error": str(e)}
 
