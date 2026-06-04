@@ -35,6 +35,17 @@ class TodoPatch(BaseModel):
     done: Optional[bool] = None
 
 
+class GeneratePromptIn(BaseModel):
+    text: str = Field(min_length=3, max_length=500)
+    topic_title: Optional[str] = Field(default="", max_length=200)
+    priority: Optional[str] = Field(default="medium")
+
+
+# Simple in-memory cooldown (per-admin user_id, 5s window)
+_GENERATE_PROMPT_LAST_CALL: dict = {}
+_GENERATE_PROMPT_COOLDOWN_SEC = 5.0
+
+
 @router.get("")
 async def list_todos(user=Depends(require_role("admin"))):
     cursor = db.admin_todos.find({}, {"_id": 0}).sort([("done", 1), ("created_at", -1)]).limit(500)
@@ -122,23 +133,27 @@ async def toggle_doc_done(payload: dict = Body(...), user=Depends(require_role("
 
 
 @router.post("/generate-prompt")
-async def generate_emergent_prompt(payload: dict = Body(...), user=Depends(require_role("admin"))):
+async def generate_emergent_prompt(payload: GeneratePromptIn, user=Depends(require_role("admin"))):
     """Generate a structured Emergent agent prompt for a single TODO item.
 
-    Body: {
-      text: str (required) — the TODO text,
-      topic_title: str (optional) — parent module from documentation,
-      priority: str (optional) — "high"|"medium"|"low"
-    }
-    Returns: {prompt: str, model, provider}
+    5-second per-admin cooldown to avoid accidental token burn from repeated clicks.
     """
     from ai_core.provider import call_llm
+    import time
 
-    text = (payload.get("text") or "").strip()
+    text = payload.text.strip()
     if len(text) < 3:
         raise HTTPException(400, "text too short")
-    topic = (payload.get("topic_title") or "").strip()
-    priority = (payload.get("priority") or "medium").strip()
+    topic = (payload.topic_title or "").strip()
+    priority = (payload.priority or "medium").strip()
+
+    # Per-admin cooldown
+    now = time.monotonic()
+    last = _GENERATE_PROMPT_LAST_CALL.get(user["id"], 0)
+    if now - last < _GENERATE_PROMPT_COOLDOWN_SEC:
+        wait = round(_GENERATE_PROMPT_COOLDOWN_SEC - (now - last), 1)
+        raise HTTPException(429, f"Așteaptă {wait}s între generări (anti-spam).")
+    _GENERATE_PROMPT_LAST_CALL[user["id"]] = now
 
     system = (
         "You are a senior engineering manager at PropManage (FastAPI + React + MongoDB stack). "

@@ -101,14 +101,7 @@ const PromptModal = ({ todo, prompt, loading, error, onClose }) => {
   const copyPrompt = async () => {
     try {
       await navigator.clipboard.writeText(prompt);
-    } catch (_) {
-      const ta = document.createElement("textarea");
-      ta.value = prompt;
-      document.body.appendChild(ta);
-      ta.select();
-      try { document.execCommand("copy"); } catch (__) { /* swallow */ }
-      document.body.removeChild(ta);
-    }
+    } catch (_) { /* clipboard API missing or blocked — silently ignore */ }
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };

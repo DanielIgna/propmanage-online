@@ -4,6 +4,14 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 ## Recent additions (Feb 2026)
+- **Phase 80 — Per-Task Emergent Prompt Generator** ✅ (Feb 6 2026)
+  - **Backend**: `POST /api/admin/todos/generate-prompt` cu Pydantic `GeneratePromptIn`, Claude Sonnet 4.5 generează prompt structurat (Obiectiv/Fișiere suspecte/Pași concreți/Criterii de validare/Risc), fallback determinist
+  - **Anti-spam**: cooldown 5s per-admin (răspunde 429 dacă click prea des)
+  - **Frontend**: wand icon (🪄) pe fiecare TODO undone, click → modal cu spinner → prompt în font mono + buton "Copiază prompt"
+  - **Done todos** nu mai au butonul (UX: nu generezi prompt pentru ce e gata)
+  - **Workflow închis**: vezi TODO → 1 click → ai prompt → mi-l dai → execut
+  - Testing iter 60: 14/14 backend pytest + frontend 100%
+
 - **Phase 79 — AI Assistant Context-Aware + ToDo Board** ✅ (Feb 6 2026)
   - **AI Assistant inline_context**: extins `POST /api/ai-docs/ask` cu params `inline_context` (max 40000 chars) + `inline_context_label`. Când e prezent, bypassează RAG complet și răspunde STRICT din manualul injectat (cu mențiunea "Nu am găsit în manual" dacă lipsește). System prompt în română, concise (max 6 propoziții).
   - **Frontend integration**: `AdminDocumentation.askAssistant` trimite acum tot manualul (titlu + status + content per topic) ca inline_context — răspunsurile devin precise platformei, nu generice.
