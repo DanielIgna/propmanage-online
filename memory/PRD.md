@@ -4,6 +4,14 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 ## Recent additions (Feb 2026)
+- **Phase 76 — Auto-Match Schedule (Autonomous Mode)** ✅ (Feb 6 2026)
+  - **APScheduler cron** la `:23` în fiecare oră (`auto_match_cron_tick`) → execută `execute_auto_match` doar când e `enabled=true` ȘI a trecut `interval_hours` de la ultima rulare
+  - **Config endpoints**: `GET/PUT /api/admin/auto-match/schedule` cu validare 1≤interval≤24, persistat în `auto_match_schedule._id=config`
+  - **Run history** `auto_match_runs` (capped 200) cu `triggered_by.kind = cron | admin_manual`
+  - **UI panel** Mod autonom în AutoMatchPanel: status badge (Activ/Dezactivat), selector interval (1h/3h/6h/12h/zilnic), buton toggle Activează/Dezactivează, afișare "Ultima rulare cron"
+  - **Refactor**: extras `execute_auto_match()` ca helper partajat între `/run` și cron tick (DRY)
+  - Testing iter 56: 14/14 backend + frontend complete
+
 - **Phase 75 — Admin Bulk Auto-Match** ✅ (Feb 6 2026)
   - **Backend** `/api/admin/auto-match/preview` + `/run` (admin-only, bypasses 45 RON lead fee, folosește `find_matching_specialists` din matching.py)
   - **Frontend** AutoMatchPanel pe `/admin` (Overview) — KPI 3-tile (neatribuite/cu match/fără match) + buton Simulează (dry_run) + Asignează (cu confirmare)
