@@ -4,6 +4,14 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 ## Recent additions (Feb 2026)
+- **Phase 77 — AI Activity Stream (Operations Center)** ✅ (Feb 6 2026)
+  - **Backend** `GET /api/admin/ai-activity?hours&limit` (admin-only, READ-ONLY)
+  - Agregă evenimente din **7 colecții**: `autonomy_snapshots`, `auto_match_runs`, `admin_ai_findings` (detected+resolved), `admin_ai_scans`, `smoke_test_runs`, `app_settings_snapshots`, `security_ai_runs`
+  - Output normalizat cu kind/ts/title/summary/severity/icon/meta/source · severitate (info/success/warning/critical) mapată inteligent per sursă
+  - **Robust**: dacă un collector crapă, restul continuă (warning log, nu 500)
+  - **Frontend widget** `AIActivityStream` pe `/admin` (Overview) — timeline cu connector vertical, 4 contoare severitate, filtre per kind (pills), auto-refresh la 60s cu reset pe manual refresh, relative timestamps ("acum 3h"), max height 500px scrollable
+  - Testing iter 57: 20/20 backend + frontend complete
+
 - **Phase 76 — Auto-Match Schedule (Autonomous Mode)** ✅ (Feb 6 2026)
   - **APScheduler cron** la `:23` în fiecare oră (`auto_match_cron_tick`) → execută `execute_auto_match` doar când e `enabled=true` ȘI a trecut `interval_hours` de la ultima rulare
   - **Config endpoints**: `GET/PUT /api/admin/auto-match/schedule` cu validare 1≤interval≤24, persistat în `auto_match_schedule._id=config`

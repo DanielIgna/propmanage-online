@@ -110,6 +110,12 @@ export const AIActivityStream = () => {
       const { data } = await ax.get("/api/admin/ai-activity", { params: { hours: 168, limit: 60 } });
       setData(data);
       setLastRefresh(new Date());
+      // Reset auto-refresh timer on any successful load so manual refresh
+      // doesn't cause a near-immediate auto-refresh after.
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = setInterval(() => load(true), 60000);
+      }
     } catch (e) {
       setError(e?.response?.data?.detail || "Eroare la încărcare");
     } finally {
@@ -145,10 +151,10 @@ export const AIActivityStream = () => {
               Timeline unificat al acțiunilor autonome: snapshot-uri, auto-match, scan-uri AI, findings detectate, smoke tests. Ultimele 7 zile.
             </p>
             <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> {sev.info || 0} info</span>
-              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {sev.success || 0} success</span>
-              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> {sev.warning || 0} warn</span>
-              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500" /> {sev.critical || 0} critic</span>
+              <span className="flex items-center gap-1" data-testid="ai-activity-sev-info"><span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> {sev.info || 0} info</span>
+              <span className="flex items-center gap-1" data-testid="ai-activity-sev-success"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {sev.success || 0} success</span>
+              <span className="flex items-center gap-1" data-testid="ai-activity-sev-warning"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> {sev.warning || 0} warn</span>
+              <span className="flex items-center gap-1" data-testid="ai-activity-sev-critical"><span className="w-1.5 h-1.5 rounded-full bg-red-500" /> {sev.critical || 0} critic</span>
             </div>
           </div>
         </div>
