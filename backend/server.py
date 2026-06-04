@@ -352,6 +352,7 @@ async def startup():
         logger.info("Morning Briefing digest scheduler started (daily 09:00 Europe/Bucharest).")
         logger.info("Daily MongoDB backup scheduler started (03:30 Europe/Bucharest, emails admin).")
         logger.info("Weekly Dev Velocity scheduler started (Mondays 09:30 Europe/Bucharest).")
+        logger.info("Autonomy snapshot scheduler started (daily 03:15 Europe/Bucharest).")
 
 
 @app.on_event("shutdown")

@@ -276,14 +276,15 @@ async def _score_ai() -> dict:
     else:
         closure_pct = 50.0  # neutral
 
+    # Memoize collection list once
+    coll_names = set(await db.list_collection_names())
+
     # Signal 2: AI memories accumulated (proxy for learning) — > 50 = mature
-    memories = await db.ai_memories.count_documents({}) if "ai_memories" in await db.list_collection_names() else 0
+    memories = await db.ai_memories.count_documents({}) if "ai_memories" in coll_names else 0
     maturity_pct = _clamp((memories / 200.0) * 100.0)
 
     # Signal 3: docs RAG ingest count (proxy for knowledge base) — > 10 docs = good
-    docs_count = 0
-    if "ai_documents" in await db.list_collection_names():
-        docs_count = await db.ai_documents.count_documents({})
+    docs_count = await db.ai_documents.count_documents({}) if "ai_documents" in coll_names else 0
     knowledge_pct = _clamp((docs_count / 20.0) * 100.0)
 
     score = closure_pct * 0.50 + maturity_pct * 0.25 + knowledge_pct * 0.25

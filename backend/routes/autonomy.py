@@ -86,6 +86,10 @@ async def update_targets(
     weights = payload.get("weights")
     targets = payload.get("targets")
     if weights:
+        expected = set(DEFAULT_WEIGHTS.keys())
+        provided = set(weights.keys())
+        if provided != expected:
+            raise HTTPException(400, f"Weights must include exactly these keys: {sorted(expected)}")
         # Normalize: weights must sum to ~1.0
         total = sum(weights.values())
         if total <= 0:

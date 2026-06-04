@@ -4,6 +4,32 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 ## Recent additions (Feb 2026)
+- **Phase 74 — AI Autonomy Engine (A1+A2)** ✅ (Feb 6 2026)
+  - **Roadmap docs** create înainte de implementare (la cererea user-ului):
+    - `/app/docs/autonomy_engine_roadmap.md` — 5 faze (A1 compute, A2 frontend, A3 snapshot job, A4 auto-tune READ-ONLY, A5 specialized agents)
+    - `/app/docs/marketplace_ecosystem_roadmap.md` — 8 faze (M0 pre-req, M1 registry, M2 install flow, M3 sandbox via webhook, M4 dev portal/SDK, M5 Stripe Connect, M6 App Store Intern, M7 review, M8 ratings)
+    - Reconfirmat MongoDB-only (no Postgres/Qdrant) cu user-ul
+  - **Backend module nou izolat**: `/app/backend/autonomy/engine.py`
+    - 5 sub-scoruri deterministice (no LLM): operational, technical, security, dev, ai
+    - General autonomy = weighted average; ponderi configurabile via `autonomy_targets`
+    - 4 tier-uri: manual (<50) / assisted (50-75) / autonomous (75-90) / self-driving (>=90)
+    - Recomandări prioritizate cu impact estimat în puncte
+  - **Backend rute**: `/app/backend/routes/autonomy.py`
+    - `GET /api/admin/autonomy/score` (cached 5 min)
+    - `GET /api/admin/autonomy/history?days=30`
+    - `POST /api/admin/autonomy/snapshot` (force)
+    - `GET/PUT /api/admin/autonomy/targets` cu validare strictă a celor 5 chei + normalizare weights la 1.0
+  - **Frontend**: `/app/frontend/src/pages/admin/AutonomyEnginePage.jsx` la `/admin/autonomy`
+    - Inel scor 0-100 cu țintă overlay (dashed), tier badge animat
+    - 5 carduri sub-scor cu progress bars + gap-to-target
+    - Drill-down modal pe click cu signal-uri + date brute
+    - Sparkline 30 zile (din `autonomy_snapshots`)
+    - Lista recomandări prioritizate cu prioritate critic/ridicat/mediu/scăzut
+  - **Scheduler nou**: APScheduler job `autonomy_snapshot_daily` la 03:15 Europe/Bucharest
+  - **Sidebar**: Entry "Autonomy Engine" sub AI section în AdminLayoutMetronic
+  - **Mongo collections noi**: `autonomy_snapshots`, `autonomy_targets`
+  - Testing iter 54: 100% pass (11/11 backend + frontend complete, fără regresii pe AI Control / Healthcheck)
+
 - **Phase 73 — Admin Manual 2.0 + Snapshots Rollback + Service Contracts** ✅ (Feb 4 2026)
   - **Admin Documentation rescriere completă** at `/admin/documentation` — 14 module documentate (vs 9 anterior):
     - 🆕 **Ghid Buton-cu-Buton**: 20 butoane principale (Settings, AI Control, QA Copilot, AI Dev Team, AI Security, Verified Estate, Client/Specialist/Operator Dashboards, GDPR) explicate în limbaj simplu — rol + când folosești + când actualizezi.
