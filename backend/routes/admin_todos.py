@@ -78,7 +78,7 @@ async def update_todo(todo_id: str, payload: TodoPatch, user=Depends(require_rol
         if payload.done:
             update["done_at"] = datetime.now(timezone.utc).isoformat()
         # On un-toggle, clear done_at instead of setting it to None
-    if not update and not (payload.done is False):
+    if not update and payload.done is not False:
         raise HTTPException(400, "Nothing to update")
     update["updated_at"] = datetime.now(timezone.utc).isoformat()
     mongo_op = {"$set": update}
@@ -119,3 +119,56 @@ async def toggle_doc_done(payload: dict = Body(...), user=Depends(require_role("
     )
     state = await db.admin_todo_state.find_one({"_id": "config"}) or {}
     return {"doc_done_ids": list(state.get("doc_done_ids") or [])}
+
+
+@router.post("/generate-prompt")
+async def generate_emergent_prompt(payload: dict = Body(...), user=Depends(require_role("admin"))):
+    """Generate a structured Emergent agent prompt for a single TODO item.
+
+    Body: {
+      text: str (required) — the TODO text,
+      topic_title: str (optional) — parent module from documentation,
+      priority: str (optional) — "high"|"medium"|"low"
+    }
+    Returns: {prompt: str, model, provider}
+    """
+    from ai_core.provider import call_llm
+
+    text = (payload.get("text") or "").strip()
+    if len(text) < 3:
+        raise HTTPException(400, "text too short")
+    topic = (payload.get("topic_title") or "").strip()
+    priority = (payload.get("priority") or "medium").strip()
+
+    system = (
+        "You are a senior engineering manager at PropManage (FastAPI + React + MongoDB stack). "
+        "Given a TODO item from the admin documentation, generate a CONCISE structured prompt "
+        "(in Romanian) that the user can paste directly into the Emergent coding agent to implement it. "
+        "Output exactly these markdown sections in order:\n"
+        "1. **Obiectiv** — 1 propoziție clară\n"
+        "2. **Fișiere suspecte** — 3-6 path-uri concrete din /app/backend sau /app/frontend (folosește bun simț tehnic; "
+        "pentru ToDo/auto-match menționează routes/admin.py, pages/admin/AdminTodoBoard.jsx; "
+        "pentru autonomy menționează backend/autonomy/, frontend AutonomyEnginePage.jsx; etc.)\n"
+        "3. **Pași concreți** — 3-5 pași numerotați, fiecare implementabil\n"
+        "4. **Criterii de validare** — 2-3 condiții clare cum testează agentul că merge\n"
+        "5. **Risc** — o singură propoziție: ce poate sparge\n\n"
+        "Reguli: maxim 400 cuvinte total · NU adăuga preambul · NU pune cod · folosește doar verbe acționabile."
+    )
+    user_msg = (
+        f"## Modul: {topic or 'Necunoscut'}\n"
+        f"## Prioritate: {priority}\n"
+        f"## TODO\n{text}"
+    )
+    res = await call_llm(system, user_msg, session_id=f"todo-prompt-{uuid.uuid4().hex[:6]}")
+    prompt = res.get("text") or ""
+    if not prompt:
+        # Fallback determinist
+        prompt = (
+            f"## Obiectiv\nImplementează: {text}\n\n"
+            f"## Fișiere suspecte\n- (verifică manual pe baza modulului '{topic or 'necunoscut'}')\n\n"
+            f"## Pași concreți\n1. Identifică fișierele relevante\n2. Implementează modificarea minimă\n"
+            f"3. Adaugă data-testids dacă e UI\n4. Rulează testing_agent_v3_fork\n\n"
+            f"## Criterii de validare\n- Funcționează end-to-end\n- Niciun regression\n\n"
+            f"## Risc\nModificarea ar putea afecta module conexe — testează cu atenție."
+        )
+    return {"prompt": prompt, "model": res.get("model"), "provider": res.get("provider")}

@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import {
   ListChecks, Loader2, Plus, Trash2, CheckCircle2, Square,
-  Filter, BookOpen, X, Sparkles, AlertCircle,
+  Filter, BookOpen, X, Sparkles, AlertCircle, Wand2, Copy,
 } from "lucide-react";
 import { TOPICS } from "./AdminDocumentation";
 
@@ -19,7 +19,7 @@ const PRIORITY_OPTIONS = [
   { value: "low",    label: "Scăzut",  color: "border-stone-500/40 bg-stone-500/10 text-stone-300" },
 ];
 
-const TodoRow = ({ todo, onToggle, onDelete, onChangePriority }) => {
+const TodoRow = ({ todo, onToggle, onDelete, onChangePriority, onGeneratePrompt }) => {
   const prio = PRIORITY_OPTIONS.find(p => p.value === todo.priority) || PRIORITY_OPTIONS[1];
   return (
     <div
@@ -67,16 +67,109 @@ const TodoRow = ({ todo, onToggle, onDelete, onChangePriority }) => {
           )}
         </div>
       </div>
-      {onDelete && todo.kind === "manual" && (
-        <button
-          onClick={() => onDelete(todo)}
-          className="text-stone-500 hover:text-red-400 transition-colors p-1"
-          data-testid={`todo-delete-${todo.id}`}
-          aria-label="șterge"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      )}
+      <div className="flex items-center gap-1 shrink-0">
+        {!todo.done && (
+          <button
+            onClick={() => onGeneratePrompt(todo)}
+            className="text-stone-400 hover:text-[#d4ff3a] transition-colors p-1.5 rounded-lg hover:bg-white/5"
+            data-testid={`todo-prompt-${todo.id}`}
+            title="Generează prompt Emergent"
+            aria-label="generează prompt"
+          >
+            <Wand2 className="w-4 h-4" />
+          </button>
+        )}
+        {onDelete && todo.kind === "manual" && (
+          <button
+            onClick={() => onDelete(todo)}
+            className="text-stone-500 hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-white/5"
+            data-testid={`todo-delete-${todo.id}`}
+            aria-label="șterge"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const PromptModal = ({ todo, prompt, loading, error, onClose }) => {
+  const [copied, setCopied] = useState(false);
+  if (!todo) return null;
+
+  const copyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(prompt);
+    } catch (_) {
+      const ta = document.createElement("textarea");
+      ta.value = prompt;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch (__) { /* swallow */ }
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose} data-testid="todo-prompt-modal">
+      <div className="bg-[#0e0e10] border border-white/10 rounded-3xl p-6 max-w-3xl w-full max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-11 h-11 rounded-2xl bg-[#d4ff3a]/15 border border-[#d4ff3a]/30 flex items-center justify-center shrink-0">
+            <Wand2 className="w-5 h-5 text-[#d4ff3a]" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-serif text-xl">Prompt Emergent generat</h3>
+            <p className="text-xs text-stone-400 mt-1 truncate">
+              Pentru: <span className="text-stone-200">{todo.text}</span>
+            </p>
+            {todo.topic_title && (
+              <p className="text-[10px] uppercase tracking-wider text-stone-500 mt-0.5">
+                {todo.topic_title}
+              </p>
+            )}
+          </div>
+          <button onClick={onClose} className="text-stone-400 hover:text-white" data-testid="todo-prompt-modal-close">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {loading && (
+          <div className="flex items-center justify-center py-10 text-stone-400 gap-2">
+            <Loader2 className="w-5 h-5 animate-spin" /> Claude scrie prompt-ul...
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-sm text-red-300 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" /> {error}
+          </div>
+        )}
+
+        {prompt && !loading && (
+          <>
+            <div className="bg-black/40 border border-white/10 rounded-xl p-4 font-mono text-xs text-stone-200 whitespace-pre-wrap leading-relaxed" data-testid="todo-prompt-output">
+              {prompt}
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-4 flex-wrap">
+              <div className="text-[11px] text-stone-500">
+                💡 Copiază mai jos și lipește în chat cu Emergent ca să implementez automat.
+              </div>
+              <button
+                onClick={copyPrompt}
+                className={`pm-btn pm-btn-sm ${copied ? "pm-btn-secondary" : "pm-btn-primary"}`}
+                data-testid="todo-prompt-copy"
+              >
+                {copied
+                  ? <><CheckCircle2 className="w-3.5 h-3.5" /> Copiat!</>
+                  : <><Copy className="w-3.5 h-3.5" /> Copiază prompt</>}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };
@@ -92,6 +185,11 @@ export const AdminTodoBoard = () => {
   const [filterDone, setFilterDone] = useState("open"); // open | done | all
   const [filterTopic, setFilterTopic] = useState(null);
   const [error, setError] = useState(null);
+  // Prompt generation modal
+  const [promptTodo, setPromptTodo] = useState(null);
+  const [promptText, setPromptText] = useState("");
+  const [promptLoading, setPromptLoading] = useState(false);
+  const [promptError, setPromptError] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -217,6 +315,29 @@ export const AdminTodoBoard = () => {
     }
   };
 
+  const generatePromptForTodo = async (todo) => {
+    setPromptTodo(todo);
+    setPromptText("");
+    setPromptError(null);
+    setPromptLoading(true);
+    try {
+      const { data } = await ax.post("/api/admin/todos/generate-prompt", {
+        text: todo.text,
+        topic_title: todo.topic_title || "",
+        priority: todo.priority || "medium",
+      });
+      setPromptText(data.prompt || "");
+    } catch (e) {
+      setPromptError(e?.response?.data?.detail || "Nu am putut genera prompt. Încearcă din nou.");
+    } finally { setPromptLoading(false); }
+  };
+
+  const closePromptModal = () => {
+    setPromptTodo(null);
+    setPromptText("");
+    setPromptError(null);
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0a0b] text-white">
       <div className="max-w-5xl mx-auto px-6 pt-28 pb-16">
@@ -339,6 +460,7 @@ export const AdminTodoBoard = () => {
               onToggle={toggleTodo}
               onDelete={t.kind === "manual" ? deleteTodo : null}
               onChangePriority={t.kind === "manual" ? changePriority : null}
+              onGeneratePrompt={generatePromptForTodo}
             />
           ))}
         </div>
@@ -368,6 +490,14 @@ export const AdminTodoBoard = () => {
           </div>
         )}
       </div>
+
+      <PromptModal
+        todo={promptTodo}
+        prompt={promptText}
+        loading={promptLoading}
+        error={promptError}
+        onClose={closePromptModal}
+      />
     </div>
   );
 };
