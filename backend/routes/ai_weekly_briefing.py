@@ -15,6 +15,7 @@ Config (db.ai_weekly_briefing_config, singleton _id="config"):
 History: db.ai_weekly_briefing_history (capped 50)
 """
 import logging
+import re
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -33,6 +34,8 @@ from routes.ai_activity import (
 
 logger = logging.getLogger("propmanage.ai_weekly_briefing")
 router = APIRouter(prefix="/api/admin/ai-weekly-briefing", tags=["admin-ai-weekly-briefing"])
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 DEFAULT_CONFIG = {
     "enabled": False,
@@ -304,7 +307,7 @@ async def update_briefing_config(payload: dict = Body(...), user=Depends(require
         clean = []
         for r in recipients:
             r = str(r).strip()
-            if "@" in r and "." in r:
+            if EMAIL_RE.match(r):
                 clean.append(r)
         cfg["recipients"] = clean
     cfg["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -316,8 +319,8 @@ async def update_briefing_config(payload: dict = Body(...), user=Depends(require
 @router.post("/send-now")
 async def trigger_send(payload: dict = Body(default={}), user=Depends(require_role("admin"))):
     """Force-send the briefing now. Optional: override recipients in body."""
-    override = payload.get("recipients") or None
-    if override and not isinstance(override, list):
+    override = payload["recipients"] if "recipients" in payload else None
+    if override is not None and not isinstance(override, list):
         raise HTTPException(400, "recipients must be a list")
     return await send_weekly_briefing(force=True, override_recipients=override)
 

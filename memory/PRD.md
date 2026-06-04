@@ -4,6 +4,16 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 ## Recent additions (Feb 2026)
+- **Phase 78 — Weekly AI Briefing (Email Săptămânal)** ✅ (Feb 6 2026)
+  - **Backend**: `routes/ai_weekly_briefing.py` cu 4 endpoints (`GET/PUT /config`, `POST /send-now`, `GET /history`) + helper `send_weekly_briefing()` + scheduler job
+  - **APScheduler cron**: Luni 09:00 Europe/Bucharest (`weekly_ai_briefing`) — silent dacă `enabled=false` sau `recipients=[]`
+  - **Conținut**: Claude Sonnet 4.5 sintetizează 7 zile de activitate AI (auto-match, findings, autonomy delta) într-un email HTML structurat cu 4 KPI cards + text natural în română + delta vs săptămâna trecută. Fallback determinist dacă LLM crapă.
+  - **Email**: trimis via Resend (existing `email_service.send_email`)
+  - **History**: `ai_weekly_briefing_history` (capped 50) cu summary text + stats + recipients + ok/error
+  - **Frontend** `WeeklyBriefingControl` pe `/admin` (Overview, între AutoMatchPanel și AIActivityStream): toggle Activează/Dezactivează, listă destinatari cu × per email, input + Adaugă, buton "Trimite acum" (cu confirm), afișare ultima trimitere + preview text summary
+  - **Email validation**: regex strict `^[^@\s]+@[^@\s]+\.[^@\s]+$`
+  - Testing iter 58: 21/21 backend + frontend complete
+
 - **Phase 77 — AI Activity Stream (Operations Center)** ✅ (Feb 6 2026)
   - **Backend** `GET /api/admin/ai-activity?hours&limit` (admin-only, READ-ONLY)
   - Agregă evenimente din **7 colecții**: `autonomy_snapshots`, `auto_match_runs`, `admin_ai_findings` (detected+resolved), `admin_ai_scans`, `smoke_test_runs`, `app_settings_snapshots`, `security_ai_runs`
