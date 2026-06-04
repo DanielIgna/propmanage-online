@@ -8,6 +8,7 @@ import { IncidentCadenceHeatmap } from "./IncidentCadenceHeatmap";
 import { MorningBriefing } from "./MorningBriefing";
 import { AutoMatchPanel } from "./AutoMatchPanel";
 import { AIActivityStream } from "./AIActivityStream";
+import { WeeklyBriefingControl } from "./WeeklyBriefingControl";
 
 const KpiCard = ({ icon: Icon, label, value, sub, tone = "blue", testid }) => {
   const tones = {
@@ -48,6 +49,7 @@ export const AdminOverview = () => {
     <div className="space-y-6">
       <MorningBriefing />
       <AutoMatchPanel />
+      <WeeklyBriefingControl />
       <AIActivityStream />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

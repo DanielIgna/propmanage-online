@@ -80,6 +80,7 @@ from routes.settings_snapshots import router as settings_snapshots_router, take_
 from routes.service_contracts import router as service_contracts_router
 from routes.autonomy import router as autonomy_router, take_autonomy_snapshot
 from routes.ai_activity import router as ai_activity_router
+from routes.ai_weekly_briefing import router as ai_weekly_briefing_router, run_weekly_briefing_job
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
@@ -165,6 +166,7 @@ for r in (
     service_contracts_router,
     autonomy_router,
     ai_activity_router,
+    ai_weekly_briefing_router,
 ):
     app.include_router(r)
 
@@ -209,6 +211,14 @@ async def startup():
             id="auto_match_cron_tick",
             replace_existing=True,
             misfire_grace_time=600,
+        )
+        # Weekly AI Briefing email — Mondays 09:00 Europe/Bucharest
+        scheduler.add_job(
+            run_weekly_briefing_job,
+            CronTrigger(day_of_week="mon", hour=9, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="weekly_ai_briefing",
+            replace_existing=True,
+            misfire_grace_time=7200,
         )
         scheduler.add_job(
             auto_release_warranty_holds,
@@ -364,6 +374,7 @@ async def startup():
         logger.info("Daily MongoDB backup scheduler started (03:30 Europe/Bucharest, emails admin).")
         logger.info("Weekly Dev Velocity scheduler started (Mondays 09:30 Europe/Bucharest).")
         logger.info("Autonomy snapshot scheduler started (daily 03:15 Europe/Bucharest).")
+        logger.info("Weekly AI Briefing scheduler started (Mondays 09:00 Europe/Bucharest).")
 
 
 @app.on_event("shutdown")
