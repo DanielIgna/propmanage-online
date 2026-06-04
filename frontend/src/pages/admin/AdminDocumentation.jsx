@@ -5,7 +5,7 @@ import {
   BookOpen, ChevronRight, Building2, ShieldCheck, Box, CreditCard, Mail,
   Settings, Search, Sparkles, Facebook, BarChart3, MapPin, FileText, Award,
   Lightbulb, Rocket, Users, Calendar, Layers, Server, MailPlus, History, Brain,
-  Send, Loader2, Copy, CheckCircle2
+  Send, Loader2, Copy, CheckCircle2, Gauge, Zap, Activity, Clock
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -17,7 +17,7 @@ const TOPICS = [
     icon: Layers,
     title: "Ghid Buton-cu-Buton (Manual de utilizare)",
     summary: "Fiecare buton important din platformă explicat simplu — pentru orice admin, fără cunoștințe IT",
-    status: { created: ["20 butoane principale documentate", "Limbaj simplu, fără jargon tehnic", "Sugestie când se folosește + când se actualizează"], todo: ["Adăugare screenshot animat pentru fiecare buton (GIF/Lottie)", "Versiune video 60-90 secunde per zonă", "Tooltip cu link către manualul respectiv direct în UI"] },
+    status: { created: ["28 butoane principale documentate (incl. Autonomy/Auto-Match/Activity/Briefing)", "Limbaj simplu, fără jargon tehnic", "Sugestie când se folosește + când se actualizează"], todo: ["Adăugare screenshot animat pentru fiecare buton (GIF/Lottie)", "Versiune video 60-90 secunde per zonă", "Tooltip cu link către manualul respectiv direct în UI"] },
     content: [
       { h: "Dashboard → 'Snapshot acum' (Control Administrare)", p: "Salvează manual configurarea curentă (prețuri, link-uri sociale, SEO) ca punct de recuperare. Folosește înainte de o schimbare majoră. ACTUALIZEAZĂ când: vrei să testezi un set nou de prețuri sau înainte de ședință de planificare." },
       { h: "Dashboard → 'Reset la valori implicite'", p: "Resetează TOATE setările la valorile din cod (350 RON audit, 950 RON twin, 2.5% comision). Folosește DOAR dacă cineva a stricat configurarea și nu mai funcționează nimic. NU folosi la întâmplare — vei pierde link-urile sociale și setările SEO." },
@@ -39,6 +39,92 @@ const TOPICS = [
       { h: "Setări Platformă → 'Modul demo'", p: "Activează datele demo (specialiști fictivi, proprietăți seed). Folosește la prezentări demo, NU în producție cu utilizatori reali (date vor părea inutile)." },
       { h: "GDPR Pack → 'Exportă date user'", p: "Generează arhivă ZIP cu toate datele unui user (la cererea lui sau a autorității). Termen legal: 30 de zile maxim de la cerere." },
       { h: "GDPR Pack → 'Ștergere completă user'", p: "Anonimizează un user (păstrează tranzacțiile pentru contabilitate, șterge PII). Aplică DOAR după confirmarea scrisă a userului." },
+      { h: "Dashboard → 'Auto-Match: Simulează'", p: "Rulează dry-run (preview) al auto-asignării — vezi câte cereri ar primi specialist și CARE. NU face modificări în DB. Folosește înainte de bulk-assign ca să te asiguri că matcher-ul alege bine." },
+      { h: "Dashboard → 'Auto-Match: Asignează N'", p: "Atribuie BULK N cereri neatribuite (>1h vechime) celor mai buni specialiști din zonă. Lead fee se OMITE (acțiune admin). Trimite notificări către client + specialist. Folosește când vezi backlog mare de cereri pending." },
+      { h: "Dashboard → 'Mod autonom: Activează/Dezactivează'", p: "Pornește/oprește cron-ul care rulează Auto-Match singur la intervalul ales (1h/3h/6h/12h/zilnic). Cu el activ, dimineața backlog-ul e gata curățat singur. Nu se mai duplică — cron-ul are debounce intern." },
+      { h: "Dashboard → 'Autonomy Engine: Snapshot acum'", p: "Forțează calculul scorului de autonomie ACUM și îl persistă în istoric. Folosește înainte și după sprint-uri mari ca să vezi impactul direct pe scor." },
+      { h: "Dashboard → 'Autonomy: click pe sub-scor'", p: "Click pe oricare din cele 5 sub-scoruri (Operational/Technical/Security/Dev/AI) deschide drill-down cu signal-uri detaliate + date brute. Folosește când scorul scade brusc — vezi exact ce signal s-a degradat." },
+      { h: "Dashboard → 'Activity AI: filtre per kind'", p: "Click pe orice pill (smoke_test.run, autonomy.snapshot, etc.) restrânge timeline-ul la acel tip de eveniment. Folosește când investighezi un comportament specific (ex: 'câte findings noi în ultima săptămână')." },
+      { h: "Dashboard → 'Weekly Briefing: Trimite acum'", p: "Forțează generarea + trimiterea unui briefing AI ACUM (nu așteaptă lunea). Folosește la testul integrării email sau înainte de o ședință boardroom (vrei cifre proaspete în inbox)." },
+      { h: "Dashboard → 'Weekly Briefing: Activează/Dezactivează'", p: "Toggle pe cron-ul de luni 09:00. Cu el activ și destinatari setați, primești săptămânal email cu rezumat AI (auto-match, findings, autonomy delta) scris de Claude Sonnet." },
+    ],
+  },
+  {
+    id: "autonomy-engine",
+    icon: Gauge,
+    title: "Autonomy Engine · Scor de autonomie 0–100",
+    summary: "Dashboard strategic care arată cât din platformă funcționează singură (target: 90+)",
+    status: {
+      created: ["5 sub-scoruri (Operational/Technical/Security/Dev/AI) cu ponderi configurabile", "Tier-uri: Manual (<50) → Assisted (50-75) → Autonomous (75-90) → Self-driving (>=90)", "Snapshot zilnic automat la 03:15 Europe/Bucharest", "Recomandări prioritizate cu impact estimat în puncte", "Sparkline 30 zile (populează cu timpul)", "Ponderi ajustabile via PUT /api/admin/autonomy/targets"],
+      todo: ["Buton 'Aplică sugestia' care chiar execută recomandarea (cu preview modal)", "Alerta email când scorul scade > 10pt vs săptămâna trecută", "Comparativ cu istoric per sub-scor (nu doar general)"],
+    },
+    content: [
+      { h: "La ce folosește", p: "Răspunde la întrebarea: 'Cât din platformă rulează singură?'. Te ajută să prioritizezi investiția — vezi unde AI livrează deja autonomie și unde mai e muncă manuală." },
+      { h: "Cum se calculează", p: "Engine-ul citește DOAR colecții existente (requests, smoke_test_runs, oauth_health, findings, etc.) și calculează scoruri deterministe — fără LLM, fără cost. Cache de 5 minute ca să nu reîncarce baza constant." },
+      { h: "Sub-scoruri și ponderi", p: "Operational (30%) · Technical (25%) · Security (20%) · Dev (10%) · AI (15%). Le poți schimba din PUT /api/admin/autonomy/targets dacă vrei alt accent strategic." },
+      { h: "Sub-scor: Operational", p: "% requests auto-matched + % completate + scheduler health + penalty pentru incidente deschise. Cel mai ușor de urcat — activează Auto-Match Mod autonom și sărumai 20pt într-o săptămână." },
+      { h: "Sub-scor: Technical", p: "Smoke test pass rate (7 zile) + snapshot freshness + release gate pass rate. Coboară când scheduler-ul are probleme sau când smoke test-ele încep să cadă." },
+      { h: "Sub-scor: Security", p: "OAuth success rate + % findings rezolvate + penalty pentru critical open. Urcă peste 95 dacă rezolvi rapid criticele și nu lași findings noi neexplorate." },
+      { h: "Sub-scor: Dev", p: "Release gate pass rate (30 zile) + QA findings resolved + smoke stability. Reflectă disciplina dev." },
+      { h: "Sub-scor: AI", p: "% AI findings închise + maturitate memorie (>200 = max) + knowledge base (>20 docs ingestate = max). Urcă încet pe măsură ce AI învață și acumulezi documente." },
+      { h: "Recomandări", p: "Engine generează max 6 sugestii sortate după prioritate (critical → low) cu impact estimat în puncte. Folosește-le ca to-do list — fiecare e scrisă în limbaj natural." },
+      { h: "Drill-down", p: "Click pe orice card sub-scor → modal cu signal-uri brute (ex: auto_matched_requests_pct: 86.2, raw: {total_requests_30d: 282, ...}). Util pentru debugging." },
+      { h: "Cum urci scorul rapid", p: "1) Rezolvă critical findings (AI Control Center) → +5-10pt Security. 2) Activează Auto-Match Mod autonom → +10pt Operational. 3) Rulează Smoke Test manual dacă a căzut → +5pt Technical. 4) Upload mai multe documente RAG → +5pt AI." },
+    ],
+  },
+  {
+    id: "auto-match",
+    icon: Zap,
+    title: "Auto-Match · Asignare automată cereri",
+    summary: "Bulk-assign + cron orar care reduce munca manuală a admin-ului aproape la zero",
+    status: {
+      created: ["Bulk-assign manual cu preview (Simulează/Asignează)", "Mod autonom: cron la fiecare oră, execută la intervalul configurat (1h/3h/6h/12h/zilnic)", "Folosește matcher-ul existent (zonă + rating + categorie)", "Lead fee bypass pentru acțiuni admin", "Notificări automate client + specialist", "History audit `auto_match_runs` (capped 200) cu distincție cron vs admin_manual", "Debounce intern — niciodată dublu-rulare în același interval"],
+      todo: ["Per-zonă/categorie matching priorities (acum global)", "Notificare email când cron-ul ratează interval (sistem oprit)", "Buton 'Anulează asignare' inline pe cerere (acum trebuie făcut din admin user)"],
+    },
+    content: [
+      { h: "Când să folosești manual", p: "Când vezi backlog > 20 cereri pending — click 'Simulează' să vezi cine ar primi ce, apoi 'Asignează N' pentru bulk. Util la sfârșit de săptămână sau după întreruperi de sistem." },
+      { h: "Când să activezi Modul Autonom", p: "Aproape întotdeauna. Setezi interval-ul potrivit traficului tău (3-6h e sweet spot pentru majoritatea cazurilor). Cron-ul checkează la fiecare oră dar execută doar când a trecut interval-ul." },
+      { h: "Cum alege specialistul", p: "Pentru fiecare cerere: matching primar (zona clientului + categoria cererii) sortat după rating + reviews. Dacă nu există în zonă, fallback pe alți specialiști (marcați out-of-zone)." },
+      { h: "Ce NU face", p: "Nu schimbă statusul cererii dacă a fost deja atribuită manual (între timp). Nu trimite spam — o singură notificare per assigment. Nu charges lead fee pe asignări admin/cron." },
+      { h: "Auditabilitate", p: "Fiecare cerere primește câmpurile `auto_assigned_by_admin` + `auto_assigned_at` + `auto_assigned_via` ('admin_manual'/'cron'). Vezi-le în Audit Log sau direct în doc-ul cererii din Mongo." },
+      { h: "Limitări actuale", p: "Cron-ul ignoră cereri < 1h vechime (le lasă să-și găsească specialist organic prin notificările normale). Limita per rulare e 100 cereri (poți crește din body-ul POST /api/admin/auto-match/run dacă chemi direct API-ul)." },
+    ],
+  },
+  {
+    id: "ai-activity",
+    icon: Activity,
+    title: "AI Activity Stream · Operations Center",
+    summary: "Timeline LIVE al tuturor acțiunilor autonome din platformă (7 zile)",
+    status: {
+      created: ["Agregare din 7 colecții: autonomy_snapshots, auto_match_runs, admin_ai_findings, admin_ai_scans, smoke_test_runs, app_settings_snapshots, security_ai_runs", "Color-coded severity (info/success/warning/critical)", "Filtre per kind (pills)", "Auto-refresh la 60s + buton manual", "Relative timestamps ('acum 3h')", "Fault-tolerant: dacă un collector crapă, restul continuă"],
+      todo: ["Click pe row → deep link la sursa evenimentului (ex: AI scan → AI Control Center)", "Export CSV pentru perioadă custom", "Webhook outgoing când apare 'critical' (Slack/Discord)"],
+    },
+    content: [
+      { h: "La ce folosește", p: "Răspunde la întrebarea: 'Ce a făcut platforma singură peste noapte / weekend / săptămână?'. Văzut într-un singur ecran fără să intri în 5 module diferite." },
+      { h: "Tipuri de evenimente", p: "autonomy.snapshot (snapshot zilnic luat) · auto_match.run (cereri asignate) · ai.finding.detected/resolved · ai.scan.completed · smoke_test.run · settings.snapshot · security.scan. Fiecare are icon dedicat și culoare după severitate." },
+      { h: "Severități", p: "🔵 INFO — eveniment neutru (snapshot luat) · 🟢 SUCCESS — rezultat pozitiv (smoke OK, auto-match reușit, finding rezolvat) · 🟡 WARNING — atenție (security scan cu risk >40) · 🔴 CRITICAL — intervenție necesară (smoke FAIL, finding critical detectat)." },
+      { h: "Filtre", p: "Click pe 'Tot' pentru toate sau pe orice pill specific (smoke test, autonomy snapshot, etc.) pentru filtrare. Contoarele de severitate de sus se actualizează doar la primul load (rezumat global)." },
+      { h: "Auto-refresh", p: "La 60s tabela se reîmprospătează automat. Click manual pe 'Reîmprospătează' resetează și timer-ul (nu vei avea două refresh-uri prea apropiate)." },
+      { h: "Window-ul", p: "Default 7 zile, max 60 evenimente afișate. Endpoint-ul permite până la 720h și 200 evenimente — poți schimba din DevTools dacă vrei istoric mai mare (pe viitor: control UI)." },
+    ],
+  },
+  {
+    id: "weekly-briefing",
+    icon: Mail,
+    title: "Weekly AI Briefing · Email săptămânal Claude",
+    summary: "Lunea dimineața la 09:00 primești email cu rezumat AI scris natural de Claude Sonnet",
+    status: {
+      created: ["Cron Luni 09:00 Europe/Bucharest", "Claude Sonnet 4.5 sintetizează 7 zile activitate AI", "Email HTML structurat cu 4 KPI cards + autonomy delta", "Fallback determinist dacă LLM crapă", "Toggle pe/off + listă destinatari editabilă inline", "Buton 'Trimite acum' pentru test", "History (capped 50) cu summary text + stats per trimitere", "Validare strictă regex pentru emailuri"],
+      todo: ["Versiune plain-text fallback pentru clienți email vechi", "Schedule custom (nu doar luni 09:00) — dropdown 'Trimite în fiecare ___'", "Atașează PDF cu raport detaliat opțional"],
+    },
+    content: [
+      { h: "Cum funcționează", p: "Cron rulează lunea la 09:00. Verifică dacă e activat ȘI există destinatari. Dacă da: agregă 7 zile activitate (auto-match, findings, autonomy delta), trimite la Claude Sonnet care scrie un text în română (4-5 paragrafe), construiește email HTML cu KPI cards + text și îl trimite via Resend." },
+      { h: "Configurare destinatari", p: "Adaugi emailuri unul câte unul (Enter sau buton 'Adaugă'). Validare regex strictă — emailurile invalide sunt filtrate silent. Poți avea oricâți destinatari (cu moderare — toți primesc același email)." },
+      { h: "Conținut email", p: "Subject: 'PropManage · Săptămâna AI · scor N/100'. Body: 4 KPI cards (cereri auto-asignate, findings rezolvate, findings noi, smoke OK/FAIL) + autonomy delta (verde dacă a crescut, roșu dacă a scăzut) + text Claude (Vestea bună, Merită observat, Acțiune recomandată)." },
+      { h: "Test înainte de luni", p: "Click 'Trimite acum' (cu cel puțin un destinatar configurat) → cron-ul rulează imediat și primești emailul pentru verificare. Util ca să vezi formatul înainte de prima livrare live." },
+      { h: "Fallback dacă LLM crapă", p: "Dacă Claude returnează eroare (rate limit, server down), sistemul folosește un template determinist tot în română — emailul nu se pierde niciodată. Vezi mențiunea 'fallback' în text dacă a fost cazul." },
+      { h: "Cost", p: "Un LLM call/săptămână = câteva cenți (Claude Sonnet input ~500 tokens, output ~400 tokens). Folosește Emergent LLM Key (budget shared cu alte funcții AI)." },
+      { h: "Audit", p: "Toate trimiterile (cron + manuale) se păstrează în `ai_weekly_briefing_history` (max 50 ultime). Vezi summary text + stats pentru fiecare. Util pentru audit GDPR sau revizuire post-mortem." },
     ],
   },
   {
