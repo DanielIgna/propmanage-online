@@ -78,6 +78,7 @@ from routes.ai_dev_team import router as ai_dev_team_router
 from routes.ai_security import router as ai_security_router
 from routes.settings_snapshots import router as settings_snapshots_router, take_auto_snapshot
 from routes.service_contracts import router as service_contracts_router
+from routes.autonomy import router as autonomy_router, take_autonomy_snapshot
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
@@ -161,6 +162,7 @@ for r in (
     ai_security_router,
     settings_snapshots_router,
     service_contracts_router,
+    autonomy_router,
 ):
     app.include_router(r)
 
@@ -187,6 +189,13 @@ async def startup():
             take_auto_snapshot,
             CronTrigger(hour=4, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="settings_snapshot_daily",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        scheduler.add_job(
+            take_autonomy_snapshot,
+            CronTrigger(hour=3, minute=15, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="autonomy_snapshot_daily",
             replace_existing=True,
             misfire_grace_time=3600,
         )
