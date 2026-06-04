@@ -6,7 +6,7 @@ import logging
 from typing import Optional, List, Literal, Dict
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Body
 from pydantic import BaseModel, Field
 
 from db import db
@@ -483,4 +483,190 @@ async def review_specialist_document(spec_id: str, doc_id: str, data: DocumentRe
         msg += f" Motiv: {data.reason}"
     await notify(spec_id, title, msg, type_="verification", link="/specialist")
     return {"ok": True}
+
+
+
+# ============================================================================
+# BULK AUTO-MATCH — Admin tool to assign pending open requests
+# ============================================================================
+@router.post("/admin/auto-match/preview")
+async def auto_match_preview(user: dict = Depends(require_role("admin"))):
+    """Preview unmatched open requests + best specialist suggestion per each.
+
+    Read-only. Returns the list with proposed assignments so admin can review
+    before executing the bulk operation.
+    """
+    from routes.matching import find_matching_specialists
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+    cursor = db.requests.find({
+        "status": "open",
+        "specialist_id": {"$in": [None, ""]},
+        "created_at": {"$lt": cutoff.isoformat()},
+    }).sort("created_at", 1).limit(100)
+
+    items = []
+    async for req in cursor:
+        category = req.get("category") or ""
+        # Best-effort zone resolve
+        zone = req.get("property_zone") or req.get("zone") or ""
+        if not zone and req.get("property_id"):
+            prop = await db.properties.find_one({"_id": ObjectId(req["property_id"])})
+            if prop:
+                zone = prop.get("zone") or prop.get("city") or "default"
+        zone = zone or "default"
+
+        matches = await find_matching_specialists(category, zone, max_results=3)
+        best = matches[0] if matches else None
+        items.append({
+            "request_id": str(req["_id"]),
+            "title": req.get("title"),
+            "category": category,
+            "client_name": req.get("client_name"),
+            "property_address": req.get("property_address"),
+            "created_at": req.get("created_at"),
+            "best_match": {
+                "id": best["id"],
+                "name": best["name"],
+                "rating": best.get("rating"),
+                "in_zone": best.get("is_in_zone"),
+                "reasons": best.get("match_reasons", []),
+            } if best else None,
+            "alternatives_count": max(0, len(matches) - 1),
+        })
+
+    return {
+        "items": items,
+        "total_unmatched": len(items),
+        "with_match_available": sum(1 for i in items if i["best_match"]),
+        "no_match_available": sum(1 for i in items if not i["best_match"]),
+    }
+
+
+@router.post("/admin/auto-match/run")
+async def auto_match_run(
+    payload: dict = Body(default={}),
+    user: dict = Depends(require_role("admin")),
+):
+    """Bulk-assign unmatched open requests to their best-fit specialist.
+
+    Admin-driven matching — bypasses the 45 RON lead fee (admin tool).
+    Each assignment is logged + the specialist + client receive notification.
+
+    Body:
+      {
+        "limit": 50,            # cap on how many to assign in one run
+        "min_rating": 4.0,      # skip specialists below this rating
+        "dry_run": false        # if true, returns plan without writing
+      }
+    """
+    from routes.matching import find_matching_specialists
+
+    limit = int(payload.get("limit") or 50)
+    min_rating = float(payload.get("min_rating") or 0.0)
+    dry_run = bool(payload.get("dry_run") or False)
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+    cursor = db.requests.find({
+        "status": "open",
+        "specialist_id": {"$in": [None, ""]},
+        "created_at": {"$lt": cutoff.isoformat()},
+    }).sort("created_at", 1).limit(limit)
+
+    assigned = []
+    skipped = []
+    async for req in cursor:
+        category = req.get("category") or ""
+        zone = req.get("property_zone") or req.get("zone") or ""
+        if not zone and req.get("property_id"):
+            try:
+                prop = await db.properties.find_one({"_id": ObjectId(req["property_id"])})
+                if prop:
+                    zone = prop.get("zone") or prop.get("city") or "default"
+            except Exception:
+                zone = "default"
+        zone = zone or "default"
+
+        matches = await find_matching_specialists(category, zone, max_results=5)
+        best = None
+        for m in matches:
+            if (m.get("rating") or 0) >= min_rating:
+                best = m
+                break
+
+        if not best:
+            skipped.append({
+                "request_id": str(req["_id"]),
+                "reason": "no_eligible_specialist",
+                "category": category,
+            })
+            continue
+
+        if dry_run:
+            assigned.append({
+                "request_id": str(req["_id"]),
+                "specialist_id": best["id"],
+                "specialist_name": best["name"],
+                "dry_run": True,
+            })
+            continue
+
+        try:
+            spec = await db.users.find_one({"_id": ObjectId(best["id"])})
+            update = {
+                "status": "assigned",
+                "specialist_id": best["id"],
+                "specialist_name": spec.get("name"),
+                "specialist_specialty": spec.get("specialty") or spec.get("category") or "",
+                "specialist_city": spec.get("city") or spec.get("location") or "",
+                "specialist_verified": bool(spec.get("verified")),
+                "assigned_at": datetime.now(timezone.utc).isoformat(),
+                "auto_assigned_by_admin": user["id"],
+                "auto_assigned_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.requests.update_one({"_id": req["_id"]}, {"$set": update})
+
+            # Notifications (best-effort, never block bulk on a single failure)
+            try:
+                await notify(
+                    req["client_id"],
+                    f"Specialist alocat automat: {spec.get('name')}",
+                    f"Admin a alocat un specialist potrivit pentru '{req.get('title','')}'. Verifică detaliile.",
+                    type_="assignment", link="/client",
+                )
+                await notify(
+                    best["id"],
+                    "Cerere alocată de admin",
+                    f"Ai primit o cerere de la admin: {req.get('title','')}. Lead fee gratuit (admin-driven).",
+                    type_="assignment", link="/specialist",
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[auto-match] notify failed for {req['_id']}: {e}")
+
+            try:
+                await log_event(str(req["_id"]), "request.auto_assigned", actor=user,
+                                payload={"specialist_id": best["id"], "via": "admin_bulk"})
+            except Exception:
+                pass
+
+            assigned.append({
+                "request_id": str(req["_id"]),
+                "specialist_id": best["id"],
+                "specialist_name": spec.get("name"),
+            })
+        except Exception as e:  # noqa: BLE001
+            logger.exception(f"[auto-match] failed for request {req['_id']}: {e}")
+            skipped.append({
+                "request_id": str(req["_id"]),
+                "reason": f"error: {str(e)[:120]}",
+            })
+
+    return {
+        "ok": True,
+        "dry_run": dry_run,
+        "assigned_count": len(assigned),
+        "skipped_count": len(skipped),
+        "assigned": assigned,
+        "skipped": skipped,
+    }
 
