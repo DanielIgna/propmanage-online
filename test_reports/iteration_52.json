@@ -1,0 +1,44 @@
+{
+  "summary": "Phase 73 — Snapshots module is fully GREEN (8/8 backend tests + frontend UI verified). Service Contracts module has a CRITICAL backend bug: contract generation cannot find ANY existing request because routes/service_contracts.py:126 queries db.requests by string `id` field, but the requests collection stores documents with Mongo ObjectId `_id` and no string `id` field (the `id` field is only synthesized in API responses). Result: POST /api/contracts/generate returns 404 'Solicitarea nu a fost găsită' for every real request_id. Admin Documentation 2.0 UI is fully verified: 14 topics rendered, search filter works (snapshot→3 results, ZZZNOTHING→empty state), button-guide expansion shows status panel + 20 sections, AI Assistant modal opens. AdminSettingsControl shows snapshot/list/reset buttons and snapshots-panel after toggle. ContractPage frontend not tested end-to-end because no contract can be generated.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/contracts/generate", "issue": "Always returns 404 'Solicitarea nu a fost găsită' for valid request IDs. Root cause: routes/service_contracts.py line 126 does `db.requests.find_one({'id': payload.request_id})` but the requests collection only has `_id: ObjectId(...)`, no string `id` field. Verified via direct Mongo query: find_one({'id': '6a1787b434ac1dcb3f3b4ee0'}) → None, find_one({'_id': ObjectId('6a1787b434ac1dcb3f3b4ee0')}) → document found. Fix: try ObjectId lookup first, fall back to string id (similar pattern already used for users at lines 147-153). This BLOCKS every downstream contract endpoint (sign, by-request, operator-resolve) because no contract can be created.", "priority": "CRITICAL"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/requests/my", "issue": "Returns 500 Internal Server Error for client user (not part of this sprint but observed during fixture setup; unrelated to Phase 73). Pre-existing."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Contract page (/contracts/:id)", "issue": "Cannot be tested end-to-end because the contract generation API is broken (see backend critical). Frontend code in ContractPage.jsx itself looks correct (uses /api/contracts/{id}, signs via /sign, operator-resolve via /operator-resolve, renders body_html via dangerouslySetInnerHTML, has contract-title/contract-body/sig-client/sig-specialist/contract-print testids).", "affected_selectors": ["contract-title","contract-body","sig-client","sig-specialist","contract-print"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase73.py",
+    "/app/test_reports/pytest/phase73_results.xml"
+  ],
+  "action_items": [
+    "FIX CRITICAL: /app/backend/routes/service_contracts.py line 126 — replace `req = await db.requests.find_one({'id': payload.request_id})` with a dual lookup: `try: from bson import ObjectId; req = await db.requests.find_one({'_id': ObjectId(payload.request_id)})` then fallback to `db.requests.find_one({'id': payload.request_id})`. Same pattern as the `_find_user` helper at lines 147-153.",
+    "Re-test contract flow after fix: generate → sign as client + specialist → status='active' → operator-resolve → status='mediated'.",
+    "Pre-existing /api/requests/my returns 500 — investigate separately."
+  ],
+  "critical_code_review_comments": [
+    "routes/service_contracts.py:126 — Inconsistent ID lookup pattern: the same file correctly handles dual ObjectId/string lookup for users (_find_user helper), but the request lookup at line 126 is single-mode string-id only. This is the root cause of the entire contracts module being non-functional.",
+    "routes/service_contracts.py:131 — Authorization check `uid not in (str(req.get('client_id')), str(req.get('specialist_id'))) and user.get('role') not in ('admin','operator')` — note that client_id/specialist_id in the request doc may be ObjectId strings (24 hex chars) while user.id is also ObjectId hex; comparison via str() is fine but worth a comment.",
+    "routes/settings_snapshots.py — Clean implementation. The rolling buffer (skip 50, delete the rest) correctly handles edge cases. Pre-restore safety net works as designed (verified via test_restore_creates_pre_restore).",
+    "AdminDocumentation.jsx — TopicCard uses topic.id in all testids (docs-status-${id}, docs-gen-prompt-${id}, etc.) — testids in spec all map correctly. The `generatePrompt` button is INSIDE the toggle button (nested), so click events should call e.stopPropagation() which they do. Good.",
+    "ContractPage.jsx:103 — Uses dangerouslySetInnerHTML on body_html from the API. This is acceptable since the HTML is server-generated from a known template, but if the template ever becomes user-editable via /admin/settings-control (contract_template setting referenced at routes/service_contracts.py:142), an admin could inject arbitrary scripts. Worth a sanitization pass (DOMPurify) before exposing template editing UI."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase73.py (new — 16 tests, 8 PASS for snapshots, 8 FAIL/SKIP for contracts due to backend bug)"
+  ],
+  "success_rate": {"backend": "50% (8/16 — all 8 snapshot tests PASS; all 8 contract tests FAIL due to single root cause: ObjectId lookup bug)", "frontend": "Docs page 100% (docs-title, 14 topics, search filter, button-guide auto-expanded with status + 20 sections, AI assistant modal opens). SettingsControl 100% (settings-snapshot, toggle-snapshots-list, settings-reset all present; snapshots-panel renders with manual + pre_restore items). ContractPage NOT TESTED — blocked by backend bug."},
+  "test_credentials": "admin@propmanage.io / Admin123!  ·  client@propmanage.io / Client123!  ·  specialist@propmanage.io / Spec123!  ·  operator pwd is Op123! (not Operator123! as written in review request) per /app/memory/test_credentials.md",
+  "seed_data_creation": "3 manual snapshots + 1 pre_restore snapshot created in app_settings_snapshots during testing (all visible in frontend /admin/settings-control panel). No contracts created (generation broken). No request mutation.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Phase 73 snapshots module is fully validated (test_phase73.py TestSnapshots class). The contracts module needs ONE backend fix: routes/service_contracts.py line 126 — change request lookup to handle Mongo ObjectId (the requests collection has no string `id` field; the field is only synthesized in API serialization). After fix, re-run test_phase73.py TestContracts class — all 8 contract tests should pass. Then test ContractPage UI end-to-end at /contracts/{id} (the frontend code is already in place with all required testids: contract-title, contract-body, sig-client, sig-specialist, contract-print, contract-sign-btn, op-resolve-submit). The AI Assistant + Generate-prompt features use /api/ai-docs/ask endpoint which I did not measure response-time for — allow 10-30s per call.",
+  "rca of the issue": "ROOT CAUSE — Contract generation route (routes/service_contracts.py:126) queries requests collection with `find_one({'id': str_value})` but requests are stored as `{_id: ObjectId, ...}` with NO string `id` field. The `id` key only appears in API responses where it's synthesized from `_id` (str cast). Direct Mongo verification: query by `{'id': '6a1787b434ac1dcb3f3b4ee0'}` → None; query by `{'_id': ObjectId('6a1787b434ac1dcb3f3b4ee0')}` → document found with keys ['_id','property_id','category','title','description',...]. REPRODUCTION: curl -X POST /api/contracts/generate -d '{\"request_id\":\"<any real id>\"}' → always 404 'Solicitarea nu a fost găsită'. FIX: in service_contracts.py:126 use a dual lookup like the _find_user helper at line 147-153: try ObjectId(payload.request_id) first, fall back to string id query. The same fix may be needed at GET /by-request/{request_id} (line 271) which also queries service_contracts by request_id — but that's a different collection so likely OK since contracts ARE stored with a string `id` field (uuid4().hex)."
+}

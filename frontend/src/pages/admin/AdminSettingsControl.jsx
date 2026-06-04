@@ -4,7 +4,7 @@ import axios from "axios";
 import {
   Settings, Save, RefreshCcw, AlertCircle, CheckCircle2, Loader2,
   Facebook, Instagram, Youtube, Linkedin, Sparkles, Building2, Mail, Phone, MapPin,
-  Search, BookOpen
+  Search, BookOpen, Camera, History, Undo2
 } from "lucide-react";
 import { invalidateSEOCache } from "@/lib/useDynamicSEO";
 
@@ -49,12 +49,47 @@ export const AdminSettingsControl = () => {
   const [saved, setSaved] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [snapshots, setSnapshots] = useState([]);
+  const [showSnapshots, setShowSnapshots] = useState(false);
+
+  const loadSnapshots = async () => {
+    try {
+      const res = await axios.get(`${API}/api/admin/app-settings/snapshots`, { withCredentials: true });
+      setSnapshots(res.data.items || []);
+    } catch (_) { /* silent */ }
+  };
+
+  const takeSnapshot = async () => {
+    const label = window.prompt("Etichetă pentru snapshot (opțional):", "Snapshot manual " + new Date().toLocaleDateString("ro-RO"));
+    if (label === null) return;
+    try {
+      await axios.post(`${API}/api/admin/app-settings/snapshots`, { label: label || "Snapshot manual" }, { withCredentials: true });
+      await loadSnapshots();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (e) {
+      setError(e?.response?.data?.detail || "Eroare la snapshot");
+    }
+  };
+
+  const restoreSnapshot = async (sid, label) => {
+    if (!window.confirm(`Sigur restorezi setările din snapshot "${label}"?\n\nUn snapshot 'pre_restore' va fi creat automat ca să poți reveni.`)) return;
+    setSaving(true);
+    try {
+      await axios.post(`${API}/api/admin/app-settings/snapshots/${sid}/restore`, {}, { withCredentials: true });
+      window.location.reload();
+    } catch (e) {
+      setError(e?.response?.data?.detail || "Eroare la restore");
+      setSaving(false);
+    }
+  };
 
   useEffect(() => {
     axios.get(`${API}/api/admin/app-settings`, { withCredentials: true })
       .then(r => setData(r.data))
       .catch(e => setError(e?.response?.data?.detail || "Eroare la încărcare"))
       .finally(() => setLoading(false));
+    loadSnapshots();
   }, []);
 
   const updateField = (section, key, value) => {
@@ -133,15 +168,45 @@ export const AdminSettingsControl = () => {
           </button>
         </div>
 
-        {/* Action bar: Documentation + Reset */}
+        {/* Action bar: Documentation + Snapshot + Reset */}
         <div className="flex flex-wrap gap-2 mb-6">
           <Link to="/admin/documentation" className="pm-btn pm-btn-secondary pm-btn-sm" data-testid="open-docs">
             <BookOpen className="w-3.5 h-3.5" /> Documentație & Training
           </Link>
+          <button onClick={takeSnapshot} disabled={saving} className="pm-btn pm-btn-secondary pm-btn-sm" data-testid="settings-snapshot">
+            <Camera className="w-3.5 h-3.5" /> Snapshot acum
+          </button>
+          <button onClick={() => setShowSnapshots(!showSnapshots)} className="pm-btn pm-btn-secondary pm-btn-sm" data-testid="toggle-snapshots-list">
+            <History className="w-3.5 h-3.5" /> Istoric snapshots
+          </button>
           <button onClick={resetToDefaults} disabled={saving} className="pm-btn pm-btn-danger pm-btn-sm" data-testid="settings-reset">
             <RefreshCcw className="w-3.5 h-3.5" /> Reset la valori implicite
           </button>
         </div>
+
+        {showSnapshots && (
+          <div className="bg-[#0e0e10] border border-white/10 rounded-2xl p-5 mb-6" data-testid="snapshots-panel">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-serif text-lg">Istoric Snapshots (ultimele 30)</h3>
+              <span className="text-xs text-stone-500">Snapshot automat zilnic la 04:00 + manuale</span>
+            </div>
+            {snapshots.length === 0 && <div className="text-xs text-stone-500 italic py-3">Niciun snapshot. Apasă "Snapshot acum" pentru primul.</div>}
+            <div className="space-y-1 max-h-[400px] overflow-y-auto">
+              {snapshots.map(s => (
+                <div key={s.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/[0.02] border border-white/5 text-xs" data-testid={`snapshot-${s.id}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider border ${s.kind === "auto" ? "bg-blue-500/15 text-blue-300 border-blue-500/30" : s.kind === "manual" ? "bg-[#d4ff3a]/15 text-[#d4ff3a] border-[#d4ff3a]/30" : "bg-amber-500/15 text-amber-300 border-amber-500/30"}`}>{s.kind}</span>
+                  <div className="flex-1">
+                    <div>{s.label}</div>
+                    <div className="text-[10px] text-stone-500">{new Date(s.ts).toLocaleString("ro-RO")} · {s.created_by}</div>
+                  </div>
+                  <button onClick={() => restoreSnapshot(s.id, s.label)} className="pm-btn pm-btn-ghost pm-btn-sm" data-testid={`restore-${s.id}`}>
+                    <Undo2 className="w-3 h-3" /> Restore
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 mb-6 flex items-start gap-3" data-testid="settings-error">
