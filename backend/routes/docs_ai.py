@@ -94,9 +94,11 @@ def _extract_text(content: bytes, kind: str) -> str:
 
 # ---------- Schemas ----------
 class AskDocIn(BaseModel):
-    question: str = Field(min_length=2, max_length=1000)
+    question: str = Field(min_length=2, max_length=4000)
     doc_id: Optional[str] = None  # If set, limit search to this document
     top_k: int = Field(default=4, ge=1, le=10)
+    inline_context: Optional[str] = Field(default=None, max_length=40000)
+    inline_context_label: Optional[str] = Field(default=None, max_length=100)
 
 
 # ---------- Endpoints ----------
@@ -197,6 +199,34 @@ async def ask_docs(payload: AskDocIn, user: dict = Depends(get_current_user)):
     """
     if not await ecosystem_enabled():
         return {"answer": "Ecosistemul AI este dezactivat.", "sources": []}
+
+    # ---- inline-context mode ----
+    # When caller passes `inline_context` (e.g. Admin Manual injection from the
+    # Docs page), skip RAG over user docs and answer strictly from that text.
+    if payload.inline_context:
+        label = payload.inline_context_label or "Manual Admin PropManage"
+        system = (
+            "You are PropManage's admin assistant. Answer in Romanian, "
+            f"using ONLY the provided '{label}' text as source of truth. "
+            "If the answer is NOT explicitly in the text, reply: "
+            "'Nu am găsit informația în manual. Întreabă echipa de dezvoltare.' "
+            "Be concise (max 6 propoziții), friendly, no jargon. "
+            "When you quote a section, mention its title in italic (ex: *Autonomy Engine*)."
+        )
+        user_msg = (
+            f"## {label}\n{payload.inline_context}\n\n"
+            f"## Întrebare admin\n{payload.question}"
+        )
+        result = await call_llm(system, user_msg, session_id=f"manual-{uuid.uuid4().hex[:6]}")
+        answer = result.get("text") or "Nu am putut răspunde acum."
+        return {
+            "answer": answer,
+            "sources": [{"doc_title": label, "kind": "inline_manual"}],
+            "provider": result.get("provider"),
+            "model": result.get("model"),
+            "mode": "inline_context",
+        }
+    # ---- end inline-context mode ----
 
     query_tokens = set(_tokenize(payload.question))
     if not query_tokens:

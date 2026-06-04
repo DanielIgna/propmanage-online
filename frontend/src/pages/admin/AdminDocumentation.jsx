@@ -558,16 +558,19 @@ export const AdminDocumentation = () => {
     if (!assistantQ.trim()) return;
     setAssistantLoading(true);
     try {
-      // Build a context from all topics' content and ask Claude via /api/ai-docs/ask
-      // (re-use docs RAG which is fastest; for now we send the question with manual context)
-      const manualContext = TOPICS.map(t =>
-        `## ${t.title}\n${t.content.map(c => `### ${c.h}\n${c.p}`).join("\n")}`
-      ).join("\n\n").slice(0, 12000);
+      // Build complete admin manual context — passes every topic (title + status + content)
+      const manualContext = TOPICS.map(t => {
+        const status = t.status
+          ? `\n**Implementat:** ${(t.status.created || []).join(" · ")}\n**TODO:** ${(t.status.todo || []).join(" · ")}`
+          : "";
+        const body = (t.content || []).map(c => `### ${c.h}\n${c.p}`).join("\n");
+        return `## ${t.title}\n*${t.summary}*${status}\n${body}`;
+      }).join("\n\n---\n\n").slice(0, 35000);
 
-      // Inline RAG: ask the LLM directly via a small POST to the existing ai-docs/ask
-      // but with the manual injected as a virtual doc.
       const { data } = await ax.post("/api/ai-docs/ask", {
-        question: `Întrebare admin: ${assistantQ.trim()}\n\nFolosește acest manual ca sursă (sau lit. ”Nu am găsit în manual.”):\n${manualContext}`,
+        question: assistantQ.trim(),
+        inline_context: manualContext,
+        inline_context_label: "Manual Admin PropManage (18 module)",
         top_k: 1,
       });
       setAssistantA(data.answer || "Nu am putut răspunde. Încearcă altă formulare.");
@@ -587,9 +590,14 @@ export const AdminDocumentation = () => {
             </h1>
             <p className="text-sm text-stone-400 mt-2">Manual de operare cu AI assistant integrat. Click pe orice secțiune pentru detalii.</p>
           </div>
-          <button onClick={() => setAssistantOpen(true)} className="pm-btn pm-btn-primary" data-testid="docs-open-ai-assistant">
-            <Brain className="w-4 h-4" /> Întreabă AI Assistant
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link to="/admin/todo" className="pm-btn pm-btn-secondary pm-btn-sm" data-testid="docs-open-todo">
+              <CheckCircle2 className="w-3.5 h-3.5" /> ToDo Board
+            </Link>
+            <button onClick={() => setAssistantOpen(true)} className="pm-btn pm-btn-primary" data-testid="docs-open-ai-assistant">
+              <Brain className="w-4 h-4" /> Întreabă AI Assistant
+            </button>
+          </div>
         </div>
 
         <div className="relative mb-6">
@@ -683,3 +691,4 @@ export const AdminDocumentation = () => {
 };
 
 export default AdminDocumentation;
+export { TOPICS };

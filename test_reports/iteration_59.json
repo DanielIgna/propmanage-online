@@ -1,0 +1,39 @@
+{
+  "summary": "Phase 79 — AI Assistant inline_context + Admin ToDo Board fully verified. Backend pytest: 18/18 PASS (~7s). Frontend: docs page exposes both docs-open-ai-assistant and docs-open-todo buttons; AI modal returns answer mentioning 'manual', 'operational', 'technical', 'security' (inline_context path active). ToDo Board page (/admin/todo) renders title, 5-card stats (Total 31 / Deschise 30 / Finalizate 1 / Din manual 30 / Custom 1), add form, 3 filters, per-topic block with 9 topics. Add → toggle → done-filter → delete round-trip works against backend. Documented todos toggle present and read-only (no delete button rendered). Sidebar 'ToDo Board' entry confirmed in AdminLayoutMetronic.jsx:68.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/admin/todo empty state", "issues": ["Typo: 'Nicio rezultat' — should be 'Niciun rezultat' (Romanian grammar; 'rezultat' is masculine). Cosmetic."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase79_admin_todos.py",
+    "/app/test_reports/pytest/phase79.xml"
+  ],
+  "action_items": [
+    "(cosmetic) Fix Romanian agreement: 'Nicio rezultat' → 'Niciun rezultat' in AdminTodoBoard.jsx empty state."
+  ],
+  "critical_code_review_comments": [
+    "admin_todos.py:38 — list_todos sorts by ('done', 1) THEN ('created_at', -1) but the projection excludes _id only; if many todos accumulate, the .limit(500) is a silent cap with no pagination signal. Add a `total` count or a `has_more` flag for future-proofing.",
+    "admin_todos.py:78 — when done=False is sent, code sets done_at to None which is correct but adds a `done_at: null` field forever. Consider $unset on un-toggle for cleanliness.",
+    "admin_todos.py:98 — toggle_doc_done accepts raw dict Body(...) with no Pydantic model; combined with the 'doc:' prefix check this is fine, but switching to a typed model would catch malformed payloads earlier (e.g. {id: 123}).",
+    "docs_ai.py:206 — inline_context branch trusts the caller-supplied text up to 40000 chars and feeds it directly to the LLM. Cost & PII implication: any admin can paste arbitrary internal docs and they go to Claude — fine as designed, but worth a one-line audit log entry ('admin X asked manual question with N-char context').",
+    "docs_ai.py:228 — inline_context response lacks the ai_memory.remember() call that the RAG path does (line 281). Manual-mode questions are not memorialized; if memory of admin Q&A is desired, mirror the remember() call.",
+    "AdminTodoBoard.jsx:211 — uses window.confirm() for delete. Works but breaks the dark-theme UX consistency; the rest of the app uses inline confirms or shadcn AlertDialog. Cosmetic.",
+    "AdminTodoBoard.jsx:108 — useEffect with [] runs load() once, but there is no polling or websocket; if two admins edit simultaneously they will see stale data. Acceptable for an internal board.",
+    "AdminTodoBoard.jsx:131 — allTodos memo combines arrays but doesn't deduplicate; if a doc:topic:i ever collides with a uuid (impossible in practice) keys would collide. Defensive only.",
+    "AdminTodoBoard.jsx:155 — stats.documented counts ALL documented todos including 'done' ones; the 'Din manual' card label may suggest 'remaining from manual', clarify or split.",
+    "AdminTodoBoard.jsx:329 — 'Nicio rezultat' grammar issue noted above.",
+    "Console: two 401 errors observed during admin session — likely unrelated /api/auth/me probes before cookie hydrates; not blocking. Same was reported in prior iterations."
+  ],
+  "updated_files": ["/app/backend/tests/test_phase79_admin_todos.py"],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "100% (docs buttons, AI modal answer, navigation, add/toggle/done-filter/delete, stats, documented toggle present, sidebar entry)"},
+  "test_credentials": "admin@propmanage.io/Admin123! (admin), client@propmanage.io/Client123! (403 check)",
+  "seed_data_creation": "Created and deleted multiple TEST_-prefixed todos through pytest + UI (all cleaned up via fixture teardown / UI delete). doc_done_ids state for 'doc:autonomy-engine:0' was marked then unmarked. Existing pre-test custom todo 'Test sample task' (done=true) left untouched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 79 stable. Endpoints: GET/POST/PUT/DELETE /api/admin/todos, POST /api/admin/todos/doc-done. AI inline_context: POST /api/ai-docs/ask with `inline_context` returns {mode:'inline_context', sources:[{kind:'inline_manual'}]}. UI: /admin/todo with data-testids per review request. Documentation page header has docs-open-ai-assistant + docs-open-todo. Sidebar entry under AI section in AdminLayoutMetronic.jsx:68. There is currently 1 lingering custom todo ('Test sample task', done=true) from earlier manual testing; safe to leave or delete.",
+  "rca of the issue": "N/A — no functional bugs."
+}

@@ -51,6 +51,7 @@ import DocsAIPage from "./pages/DocsAIPage";
 import AIDevTeamPage from "./pages/admin/AIDevTeamPage";
 import AISecurityCenterPage from "./pages/admin/AISecurityCenterPage";
 import AutonomyEnginePage from "./pages/admin/AutonomyEnginePage";
+import AdminTodoBoard from "./pages/admin/AdminTodoBoard";
 import ContractPage from "./pages/ContractPage";
 import { trackPageView } from "@/lib/analytics";
 import { useDynamicSEO } from "@/lib/useDynamicSEO";
@@ -1585,6 +1586,7 @@ function App() {
               <Route path="/admin/ai-dev-team" element={<AIDevTeamPage />} />
               <Route path="/admin/ai-security" element={<AISecurityCenterPage />} />
               <Route path="/admin/autonomy" element={<AutonomyEnginePage />} />
+              <Route path="/admin/todo" element={<AdminTodoBoard />} />
               <Route path="/contracts/:id" element={<ContractPage />} />
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />
               <Route path="/ghiduri" element={<GhiduriIndex />} />

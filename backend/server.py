@@ -81,6 +81,7 @@ from routes.service_contracts import router as service_contracts_router
 from routes.autonomy import router as autonomy_router, take_autonomy_snapshot
 from routes.ai_activity import router as ai_activity_router
 from routes.ai_weekly_briefing import router as ai_weekly_briefing_router, run_weekly_briefing_job
+from routes.admin_todos import router as admin_todos_router
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
@@ -167,6 +168,7 @@ for r in (
     autonomy_router,
     ai_activity_router,
     ai_weekly_briefing_router,
+    admin_todos_router,
 ):
     app.include_router(r)
 
