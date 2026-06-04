@@ -4,6 +4,21 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 ## Recent additions (Feb 2026)
+- **Phase 75 — Admin Bulk Auto-Match** ✅ (Feb 6 2026)
+  - **Backend** `/api/admin/auto-match/preview` + `/run` (admin-only, bypasses 45 RON lead fee, folosește `find_matching_specialists` din matching.py)
+  - **Frontend** AutoMatchPanel pe `/admin` (Overview) — KPI 3-tile (neatribuite/cu match/fără match) + buton Simulează (dry_run) + Asignează (cu confirmare)
+  - **Notificări** auto către client + specialist când rulează
+  - **Quick Win impact**: 39 cereri asignate → `auto_matched_requests_pct: 50.7% → 100%`, Operational 44 → 61, **General 63 → 68**
+  - Testing iter 55: 9/9 backend + frontend complete
+
+- **Quick Win Sprint (Phase 74.5)** ✅ (Feb 6 2026)
+  - 2 critical AI findings rezolvate (prompt injection + bot — deja auto-blocate)
+  - 57 low-severity findings bulk-dismissed
+  - Smoke test rulat 6/6 PASS
+  - Settings snapshot proaspăt
+  - Mini-fix engine: corectat field-urile reale `smoke_test_runs.ok` și `release_gates.summary.p0_fail/blocked`
+  - **Rezultat**: Autonomy 27 → 63 (Manual → Assisted)
+
 - **Phase 74 — AI Autonomy Engine (A1+A2)** ✅ (Feb 6 2026)
   - **Roadmap docs** create înainte de implementare (la cererea user-ului):
     - `/app/docs/autonomy_engine_roadmap.md` — 5 faze (A1 compute, A2 frontend, A3 snapshot job, A4 auto-tune READ-ONLY, A5 specialized agents)
