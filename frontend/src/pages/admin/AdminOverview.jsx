@@ -7,6 +7,7 @@ import { API } from "../DashShared";
 import { IncidentCadenceHeatmap } from "./IncidentCadenceHeatmap";
 import { MorningBriefing } from "./MorningBriefing";
 import { AutoMatchPanel } from "./AutoMatchPanel";
+import { AIActivityStream } from "./AIActivityStream";
 
 const KpiCard = ({ icon: Icon, label, value, sub, tone = "blue", testid }) => {
   const tones = {
@@ -47,6 +48,7 @@ export const AdminOverview = () => {
     <div className="space-y-6">
       <MorningBriefing />
       <AutoMatchPanel />
+      <AIActivityStream />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard icon={Users} label="Useri Total" value={stats?.users ?? "—"} tone="blue" testid="kpi-users" />

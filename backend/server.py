@@ -79,6 +79,7 @@ from routes.ai_security import router as ai_security_router
 from routes.settings_snapshots import router as settings_snapshots_router, take_auto_snapshot
 from routes.service_contracts import router as service_contracts_router
 from routes.autonomy import router as autonomy_router, take_autonomy_snapshot
+from routes.ai_activity import router as ai_activity_router
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
@@ -163,6 +164,7 @@ for r in (
     settings_snapshots_router,
     service_contracts_router,
     autonomy_router,
+    ai_activity_router,
 ):
     app.include_router(r)
 

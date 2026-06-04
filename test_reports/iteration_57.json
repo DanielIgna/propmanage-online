@@ -1,0 +1,26 @@
+{
+  "summary": "Phase 77 — AI Activity Stream fully verified. Backend: 20/20 pytest pass (AuthZ admin-only + 403 for client + 401 anon, default shape {items,count,hours=72,summary:{by_kind,by_severity}}, items have all required fields kind/ts/title/summary/severity/icon/meta/source, sorted desc by ts, limit respected (max 5), hours filter narrows (1h <= 720h), summary counts match items by_kind & by_severity exactly, query validation hours 0/721 & limit 4/201 all 422, severity mapping: smoke ok→success/!ok→critical, autonomy >=75→success else info, finding resolved/dismissed→success). Regression: GET /admin/autonomy/score 200, POST /admin/auto-match/preview 200, GET /admin/auto-match/schedule 200, login 200. Frontend at /admin (Dashboard): ai-activity-stream rendered, ai-activity-list present, 36 rows visible across 5 kinds (smoke_test.run, autonomy.snapshot, ai.finding.resolved, ai.scan.completed, ai.finding.detected), 6 filter pills (filter-all + per-kind) all with correct data-testids, refresh button (ai-activity-refresh) reloads data, severity counters visible (18 info / 18 success / 0 warn / 0 critic) and consistent with backend response, filter pill restricts list to chosen kind with 0 mismatched rows, 'Tot' (All) restores full list. No console errors, no infinite re-render. Component sets a 60s setInterval and cleans up on unmount (confirmed by code review of AIActivityStream.jsx lines 120-125).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_phase77_ai_activity.py",
+    "/app/test_reports/pytest/phase77_ai_activity.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/ai_activity.py uses ISO-string lexicographic comparison for $gte timestamp filter. This works as long as all collectors store timestamps as timezone-aware UTC ISO strings with consistent precision. autonomy_snapshots/auto_match_runs/etc. mix datetime.utcnow().isoformat() and datetime.now(timezone.utc).isoformat() in different paths — the latter produces a +00:00 suffix while the former is naive. Lexicographic compare across both formats works because both put YYYY-MM-DDTHH:MM:SS first, but it is fragile. Consider normalizing all writes to datetime.now(timezone.utc).isoformat() consistently.",
+    "AIActivityStream.jsx calls GET with hours=168 (7 days) hard-coded, but the backend default is 72h. The header text states 'Ultimele 7 zile' so that's consistent UX-wise, but it means the visible widget does not reflect the documented backend default. Acceptable as a UI choice; just note divergence in docs.",
+    "AIActivityStream load() ignores the 60s timer instance during a manual refresh — clicking Reîmprospătează does not reset the autorefresh countdown, so the next auto-refresh can fire 1s later. Minor UX issue; trivially fixed by clearing+resetting timerRef inside load().",
+    "ai_activity.py per-collector limits (15, 20, 15, 10, 8, 8, 5, 5) sum to 96 events max while endpoint limit ceiling is 200 — if traffic ever increases, older events from any single collector are dropped before the global merge/sort. Document or scale the per-collector caps.",
+    "The summary.by_kind only includes kinds present in the *returned* (post-limit) set. If limit=5 truncates aggressively, the filter pills will hide kinds the user has data for. This is by design per problem statement but worth surfacing in the UI as 'Showing 5/N'.",
+    "No data-testid on the lastRefresh footer or on individual severity counters — fine for now since the testing brief only requires the listed ids, but adding e.g. ai-activity-sev-info would help future tests."
+  ],
+  "updated_files": ["/app/backend/tests/test_phase77_ai_activity.py"],
+  "success_rate": {"backend": "100% (20/20)", "frontend": "100% (all flows: render, filter, refresh, empty-state hooks, no console errors)"},
+  "test_credentials": "admin@propmanage.io/Admin123! (admin), client@propmanage.io/Client123! (403 check)",
+  "seed_data_creation": "No seed data inserted. Used pre-existing fixtures (autonomy_snapshots:9, smoke_test_runs:18, admin_ai_findings:63, admin_ai_scans:7, app_settings_snapshots:5, security_ai_runs:3, auto_match_runs:3).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 77 ai-activity endpoint is stable read-only aggregator. Pytest file at /app/backend/tests/test_phase77_ai_activity.py (20 tests, ~3s). Frontend widget at /admin Overview tab after AutoMatchPanel, scroll to find it. data-testids: ai-activity-stream, ai-activity-list, ai-activity-row-{kind}, ai-activity-filter-all, ai-activity-filter-{kind}, ai-activity-refresh, ai-activity-empty. The endpoint defaults hours=72/limit=60 but the frontend overrides to hours=168/limit=60. Validation bounds: hours 1..720, limit 5..200, both enforced (422 outside). Severity mapping verified per spec. by_kind / by_severity sums equal items count.",
+  "rca of the issue": "N/A — no bug found."
+}
