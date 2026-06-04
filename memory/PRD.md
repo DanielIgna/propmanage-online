@@ -4,6 +4,32 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 ## Recent additions (Feb 2026)
+- **Phase 73 — Admin Manual 2.0 + Snapshots Rollback + Service Contracts** ✅ (Feb 4 2026)
+  - **Admin Documentation rescriere completă** at `/admin/documentation` — 14 module documentate (vs 9 anterior):
+    - 🆕 **Ghid Buton-cu-Buton**: 20 butoane principale (Settings, AI Control, QA Copilot, AI Dev Team, AI Security, Verified Estate, Client/Specialist/Operator Dashboards, GDPR) explicate în limbaj simplu — rol + când folosești + când actualizezi.
+    - 🆕 **Snapshots & Rollback Settings** — ghid utilizare.
+    - 🆕 **Contract Servicii** — cum se generează, semnează, mediază.
+    - 🆕 **Server Rackhost & Plan Migrare** — istoric + plan migrare către Cloudflare/Hetzner cu pași concreți și avertismente.
+    - 🆕 **Adrese email .ro dedicate** — 3 opțiuni (Zoho Free RECOMANDAT, Google Workspace 6 EUR/u/lună, Migadu 9 EUR flat) cu pași DNS exacți.
+    - **Status per topic**: `Creat` (verde) cu lista realizărilor + `TODO Îmbunătățiri` (galben) cu lista pentru perfecționare.
+    - **Buton "Generează prompt pentru Emergent"** per topic — Claude scrie task structurat din TODO-uri, gata de copy-paste înapoi în chat.
+    - **AI Manual Assistant modal**: chat care răspunde din manual folosind RAG (Document Intelligence pipeline din Phase 71).
+    - Search bar peste tot conținutul.
+  - **Snapshots & Rollback** — `routes/settings_snapshots.py`:
+    - APScheduler job zilnic la 04:00 (Bucharest TZ) — `take_auto_snapshot()`.
+    - Buton "Snapshot acum" + listă istoric ultimele 50 (rolling buffer auto-clean).
+    - POST `/restore` face automat un `pre_restore` snapshot înainte de overwrite — rollback la rollback.
+    - 3 tipuri: `auto` / `manual` / `pre_restore` cu UI cu coloare distinctă (albastru / lime / amber).
+    - Integrat în AdminSettingsControl cu toggle pentru afișare panou.
+  - **Service Contracts** — `routes/service_contracts.py`:
+    - Template română generic (level "scrisoare de intenție comercială", nu act notarial) cu 9 clauze: părți, obiect, preț ESCROW Stripe, obligații client, obligații specialist, mediere prin Operator PropManage (obligatorie 5 zile lucrătoare înainte instanță), dispută, recepție 48h, clauze finale.
+    - Editabil din `app_settings.contract_template` (HTML cu `{{placeholdere}}` simplu fără eval).
+    - Endpoints: `/generate`, `/{cid}`, `/{cid}/sign`, `/{cid}/operator-resolve`, `/by-request/{request_id}`, `/list/my`.
+    - Pagină `/contracts/{cid}` cu print-friendly white background, semnătură electronică modal, operator mediation form (când role=operator/admin).
+    - **Bug critical găsit și fixat** (iter 52→53): request lookup folosea `id` string, dar Mongo stochează `_id: ObjectId`. Dual lookup + storage normalizat la string-form.
+  - **Mongo collections**: `app_settings_snapshots`, `service_contracts`.
+  - **Tested**: iteration_52 (8/8 snapshots + 8/8 contracts FAIL=>fix), iteration_53 (10/10 contracts PASS post-fix) = **18/18 backend + 100% frontend**.
+
 - **Phase 72 — AI Dev Team + AI Security Center** ✅ (Feb 4 2026)
   - **AI Dev Team READ-ONLY** at `/admin/ai-dev-team` — 4 specialized Claude agents (frontend/backend/qa/security) analyze any indexed file → return JSON with summary, issues (P0-P3 severity), improvements, security_concerns, next_actions (copy-paste prompts for Emergent chat). Defense-in-depth path validation: blocks `..`, absolute paths, `.env/.git/secrets/node_modules`, plus enforces file must be in code_index. Max 12000 chars/file to keep within Cloudflare 60s timeout.
   - **AI Security Center** at `/admin/ai-security` — read-only threat dashboard:
