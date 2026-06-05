@@ -180,7 +180,9 @@ const FutureIdeasVault = () => {
           </div>
         ) : (
           <div className="mt-8 space-y-4">
-            {FUTURE_IDEAS.map((idea) => {
+            {[...FUTURE_IDEAS]
+              .sort((a, b) => (a.priority === "high" ? -1 : 0) - (b.priority === "high" ? -1 : 0))
+              .map((idea) => {
               const st = getStatus(idea.id);
               const meta = STATUS_META[st];
               const Icon = meta.icon;
@@ -188,16 +190,25 @@ const FutureIdeasVault = () => {
                 <button
                   key={idea.id}
                   onClick={() => setSelected(idea)}
-                  className="w-full text-left bg-[#0e0e10] border border-white/10 hover:border-white/20 rounded-2xl p-5 transition-all group"
+                  className={`w-full text-left bg-[#0e0e10] border rounded-2xl p-5 transition-all group ${
+                    idea.priority === "high" ? "border-red-500/40 hover:border-red-500/60" : "border-white/10 hover:border-white/20"
+                  }`}
                   data-testid={`fi-card-${idea.id}`}
                 >
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                      <idea.icon className="w-5 h-5 text-stone-300" />
+                    <div className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${
+                      idea.priority === "high" ? "bg-red-500/10 border-red-500/30" : "bg-white/5 border-white/10"
+                    }`}>
+                      <idea.icon className={`w-5 h-5 ${idea.priority === "high" ? "text-red-300" : "text-stone-300"}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <span className="font-mono text-[10px] uppercase tracking-wider text-stone-500">{idea.code}</span>
+                        {idea.priority === "high" && (
+                          <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border bg-red-500/15 border-red-500/40 text-red-300 font-bold animate-pulse">
+                            <ShieldAlert className="w-3 h-3" /> Prioritate Înaltă
+                          </span>
+                        )}
                         <span className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border ${colorClasses(meta.color)}`}>
                           <Icon className="w-3 h-3" /> {meta.label}
                         </span>
@@ -315,6 +326,7 @@ const RecentActivity = ({ ideas, statuses, onOpen }) => {
 // ============================================================================
 const TABS = [
   { id: "overview", label: "Overview",        icon: Lightbulb },
+  { id: "questions", label: "Decizii Pending", icon: AlertTriangle, conditional: "openQuestions" },
   { id: "phases",   label: "Faze (Etape)",    icon: GitBranch },
   { id: "backend",  label: "Backend Spec",    icon: Code2 },
   { id: "frontend", label: "Frontend Spec",   icon: Layout },
@@ -523,18 +535,25 @@ const IdeaDetail = ({ idea, status, onBack, onSaved }) => {
 
         {/* TABS */}
         <div className="flex flex-wrap gap-2 mb-4">
-          {TABS.map(t => {
+          {TABS.filter(t => !t.conditional || idea[t.conditional]).map(t => {
             const Icon = t.icon;
+            const isQuestions = t.id === "questions";
+            const pendingCount = isQuestions ? (idea.openQuestions || []).filter(q => !q.founderDecision).length : 0;
             return (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm border transition-colors ${
-                  tab === t.id ? "bg-white/10 border-white/30 text-white" : "bg-[#0e0e10] border-white/10 text-stone-400 hover:text-white"
+                  tab === t.id
+                    ? (isQuestions ? "bg-red-500/15 border-red-500/40 text-red-200" : "bg-white/10 border-white/30 text-white")
+                    : (isQuestions ? "bg-red-500/5 border-red-500/30 text-red-300 hover:bg-red-500/10" : "bg-[#0e0e10] border-white/10 text-stone-400 hover:text-white")
                 }`}
                 data-testid={`fi-tab-${t.id}`}
               >
                 <Icon className="w-4 h-4" /> {t.label}
+                {isQuestions && pendingCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0 rounded-full bg-red-500 text-white text-[10px] font-bold">{pendingCount}</span>
+                )}
               </button>
             );
           })}
@@ -542,7 +561,8 @@ const IdeaDetail = ({ idea, status, onBack, onSaved }) => {
 
         {/* TAB CONTENT */}
         <div className="bg-[#0e0e10] border border-white/10 rounded-2xl p-6">
-          {tab === "overview" && <SectionOverview idea={idea} />}
+          {tab === "overview"  && <SectionOverview idea={idea} />}
+          {tab === "questions" && <SectionOpenQuestions idea={idea} />}
           {tab === "phases"   && <SectionPhases idea={idea} />}
           {tab === "backend"  && <SectionBackend idea={idea} />}
           {tab === "frontend" && <SectionFrontend idea={idea} />}
@@ -604,6 +624,73 @@ const SectionOverview = ({ idea }) => (
     </div>
   </div>
 );
+
+// ============================================================================
+// OPEN QUESTIONS — decisions pending from founder before implementation
+// ============================================================================
+const SectionOpenQuestions = ({ idea }) => {
+  const questions = idea.openQuestions || [];
+  const pendingCount = questions.filter(q => !q.founderDecision).length;
+  return (
+    <div className="space-y-5">
+      <div className="bg-red-500/10 border border-red-500/40 rounded-xl p-4 flex items-start gap-3">
+        <ShieldAlert className="w-5 h-5 text-red-300 shrink-0 mt-0.5" />
+        <div className="text-sm">
+          <div className="font-semibold text-red-200 mb-1">⚠️ Decizii necesare ÎNAINTE de implementare ({pendingCount} pending)</div>
+          <div className="text-stone-300 text-xs">
+            Această propunere este marcată cu <strong className="text-red-300">PRIORITATE ÎNALTĂ</strong> dar nu poate fi implementată până nu primim răspunsuri la întrebările de mai jos.
+            Răspunsurile tale vor fi folosite pentru a configura scope-ul exact al implementării.
+          </div>
+        </div>
+      </div>
+
+      {questions.map((q, i) => (
+        <div key={i} className="border border-white/10 rounded-xl bg-white/[0.02] overflow-hidden">
+          <div className="px-4 py-3 bg-white/[0.03] border-b border-white/10 flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-red-500/15 border border-red-500/40 flex items-center justify-center text-[10px] font-bold text-red-300">{i + 1}</span>
+            <div className="font-semibold text-white text-sm flex-1">{q.title}</div>
+            {q.founderDecision ? (
+              <span className="text-[10px] uppercase px-2 py-0.5 rounded-full border bg-emerald-500/10 border-emerald-500/40 text-emerald-300">
+                <CheckCircle2 className="w-3 h-3 inline mr-1" /> Decis
+              </span>
+            ) : (
+              <span className="text-[10px] uppercase px-2 py-0.5 rounded-full border bg-amber-500/10 border-amber-500/40 text-amber-300">
+                <Clock className="w-3 h-3 inline mr-1" /> Pending
+              </span>
+            )}
+          </div>
+          <div className="px-4 py-3 space-y-3">
+            <div className="text-xs text-stone-400 leading-relaxed">{q.context}</div>
+            <div className="space-y-1.5">
+              {q.options.map((opt, j) => (
+                <div key={j} className={`text-sm px-3 py-2 rounded-lg border ${
+                  q.founderDecision === opt
+                    ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-200"
+                    : "bg-white/[0.02] border-white/10 text-stone-300"
+                }`}>
+                  {q.founderDecision === opt && <CheckCircle2 className="w-3.5 h-3.5 inline mr-1.5 text-emerald-400" />}
+                  {opt}
+                </div>
+              ))}
+            </div>
+            {q.founderDecision && (
+              <div className="text-[11px] text-stone-500 italic">
+                Decizie founder: {q.founderDecision}
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+
+      <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-3 text-xs text-blue-100 flex items-start gap-2">
+        <Lightbulb className="w-3.5 h-3.5 shrink-0 mt-0.5 text-blue-300" />
+        <div>
+          Pentru a răspunde la aceste întrebări, scrie-mi în chat: <code className="bg-white/10 px-1 rounded">"Decizii FOUNDER-GATE: 1=a, 2=b, 3=a, 4=c"</code> sau direct cu detalii. Voi actualiza propunerea cu deciziile tale.
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const SectionPhases = ({ idea }) => (
   <div className="space-y-3">

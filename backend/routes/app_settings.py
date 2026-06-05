@@ -138,6 +138,7 @@ class FounderContact(BaseModel):
     """Primary owner contact — used for critical alerts + dual-verification gates."""
     name: Optional[str] = ""
     email: Optional[str] = ""
+    backup_email: Optional[str] = ""  # secondary recipient for security/data alerts
     phone: Optional[str] = ""
     country: Optional[str] = "RO"
     is_primary_owner: Optional[bool] = True

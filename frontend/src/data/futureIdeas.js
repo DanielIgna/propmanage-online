@@ -19,6 +19,7 @@ export const FUTURE_IDEAS = [
     code: "FOUNDER-GATE",
     title: "Founder Approval Gate — Dublă verificare email + SMS pentru modificări critice",
     icon: ShieldCheck,
+    priority: "high",
     risk: 6,
     riskExplanation: "Risc 6/10 = atinge zonele critice (cod, date, admin permissions, modificări business logic). Probabilitate ~60% de bug-uri în primele 2-3 săptămâni (false-positive la detection, lockout potențial dacă SMS Twilio eșuează). Mitigările: bypass tip 'glass-break' (cod recovery offline) + audit log imutabil + opțiune SMS-fallback prin email TOTP. Funcțional 100%, doar trebuie testat extensiv.",
     timelineDays: 12,
@@ -295,6 +296,51 @@ export const FUTURE_IDEAS = [
     ],
     breakEven: "Pe Emergent: 50-90 credite estimate. Comparativ freelance: 2.400€ teoretic (12 zile × 200€/zi). Opex lunar: 25€ (Twilio SMS + email). Break-even: nu se măsoară în venit direct (e protecție, nu monetizare), ci în RISK MITIGATION. Echivalent ROI: prevenirea unui singur incident major (ștergere accidentală, fraudă admin compromis, AI scăpat de sub control) acoperă investiția x100. Esențial dacă: (a) ai >2 admini, (b) folosești agent AI autonom, (c) scalezi spre platformă serioasă.",
     recommendation: "Recomandare: **PRIORITATE TOP**. Acest gate ar trebui implementat ÎNAINTEA oricărei alte propuneri majore (DS-ATLAS, MKT-V2, EXP-V2) pentru că orice viitoare modificare va beneficia de protecția lui. START cu FG-0 + FG-1 + FG-2 (6 zile, ~25-45 credite) — minimum viabil care îți dă deja 80% din protecție. Pentru întrebarea ta despre 'modificări care pot schimba major funcționalitatea aplicației': lista inițială pe care o propun: (1) modificare comision/pricing, (2) ștergere bulk colecții, (3) transfer ownership cont, (4) export GDPR >100 rânduri, (5) modificare admin roles, (6) deploy production cod cu impact business logic, (7) agent AI sugerează schimbare structurală, (8) modificare destinație Stripe, (9) dezactivare gate însuși. Tu poți edita lista oricând.",
+    openQuestions: [
+      {
+        title: "Lista acțiuni protejate inițială",
+        context: "9 acțiuni propuse: comision, ștergere bulk, transfer ownership, export GDPR >100, admin roles, deploy backend, agent AI structural, destinație Stripe, dezactivare gate. Trebuie validat dacă adăugăm: credențiale Stripe, API keys, schimbare email founder.",
+        options: [
+          "a) OK lista propusă (9 acțiuni)",
+          "b) Adaugă: modificare credențiale Stripe, API keys, schimbare email founder (→ 12 acțiuni)",
+          "c) Adaugă altele specifice (de definit)",
+          "d) Lista minimă (3-4 acțiuni esențiale doar) pentru rollout treptat",
+        ],
+        founderDecision: null,
+      },
+      {
+        title: "Cont Twilio pentru SMS",
+        context: "Twilio Romania: ~0.04€/SMS. Estimat 50 cereri/lună = 2€/lună la regim normal. Trebuie cont activat înainte de Phase FG-1.",
+        options: [
+          "a) Founder creează contul Twilio (control direct, card propriu)",
+          "b) Folosește trial gratuit Twilio până validăm flow-ul (apoi upgrade)",
+          "c) Pe BACKLOG — decid mai târziu, începe doar FG-0",
+        ],
+        founderDecision: null,
+      },
+      {
+        title: "Timeout pentru aprobare",
+        context: "Cât timp stă o cerere în queue înainte să fie auto-respinsă. Afectează balansul între strictness și risc lockout dacă founder e indisponibil.",
+        options: [
+          "a) 24h (recomandat) — auto-reject după zi întreagă, founder are timp",
+          "b) 4h — mai strict, dar risc lockout dacă ești în avion/concediu",
+          "c) 72h — mai relaxat, dar acțiuni importante stau mult în queue",
+          "d) Configurable per severity (critical=4h, high=24h, medium=72h)",
+        ],
+        founderDecision: null,
+      },
+      {
+        title: "Când începem implementarea",
+        context: "Phase FG-0 + FG-1 = ~6 zile, ~25-45 credite Emergent. Acest gate ar trebui implementat ÎNAINTEA altor propuneri majore.",
+        options: [
+          "a) ACUM — START Phase FG-0 (foundation) imediat după aprobare",
+          "b) Marchează doar Aprobat acum, începem după validare lista acțiuni",
+          "c) Aprobat dar AȘTEAPTĂ — vreau Twilio cont gata + recovery codes printate înainte",
+          "d) ÎN DISCUȚIE — vreau să verific cost SMS pe 3 luni înainte de commit",
+        ],
+        founderDecision: null,
+      },
+    ],
   },
 
   // ==========================================================================
