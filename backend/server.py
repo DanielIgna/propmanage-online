@@ -84,6 +84,7 @@ from routes.ai_weekly_briefing import router as ai_weekly_briefing_router, run_w
 from routes.admin_todos import router as admin_todos_router
 from routes.experience_spaces_bootstrap import router as es_bootstrap_router
 from routes.future_ideas import router as future_ideas_router
+from routes.future_ideas_digest import router as future_ideas_digest_router, run_future_ideas_digest_job
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
@@ -173,6 +174,7 @@ for r in (
     admin_todos_router,
     es_bootstrap_router,
     future_ideas_router,
+    future_ideas_digest_router,
 ):
     app.include_router(r)
 
@@ -223,6 +225,14 @@ async def startup():
             run_weekly_briefing_job,
             CronTrigger(day_of_week="mon", hour=9, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="weekly_ai_briefing",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        # Future Ideas Vault — weekly digest, Mondays 09:15 (after AI briefing)
+        scheduler.add_job(
+            run_future_ideas_digest_job,
+            CronTrigger(day_of_week="mon", hour=9, minute=15, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="future_ideas_digest",
             replace_existing=True,
             misfire_grace_time=7200,
         )
@@ -381,6 +391,7 @@ async def startup():
         logger.info("Weekly Dev Velocity scheduler started (Mondays 09:30 Europe/Bucharest).")
         logger.info("Autonomy snapshot scheduler started (daily 03:15 Europe/Bucharest).")
         logger.info("Weekly AI Briefing scheduler started (Mondays 09:00 Europe/Bucharest).")
+        logger.info("Future Ideas digest scheduler started (Mondays 09:15 Europe/Bucharest).")
 
 
 @app.on_event("shutdown")

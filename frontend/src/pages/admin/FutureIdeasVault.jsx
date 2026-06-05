@@ -14,7 +14,7 @@ import {
   Lightbulb, ShieldAlert, Lock, Sparkles, ChevronRight, ChevronLeft,
   Loader2, Save, Coins, TrendingUp, AlertTriangle, CheckCircle2,
   Code2, Database, Layout, GitBranch, Brain, Clock, FileText,
-  BarChart3, X as XIcon, History, ArrowRight,
+  BarChart3, X as XIcon, History, ArrowRight, Mail, Send,
 } from "lucide-react";
 import { FUTURE_IDEAS } from "../../data/futureIdeas";
 
@@ -74,6 +74,7 @@ const FutureIdeasVault = () => {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null); // idea object
   const [showComparator, setShowComparator] = useState(false);
+  const [showDigest, setShowDigest] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -120,23 +121,41 @@ const FutureIdeasVault = () => {
               Fiecare propunere include documentație completă pentru echipa IT (backend, frontend, DB, riscuri, faze, ROI estimat).
             </p>
           </div>
-          <button
-            onClick={() => setShowComparator(true)}
-            className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-500/10 border border-violet-500/40 text-violet-200 text-sm font-semibold hover:bg-violet-500/20 transition-colors shrink-0 mt-2"
-            data-testid="fi-open-comparator"
-          >
-            <BarChart3 className="w-4 h-4" /> Comparator propuneri
-          </button>
+          <div className="flex flex-col gap-2 shrink-0 mt-2">
+            <button
+              onClick={() => setShowComparator(true)}
+              className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-500/10 border border-violet-500/40 text-violet-200 text-sm font-semibold hover:bg-violet-500/20 transition-colors"
+              data-testid="fi-open-comparator"
+            >
+              <BarChart3 className="w-4 h-4" /> Comparator propuneri
+            </button>
+            <button
+              onClick={() => setShowDigest(true)}
+              className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/40 text-blue-200 text-sm font-semibold hover:bg-blue-500/20 transition-colors"
+              data-testid="fi-open-digest"
+            >
+              <Mail className="w-4 h-4" /> Digest email
+            </button>
+          </div>
         </div>
 
         {/* Mobile-only comparator button */}
-        <button
-          onClick={() => setShowComparator(true)}
-          className="sm:hidden mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-violet-500/10 border border-violet-500/40 text-violet-200 text-sm font-semibold hover:bg-violet-500/20 transition-colors"
-          data-testid="fi-open-comparator-mobile"
-        >
-          <BarChart3 className="w-4 h-4" /> Comparator propuneri
-        </button>
+        <div className="sm:hidden mt-4 grid grid-cols-2 gap-2">
+          <button
+            onClick={() => setShowComparator(true)}
+            className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-violet-500/10 border border-violet-500/40 text-violet-200 text-sm font-semibold hover:bg-violet-500/20 transition-colors"
+            data-testid="fi-open-comparator-mobile"
+          >
+            <BarChart3 className="w-4 h-4" /> Comparator
+          </button>
+          <button
+            onClick={() => setShowDigest(true)}
+            className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/40 text-blue-200 text-sm font-semibold hover:bg-blue-500/20 transition-colors"
+            data-testid="fi-open-digest-mobile"
+          >
+            <Mail className="w-4 h-4" /> Digest
+          </button>
+        </div>
 
         {/* WARNING BANNER — most prominent */}
         <div className="mt-6 rounded-2xl border border-red-500/40 bg-gradient-to-r from-red-500/10 via-red-500/5 to-amber-500/5 p-5 flex items-start gap-3" data-testid="fi-warning">
@@ -218,6 +237,10 @@ const FutureIdeasVault = () => {
           statuses={statuses}
           onClose={() => setShowComparator(false)}
         />
+      )}
+
+      {showDigest && (
+        <DigestModal onClose={() => setShowDigest(false)} />
       )}
     </div>
   );
@@ -1174,6 +1197,238 @@ const ComparatorModal = ({ ideas, statuses, onClose }) => {
           <span><strong className="text-amber-300">ROI galben</strong>: 4-6 luni</span>
           <span><strong className="text-red-300">ROI roșu</strong>: &gt;6 luni</span>
           <span className="ml-auto">💡 ROI = Cost dev / Venit lunar. Mai mic = mai bine.</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// DIGEST MODAL — weekly email config + send-now + history
+// ============================================================================
+const DigestModal = ({ onClose }) => {
+  const [cfg, setCfg] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [preview, setPreview] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  const [recipientsInput, setRecipientsInput] = useState("");
+  const [staleDaysInput, setStaleDaysInput] = useState(30);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [c, h, p] = await Promise.all([
+        ax.get("/api/admin/future-ideas-digest/config"),
+        ax.get("/api/admin/future-ideas-digest/history?limit=10"),
+        ax.get("/api/admin/future-ideas-digest/preview"),
+      ]);
+      setCfg(c.data);
+      setHistory(h.data.items || []);
+      setPreview(p.data);
+      setRecipientsInput((c.data.recipients || []).join(", "));
+      setStaleDaysInput(c.data.stale_threshold_days || 30);
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const saveConfig = async (patch) => {
+    setSaving(true);
+    setFeedback(null);
+    try {
+      const { data } = await ax.put("/api/admin/future-ideas-digest/config", patch);
+      setCfg(data);
+      setFeedback({ type: "ok", text: "Setări salvate" });
+      setTimeout(() => setFeedback(null), 2200);
+    } catch (e) {
+      setFeedback({ type: "err", text: e?.response?.data?.detail || "Eroare la salvare" });
+    } finally { setSaving(false); }
+  };
+
+  const toggleEnabled = () => saveConfig({ enabled: !cfg.enabled });
+
+  const saveRecipients = () => {
+    const list = recipientsInput.split(",").map(s => s.trim()).filter(Boolean);
+    saveConfig({ recipients: list, stale_threshold_days: Number(staleDaysInput) });
+  };
+
+  const sendNow = async () => {
+    setSending(true);
+    setFeedback(null);
+    try {
+      const { data } = await ax.post("/api/admin/future-ideas-digest/send-now", {});
+      if (data.skipped) {
+        setFeedback({ type: "err", text: `Trimitere sărită: ${data.skipped}` });
+      } else if (data.ok) {
+        setFeedback({ type: "ok", text: `Trimis: ${data.subject}` });
+        load();
+      } else {
+        setFeedback({ type: "err", text: `Eroare trimitere: ${data.error || "necunoscută"}` });
+      }
+    } catch (e) {
+      setFeedback({ type: "err", text: e?.response?.data?.detail || "Eroare trimitere" });
+    } finally { setSending(false); }
+  };
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div className="bg-[#0a0a0b] border border-blue-500/30 rounded-2xl px-8 py-6 flex items-center gap-3 text-stone-400">
+          <Loader2 className="w-5 h-5 animate-spin text-blue-300" /> Se încarcă configurarea...
+        </div>
+      </div>
+    );
+  }
+
+  const nStale = preview?.data?.stale_items?.length || 0;
+  const nRecent = preview?.data?.recent_decisions?.length || 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm" data-testid="fi-digest-modal">
+      <div className="bg-[#0a0a0b] border border-blue-500/30 rounded-2xl max-w-3xl w-full max-h-[95vh] overflow-hidden flex flex-col">
+        <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center">
+              <Mail className="w-5 h-5 text-blue-300" />
+            </div>
+            <div>
+              <h2 className="font-serif text-xl text-white">Digest Email Săptămânal</h2>
+              <p className="text-[11px] text-stone-500">Trimis automat Lunea 09:15 · Europe/Bucharest</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center" data-testid="fi-digest-close">
+            <XIcon className="w-4 h-4 text-stone-400" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-auto px-5 py-4 space-y-5">
+          {/* TOGGLE */}
+          <div className="flex items-center justify-between bg-[#0e0e10] border border-white/10 rounded-xl p-4">
+            <div>
+              <div className="text-sm text-white font-semibold">Digest activat</div>
+              <div className="text-[11px] text-stone-500 mt-0.5">
+                Când e ON, email-ul se trimite automat luni dimineața la 09:15
+              </div>
+            </div>
+            <button
+              onClick={toggleEnabled}
+              disabled={saving}
+              className={`relative w-12 h-7 rounded-full transition-colors ${cfg.enabled ? "bg-emerald-500" : "bg-stone-700"}`}
+              data-testid="fi-digest-toggle"
+            >
+              <span className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white transition-transform ${cfg.enabled ? "translate-x-5" : ""}`}></span>
+            </button>
+          </div>
+
+          {/* CONFIG */}
+          <div className="bg-[#0e0e10] border border-white/10 rounded-xl p-4 space-y-3">
+            <div className="text-xs uppercase tracking-wider text-stone-400">Configurare</div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-stone-400">Destinatari (separate prin virgulă)</label>
+              <input
+                type="text"
+                value={recipientsInput}
+                onChange={(e) => setRecipientsInput(e.target.value)}
+                className="mt-2 w-full bg-[#0a0a0b] border border-white/10 rounded-lg px-3 py-2 text-sm"
+                placeholder="admin@propmanage.io, partner@..."
+                data-testid="fi-digest-recipients"
+              />
+            </div>
+            <div className="flex items-end gap-3 flex-wrap">
+              <div className="flex-1 min-w-[150px]">
+                <label className="text-[10px] uppercase tracking-wider text-stone-400">Prag "uitate" (zile)</label>
+                <input
+                  type="number"
+                  min={7}
+                  max={365}
+                  value={staleDaysInput}
+                  onChange={(e) => setStaleDaysInput(e.target.value)}
+                  className="mt-2 w-full bg-[#0a0a0b] border border-white/10 rounded-lg px-3 py-2 text-sm font-mono"
+                  data-testid="fi-digest-threshold"
+                />
+              </div>
+              <button
+                onClick={saveRecipients}
+                disabled={saving}
+                className="px-4 py-2 rounded-xl bg-white/10 border border-white/20 text-stone-200 text-sm hover:bg-white/15 disabled:opacity-50"
+                data-testid="fi-digest-save-config"
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvează"}
+              </button>
+            </div>
+            <div className="text-[10px] text-stone-500">
+              💡 Propunerile rămase în "În evaluare" sau "În discuție" mai mult de {staleDaysInput} zile fără modificare apar în digest.
+            </div>
+          </div>
+
+          {/* PREVIEW STATS */}
+          <div className="bg-[#0e0e10] border border-blue-500/20 rounded-xl p-4">
+            <div className="text-xs uppercase tracking-wider text-blue-300 mb-3">Preview content (pe baza datelor curente)</div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="bg-amber-500/5 border border-amber-500/30 rounded-lg p-3">
+                <div className="text-[10px] uppercase text-amber-300">Propuneri uitate</div>
+                <div className="text-2xl font-mono text-white mt-1">{nStale}</div>
+                <div className="text-[10px] text-stone-500 mt-1">{`> ${cfg.stale_threshold_days} zile fără decizie`}</div>
+              </div>
+              <div className="bg-violet-500/5 border border-violet-500/30 rounded-lg p-3">
+                <div className="text-[10px] uppercase text-violet-300">Decizii ultimele 7 zile</div>
+                <div className="text-2xl font-mono text-white mt-1">{nRecent}</div>
+                <div className="text-[10px] text-stone-500 mt-1">cross-propuneri</div>
+              </div>
+            </div>
+          </div>
+
+          {/* SEND NOW */}
+          <button
+            onClick={sendNow}
+            disabled={sending || cfg.recipients.length === 0}
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="fi-digest-send-now"
+          >
+            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            Trimite acum (test) {cfg.recipients.length > 0 ? `→ ${cfg.recipients.length} destinatari` : "(necesită destinatari)"}
+          </button>
+
+          {feedback && (
+            <div className={`text-xs rounded-lg p-3 border flex items-center gap-2 ${
+              feedback.type === "ok" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : "bg-red-500/10 border-red-500/30 text-red-300"
+            }`}>
+              {feedback.type === "ok" ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+              {feedback.text}
+            </div>
+          )}
+
+          {/* HISTORY */}
+          <div>
+            <div className="text-xs uppercase tracking-wider text-stone-400 mb-2 flex items-center gap-2">
+              <History className="w-3.5 h-3.5" /> Istoric trimiteri ({history.length})
+            </div>
+            {history.length === 0 ? (
+              <div className="text-xs text-stone-500 bg-white/[0.02] rounded-lg p-3 italic">Niciun digest trimis încă.</div>
+            ) : (
+              <div className="space-y-1 max-h-48 overflow-auto">
+                {history.map((h, i) => (
+                  <div key={i} className="text-[11px] bg-white/[0.02] border border-white/5 rounded-lg p-2 flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${h.ok ? "bg-emerald-400" : "bg-red-400"}`}></span>
+                    <span className="text-stone-400 font-mono">{new Date(h.sent_at).toLocaleString("ro-RO")}</span>
+                    <span className="text-stone-500">·</span>
+                    <span className="text-stone-300 truncate flex-1">{h.subject}</span>
+                    {h.forced && <span className="text-[9px] text-blue-300 uppercase">manual</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="px-5 py-3 border-t border-white/10 bg-white/[0.02] text-[10px] text-stone-500">
+          💡 Schedule automat: <strong className="text-stone-300">Luni 09:15 Europe/Bucharest</strong>. Dezactivează din toggle de mai sus pentru a opri trimiterile automate.
+          {cfg.last_sent_at && (
+            <span className="ml-2">· Ultima trimitere: {new Date(cfg.last_sent_at).toLocaleString("ro-RO")}</span>
+          )}
         </div>
       </div>
     </div>
