@@ -37,6 +37,38 @@ const colorClasses = (c) => ({
   stone:   "bg-stone-500/10 border-stone-500/40 text-stone-300",
 }[c]);
 
+// Relative time helper — "acum 2h", "acum 3 zile"
+const relativeTime = (iso) => {
+  if (!iso) return "";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const sec = Math.floor(diffMs / 1000);
+  if (sec < 60) return "acum câteva secunde";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `acum ${min} min`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `acum ${hr}h`;
+  const days = Math.floor(hr / 24);
+  if (days < 7) return `acum ${days} zile`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `acum ${weeks} săpt.`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `acum ${months} luni`;
+  return `acum ${Math.floor(days / 365)} ani`;
+};
+
+// Aggregate recent decisions across all proposals (newest first, top N)
+const aggregateRecentDecisions = (ideas, statuses, limit = 5) => {
+  const all = [];
+  ideas.forEach((idea) => {
+    const log = statuses[idea.id]?.decision_log || [];
+    log.forEach((entry) => {
+      all.push({ ...entry, idea_id: idea.id, idea_code: idea.code, idea_title: idea.title, idea_icon: idea.icon });
+    });
+  });
+  all.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  return all.slice(0, limit);
+};
+
 const FutureIdeasVault = () => {
   const [statuses, setStatuses] = useState({}); // idea_id -> status doc
   const [loading, setLoading] = useState(true);
@@ -120,6 +152,9 @@ const FutureIdeasVault = () => {
           </div>
         </div>
 
+        {/* RECENT CROSS-PROPOSAL ACTIVITY — top 5 decisions across all ideas */}
+        {!loading && <RecentActivity ideas={FUTURE_IDEAS} statuses={statuses} onOpen={(idea) => setSelected(idea)} />}
+
         {loading ? (
           <div className="mt-10 text-center text-stone-400 flex items-center justify-center gap-2">
             <Loader2 className="w-4 h-4 animate-spin" /> Se încarcă propunerile...
@@ -184,6 +219,70 @@ const FutureIdeasVault = () => {
           onClose={() => setShowComparator(false)}
         />
       )}
+    </div>
+  );
+};
+
+// ============================================================================
+// RECENT ACTIVITY — cross-proposal decision timeline (top 5)
+// ============================================================================
+const RecentActivity = ({ ideas, statuses, onOpen }) => {
+  const recent = aggregateRecentDecisions(ideas, statuses, 5);
+  if (recent.length === 0) {
+    return (
+      <div className="mt-6 bg-[#0e0e10] border border-white/10 rounded-2xl p-5" data-testid="fi-recent-activity-empty">
+        <div className="flex items-center gap-2 text-sm uppercase tracking-wider text-stone-400 mb-2">
+          <History className="w-4 h-4 text-violet-300" /> Activitate recentă cross-propuneri
+        </div>
+        <div className="text-xs text-stone-500">
+          Nicio decizie încă. Pe măsură ce marchezi statusul propunerilor (cu motiv), ultimele 5 modificări apar aici pentru o vedere rapidă.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-6 bg-[#0e0e10] border border-violet-500/20 rounded-2xl overflow-hidden" data-testid="fi-recent-activity">
+      <div className="px-5 py-3 border-b border-white/10 bg-violet-500/5 flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2 text-sm uppercase tracking-wider text-violet-200">
+          <History className="w-4 h-4 text-violet-300" /> Activitate recentă cross-propuneri
+        </div>
+        <span className="text-[10px] text-stone-500 font-mono">Ultimele {recent.length} decizii</span>
+      </div>
+      <div className="divide-y divide-white/5">
+        {recent.map((entry, i) => {
+          const fromMeta = STATUS_META[entry.from_status] || STATUS_META.pending_validation;
+          const toMeta = STATUS_META[entry.to_status] || STATUS_META.pending_validation;
+          const Icon = entry.idea_icon;
+          return (
+            <button
+              key={i}
+              onClick={() => onOpen(ideas.find((idea) => idea.id === entry.idea_id))}
+              className="w-full text-left px-5 py-3 hover:bg-white/[0.03] transition-colors flex items-start gap-3 group"
+              data-testid={`fi-recent-entry-${i}`}
+            >
+              <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 group-hover:border-violet-500/40">
+                <Icon className="w-4 h-4 text-stone-300" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-stone-500">{entry.idea_code}</span>
+                  <span className="text-sm text-white font-semibold truncate max-w-[300px] sm:max-w-[400px]">{entry.idea_title}</span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap text-[10px] mb-1">
+                  <span className={`inline-block uppercase px-1.5 py-0.5 rounded border ${colorClasses(fromMeta.color)}`}>{fromMeta.label}</span>
+                  <ArrowRight className="w-3 h-3 text-stone-500" />
+                  <span className={`inline-block uppercase px-1.5 py-0.5 rounded border ${colorClasses(toMeta.color)}`}>{toMeta.label}</span>
+                  <span className="ml-1 text-stone-500">· {relativeTime(entry.at)}</span>
+                  <span className="text-stone-600">· {entry.by}</span>
+                </div>
+                <div className="text-xs text-stone-300 line-clamp-2 italic">"{entry.reason}"</div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-stone-600 group-hover:text-violet-300 shrink-0 mt-2" />
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 };
