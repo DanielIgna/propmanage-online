@@ -14,7 +14,7 @@ import {
   Lightbulb, ShieldAlert, Lock, Sparkles, ChevronRight, ChevronLeft,
   Loader2, Save, Coins, TrendingUp, AlertTriangle, CheckCircle2,
   Code2, Database, Layout, GitBranch, Brain, Clock, FileText,
-  BarChart3, X as XIcon,
+  BarChart3, X as XIcon, History, ArrowRight,
 } from "lucide-react";
 import { FUTURE_IDEAS } from "../../data/futureIdeas";
 
@@ -200,6 +200,7 @@ const TABS = [
   { id: "risks",    label: "Riscuri",         icon: AlertTriangle },
   { id: "ai",       label: "AI Touchpoints",  icon: Brain },
   { id: "roi",      label: "Cost vs Venit",   icon: TrendingUp },
+  { id: "history",  label: "Istoric Decizii", icon: History },
 ];
 
 const IdeaDetail = ({ idea, status, onBack, onSaved }) => {
@@ -214,10 +215,16 @@ const IdeaDetail = ({ idea, status, onBack, onSaved }) => {
   });
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [reasonModal, setReasonModal] = useState(null); // {fromStatus, toStatus, reason}
 
-  const save = async () => {
+  const prevStatus = status?.status || "pending_validation";
+  const statusChanged = draft.status !== prevStatus;
+
+  const doSave = async (decisionReason = null) => {
     setSaving(true);
     setSaveOk(false);
+    setSaveError(null);
     try {
       const payload = {
         status: draft.status,
@@ -227,11 +234,28 @@ const IdeaDetail = ({ idea, status, onBack, onSaved }) => {
         emergent_credits_used: draft.emergent_credits_used === "" ? null : Number(draft.emergent_credits_used),
         emergent_credits_notes: draft.emergent_credits_notes,
       };
+      if (decisionReason) payload.decision_reason = decisionReason;
       const { data } = await ax.put(`/api/admin/future-ideas/${idea.id}`, payload);
       onSaved(data);
       setSaveOk(true);
+      setReasonModal(null);
       setTimeout(() => setSaveOk(false), 2200);
+    } catch (e) {
+      setSaveError(e?.response?.data?.detail || "Eroare la salvare");
     } finally { setSaving(false); }
+  };
+
+  const save = () => {
+    if (statusChanged) {
+      // Open reason modal
+      setReasonModal({
+        fromStatus: prevStatus,
+        toStatus: draft.status,
+        reason: "",
+      });
+    } else {
+      doSave();
+    }
   };
 
   const stMeta = STATUS_META[draft.status];
@@ -346,11 +370,16 @@ const IdeaDetail = ({ idea, status, onBack, onSaved }) => {
             </div>
           </div>
 
-          <div className="flex items-center justify-between mt-4">
+          <div className="flex items-center justify-between mt-4 flex-wrap gap-3">
             <div className="text-xs text-stone-500">
               Status curent: <span className={`px-2 py-0.5 rounded-full border ${colorClasses(stMeta.color)}`}>{stMeta.label}</span>
               {status?.updated_at && (
                 <span className="ml-2">· Modificat: {new Date(status.updated_at).toLocaleString("ro-RO")} de {status.updated_by}</span>
+              )}
+              {statusChanged && (
+                <span className="ml-2 inline-flex items-center gap-1 text-amber-300">
+                  <AlertTriangle className="w-3 h-3" /> Status modificat — va cere motivul la salvare
+                </span>
               )}
             </div>
             <button
@@ -360,9 +389,14 @@ const IdeaDetail = ({ idea, status, onBack, onSaved }) => {
               data-testid="fi-save"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saveOk ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-              {saveOk ? "Salvat" : "Salvează decizia"}
+              {saveOk ? "Salvat" : statusChanged ? "Continuă & adaugă motiv" : "Salvează"}
             </button>
           </div>
+          {saveError && (
+            <div className="mt-3 bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-xs text-red-300 flex items-center gap-2">
+              <AlertTriangle className="w-3.5 h-3.5" /> {saveError}
+            </div>
+          )}
         </div>
 
         {/* TABS */}
@@ -394,8 +428,21 @@ const IdeaDetail = ({ idea, status, onBack, onSaved }) => {
           {tab === "risks"    && <SectionRisks idea={idea} />}
           {tab === "ai"       && <SectionAI idea={idea} />}
           {tab === "roi"      && <SectionROI idea={idea} />}
+          {tab === "history"  && <SectionHistory status={status} />}
         </div>
       </div>
+
+      {reasonModal && (
+        <DecisionReasonModal
+          fromStatus={reasonModal.fromStatus}
+          toStatus={reasonModal.toStatus}
+          ideaTitle={idea.title}
+          saving={saving}
+          error={saveError}
+          onCancel={() => { setReasonModal(null); setSaveError(null); }}
+          onConfirm={(reason) => doSave(reason)}
+        />
+      )}
     </div>
   );
 };
@@ -684,6 +731,155 @@ const SectionROI = ({ idea }) => (
     </div>
   </div>
 );
+
+// ============================================================================
+// HISTORY TAB — chronological decision timeline per idea
+// ============================================================================
+const SectionHistory = ({ status }) => {
+  const log = [...(status?.decision_log || [])].reverse(); // newest first
+  if (log.length === 0) {
+    return (
+      <div className="text-center py-10">
+        <History className="w-10 h-10 text-stone-600 mx-auto mb-3" />
+        <div className="text-sm text-stone-400">Nicio decizie istorică încă</div>
+        <div className="text-xs text-stone-500 mt-1 max-w-md mx-auto">
+          Istoricul se completează automat când schimbi statusul propunerii. Fiecare schimbare cere un motiv documentat, păstrat aici permanent pentru audit decizional.
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-4" data-testid="fi-history-list">
+      <H>Cronologie decizii ({log.length})</H>
+      <div className="relative pl-6">
+        {/* timeline vertical line */}
+        <div className="absolute left-2 top-2 bottom-2 w-px bg-gradient-to-b from-violet-500/40 via-white/10 to-transparent"></div>
+
+        {log.map((entry, i) => {
+          const fromMeta = STATUS_META[entry.from_status] || STATUS_META.pending_validation;
+          const toMeta = STATUS_META[entry.to_status] || STATUS_META.pending_validation;
+          const FromIcon = fromMeta.icon;
+          const ToIcon = toMeta.icon;
+          return (
+            <div key={i} className="relative pl-6 pb-5" data-testid={`fi-history-entry-${i}`}>
+              {/* timeline dot */}
+              <div className="absolute -left-[5px] top-1 w-3 h-3 rounded-full bg-violet-500 border-2 border-[#0e0e10] shadow-[0_0_0_2px_rgba(139,92,246,0.3)]"></div>
+              <div className="bg-white/[0.02] border border-white/10 rounded-xl p-4">
+                <div className="flex items-center gap-2 flex-wrap text-xs">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${colorClasses(fromMeta.color)}`}>
+                    <FromIcon className="w-3 h-3" /> {fromMeta.label}
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5 text-stone-500" />
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${colorClasses(toMeta.color)}`}>
+                    <ToIcon className="w-3 h-3" /> {toMeta.label}
+                  </span>
+                  <span className="ml-auto text-[10px] text-stone-500">
+                    {new Date(entry.at).toLocaleString("ro-RO", { dateStyle: "medium", timeStyle: "short" })}
+                  </span>
+                </div>
+                <div className="mt-3 text-sm text-stone-200 leading-relaxed whitespace-pre-wrap">
+                  {entry.reason}
+                </div>
+                <div className="mt-2 text-[10px] text-stone-500">
+                  Decizia luată de: <span className="text-stone-400">{entry.by}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-3 text-xs text-violet-100 flex items-start gap-2">
+        <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5 text-violet-300" />
+        <div>Istoricul este <strong>imutabil</strong> — odată salvată, o decizie nu poate fi editată sau ștearsă. Util pentru audit strategic și pentru a-ți aminti peste 6 luni "de ce" ai luat o decizie.</div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// DECISION REASON MODAL — required when status changes
+// ============================================================================
+const DecisionReasonModal = ({ fromStatus, toStatus, ideaTitle, saving, error, onCancel, onConfirm }) => {
+  const [reason, setReason] = useState("");
+  const fromMeta = STATUS_META[fromStatus];
+  const toMeta = STATUS_META[toStatus];
+  const FromIcon = fromMeta.icon;
+  const ToIcon = toMeta.icon;
+  const valid = reason.trim().length >= 3;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" data-testid="fi-reason-modal">
+      <div className="bg-[#0a0a0b] border border-violet-500/40 rounded-2xl max-w-lg w-full overflow-hidden">
+        <div className="px-5 py-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/30 flex items-center justify-center">
+              <History className="w-5 h-5 text-violet-300" />
+            </div>
+            <div>
+              <h2 className="font-serif text-lg text-white">Justificare decizie</h2>
+              <p className="text-[11px] text-stone-500">Va fi păstrată permanent în istoric · imutabilă</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-5 py-4">
+          <div className="text-xs text-stone-400 mb-2">Propunere:</div>
+          <div className="text-sm text-white font-semibold mb-4">{ideaTitle}</div>
+
+          <div className="flex items-center gap-2 flex-wrap mb-4">
+            <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${colorClasses(fromMeta.color)}`}>
+              <FromIcon className="w-3 h-3" /> {fromMeta.label}
+            </span>
+            <ArrowRight className="w-4 h-4 text-stone-500" />
+            <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${colorClasses(toMeta.color)}`}>
+              <ToIcon className="w-3 h-3" /> {toMeta.label}
+            </span>
+          </div>
+
+          <label className="text-[10px] uppercase tracking-wider text-violet-300 block mb-2">
+            Motiv principal (obligatoriu, min. 3 caractere)
+          </label>
+          <textarea
+            autoFocus
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={4}
+            className="w-full bg-[#0e0e10] border border-violet-500/30 focus:border-violet-500/60 rounded-lg px-3 py-2 text-sm outline-none"
+            placeholder="ex: validat cu 3 specialiști vechi, ROI estimat 19x conform istoric 2025, începem cu Phase MKT-0 + MKT-1..."
+            data-testid="fi-reason-input"
+          />
+          <div className="text-[10px] text-stone-500 mt-2">
+            💡 Tip: scrie ce ai luat în considerare (date, validări, riscuri acceptate). Te va ajuta peste 6 luni să-ți amintești context-ul.
+          </div>
+
+          {error && (
+            <div className="mt-3 bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-xs text-red-300 flex items-center gap-2">
+              <AlertTriangle className="w-3.5 h-3.5" /> {error}
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 py-3 border-t border-white/10 bg-white/[0.02] flex items-center justify-end gap-2">
+          <button
+            onClick={onCancel}
+            disabled={saving}
+            className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-stone-300 text-sm hover:bg-white/10 disabled:opacity-50"
+            data-testid="fi-reason-cancel"
+          >Anulează</button>
+          <button
+            onClick={() => onConfirm(reason.trim())}
+            disabled={!valid || saving}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-500 text-white text-sm font-semibold hover:bg-violet-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="fi-reason-confirm"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Confirmă & salvează
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ============================================================================
 // COMPARATOR MODAL — side-by-side comparison of all proposals
