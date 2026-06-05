@@ -14,6 +14,7 @@ import {
   Lightbulb, ShieldAlert, Lock, Sparkles, ChevronRight, ChevronLeft,
   Loader2, Save, Coins, TrendingUp, AlertTriangle, CheckCircle2,
   Code2, Database, Layout, GitBranch, Brain, Clock, FileText,
+  BarChart3, X as XIcon,
 } from "lucide-react";
 import { FUTURE_IDEAS } from "../../data/futureIdeas";
 
@@ -40,6 +41,7 @@ const FutureIdeasVault = () => {
   const [statuses, setStatuses] = useState({}); // idea_id -> status doc
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null); // idea object
+  const [showComparator, setShowComparator] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -77,7 +79,7 @@ const FutureIdeasVault = () => {
           <div className="w-12 h-12 rounded-2xl bg-[#d4ff3a]/10 border border-[#d4ff3a]/30 flex items-center justify-center shrink-0">
             <Lightbulb className="w-5 h-5 text-[#d4ff3a]" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="font-serif text-4xl md:text-5xl tracking-tight" data-testid="fi-title">
               Idei de <span className="italic gradient-text">Dezvoltare</span> Viitoare
             </h1>
@@ -86,7 +88,23 @@ const FutureIdeasVault = () => {
               Fiecare propunere include documentație completă pentru echipa IT (backend, frontend, DB, riscuri, faze, ROI estimat).
             </p>
           </div>
+          <button
+            onClick={() => setShowComparator(true)}
+            className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-500/10 border border-violet-500/40 text-violet-200 text-sm font-semibold hover:bg-violet-500/20 transition-colors shrink-0 mt-2"
+            data-testid="fi-open-comparator"
+          >
+            <BarChart3 className="w-4 h-4" /> Comparator propuneri
+          </button>
         </div>
+
+        {/* Mobile-only comparator button */}
+        <button
+          onClick={() => setShowComparator(true)}
+          className="sm:hidden mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-violet-500/10 border border-violet-500/40 text-violet-200 text-sm font-semibold hover:bg-violet-500/20 transition-colors"
+          data-testid="fi-open-comparator-mobile"
+        >
+          <BarChart3 className="w-4 h-4" /> Comparator propuneri
+        </button>
 
         {/* WARNING BANNER — most prominent */}
         <div className="mt-6 rounded-2xl border border-red-500/40 bg-gradient-to-r from-red-500/10 via-red-500/5 to-amber-500/5 p-5 flex items-start gap-3" data-testid="fi-warning">
@@ -158,6 +176,14 @@ const FutureIdeasVault = () => {
           </div>
         </div>
       </div>
+
+      {showComparator && (
+        <ComparatorModal
+          ideas={FUTURE_IDEAS}
+          statuses={statuses}
+          onClose={() => setShowComparator(false)}
+        />
+      )}
     </div>
   );
 };
@@ -658,5 +684,205 @@ const SectionROI = ({ idea }) => (
     </div>
   </div>
 );
+
+// ============================================================================
+// COMPARATOR MODAL — side-by-side comparison of all proposals
+// ============================================================================
+const ComparatorModal = ({ ideas, statuses, onClose }) => {
+  const [sortBy, setSortBy] = useState("roi"); // roi | risk | duration | credits
+  const [filter, setFilter] = useState("all"); // all | approved | pending | rejected
+
+  // Compute ROI score (rough heuristic for sorting)
+  const computeRoiScore = (idea, st) => {
+    const cost = st?.estimated_cost_eur ?? idea.estCostEur ?? 1;
+    const revenue = st?.estimated_revenue_eur_monthly ?? idea.estRevenueMonthly ?? 0;
+    // Months to recoup = cost / monthly_revenue (lower = better ROI)
+    return revenue > 0 ? cost / revenue : 999;
+  };
+
+  const filterFn = (idea) => {
+    if (filter === "all") return true;
+    const st = statuses[idea.id]?.status || "pending_validation";
+    if (filter === "approved") return st === "approved" || st === "in_discussion";
+    if (filter === "pending")  return st === "pending_validation";
+    if (filter === "rejected") return st === "rejected" || st === "on_hold";
+    return true;
+  };
+
+  const sortedIdeas = [...ideas].filter(filterFn).sort((a, b) => {
+    const sA = statuses[a.id];
+    const sB = statuses[b.id];
+    if (sortBy === "roi")      return computeRoiScore(a, sA) - computeRoiScore(b, sB);
+    if (sortBy === "risk")     return (a.risk || 5) - (b.risk || 5);
+    if (sortBy === "duration") return (a.timelineDays || 0) - (b.timelineDays || 0);
+    if (sortBy === "credits") {
+      const cA = parseInt((a.emergentCreditsEstimate || "0").match(/\d+/)?.[0] || 999);
+      const cB = parseInt((b.emergentCreditsEstimate || "0").match(/\d+/)?.[0] || 999);
+      return cA - cB;
+    }
+    return 0;
+  });
+
+  const totalApprovedCost = ideas
+    .filter(i => ["approved", "in_discussion"].includes(statuses[i.id]?.status))
+    .reduce((acc, i) => acc + (statuses[i.id]?.estimated_cost_eur ?? i.estCostEur ?? 0), 0);
+  const totalApprovedRevenue = ideas
+    .filter(i => ["approved", "in_discussion"].includes(statuses[i.id]?.status))
+    .reduce((acc, i) => acc + (statuses[i.id]?.estimated_revenue_eur_monthly ?? i.estRevenueMonthly ?? 0), 0);
+  const totalCreditsUsed = ideas.reduce((acc, i) => acc + (statuses[i.id]?.emergent_credits_used || 0), 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm" data-testid="fi-comparator-modal">
+      <div className="bg-[#0a0a0b] border border-violet-500/30 rounded-2xl max-w-7xl w-full max-h-[95vh] overflow-hidden flex flex-col">
+        {/* HEADER */}
+        <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/30 flex items-center justify-center">
+              <BarChart3 className="w-5 h-5 text-violet-300" />
+            </div>
+            <div>
+              <h2 className="font-serif text-xl text-white">Comparator Propuneri</h2>
+              <p className="text-[11px] text-stone-500">Side-by-side decision tool · {sortedIdeas.length} din {ideas.length} propuneri</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center" data-testid="fi-comparator-close">
+            <XIcon className="w-4 h-4 text-stone-400" />
+          </button>
+        </div>
+
+        {/* TOTALS BANNER */}
+        <div className="px-5 py-3 bg-violet-500/5 border-b border-violet-500/20 grid sm:grid-cols-3 gap-3 text-xs">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-violet-300">Total cost dev (aprobate / în discuție)</div>
+            <div className="text-lg font-mono text-white mt-0.5">~{totalApprovedCost.toLocaleString("ro-RO")}€</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-violet-300">Total venit potențial / lună</div>
+            <div className="text-lg font-mono text-emerald-300 mt-0.5">~{totalApprovedRevenue.toLocaleString("ro-RO")}€</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-violet-300">Credite Emergent consumate (total)</div>
+            <div className="text-lg font-mono text-white mt-0.5">{totalCreditsUsed}</div>
+          </div>
+        </div>
+
+        {/* CONTROLS */}
+        <div className="px-5 py-3 border-b border-white/10 flex items-center gap-2 flex-wrap text-xs">
+          <span className="text-stone-500">Sortează:</span>
+          {[
+            { id: "roi",      label: "ROI (luni recuperare)" },
+            { id: "risk",     label: "Risc" },
+            { id: "duration", label: "Durată" },
+            { id: "credits",  label: "Credite Emergent" },
+          ].map(s => (
+            <button
+              key={s.id}
+              onClick={() => setSortBy(s.id)}
+              className={`px-2.5 py-1 rounded-lg border transition-colors ${
+                sortBy === s.id ? "bg-violet-500/20 border-violet-500/40 text-violet-200" : "bg-white/5 border-white/10 text-stone-400 hover:text-white"
+              }`}
+              data-testid={`fi-sort-${s.id}`}
+            >{s.label}</button>
+          ))}
+          <span className="text-stone-500 ml-3">Filtru:</span>
+          {[
+            { id: "all",      label: "Toate" },
+            { id: "approved", label: "Aprobate / discuție" },
+            { id: "pending",  label: "În evaluare" },
+            { id: "rejected", label: "Respinse / pauză" },
+          ].map(f => (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={`px-2.5 py-1 rounded-lg border transition-colors ${
+                filter === f.id ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-200" : "bg-white/5 border-white/10 text-stone-400 hover:text-white"
+              }`}
+              data-testid={`fi-filter-${f.id}`}
+            >{f.label}</button>
+          ))}
+        </div>
+
+        {/* TABLE */}
+        <div className="flex-1 overflow-auto">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-[#0a0a0b] z-10">
+              <tr className="border-b border-white/10 text-[10px] uppercase tracking-wider text-stone-500">
+                <th className="text-left px-3 py-3 font-medium">Propunere</th>
+                <th className="text-left px-3 py-3 font-medium">Status</th>
+                <th className="text-right px-3 py-3 font-medium">Risc</th>
+                <th className="text-right px-3 py-3 font-medium">Faze</th>
+                <th className="text-right px-3 py-3 font-medium">Durată<br/>(ref.)</th>
+                <th className="text-right px-3 py-3 font-medium">Cost dev<br/>(€ ref.)</th>
+                <th className="text-right px-3 py-3 font-medium">Credite<br/>Emergent</th>
+                <th className="text-right px-3 py-3 font-medium">Opex<br/>€/lună</th>
+                <th className="text-right px-3 py-3 font-medium">Venit<br/>€/lună</th>
+                <th className="text-right px-3 py-3 font-medium">ROI<br/>(luni)</th>
+                <th className="text-right px-3 py-3 font-medium">Credite<br/>consumate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedIdeas.map(idea => {
+                const st = statuses[idea.id];
+                const stKey = st?.status || "pending_validation";
+                const sMeta = STATUS_META[stKey];
+                const cost = st?.estimated_cost_eur ?? idea.estCostEur;
+                const rev  = st?.estimated_revenue_eur_monthly ?? idea.estRevenueMonthly;
+                const roi  = rev > 0 ? (cost / rev).toFixed(1) : "—";
+                return (
+                  <tr key={idea.id} className="border-b border-white/5 hover:bg-white/[0.02]" data-testid={`fi-comp-row-${idea.id}`}>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <idea.icon className="w-4 h-4 text-stone-400 shrink-0" />
+                        <div className="min-w-0">
+                          <div className="font-mono text-[10px] text-stone-500">{idea.code}</div>
+                          <div className="text-sm text-white truncate max-w-[200px]" title={idea.title}>{idea.title}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className={`inline-block text-[10px] uppercase px-2 py-0.5 rounded-full border ${colorClasses(sMeta.color)}`}>
+                        {sMeta.label}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <span className={`font-mono ${idea.risk <= 3 ? "text-emerald-300" : idea.risk <= 5 ? "text-amber-300" : idea.risk <= 7 ? "text-orange-300" : "text-red-300"}`}>
+                        {idea.risk}/10
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-right text-stone-300 font-mono">{idea.phases.length}</td>
+                    <td className="px-3 py-3 text-right text-stone-300 font-mono">{idea.timelineDays}z</td>
+                    <td className="px-3 py-3 text-right text-stone-300 font-mono">{cost?.toLocaleString("ro-RO")}€</td>
+                    <td className="px-3 py-3 text-right text-violet-300 font-mono text-[11px]">{idea.emergentCreditsEstimate || "—"}</td>
+                    <td className="px-3 py-3 text-right text-stone-300 font-mono">{idea.estOpexMonthly}€</td>
+                    <td className="px-3 py-3 text-right text-emerald-300 font-mono">{rev > 0 ? `~${rev.toLocaleString("ro-RO")}€` : "—"}</td>
+                    <td className="px-3 py-3 text-right">
+                      <span className={`font-mono ${roi === "—" ? "text-stone-500" : Number(roi) <= 3 ? "text-emerald-300" : Number(roi) <= 6 ? "text-amber-300" : "text-red-300"}`}>
+                        {roi !== "—" ? `${roi} luni` : "—"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-right text-stone-300 font-mono">
+                      {st?.emergent_credits_used ?? "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+              {sortedIdeas.length === 0 && (
+                <tr><td colSpan={11} className="text-center text-stone-500 py-10">Niciun rezultat pentru filtrul curent</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* LEGEND FOOTER */}
+        <div className="px-5 py-3 border-t border-white/10 bg-white/[0.02] text-[10px] text-stone-500 flex flex-wrap gap-x-4 gap-y-1">
+          <span><strong className="text-emerald-300">ROI verde</strong>: ≤3 luni payback</span>
+          <span><strong className="text-amber-300">ROI galben</strong>: 4-6 luni</span>
+          <span><strong className="text-red-300">ROI roșu</strong>: &gt;6 luni</span>
+          <span className="ml-auto">💡 ROI = Cost dev / Venit lunar. Mai mic = mai bine.</span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default FutureIdeasVault;
