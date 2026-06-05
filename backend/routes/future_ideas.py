@@ -34,6 +34,8 @@ class StatusPatch(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=4000)
     estimated_cost_eur: Optional[float] = None
     estimated_revenue_eur_monthly: Optional[float] = None
+    emergent_credits_used: Optional[float] = None
+    emergent_credits_notes: Optional[str] = Field(default=None, max_length=2000)
 
 
 def _serialize(doc: dict) -> dict:
@@ -43,6 +45,8 @@ def _serialize(doc: dict) -> dict:
         "notes": doc.get("notes", ""),
         "estimated_cost_eur": doc.get("estimated_cost_eur"),
         "estimated_revenue_eur_monthly": doc.get("estimated_revenue_eur_monthly"),
+        "emergent_credits_used": doc.get("emergent_credits_used"),
+        "emergent_credits_notes": doc.get("emergent_credits_notes", ""),
         "updated_at": doc.get("updated_at"),
         "updated_by": doc.get("updated_by"),
     }
@@ -88,6 +92,10 @@ async def update_status(idea_id: str, patch: StatusPatch, user=Depends(require_r
         update["estimated_cost_eur"] = patch.estimated_cost_eur
     if patch.estimated_revenue_eur_monthly is not None:
         update["estimated_revenue_eur_monthly"] = patch.estimated_revenue_eur_monthly
+    if patch.emergent_credits_used is not None:
+        update["emergent_credits_used"] = patch.emergent_credits_used
+    if patch.emergent_credits_notes is not None:
+        update["emergent_credits_notes"] = patch.emergent_credits_notes
 
     await db.future_ideas_status.update_one(
         {"idea_id": idea_id},

@@ -129,13 +129,14 @@ const FutureIdeasVault = () => {
                         <span className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border ${colorClasses(meta.color)}`}>
                           <Icon className="w-3 h-3" /> {meta.label}
                         </span>
-                        <span className="text-[10px] text-stone-500">Risk {idea.risk}/10 · {idea.timelineDays}z dev</span>
+                        <span className="text-[10px] text-stone-500">Risc {idea.risk}/10 · {idea.timelineDays}z (freelance ref.)</span>
                       </div>
                       <div className="text-lg font-semibold text-white">{idea.title}</div>
                       <div className="text-sm text-stone-400 mt-1 line-clamp-2">{idea.summary}</div>
-                      <div className="flex items-center gap-3 mt-3 text-[11px] text-stone-500">
-                        <span className="inline-flex items-center gap-1"><Coins className="w-3 h-3" /> Cost ~{idea.estCostEur}€</span>
-                        <span className="inline-flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Venit potențial {idea.estRevenueRange}</span>
+                      <div className="flex items-center gap-3 mt-3 text-[11px] text-stone-500 flex-wrap">
+                        <span className="inline-flex items-center gap-1"><Coins className="w-3 h-3" /> Freelance ~{idea.estCostEur}€</span>
+                        <span className="inline-flex items-center gap-1 text-violet-300"><Brain className="w-3 h-3" /> Emergent: {idea.emergentCreditsEstimate || "—"}</span>
+                        <span className="inline-flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Venit {idea.estRevenueRange}</span>
                         <span className="inline-flex items-center gap-1"><GitBranch className="w-3 h-3" /> {idea.phases.length} faze</span>
                       </div>
                     </div>
@@ -182,6 +183,8 @@ const IdeaDetail = ({ idea, status, onBack, onSaved }) => {
     notes: status?.notes || "",
     estimated_cost_eur: status?.estimated_cost_eur ?? "",
     estimated_revenue_eur_monthly: status?.estimated_revenue_eur_monthly ?? "",
+    emergent_credits_used: status?.emergent_credits_used ?? "",
+    emergent_credits_notes: status?.emergent_credits_notes ?? "",
   });
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
@@ -195,6 +198,8 @@ const IdeaDetail = ({ idea, status, onBack, onSaved }) => {
         notes: draft.notes,
         estimated_cost_eur: draft.estimated_cost_eur === "" ? null : Number(draft.estimated_cost_eur),
         estimated_revenue_eur_monthly: draft.estimated_revenue_eur_monthly === "" ? null : Number(draft.estimated_revenue_eur_monthly),
+        emergent_credits_used: draft.emergent_credits_used === "" ? null : Number(draft.emergent_credits_used),
+        emergent_credits_notes: draft.emergent_credits_notes,
       };
       const { data } = await ax.put(`/api/admin/future-ideas/${idea.id}`, payload);
       onSaved(data);
@@ -217,9 +222,15 @@ const IdeaDetail = ({ idea, status, onBack, onSaved }) => {
             <idea.icon className="w-6 h-6 text-[#d4ff3a]" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="font-mono text-[10px] uppercase tracking-wider text-stone-500">{idea.code} · Risk {idea.risk}/10 · {idea.timelineDays} zile dev</div>
+            <div className="font-mono text-[10px] uppercase tracking-wider text-stone-500">{idea.code} · Risc {idea.risk}/10 · Complexitate Emergent: {idea.emergentComplexity || "—"}</div>
             <h1 className="font-serif text-3xl md:text-4xl tracking-tight mt-1" data-testid="fi-detail-title">{idea.title}</h1>
             <p className="text-sm text-stone-400 mt-2 max-w-3xl">{idea.summary}</p>
+            {idea.riskExplanation && (
+              <div className="mt-3 bg-blue-500/5 border border-blue-500/30 rounded-xl p-3 text-xs text-blue-100 flex items-start gap-2 max-w-3xl">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-blue-400" />
+                <div><strong className="text-blue-300">Ce înseamnă Risc {idea.risk}/10:</strong> {idea.riskExplanation}</div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -274,6 +285,40 @@ const IdeaDetail = ({ idea, status, onBack, onSaved }) => {
             placeholder="ex: așteptăm validare cu 3 clienți pilot înainte de a aproba Phase ES-2..."
             data-testid="fi-notes-input"
           />
+
+          {/* EMERGENT CREDITS TRACKING — populated during/after implementation */}
+          <div className="mt-5 border-t border-white/10 pt-5">
+            <div className="text-[10px] uppercase tracking-wider text-violet-300 mb-2 flex items-center gap-2">
+              <Brain className="w-3 h-3" /> Tracking credite Emergent (actualizat pe parcurs)
+            </div>
+            <div className="grid md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-stone-400">Credite consumate până acum</label>
+                <input
+                  type="number"
+                  value={draft.emergent_credits_used}
+                  onChange={(e) => setDraft(d => ({ ...d, emergent_credits_used: e.target.value }))}
+                  className="mt-2 w-full bg-[#0a0a0b] border border-violet-500/30 rounded-lg px-3 py-2 text-sm font-mono"
+                  placeholder="ex: 12 (după primul task)"
+                  data-testid="fi-credits-used"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-stone-400">Note credite (per task)</label>
+                <textarea
+                  value={draft.emergent_credits_notes}
+                  onChange={(e) => setDraft(d => ({ ...d, emergent_credits_notes: e.target.value }))}
+                  rows={2}
+                  className="mt-2 w-full bg-[#0a0a0b] border border-violet-500/30 rounded-lg px-3 py-2 text-xs font-mono"
+                  placeholder="ex: ES-0 foundation ~15 cred, ES-1 spaces ~25 cred"
+                  data-testid="fi-credits-notes"
+                />
+              </div>
+            </div>
+            <div className="text-[10px] text-stone-500 mt-2">
+              💡 Câmpurile se completează pe parcursul implementării. Eu îți voi raporta aproximativ după fiecare fază pentru tracking acuratețe estimări.
+            </div>
+          </div>
 
           <div className="flex items-center justify-between mt-4">
             <div className="text-xs text-stone-500">
@@ -529,26 +574,66 @@ const SectionAI = ({ idea }) => (
 
 const SectionROI = ({ idea }) => (
   <div className="space-y-5">
+    {/* DUAL METRICS — Emergent vs Freelance */}
     <div>
-      <H>Estimare cost dezvoltare</H>
+      <H>Estimare Emergent (cost real pentru tine)</H>
       <div className="grid sm:grid-cols-3 gap-3">
-        <div className="border border-white/10 rounded-xl p-4 bg-white/[0.02]">
-          <div className="text-[10px] uppercase text-stone-400">Cost total (dev one-time)</div>
-          <div className="text-2xl font-mono mt-1 text-white">~{idea.estCostEur}€</div>
-          <div className="text-[10px] text-stone-500 mt-1">{idea.timelineDays} zile la rata internă</div>
+        <div className="border border-violet-500/40 rounded-xl p-4 bg-violet-500/5">
+          <div className="text-[10px] uppercase text-violet-300">Complexitate</div>
+          <div className="text-2xl font-mono mt-1 text-white">{idea.emergentComplexity || "—"}</div>
+          <div className="text-[10px] text-stone-500 mt-1">Cât de dificil arhitectural</div>
         </div>
-        <div className="border border-white/10 rounded-xl p-4 bg-white/[0.02]">
-          <div className="text-[10px] uppercase text-stone-400">Cost operare lunar</div>
-          <div className="text-2xl font-mono mt-1 text-white">~{idea.estOpexMonthly}€</div>
-          <div className="text-[10px] text-stone-500 mt-1">AI calls + storage + transactional emails</div>
+        <div className="border border-violet-500/40 rounded-xl p-4 bg-violet-500/5">
+          <div className="text-[10px] uppercase text-violet-300">Effort estimat</div>
+          <div className="text-sm font-mono mt-1 text-white leading-tight">{idea.emergentEffort || "—"}</div>
+          <div className="text-[10px] text-stone-500 mt-1">Task-uri agent necesare</div>
         </div>
-        <div className="border border-white/10 rounded-xl p-4 bg-white/[0.02]">
-          <div className="text-[10px] uppercase text-stone-400">Venit potențial lunar</div>
-          <div className="text-2xl font-mono mt-1 text-emerald-300">{idea.estRevenueRange}</div>
-          <div className="text-[10px] text-stone-500 mt-1">Scenarii pesimist → optimist</div>
+        <div className="border border-violet-500/40 rounded-xl p-4 bg-violet-500/5">
+          <div className="text-[10px] uppercase text-violet-300">Credite Emergent estimate</div>
+          <div className="text-xl font-mono mt-1 text-violet-200">{idea.emergentCreditsEstimate || "—"}</div>
+          <div className="text-[10px] text-stone-500 mt-1">Updated în timp real pe parcursul dev</div>
         </div>
       </div>
+      <div className="mt-3 text-[11px] text-stone-500 bg-white/[0.02] border border-white/5 rounded-lg p-3">
+        💡 Costul real Emergent = credite consumate per task agent. Verifici în Profile → Billing. Eu îți voi raporta consumul aproximativ după fiecare task major odată ce începem implementarea.
+      </div>
     </div>
+
+    {/* THEORETICAL REFERENCE */}
+    <div>
+      <H>Referință teoretică (dacă ai externaliza freelance)</H>
+      <div className="grid sm:grid-cols-3 gap-3">
+        <div className="border border-white/10 rounded-xl p-4 bg-white/[0.02]">
+          <div className="text-[10px] uppercase text-stone-400">Cost freelance one-time</div>
+          <div className="text-2xl font-mono mt-1 text-stone-200">~{idea.estCostEur}€</div>
+          <div className="text-[10px] text-stone-500 mt-1">{idea.timelineDays} zile × 200€/zi mid-level</div>
+        </div>
+        <div className="border border-white/10 rounded-xl p-4 bg-white/[0.02]">
+          <div className="text-[10px] uppercase text-stone-400">Opex lunar (după lansare)</div>
+          <div className="text-2xl font-mono mt-1 text-stone-200">~{idea.estOpexMonthly}€</div>
+          <div className="text-[10px] text-stone-500 mt-1">AI calls + storage + emails</div>
+        </div>
+        <div className="border border-emerald-500/30 rounded-xl p-4 bg-emerald-500/5">
+          <div className="text-[10px] uppercase text-emerald-300">Venit potențial lunar</div>
+          <div className="text-xl font-mono mt-1 text-emerald-300">{idea.estRevenueRange}</div>
+          <div className="text-[10px] text-stone-500 mt-1">Pesimist → optimist</div>
+        </div>
+      </div>
+      <div className="mt-3 text-[11px] text-stone-500">
+        ⚠️ Aceste valori sunt <strong>orientative pentru comparație</strong> — pe Emergent nu plătești 5.000€, plătești credite proporțional cu munca efectivă.
+      </div>
+    </div>
+
+    {/* BUSINESS IMPACT */}
+    {idea.businessImpact && (
+      <div>
+        <H>Impact business direct</H>
+        <div className="text-sm text-stone-200 leading-relaxed bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4">
+          {idea.businessImpact}
+        </div>
+      </div>
+    )}
+
     <div>
       <H>Scenarii de monetizare</H>
       <div className="space-y-2">

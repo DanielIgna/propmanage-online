@@ -3,7 +3,12 @@
 // Each entry is a self-contained proposal with full technical breakdown.
 // Status (pending/approved/rejected) is persisted server-side; content here
 // is version-controlled and reviewable via PR.
-import { Sparkles } from "lucide-react";
+//
+// METRICI DUALE:
+// - timelineDays / estCostEur = referință teoretică freelance (200€/zi mid-level)
+// - emergentComplexity / emergentEffort / emergentCreditsEstimate = realitatea Emergent
+// - risk (X/10) = probabilitate apariție bug-uri/regresii, NU "doar X din 10 funcționează"
+import { Sparkles, Palette, Coins } from "lucide-react";
 
 export const FUTURE_IDEAS = [
   {
@@ -12,11 +17,16 @@ export const FUTURE_IDEAS = [
     title: "Experience Spaces — Business Operating System",
     icon: Sparkles,
     risk: 5,
+    riskExplanation: "Probabilitate ~50% de bug-uri minore (timezone DST, race conditions booking) ce se rezolvă în 1-2 task-uri. Funcțional 100%, NU înseamnă că doar 5/10 va merge.",
     timelineDays: 35,
     estCostEur: 7000,
     estOpexMonthly: 80,
     estRevenueMonthly: 3500,
     estRevenueRange: "1.500€ – 8.000€",
+    emergentComplexity: "Ridicată",
+    emergentEffort: "8-12 task-uri agent mari (foundation + spaces + bookings + payments + AI)",
+    emergentCreditsEstimate: "150-250 credite estimate (full roadmap)",
+    businessImpact: "Nou flux venit complet — primul spațiu pilot poate genera 1.500€/lună după 30 zile de la lansare",
     summary: "Modul complet izolat care transformă PropManage din Property Management în Business Operating System pentru monetizarea spațiilor fizice (centru educațional kids, evenimente, ateliere, studio foto). Include calendar atomic, plăți Stripe, ecosistem furnizori, Digital Twin 3D și AI Business Manager — totul guard-uit de feature flag și 100% rollback-able.",
     problemAndOpportunity: "PropManage gestionează în prezent imobile și chiriași. Founder-ul deține/operează spații monetizabile (centru educațional kids ~25 locuri) care necesită calendar rezervări, pachete personalizate (aniversări, ateliere, photo sessions), gestiune furnizori (fotograf, decor, catering), plăți online și raportare financiară. Construirea acestui modul pe PropManage permite reutilizarea infrastructurii (auth, email, Stripe, AI) FĂRĂ a atinge modulele existente — generând un al doilea flux de venit fără risc de regresie.",
     principles: [
@@ -510,4 +520,564 @@ export const FUTURE_IDEAS = [
     breakEven: "Cost dev one-time: ~7.000€ (35 zile × 200€/zi rată internă). Opex lunar: ~80€ (AI calls + Stripe fees + email). Break-even la ~3-5 luni dacă centrul pilot generează minim 1.500€/lună NET. Payback complet în 6-8 luni la scenariu mediu. ROI pozitiv compus prin marketplace + white-label.",
     recommendation: "Recomandare: START cu Phase ES-0 + ES-1 (8 zile, ~1.600€ investiție) DOAR DACĂ există un spațiu pilot real pregătit să se ducă live în 30 zile. Dacă pilot-ul nu e gata sau nu validăm cu 3-5 booking-uri reale în prima lună → STOP la ES-1 fără pierdere de date (rollback instant). Decizia ES-2 (booking-uri + plăți reale) se ia DOAR după validarea cererii pe ES-1. AI Manager (ES-6) și White Label (ES-8) sunt strict opționale — adăugare doar dacă MVP-ul atinge 1.500€/lună stabil 3 luni consecutive.",
   },
+
+  // ==========================================================================
+  // PROPUNERE 2 — DESIGN SYSTEM UNIFICATION
+  // ==========================================================================
+  {
+    id: "design_system_atlas",
+    code: "DS-ATLAS",
+    title: "Design System Unification — PropManage Atlas",
+    icon: Palette,
+    risk: 4,
+    riskExplanation: "Surface area mare (~30+ pagini de re-stilizat) dar arhitectural izolabil prin feature flag CSS. Risc 4/10 = probabilitate ~40% de bug-uri vizuale minore (un buton offset, contrast text într-un edge case) ce se rezolvă în 1-2 task-uri Emergent. Backend INTACT, doar layer vizual.",
+    timelineDays: 25,
+    estCostEur: 5000,
+    estOpexMonthly: 0,
+    estRevenueMonthly: 0,
+    estRevenueRange: "Indirect: +15% retenție",
+    emergentComplexity: "Medie-Ridicată",
+    emergentEffort: "5-8 task-uri agent mari (tokens + components shared + migrare per dashboard)",
+    emergentCreditsEstimate: "80-140 credite estimate (full rebrand)",
+    businessImpact: "Percepție profesionalism crescută → conversie home page +10-20%, retenție specialist +15% (UI consistent reduce frustrarea cross-dashboard)",
+    summary: "Unificare design vizual pe TOATE dashboard-urile (Public/Home, Client, Specialist, Operator, Admin) folosind paletă mov-violet pe dark theme, tipografie consistentă, component library reutilizabilă. Backend ZERO impact — schimbare strict vizuală cu feature flag pentru rollback. Inspirat din PropManage.net (HomeRun Pro-style) cu 15+ pattern-uri identificate.",
+    problemAndOpportunity: "Acum PropManage are 3 stiluri vizuale diferite: Client (light, vechi Tailwind), Specialist (semi-dark improvizat), Admin (Metronic light + AdminLayout dark amestecate). Inconsistența reduce percepția de calitate și forțează userii să re-învețe layout-ul la fiecare dashboard. Unificarea aduce: (1) UX coerent → retenție mai mare; (2) Mobile-first proper → 70%+ trafic vine de pe telefon; (3) Componentă reutilizabilă → orice feature nou se face de 3-5x mai rapid în viitor.",
+    principles: [
+      "ZERO modificări la business logic / backend — strict UI layer",
+      "Feature flag `enable_design_v2` în `app_settings` pentru toggle instant rollback",
+      "CSS variables shim — temele vechi + noi coexistă în paralel via `data-theme` attribute pe root",
+      "Migrare pe etape: pagină cu pagină, fiecare validată independent",
+      "Tokens centralizate în `tokens.css` — orice modificare ulterioară de culoare = 1 schimbare",
+      "Component library în `/components/atlas/` (Button, Card, StatCard, Modal, Pipeline, etc.) — reutilizabile peste tot",
+      "Mobile-first: layout-uri optimizate pentru 375-768px întâi, desktop e secundar",
+      "Accessibility (WCAG AA): contraste verificate, focus rings vizibile, keyboard nav funcțional",
+      "Storybook intern (Admin Design Lab) pentru preview componente fără atingerea producției",
+    ],
+    antiPatterns: [
+      "NU rescrie business logic în paralel — schimbi DOAR JSX + CSS",
+      "NU șterge clase Tailwind vechi imediat — coexistă cu cele noi prin flag până validare",
+      "NU forța migrarea într-un singur sprint — risc maxim de regresii",
+      "NU schimba structura DB / API pentru cosmetice (ex: rating display) — folosește date existente",
+      "NU adăuga librării grele (Material UI, Chakra) — staying lean cu shadcn/ui existente",
+    ],
+    phases: [
+      {
+        code: "DS-0", title: "Foundation: Tokens + Theme Toggle", days: 2,
+        description: "Setup paletă completă în CSS variables + feature flag + theme switcher în Admin.",
+        deliverables: [
+          "tokens.css cu paletă completă (40+ variabile)",
+          "Feature flag `enable_design_v2` în `app_settings`",
+          "Hook `useDesignTheme()` pentru detect + switch",
+          "Admin toggle în Settings → Design Lab",
+          "data-theme attribute pe root cu fallback la tema veche",
+        ],
+      },
+      {
+        code: "DS-1", title: "Component Library Core", days: 4,
+        description: "Construire 15 componente reutilizabile în `/components/atlas/`.",
+        deliverables: [
+          "Button (primary mov solid, secondary outline, ghost)",
+          "Card (default + colored variants per category)",
+          "StatCard cu icon + counter mare + label",
+          "Modal/Dialog cu border purple focus",
+          "Tab pills + Filter dropdown",
+          "Pipeline column (Kanban-style)",
+          "Status badge color-coded",
+          "Empty state friendly",
+          "Notification rule card",
+          "Section header cu icon decorativ",
+          "Form inputs (Text, Select, Textarea, DatePicker)",
+          "ProgressBar multi-stage (Friendly Reminder → Formal Demand → Legal)",
+          "Avatar + Streak badge",
+          "Greeting card hero",
+          "List item interactive",
+        ],
+      },
+      {
+        code: "DS-2", title: "Public/Home Migration", days: 3,
+        description: "Refacere landing page + pagini publice (servicii, specialiști).",
+        deliverables: [
+          "Home page redesign cu hero mov + CTA",
+          "Pagina /servicii (listare sub-categorii)",
+          "Pagina /servicii/{slug} (SEO-ready)",
+          "Pagina profil public specialist",
+          "Pagina recenzii publice",
+          "Footer + Navbar unificat",
+        ],
+      },
+      {
+        code: "DS-3", title: "Client Dashboard Migration", days: 4,
+        description: "Refacere completă dashboard client (postare cerere, oferte primite, chat).",
+        deliverables: [
+          "Hero greeting card",
+          "StatCards: cereri active, oferte primite, finalizate",
+          "Lista oferte primite cu cards uniforme",
+          "Pagina detalii ofertă",
+          "Form postare cerere multi-step",
+          "Chat UI cu mesaje + atașamente",
+        ],
+      },
+      {
+        code: "DS-4", title: "Specialist Dashboard Migration", days: 5,
+        description: "Refacere completă dashboard specialist (oportunități, oferte trimise, lucrări câștigate, profil).",
+        deliverables: [
+          "Hero greeting cu streak + rating",
+          "StatCards specialist (oportunități noi, oferte active, câștigate, fee cheltuit)",
+          "Lista oportunități cu cards (gated/unlocked states)",
+          "Detail page oportunitate (2 stări vizuale)",
+          "Form trimite ofertă cu preț propriu",
+          "Tab Pipeline (Kanban: Oportunități → Ofertate → Câștigate)",
+          "Tab Recenzii cu filtre",
+          "Profil specialist editabil cu sub-categorii servicii",
+          "Bottom nav mobile (Oportunități / Oferte / Câștigate / Setări)",
+        ],
+      },
+      {
+        code: "DS-5", title: "Operator Dashboard Migration", days: 3,
+        description: "Refacere dashboard operator (jobs, twins, NC).",
+        deliverables: [
+          "Lista jobs operator unificată",
+          "Detail job cu acțiuni (start/pause/finalize)",
+          "Digital Twin viewer page",
+          "Non-conformity report form",
+        ],
+      },
+      {
+        code: "DS-6", title: "Admin Dashboard Polish", days: 3,
+        description: "Admin Metronic deja are stil propriu — aliniere doar la tokens noi + spacing.",
+        deliverables: [
+          "Sidebar Admin aliniat la noile tokens",
+          "Cards Admin refăcute cu StatCard nou",
+          "Tables Admin cu coloane consistente",
+          "Modals Admin uniformizate",
+        ],
+      },
+      {
+        code: "DS-7", title: "Polish + A11y + Mobile Testing", days: 2,
+        description: "Final pass — accessibility audit, mobile device testing, dark/light mode coerent.",
+        deliverables: [
+          "WCAG AA audit per pagină",
+          "Test pe iPhone SE / iPhone 14 / Pixel / Android Galaxy",
+          "Light mode opțional (pentru cei care preferă)",
+          "Reduced motion fallback",
+          "Print stylesheet pentru facturi",
+        ],
+      },
+      {
+        code: "DS-8", title: "Documentație + Storybook", days: 1,
+        description: "Catalog complet componente în Admin → Design Lab pentru viitoare extensii.",
+        deliverables: [
+          "Pagină Admin /admin/design-lab cu toate componentele live",
+          "Documentație props + variants per componentă",
+          "Cheat-sheet design tokens (markdown export)",
+        ],
+      },
+    ],
+    backend: {
+      structure: `/app/backend/  → ZERO modificări la business logic.
+└── app_settings: adăugat câmp \`enable_design_v2: boolean\` (default false)
+└── routes/app_settings.py: extins PUT endpoint să accepte flag-ul nou
+└── NIMIC alt impact backend — design e PUR frontend`,
+      endpoints: [
+        { method: "GET",  path: "/api/app-settings",                     note: "Citește flag enable_design_v2" },
+        { method: "PUT",  path: "/api/app-settings",                     note: "Admin toggle flag" },
+      ],
+      security: [
+        "Flag-ul `enable_design_v2` e citit doar de frontend pentru theme switch",
+        "Nu impactează permisiuni sau autentificare",
+        "Rollback prin flag OFF → frontend re-randează cu tema veche în <1s",
+      ],
+      dependencies: [
+        "# ZERO dependențe noi backend",
+      ],
+    },
+    frontend: {
+      structure: `/app/frontend/src/
+├── styles/
+│   ├── tokens.css           # Paletă + spacing + typography variables
+│   ├── theme-legacy.css     # Stilurile vechi (păstrate până la validare)
+│   └── theme-atlas.css      # Tema nouă Atlas
+├── components/
+│   ├── atlas/               # NEW component library
+│   │   ├── Button.jsx
+│   │   ├── Card.jsx
+│   │   ├── StatCard.jsx
+│   │   ├── Modal.jsx
+│   │   ├── Pipeline.jsx
+│   │   ├── StatusBadge.jsx
+│   │   ├── EmptyState.jsx
+│   │   ├── GreetingHero.jsx
+│   │   ├── StreakBadge.jsx
+│   │   ├── BottomNav.jsx
+│   │   └── ... (15 total)
+│   └── ui/                  # shadcn existing — păstrate
+├── hooks/
+│   └── useDesignTheme.js   # Citește flag + aplică data-theme
+└── pages/
+    ├── HomeAtlas.jsx        # Versiune nouă, paralel cu Home.jsx existent
+    ├── ClientDashboardAtlas.jsx
+    ├── SpecialistDashboardAtlas.jsx
+    └── ...
+    (Atunci când flag e ON, App.js routează la versiunile *Atlas.jsx)`,
+      routes: [
+        { scope: "public", path: "/  (Atlas când flag ON)",            note: "Landing page rebrandat" },
+        { scope: "public", path: "/servicii",                          note: "Listare sub-categorii SEO" },
+        { scope: "public", path: "/specialisti/{slug}",                note: "Profil public specialist" },
+        { scope: "auth",   path: "/client  (Atlas când flag ON)",      note: "Dashboard client nou" },
+        { scope: "auth",   path: "/specialist  (Atlas când flag ON)",  note: "Dashboard specialist nou" },
+        { scope: "auth",   path: "/operator  (Atlas când flag ON)",    note: "Dashboard operator nou" },
+        { scope: "admin",  path: "/admin/design-lab",                  note: "Storybook intern componente" },
+      ],
+      designReuse: [
+        "Paletă: Dark `#0a0a0b` background + Purple `#8b5cf6` primary + tints semantice",
+        "Tipografie: Inter pentru body (deja existent), serif (existent) păstrat pentru hero-uri",
+        "Spacing scale: 4px base (4, 8, 12, 16, 20, 24, 32, 48, 64)",
+        "Border radius: 8px (small), 12px (default), 16px (large), 24px (xl pills)",
+        "Shadows: subtle (0 1px 2px rgba(0,0,0,0.1)) + glow purple pentru focus",
+        "Animations: 150ms ease pentru micro-interactions, 300ms pentru page transitions",
+        "Icons: lucide-react existent (zero dependențe noi)",
+      ],
+      dependencies: [
+        "# Zero dependențe noi — folosim shadcn + tailwind existente",
+        "# Opțional: motion (deja instalat) pentru animații complexe",
+      ],
+    },
+    db: {
+      isolationRule: "ZERO modificări la database. Singura schimbare e UN SINGUR field nou în colecția existentă `app_settings`: `enable_design_v2: boolean` default false. NIMIC altceva atins.",
+      collections: [
+        {
+          name: "app_settings (existing — extended)", purpose: "Adăugat 1 câmp boolean pentru flag rollback",
+          schema: `{
+  // Toate câmpurile existente NEATINSE...
+  enable_design_v2: false,        // NEW — default OFF
+  design_v2_pilot_users: [],      // NEW optional — gradual rollout
+  design_v2_force_legacy: []      // NEW optional — userii care opt-out
+}`,
+          indexes: ["existing _id='config' unique (deja există)"],
+        },
+      ],
+    },
+    risks: [
+      { id: "DS-R1", severity: "MEDIUM", title: "Regresie vizuală pe pagini neacoperite de testing",
+        mitigation: "Screenshot regression tests pe rute principale înainte/după per fază. Feature flag instant OFF dacă apare bug critic." },
+      { id: "DS-R2", severity: "LOW", title: "Performance hit din CSS extra (legacy + atlas în paralel)",
+        mitigation: "CSS atlas e lazy-loaded doar când flag ON. Bundle size analyzer rulează la fiecare fază." },
+      { id: "DS-R3", severity: "MEDIUM", title: "Mobile breakpoints nu sincronizate cu legacy",
+        mitigation: "Mobile-first design impune breakpoint-uri unificate (375/640/768/1024). Test pe device real, nu doar DevTools." },
+      { id: "DS-R4", severity: "LOW", title: "Tema veche/nouă switch causes flash of unstyled content",
+        mitigation: "data-theme aplicat pre-hydration via inline <script> în <head>." },
+      { id: "DS-R5", severity: "LOW", title: "Useri obișnuiți cu UI vechi se pierd",
+        mitigation: "Rollout gradual: opt-in pilot users → 25% → 50% → 100%. Feedback widget per pagină în primele 14 zile." },
+      { id: "DS-R6", severity: "MEDIUM", title: "Admin Metronic complex — risc rupere navigare",
+        mitigation: "Admin migrate ULTIMUL (DS-6) doar după validare client+specialist+operator OK." },
+      { id: "DS-R7", severity: "LOW", title: "Accessibility regressions (contraste, focus states)",
+        mitigation: "WCAG AA audit automat (axe-core) în CI + pass manual pe screen reader." },
+    ],
+    ai: {
+      philosophy: "Design System nu folosește AI direct — dar oferă o fundație componentă pentru viitoare AI widgets (chat bot, insight cards, smart filters) ce vor fi consistente vizual.",
+      touchpoints: [
+        { title: "AI Chat Widget (cross-dashboard)", description: "Floating action button cu chat overlay folosind tema unificată — același UI peste tot",
+          reuse: "ai_core/provider.py existent", phase: "Post DS-8 (when AI features matter)" },
+        { title: "Insight Cards animated", description: "Carduri cu insights AI prezentate uniform în toate dashboard-urile",
+          reuse: "Atlas Card component", phase: "Post DS-8" },
+      ],
+    },
+    revenueScenarios: [
+      { name: "Conversie home page", estimatedRevenue: "+10-20% lead-uri postate",
+        description: "Landing rebrandat → percepție mai profesională → mai mulți clienți postează cereri (de la 100 la ~115/lună la trafic constant)." },
+      { name: "Retenție specialist", estimatedRevenue: "+15% LTV specialist",
+        description: "UI consistent + mobile-first reduce frustrarea → specialiștii rămân activi mai mult, ofertează mai mult." },
+      { name: "Time-to-feature 3-5x mai rapid", estimatedRevenue: "Indirect: -60% timp dev features noi",
+        description: "Component library reutilizabilă → orice feature nou costă 3-5x mai puțin în task-uri Emergent." },
+      { name: "Pregătire pentru white-label", estimatedRevenue: "Habilitator viitor (Experience Spaces ES-8)",
+        description: "Cu design tokens centralizate, white-label per org devine trivial — schimbi 5 variabile CSS și ai brandul clientului." },
+    ],
+    breakEven: "Pe Emergent: 80-140 credite total estimate. Comparativ cu freelance: 5.000€ teoretic (25 zile × 200€/zi). Break-even NU se măsoară direct în €/lună (e investiție în calitate + viteză viitoare), ci în: (a) reducere churn specialist de la X% la Y%, (b) creștere conversie home cu 10-20%, (c) viitor: orice feature costă 3-5x mai puțin de dezvoltat în task-uri Emergent.",
+    recommendation: "Recomandare: START cu DS-0 + DS-1 (6 zile, foundation + component library) — fără să atingi paginile existente. Apoi validare cu 1 pagină pilot (DS-2 Home) și măsurare impact ÎNAINTE de a continua cu Client/Specialist. Dacă DS-2 nu generează feedback pozitiv în 14 zile → STOP fără pierdere. Continuă DS-3 → DS-8 doar după validare pilot. Admin (DS-6) e ULTIMUL pentru că e cel mai stabil deja.",
+  },
+
+  // ==========================================================================
+  // PROPUNERE 3 — MARKETPLACE ECONOMICS V2
+  // ==========================================================================
+  {
+    id: "marketplace_economics_v2",
+    code: "MKT-V2",
+    title: "Marketplace Economics V2 — Fee Dinamic + Lead Gating",
+    icon: Coins,
+    risk: 5,
+    riskExplanation: "Atinge gating informații client (telefon, adresă) + payment flow. Risc 5/10 = probabilitate 50% de bug-uri minore în primele 2 săptămâni (ex: un specialist vede telefon înainte de plată dacă URL-ul e ghicit). TOATE mitigările sunt server-side enforcement → bug-uri fixabile în 1 task. Funcțional 100%, doar trebuie testat riguros.",
+    timelineDays: 15,
+    estCostEur: 3000,
+    estOpexMonthly: 5,
+    estRevenueMonthly: 800,
+    estRevenueRange: "300€ – 2.000€",
+    emergentComplexity: "Medie",
+    emergentEffort: "4-6 task-uri agent mari (DB + backend gating + frontend states + admin config)",
+    emergentCreditsEstimate: "60-100 credite estimate",
+    businessImpact: "Restartarea fluxului de venit marketplace care a stagnat în 2026 din cauza fee-urilor prea mari. Validat cu istoric real: în 2025 cu fee 5-50 RON ai cheltuit 2.500 RON și ai încasat 48.000 RON (ROI 19x). Cu fee dinamic 5-99 RON ne întoarcem la modelul care a funcționat.",
+    summary: "Corectarea modelului economic marketplace: (1) Fee dinamic per lead 5-99 RON configurabil din Admin (acum confuzul \"Estimat 11000 RON\" + fix 45 RON); (2) Gating informații client — specialistul vede DOAR oraș + prenume + descriere până plătește fee-ul, după care primește telefon + nume complet + adresă + chat; (3) Limită 5 ofertanți/cerere pentru calitate; (4) Sub-categorii servicii pentru SEO indexabil; (5) Pipeline vizual (Oportunități → Ofertate → Câștigate). Bazat pe modelul validat HomeRun Pro și pe istoricul tău real de 1+ an pe acea platformă.",
+    problemAndOpportunity: "PROBLEMA: PropManage actual are 3 confuzii majore: (a) UI specialist arată \"Estimat 11000 RON\" și \"Acceptă (45 RON)\" — utilizatorii nu înțeleg cine plătește ce; (b) Fee fix 45 RON pentru toate lead-urile descurajează ofertare la lead-uri mici; (c) Nu există gating — specialistul vede tot din primul moment, nu are motivație să plătească. OPORTUNITATEA: Modelul HomeRun Pro (fee dinamic 5-99 RON + gating strict) e validat de 1+ an de utilizatorul nostru pilot — în 2025 a generat ROI 19x. Replicarea modelului în PropManage cu adaptările necesare = retenție specialist + venit constant marketplace.",
+    principles: [
+      "Server-side enforcement strict — toate datele sensibile (telefon, adresă, nume complet) sunt FILTRATE din API până nu există un `lead_unlock` valid",
+      "Fee dinamic configurabil din Admin Panel — reguli per categorie × oraș × buget client",
+      "Limită max 5 ofertanți / cerere — protejează calitatea și concurența sănătoasă",
+      "Wallet opțional pentru specialist (pre-paid credits) — alternativă la plata per lead Stripe",
+      "Sub-categorii servicii cu slug-uri unice (`/servicii/design-interior-baie-cluj`) pentru SEO long-tail",
+      "Eliminare totală a câmpului \"Estimat XXX RON\" din UI specialist (e formulă internă admin, nu relevant pentru flow)",
+      "Notificare clientului când un specialist a plătit accesul (transparency + trust)",
+      "Buton call-to-action clar: \"Trimite oferta (XX RON)\" în loc de \"Acceptă (45 RON)\" — denotă intenția",
+    ],
+    antiPatterns: [
+      "NU expune nicio informație sensibilă în răspunsul API înainte de unlock — chiar dacă frontend-ul o filtrează",
+      "NU permite acces la chat / telefon prin URL guessing — toate endpoint-urile verifică unlock",
+      "NU permite refund automat fee dacă clientul nu răspunde — politica trebuie clarificată în T&C",
+      "NU adăuga taxe ascunse — fee-ul afișat e fee-ul plătit, fără surprize",
+      "NU permite re-deblocare gratuită dacă specialistul a plătit deja o dată (per lead) — un fee = un acces permanent",
+    ],
+    phases: [
+      {
+        code: "MKT-0", title: "Foundation: DB + Config", days: 2,
+        description: "Scheme DB noi + admin config feature flag.",
+        deliverables: [
+          "Collection `lead_unlocks` cu unique index pe (specialist_id, request_id)",
+          "Collection `lead_pricing_rules` cu reguli admin",
+          "Field `max_offers` pe request (default 5)",
+          "Feature flag `enable_marketplace_v2` în `app_settings`",
+          "Admin UI pentru configurare fee dinamic (sliders min/max + reguli)",
+        ],
+      },
+      {
+        code: "MKT-1", title: "Backend Gating", days: 3,
+        description: "API security — toate datele sensibile filtrate până la unlock.",
+        deliverables: [
+          "Helper `is_unlocked(specialist_id, request_id)` reutilizabil",
+          "Modify GET /api/requests/{id} → ascunde telefon, adresă, nume complet dacă !unlocked",
+          "Modify GET /api/requests/list specialist view → arată DOAR oraș + prenume + descriere scurtă",
+          "Endpoint POST /api/leads/{id}/unlock → consume fee, crează unlock record",
+          "Endpoint blocking pe chat/call → 403 dacă !unlocked",
+          "Endpoint GET /api/leads/{id}/offer-count → returnează count (pentru limită 5)",
+        ],
+      },
+      {
+        code: "MKT-2", title: "Fee Dinamic Engine", days: 2,
+        description: "Algoritm calcul fee per lead + admin tools.",
+        deliverables: [
+          "Funcție `compute_lead_fee(request)` ce aplică reguli + categorii + oraș",
+          "Admin UI: tabel reguli cu categorie/oraș/buget → fee min-max",
+          "Preview live în Admin: \"Pentru această cerere fee-ul ar fi 23 RON\"",
+          "Activity log pentru orice schimbare reguli (audit)",
+        ],
+      },
+      {
+        code: "MKT-3", title: "Frontend Specialist — Lead States", days: 3,
+        description: "UI specialist cu 2 stări vizuale (gated vs unlocked).",
+        deliverables: [
+          "Lista oportunități: card minimal (oraș + prenume + tag-uri + fee dinamic)",
+          "Detail page state \"gated\": briefing scurt + CTA \"Trimite oferta (XX RON)\"",
+          "Detail page state \"unlocked\": nume complet, telefon clickable, adresă, chat link",
+          "Form ofertare cu preț propriu (NU estimat sistem)",
+          "Eliminare totală \"Estimat XXX RON\" din UI specialist",
+          "Indicator \"3/5 specialiști au ofertat deja\" pentru urgență",
+        ],
+      },
+      {
+        code: "MKT-4", title: "Sub-categorii Servicii + SEO", days: 3,
+        description: "Granular services + indexare publică Google.",
+        deliverables: [
+          "Collection `specialist_services` ierarhică (parent + child slug)",
+          "Admin UI pentru gestionare sub-categorii globale",
+          "Pagini publice `/servicii/{slug}` + `/servicii/{slug}/{oras}`",
+          "Schema.org JSON-LD markup (Service, LocalBusiness, AggregateRating)",
+          "Sitemap.xml dinamic generat din servicii × orașe active",
+          "Meta tags Open Graph + Twitter cards per pagină",
+        ],
+      },
+      {
+        code: "MKT-5", title: "Pipeline + Tab Câștigate", days: 2,
+        description: "Vizualizare Kanban pentru specialist + tab oferte câștigate.",
+        deliverables: [
+          "Tab Oportunități: lista activă",
+          "Tab Ofertate: oferte trimise (cu fee plătit) — așteptând răspuns client",
+          "Tab Câștigate: lucrări unde clientul a acceptat (nume + telefon + mesaj original)",
+          "Tab Setări: profil + sub-categorii + tarife",
+          "Bottom nav mobile (cu icoane + badge count)",
+        ],
+      },
+    ],
+    backend: {
+      structure: `/app/backend/
+├── routes/
+│   ├── leads_v2.py            # NEW: gating + unlock + pricing
+│   ├── lead_pricing_rules.py  # NEW: admin config fee dinamic
+│   └── (existing requests.py NEATINS — doar query updates)
+├── helpers/
+│   ├── lead_gating.py         # NEW: is_unlocked() + filter_sensitive_fields()
+│   └── fee_calculator.py      # NEW: compute_lead_fee()
+└── models/
+    ├── lead_unlock.py         # NEW model
+    └── lead_pricing_rule.py   # NEW model`,
+      endpoints: [
+        { method: "GET",  path: "/api/leads",                              note: "Lista oportunități (gated)" },
+        { method: "GET",  path: "/api/leads/{id}",                         note: "Detail lead (filtered if !unlocked)" },
+        { method: "POST", path: "/api/leads/{id}/unlock",                  note: "Plătește fee + deblochează" },
+        { method: "POST", path: "/api/leads/{id}/offer",                   note: "Trimite oferta (consumă unlock dacă nu există)" },
+        { method: "GET",  path: "/api/leads/{id}/offer-count",             note: "Returnează count ofertanți pentru limită 5" },
+        { method: "GET",  path: "/api/admin/lead-pricing-rules",           note: "Lista reguli fee dinamic" },
+        { method: "POST", path: "/api/admin/lead-pricing-rules",           note: "Creează regulă" },
+        { method: "PUT",  path: "/api/admin/lead-pricing-rules/{id}",      note: "Update regulă" },
+        { method: "POST", path: "/api/admin/lead-pricing-rules/preview",   note: "Preview fee pentru request mock" },
+        { method: "GET",  path: "/api/specialist-services",                note: "Listă sub-categorii ierarhice" },
+        { method: "GET",  path: "/api/public/services/{slug}",             note: "Pagină publică SEO" },
+        { method: "GET",  path: "/sitemap.xml",                            note: "Sitemap dinamic" },
+      ],
+      security: [
+        "Helper `filter_sensitive_fields()` aplicat în TOATE răspunsurile API care includ lead data",
+        "Unlock record imutabil — nu se șterge niciodată (audit trail)",
+        "Rate limit 10 unlock/oră/specialist pentru a preveni abuz",
+        "Stripe webhook → la succes payment, crează unlock atomic",
+        "Verificare offer_count < max_offers înainte de a permite ofertare nouă",
+      ],
+      dependencies: [
+        "# ZERO dependențe noi — reuse stripe, motor, pydantic",
+      ],
+    },
+    frontend: {
+      structure: `/app/frontend/src/
+├── pages/
+│   ├── specialist/
+│   │   ├── OpportunitiesList.jsx     # gated cards
+│   │   ├── OpportunityDetail.jsx     # 2 states (gated/unlocked)
+│   │   ├── OffersSubmitted.jsx       # tab oferte trimise
+│   │   ├── OffersWon.jsx             # tab câștigate
+│   │   └── SpecialistProfile.jsx     # sub-categorii editor
+│   ├── public/
+│   │   ├── ServicesIndex.jsx         # /servicii
+│   │   ├── ServiceDetail.jsx         # /servicii/{slug}
+│   │   └── ServiceByCity.jsx         # /servicii/{slug}/{oras}
+│   └── admin/
+│       ├── LeadPricingRules.jsx      # config fee dinamic
+│       └── SpecialistServicesAdmin.jsx
+└── components/
+    ├── LeadCardGated.jsx
+    ├── LeadCardUnlocked.jsx
+    ├── OfferForm.jsx
+    └── PipelineTabs.jsx`,
+      routes: [
+        { scope: "auth",   path: "/specialist/oportunitati",            note: "Lista gated" },
+        { scope: "auth",   path: "/specialist/oportunitati/{id}",       note: "Detail (gated/unlocked)" },
+        { scope: "auth",   path: "/specialist/ofertate",                note: "Tab oferte trimise" },
+        { scope: "auth",   path: "/specialist/castigate",               note: "Tab câștigate" },
+        { scope: "public", path: "/servicii",                           note: "SEO index" },
+        { scope: "public", path: "/servicii/{slug}",                    note: "SEO categorie" },
+        { scope: "public", path: "/servicii/{slug}/{oras}",             note: "SEO long-tail" },
+        { scope: "admin",  path: "/admin/lead-pricing",                 note: "Config fee dinamic" },
+      ],
+      designReuse: [
+        "Toate componentele folosesc Atlas (Propunerea DS-ATLAS) — dacă DS-ATLAS nu e aprobat, fallback la shadcn existent",
+        "Status badges color-coded (verde unlock plătit, galben pending, roșu expirat)",
+        "Kanban pipeline reuse din Atlas Pipeline component",
+        "Empty state friendly pentru tab-uri goale",
+      ],
+      dependencies: [
+        "# Zero dependențe noi",
+      ],
+    },
+    db: {
+      isolationRule: "2 colecții noi (`lead_unlocks`, `lead_pricing_rules`, `specialist_services`) + 1 câmp nou pe `requests` (`max_offers`). Modulele existente intacte. Rollback prin feature flag → nicio operație nouă pe colecțiile noi.",
+      collections: [
+        {
+          name: "lead_unlocks", purpose: "Tracking deblocări fee plătit per specialist × lead",
+          schema: `{
+  _id: ObjectId, id: "uuid",
+  specialist_id: "uuid",
+  request_id: "uuid",
+  amount_paid: 23.50,           // RON
+  currency: "RON",
+  payment_method: "stripe|wallet|free_credit",
+  stripe_payment_intent_id: "string?",
+  unlocked_at: ISO,
+  expires_at: null,             // unlock permanent
+  status: "active|refunded"
+}`,
+          indexes: [
+            "{specialist_id:1, request_id:1} unique",
+            "{request_id:1} pentru offer_count queries",
+          ],
+        },
+        {
+          name: "lead_pricing_rules", purpose: "Reguli admin pentru fee dinamic",
+          schema: `{
+  _id, id, name: "Design Interior Cluj high-tier",
+  active: true,
+  match: {
+    category_slug: "design-interior",
+    sub_category_slug: "design-interior-baie",
+    city: "Cluj-Napoca",
+    budget_min_ron: 5000,
+    budget_max_ron: null
+  },
+  fee_min_ron: 25, fee_max_ron: 45,
+  fee_strategy: "demand_based|fixed|tier_based",
+  priority: 100,                // higher = applied first
+  created_at, updated_at
+}`,
+          indexes: ["{active:1, priority:-1}"],
+        },
+        {
+          name: "specialist_services", purpose: "Sub-categorii servicii ierarhice (SEO)",
+          schema: `{
+  _id, id, parent_id: "uuid?",  // null = root
+  name: "Design Interior Baie",
+  slug: "design-interior-baie",
+  full_slug: "design-interior/design-interior-baie",
+  description_md, icon,
+  meta_title, meta_description,
+  active: true, sort_order: 0,
+  created_at, updated_at
+}`,
+          indexes: ["{slug:1} unique", "{parent_id:1, sort_order:1}"],
+        },
+      ],
+    },
+    risks: [
+      { id: "MKT-R1", severity: "CRITICAL", title: "Data leak — specialist vede telefon înainte de plată",
+        mitigation: "Server-side `filter_sensitive_fields()` în TOATE endpoint-urile + integration tests cu 20+ scenarii de bypass. Audit penetration test." },
+      { id: "MKT-R2", severity: "HIGH", title: "Specialist exploit — plătește fee, primește refund automat, păstrează accesul",
+        mitigation: "Refund manual doar admin (nu automat). Unlock record imutabil. Stripe webhook idempotent." },
+      { id: "MKT-R3", severity: "MEDIUM", title: "Limita 5 ofertanți creează race condition (6 plătesc simultan)",
+        mitigation: "MongoDB transaction atomic — check_count + insert într-o singură operație. Test cu 50+ POST concurent." },
+      { id: "MKT-R4", severity: "MEDIUM", title: "Fee dinamic prea agresiv → specialiști pleacă",
+        mitigation: "A/B test cu 50% useri pe fee dinamic vs fix. Dashboard admin cu metrici: cheltuit/încasat per specialist, churn rate." },
+      { id: "MKT-R5", severity: "LOW", title: "Sub-categorii prea granulare → trafic SEO diluat",
+        mitigation: "Start cu 10-15 sub-categorii bazate pe analytics existente. Add gradual based pe search volume." },
+      { id: "MKT-R6", severity: "MEDIUM", title: "Clientul nu răspunde după ce specialistul a plătit → frustrare",
+        mitigation: "Notificare email/SMS automat clientului când primește prima ofertă. Politică: dacă clientul nu răspunde în 7 zile, refund credit." },
+      { id: "MKT-R7", severity: "LOW", title: "Buton ambiguu \"Trimite oferta (XX RON)\" — userii cred că trimit XX RON la client",
+        mitigation: "Tooltip explicativ + modal confirmare cu breakdown: \"Plătești XX RON acces. Clientul plătește separat pentru serviciul tău.\"" },
+    ],
+    ai: {
+      philosophy: "AI ajută la calibrare fee dinamic (suggest pricing optim) și la detectare abuz. Nu execută acțiuni singur, doar recomandări pentru admin.",
+      touchpoints: [
+        { title: "Fee Calibration AI", description: "Zilnic AI analizează: leads ofertate/leads disponibile per categorie/oraș, sugerează ajustări fee min-max",
+          reuse: "ai_core/provider.py + Claude Sonnet", phase: "Post MKT-3" },
+        { title: "Abuse Detection", description: "Detectează pattern-uri suspecte (specialist unlock-uri masive fără ofertare, refund spam)",
+          reuse: "Same ai_core, daily cron", phase: "Post MKT-2" },
+        { title: "Smart Lead Matching", description: "Pentru un specialist nou, AI sugerează primele 5 lead-uri cu fit maxim",
+          reuse: "Reuse existing matching engine", phase: "Optional MKT-6" },
+      ],
+    },
+    revenueScenarios: [
+      { name: "Restart marketplace activ", estimatedRevenue: "300€ – 800€/lună din fee-uri specialist",
+        description: "Cu fee dinamic 5-99 RON, estimate 100-300 unlock-uri/lună × 10-25 RON mediu = 1.500-7.500 RON ≈ 300-1.500€." },
+      { name: "Retenție specialiști existenți", estimatedRevenue: "+25% LTV per specialist",
+        description: "Specialiștii care au cheltuit 2.500 RON/an în 2025 (ROI 19x) vor reveni dacă fee-ul scade înapoi la nivel sustenabil." },
+      { name: "Trafic SEO long-tail", estimatedRevenue: "+500-2.000€/lună indirect prin lead-uri organice",
+        description: "Pagini /servicii/design-interior-baie-cluj captează căutări Google specifice. La 50 lead-uri organice/lună × 30 RON fee = 1.500 RON/lună." },
+      { name: "Conversie crescută (transparency)", estimatedRevenue: "+15% rate specialist→ofertare",
+        description: "Specialiștii înțeleg clar ce plătesc și ce primesc → mai puțin abandon, mai multă ofertare." },
+    ],
+    breakEven: "Pe Emergent: 60-100 credite total estimate. Comparativ freelance: 3.000€ teoretic (15 zile × 200€/zi). Break-even la primele ~50 unlock-uri (estimate 2-4 săptămâni după lansare dacă marketing-ul către specialiști vechi funcționează). Payback complet: 2-3 luni. ROI compus pe termen lung prin SEO + retenție.",
+    recommendation: "Recomandare: START cu MKT-0 + MKT-1 + MKT-2 (7 zile, foundation + gating + fee dinamic) — minimul viabil pentru a corecta confuzia actuală. Validare cu 5-10 specialiști vechi (care au activ în 2025) că vor să revină cu noul model. Doar după feedback pozitiv, continui MKT-3 → MKT-5 (UI + pipeline + SEO). MKT-4 (SEO sub-categorii) poate fi paralelizat cu DS-ATLAS dacă acea propunere e aprobată.",
+  },
 ];
+
