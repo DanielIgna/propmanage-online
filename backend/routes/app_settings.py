@@ -134,12 +134,23 @@ class SEOSettings(BaseModel):
     og_image: Optional[str] = None
 
 
+class FounderContact(BaseModel):
+    """Primary owner contact — used for critical alerts + dual-verification gates."""
+    name: Optional[str] = ""
+    email: Optional[str] = ""
+    phone: Optional[str] = ""
+    country: Optional[str] = "RO"
+    is_primary_owner: Optional[bool] = True
+    sms_verification_enabled: Optional[bool] = False  # toggle when Twilio is integrated
+
+
 class AppSettingsUpdate(BaseModel):
     social: Optional[SocialLinks] = None
     pricing: Optional[PricingSettings] = None
     contact: Optional[ContactSettings] = None
     company: Optional[CompanySettings] = None
     seo: Optional[SEOSettings] = None
+    founder_contact: Optional[FounderContact] = None
 
 
 # ---------- Public (read-only safe subset) ----------

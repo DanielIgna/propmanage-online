@@ -8,9 +8,298 @@
 // - timelineDays / estCostEur = referință teoretică freelance (200€/zi mid-level)
 // - emergentComplexity / emergentEffort / emergentCreditsEstimate = realitatea Emergent
 // - risk (X/10) = probabilitate apariție bug-uri/regresii, NU "doar X din 10 funcționează"
-import { Sparkles, Palette, Coins } from "lucide-react";
+import { Sparkles, Palette, Coins, ShieldCheck } from "lucide-react";
 
 export const FUTURE_IDEAS = [
+  // ==========================================================================
+  // PROPUNERE 0 — FOUNDER APPROVAL GATE (cea mai critică, prioritate top)
+  // ==========================================================================
+  {
+    id: "founder_approval_gate",
+    code: "FOUNDER-GATE",
+    title: "Founder Approval Gate — Dublă verificare email + SMS pentru modificări critice",
+    icon: ShieldCheck,
+    risk: 6,
+    riskExplanation: "Risc 6/10 = atinge zonele critice (cod, date, admin permissions, modificări business logic). Probabilitate ~60% de bug-uri în primele 2-3 săptămâni (false-positive la detection, lockout potențial dacă SMS Twilio eșuează). Mitigările: bypass tip 'glass-break' (cod recovery offline) + audit log imutabil + opțiune SMS-fallback prin email TOTP. Funcțional 100%, doar trebuie testat extensiv.",
+    timelineDays: 12,
+    estCostEur: 2400,
+    estOpexMonthly: 25,
+    estRevenueMonthly: 0,
+    estRevenueRange: "Indirect: previne pierderi catastrofale",
+    emergentComplexity: "Medie-Ridicată",
+    emergentEffort: "4-6 task-uri agent (Twilio integration + workflow + UI + audit log + recovery)",
+    emergentCreditsEstimate: "50-90 credite estimate",
+    businessImpact: "PROTECȚIE CRITICĂ. Previne ca un admin secundar sau un agent AI să facă modificări irreversibile fără aprobarea founder-ului (ex: ștergere date, transfer ownership, schimbare comisioane, export GDPR masiv, modificări cod cu impact business logic). O singură eroare prevenită = recuperare cost x10. Esențial când scalezi cu mai mulți admini sau cu agent AI agentic.",
+    summary: "Sistem 2-Factor de aprobare pentru orice acțiune ADMIN cu impact critic (modificări cod backend deployed, ștergere/export date, transfer ownership, schimbare comisioane/pricing, modificare permissions, agent AI ce vrea să rescrie business logic). Workflow: acțiunea e blocată → email instant la founder cu detalii + buton Approve/Reject + cod SMS 6 cifre via Twilio → founder confirmă pe ambele canale → acțiunea se execută. Toate aprobările audit-logged imutabil. Include 'glass-break' recovery (cod offline pentru cazuri Twilio down).",
+    problemAndOpportunity: "PROBLEMA: PropManage are deja 3 conturi admin + agent AI cu autonomie crescândă (Tier 'Assisted' acum, target 90%+). Orice admin secundar sau agent AI poate ACUM, în teorie, să: (a) modifice comisionul de la 2.5% la 50% și să bate platforma; (b) șterge accidental colecții întregi; (c) exporte tot baza de clienți la o terță parte; (d) schimbe destinația plăților Stripe; (e) accepte agent AI o sugestie de cod care rupe logica. RISC: o eroare costă 10-100x mai mult decât investiția în această protecție. OPORTUNITATEA: implementarea unui gate dublu (email + SMS la founder) face IMPOSIBILE aceste modificări fără confirmarea ta personală — chiar dacă cineva îți fură credențialele admin.",
+    principles: [
+      "Identifică SET STRICT de acțiuni critice (lista hardcodată, nu permisivă): ștergere bulk date, modificare comision, transfer ownership, export GDPR >100 rânduri, modificare cod backend deployment, agent AI cu schimbare business logic",
+      "Toate acțiunile critice intercepted de middleware → puse în queue `pending_founder_approval` → email instant + SMS 6 cifre",
+      "Founder primește email cu: ce acțiune, cine a inițiat, datele afectate (count), preview JSON, buton Approve / Reject + cod SMS 6 cifre separat",
+      "Verificare dublă: trebuie să dai click pe link DIN email + să introduci cod SMS în pagina admin (același cod expiră în 10 min)",
+      "Recovery 'glass-break': 5 coduri offline (printabile / păstrate în safe) pentru cazul când Twilio e down + email comprimat",
+      "Toate aprobările/respingerile audit-logged imutabil în `founder_decisions` (collection separată, nu accept overwrites)",
+      "Bypass strict imposibil: chiar și root admin nu poate dezactiva gate-ul pentru sine (doar founder cu cod recovery)",
+      "SMS via Twilio (RO +40 fully supported) cu rate limit 5 SMS/oră + alert email dacă rate exceeded",
+      "Toate acțiunile critice expiră automat din queue după 24h dacă nu sunt aprobate (auto-reject + email notification)",
+      "Frontend admin afișează banner permanent pentru pending approvals (founder vede cât a stat in queue)",
+    ],
+    antiPatterns: [
+      "NU permite extinderea listei de acțiuni critice fără un alt gate (recursive lock)",
+      "NU loga codurile SMS în plain (audit log doar 'sent', niciodată conținutul)",
+      "NU permite recovery code reutilizat — fiecare folosit o singură dată",
+      "NU permite override din DB direct — middleware verifică flag la fiecare request, nu cache",
+      "NU permite founder să dezactiveze gate-ul fără cod SMS (chiar și pentru sine)",
+      "NU bypass-a gate-ul pentru agentul AI nici măcar 'pentru viteză' — dacă AI vrea să facă ceva critic, întreabă founder mereu",
+      "NU permite mai mulți founders (single source of truth)",
+    ],
+    phases: [
+      {
+        code: "FG-0", title: "Foundation: Founder Contact + Critical Action Registry", days: 1,
+        description: "Definire model + registry hardcoded al acțiunilor critice + storage pentru founder contact (deja salvat în app_settings.founder_contact).",
+        deliverables: [
+          "Model `FounderContact` în app_settings (email, phone, country, is_primary_owner) — DEJA EXISTĂ",
+          "Collection `critical_actions_registry` cu lista hardcoded acțiuni (slug, label, severity, requires_sms)",
+          "Helper `is_critical_action(slug)` reutilizabil",
+          "Seed inițial cu 8-10 acțiuni critice (delete_collection, change_commission, transfer_ownership, etc.)",
+        ],
+      },
+      {
+        code: "FG-1", title: "Twilio Integration + SMS Service", days: 2,
+        description: "Integrare Twilio pentru SMS verification + rate limiting.",
+        deliverables: [
+          "Cont Twilio (free trial sau plătit) + RO sender number",
+          "Helper `send_verification_sms(phone, code)` cu retry 3x",
+          "Rate limit 5 SMS/oră/founder (Redis sau MongoDB TTL)",
+          "Alert email când rate exceeded sau Twilio fails",
+          "Fallback: email TOTP (Authenticator app) dacă SMS eșuează",
+        ],
+      },
+      {
+        code: "FG-2", title: "Approval Queue + Backend Middleware", days: 3,
+        description: "Middleware care intercepted toate acțiunile critice și le pune în queue.",
+        deliverables: [
+          "Collection `pending_founder_approvals` cu TTL 24h",
+          "Decorator `@requires_founder_approval(action_slug, severity)` pentru endpoint-uri critice",
+          "Endpoint POST `/api/founder-gate/approve/{token}` (link din email)",
+          "Endpoint POST `/api/founder-gate/verify-sms` cu cod 6 cifre",
+          "State machine: pending → email_clicked → sms_verified → executed | rejected | expired",
+          "Auto-reject după 24h + email notification",
+          "Audit log imutabil în `founder_decisions`",
+        ],
+      },
+      {
+        code: "FG-3", title: "Email Templates + Approval UI", days: 2,
+        description: "Email HTML profesional + landing page pentru aprobare.",
+        deliverables: [
+          "Email template HTML cu: acțiune, actor, payload preview, buton Approve (mov), buton Reject (roșu)",
+          "Landing page `/founder-gate/{token}` (mobile-optimized, no auth needed — token e suficient)",
+          "UI pentru introducere cod SMS (6 cifre, paste-friendly)",
+          "Confirmation page după approve/reject",
+          "Notificare email finală: 'acțiunea X a fost executată/respinsă'",
+        ],
+      },
+      {
+        code: "FG-4", title: "Glass-Break Recovery + Admin Dashboard", days: 2,
+        description: "Recovery offline + dashboard pentru founder.",
+        deliverables: [
+          "Generare 5 coduri recovery one-time (printabile, păstrate offline)",
+          "Endpoint POST `/api/founder-gate/recovery-bypass/{code}` (single-use)",
+          "Dashboard `/admin/founder-gate`: pending approvals + history + recovery codes status",
+          "Banner permanent admin: 'X cereri pending la founder' cu age (cât a stat)",
+          "Export audit log CSV (pentru compliance/legal)",
+        ],
+      },
+      {
+        code: "FG-5", title: "Testing + Documentation", days: 2,
+        description: "Test suite + docs pentru founder + admin secundari.",
+        deliverables: [
+          "Test suite cu 30+ scenarii (happy path, expirat, SMS down, recovery, bypass attempts)",
+          "Penetration test: încearcă să bypass gate-ul prin DB direct, JWT manipulation, race condition",
+          "Documentație în Admin → Docs: cum funcționează, ce e protejat, ce să faci dacă pierzi telefonul",
+          "Test cu primul 'șoc' real (modificare comision de test) — verificare end-to-end pe inbox personal",
+        ],
+      },
+    ],
+    backend: {
+      structure: `/app/backend/
+├── founder_gate/
+│   ├── __init__.py
+│   ├── registry.py        # critical_actions_registry hardcoded list
+│   ├── middleware.py      # @requires_founder_approval decorator
+│   ├── queue.py           # pending_founder_approvals CRUD
+│   ├── twilio_sms.py      # SMS sender + rate limit
+│   ├── email_templates.py # approval email HTML
+│   └── recovery.py        # glass-break codes
+├── routes/
+│   └── founder_gate.py    # approve/reject/verify-sms/recovery endpoints
+└── models/
+    ├── founder_approval.py
+    └── founder_decision.py`,
+      endpoints: [
+        { method: "GET",  path: "/api/admin/founder-gate/pending",                  note: "Lista pending approvals (admin view)" },
+        { method: "GET",  path: "/api/admin/founder-gate/history",                  note: "Audit log decizii founder" },
+        { method: "GET",  path: "/api/admin/founder-gate/recovery-codes",           note: "Status (folosite/disponibile)" },
+        { method: "POST", path: "/api/admin/founder-gate/recovery-codes/regenerate", note: "Regenerare (necesită SMS founder)" },
+        { method: "POST", path: "/api/founder-gate/approve/{token}",                note: "Link din email (public, token-based)" },
+        { method: "POST", path: "/api/founder-gate/reject/{token}",                 note: "Reject din email" },
+        { method: "POST", path: "/api/founder-gate/verify-sms",                     note: "Submit cod 6 cifre" },
+        { method: "POST", path: "/api/founder-gate/recovery-bypass/{code}",         note: "Glass-break single-use" },
+        { method: "GET",  path: "/api/admin/founder-gate/critical-actions",         note: "Lista acțiuni protejate (read-only)" },
+      ],
+      security: [
+        "Token JWT semnat cu secret separat (FOUNDER_GATE_SECRET în .env)",
+        "SMS codes hashed cu bcrypt înainte de stocare (nu plain text)",
+        "Rate limit strict: 5 SMS/oră/founder, 10 approve attempts/oră",
+        "IP whitelist optional pentru landing page (RO + țări specifice)",
+        "Audit log append-only, fără DELETE permis",
+        "Recovery codes hashed individual, single-use enforced atomic",
+        "TTL automat 10 min pentru SMS codes, 24h pentru pending approvals",
+        "Constant-time comparison pentru cod SMS (anti timing attack)",
+      ],
+      dependencies: [
+        "twilio>=8.5.0          # SMS provider RO support",
+        "pyotp>=2.9             # TOTP fallback dacă vrei Authenticator app în plus",
+        "# Stocare: existing MongoDB, no Redis needed",
+      ],
+    },
+    frontend: {
+      structure: `/app/frontend/src/
+├── pages/
+│   ├── founder-gate/
+│   │   ├── ApprovalLanding.jsx     # /founder-gate/{token}
+│   │   ├── ApproveSuccess.jsx
+│   │   └── RejectSuccess.jsx
+│   └── admin/founder-gate/
+│       ├── FounderGateDashboard.jsx  # /admin/founder-gate
+│       ├── PendingApprovals.jsx
+│       ├── DecisionHistory.jsx
+│       └── RecoveryCodes.jsx
+└── components/
+    ├── FounderGateBanner.jsx       # banner permanent admin
+    └── SmsCodeInput.jsx            # 6-digit paste-friendly input`,
+      routes: [
+        { scope: "public", path: "/founder-gate/{token}",            note: "Landing page din email (token auth)" },
+        { scope: "public", path: "/founder-gate/{token}/success",    note: "Confirmation după aprobare" },
+        { scope: "admin",  path: "/admin/founder-gate",              note: "Dashboard founder" },
+        { scope: "admin",  path: "/admin/founder-gate/pending",      note: "Cereri în așteptare" },
+        { scope: "admin",  path: "/admin/founder-gate/history",      note: "Istoric decizii" },
+        { scope: "admin",  path: "/admin/founder-gate/recovery",     note: "Glass-break codes management" },
+      ],
+      designReuse: [
+        "Folosește componentele Atlas (dacă DS-ATLAS aprobat) — modal verde/roșu pentru approve/reject",
+        "Email template profesional cu logo + branding consistent",
+        "SmsCodeInput: 6 inputuri separate cu autofocus next + paste detection",
+        "Banner admin: portocaliu cu pulse animation pentru pending",
+      ],
+      dependencies: [
+        "# ZERO dependențe noi frontend — totul cu shadcn + react existent",
+      ],
+    },
+    db: {
+      isolationRule: "3 colecții noi cu prefix `founder_*` + extindere `app_settings.founder_contact` (deja existent). Toate modulele existente NEATINSE. Rollback: dacă oprești gate-ul, colecțiile rămân ca audit doar, nu blochează nimic.",
+      collections: [
+        {
+          name: "pending_founder_approvals", purpose: "Queue acțiuni critice care așteaptă founder",
+          schema: `{
+  _id, id, token: "uuid",  // pentru link email
+  action_slug: "change_commission_pct",
+  action_label: "Modificare comision platformă",
+  severity: "critical|high",
+  initiated_by: "admin_user_id",
+  initiated_by_email: "admin@...",
+  payload: { old_value, new_value, target_collection, target_id, preview },
+  state: "pending_email|pending_sms|approved|rejected|expired",
+  email_clicked_at: ISO?,
+  sms_code_hash: "bcrypt", sms_sent_at: ISO?, sms_attempts: 0,
+  created_at, expires_at: ISO  // 24h
+}`,
+          indexes: [
+            "{token:1} unique",
+            "{state:1, expires_at:1}",
+            "TTL on expires_at",
+          ],
+        },
+        {
+          name: "founder_decisions", purpose: "Audit log IMUTABIL al deciziilor founder",
+          schema: `{
+  _id, id, approval_id,
+  action_slug, action_label, severity,
+  initiator_user_id, initiator_email,
+  decision: "approved|rejected|expired_auto_reject|recovery_bypass",
+  decided_at, decided_by_method: "email_link+sms|recovery_code",
+  payload_snapshot: {},  // copie payload la momentul deciziei
+  execution_result: "success|failed|skipped",
+  execution_error?: "string",
+  ip_address?, user_agent?,
+}`,
+          indexes: [
+            "{action_slug:1, decided_at:-1}",
+            "{decision:1, decided_at:-1}",
+            "NO delete permission — append only",
+          ],
+        },
+        {
+          name: "founder_recovery_codes", purpose: "5 coduri glass-break offline (single-use)",
+          schema: `{
+  _id, id, code_hash: "bcrypt",
+  generated_at, generated_by: "founder",
+  used: false, used_at: ISO?, used_reason: "string?",
+}`,
+          indexes: ["{used:1}"],
+        },
+      ],
+    },
+    risks: [
+      { id: "FG-R1", severity: "CRITICAL", title: "Founder pierde telefonul + acces email simultan → lockout total",
+        mitigation: "Recovery codes offline (5 single-use printabile, păstrate în safe fizic). Backup: poate fi adăugat un al doilea founder/co-founder cu același nivel." },
+      { id: "FG-R2", severity: "HIGH", title: "Twilio down → niciun SMS nu se trimite",
+        mitigation: "Fallback automat: email TOTP via Google Authenticator + alert urgent founder. Monitoring Twilio uptime cu alert dacă <99%." },
+      { id: "FG-R3", severity: "HIGH", title: "Admin secundar bypass via DB direct (modifică MongoDB cu mongocli)",
+        mitigation: "Middleware verifică flag la fiecare request (nu cache). Audit cron orar care detectează modificări critice fără founder_decision corespunzător → alert email instant founder." },
+      { id: "FG-R4", severity: "MEDIUM", title: "Token din email leak (founder forwardează din greșeală)",
+        mitigation: "Token single-use + expiry 24h. Plus cod SMS care e canal separat — leak email singur nu permite execuție." },
+      { id: "FG-R5", severity: "MEDIUM", title: "Lista acțiuni critice prea agresivă → fricționare admin daily ops",
+        mitigation: "Lista minimă inițial (10 acțiuni). Adaugă doar după feedback. Niciodată acțiuni rutinăer (login, view, etc.)." },
+      { id: "FG-R6", severity: "MEDIUM", title: "Agent AI 'inteligent' care încearcă să modifice gate-ul însuși",
+        mitigation: "Modificarea registry-ului `critical_actions_registry` E EA O ACȚIUNE CRITICĂ — necesită aprobare founder. Recursive lock garantat." },
+      { id: "FG-R7", severity: "LOW", title: "SMS costuri lunare cresc nesustenabil",
+        mitigation: "Twilio Romania: ~0.04€/SMS. La 50 cereri/lună = 2€. La 500/lună (foarte agresiv) = 20€. Plafonat la 25€/lună budget în opex." },
+      { id: "FG-R8", severity: "LOW", title: "Founder approves rapid fără să citească payload (clic reflex)",
+        mitigation: "UI cere scroll obligatoriu pe payload preview + 3 sec delay înainte de buton activ. Email include preview clar al impactului." },
+      { id: "FG-R9", severity: "CRITICAL", title: "Bug în middleware permite acțiunea fără verificare",
+        mitigation: "Test suite 30+ scenarii + penetration test obligatoriu pre-deploy. Feature flag pentru rollback instant dacă apar false-positives." },
+      { id: "FG-R10", severity: "LOW", title: "Founder deviane (vrea să acționeze rapid noaptea)",
+        mitigation: "Recovery codes pentru emergencies. Plus 'pre-authorized actions' care permit acțiuni rutinăer fără aprobare (whitelist controlled de founder)." },
+    ],
+    ai: {
+      philosophy: "AI NU primește excepție de la gate. Dacă AI vrea să modifice comision, șterge date, sau transfer ownership → INTRĂ ÎN QUEUE EXACT CA UN UMAN. Filozofie: 'cu cât AI e mai autonom, cu atât mai mult acest gate e necesar'.",
+      touchpoints: [
+        { title: "AI Action Risk Scorer", description: "AI scoring zilnic al acțiunilor admin recente — detectează pattern-uri suspecte care ar trebui adăugate în critical_actions_registry",
+          reuse: "ai_core/provider.py + Claude Sonnet", phase: "Post FG-5" },
+        { title: "Auto-draft approval emails", description: "Pentru acțiuni complexe, AI generează preview-ul în limbaj uman ('Această acțiune va șterge 1.234 înregistrări client din 2023')",
+          reuse: "Same AI provider", phase: "FG-3" },
+        { title: "Suspicious activity detector", description: "Detectează admin care încearcă să bypass gate-ul (multiple rejects, requests în afara orelor de lucru, IP-uri ciudate)",
+          reuse: "Daily cron + email founder dacă scor > threshold", phase: "Post FG-5" },
+      ],
+    },
+    revenueScenarios: [
+      { name: "Prevenirea unei pierderi catastrofale", estimatedRevenue: "10.000 – 100.000€ (one-time)",
+        description: "Un singur incident prevenit (ștergere accidentală 5000 clienți, schimbare comision la 50% de un admin compromis, transfer ownership fraudulos) acoperă investiția de zeci de ori." },
+      { name: "Trust signal pentru investitori/parteneri", estimatedRevenue: "Indirect: +30% credibilitate",
+        description: "Atunci când vorbești cu un investitor sau parteneri B2B, faptul că ai 2FA pe acțiunile critice e un signal de maturitate operațională. Util în due diligence." },
+      { name: "Compliance pregătire (GDPR, ISO27001)", estimatedRevenue: "Habilitator certificări",
+        description: "ISO 27001 cere control strict pe modificări critice. GDPR cere audit log imutabil. Acest gate îți dă ambele aproape gratuit." },
+      { name: "Reducere costuri asigurare cyber",  estimatedRevenue: "10-20% reducere primă",
+        description: "Asigurătorii cyber oferă discount pentru 2FA pe acțiuni critice + audit log. Pentru o companie cu cifră de afaceri >100k€, reducere 20% poate fi 500-2.000€/an." },
+    ],
+    breakEven: "Pe Emergent: 50-90 credite estimate. Comparativ freelance: 2.400€ teoretic (12 zile × 200€/zi). Opex lunar: 25€ (Twilio SMS + email). Break-even: nu se măsoară în venit direct (e protecție, nu monetizare), ci în RISK MITIGATION. Echivalent ROI: prevenirea unui singur incident major (ștergere accidentală, fraudă admin compromis, AI scăpat de sub control) acoperă investiția x100. Esențial dacă: (a) ai >2 admini, (b) folosești agent AI autonom, (c) scalezi spre platformă serioasă.",
+    recommendation: "Recomandare: **PRIORITATE TOP**. Acest gate ar trebui implementat ÎNAINTEA oricărei alte propuneri majore (DS-ATLAS, MKT-V2, EXP-V2) pentru că orice viitoare modificare va beneficia de protecția lui. START cu FG-0 + FG-1 + FG-2 (6 zile, ~25-45 credite) — minimum viabil care îți dă deja 80% din protecție. Pentru întrebarea ta despre 'modificări care pot schimba major funcționalitatea aplicației': lista inițială pe care o propun: (1) modificare comision/pricing, (2) ștergere bulk colecții, (3) transfer ownership cont, (4) export GDPR >100 rânduri, (5) modificare admin roles, (6) deploy production cod cu impact business logic, (7) agent AI sugerează schimbare structurală, (8) modificare destinație Stripe, (9) dezactivare gate însuși. Tu poți edita lista oricând.",
+  },
+
+  // ==========================================================================
+  // PROPUNERE 1 — EXPERIENCE SPACES V2 (existent)
+  // ==========================================================================
   {
     id: "experience_spaces_v2",
     code: "EXP-V2",
