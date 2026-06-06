@@ -91,6 +91,7 @@ from routes.bug_memory_aggregator import router as bug_memory_router
 from routes.deprecation_pulse import router as deprecation_pulse_router, run_deprecation_pulse_job
 from routes.architecture_board import router as architecture_board_router
 from routes.ai_pm import router as ai_pm_router
+from routes.operating_manual import router as operating_manual_router
 from routes.twin_orchestrator import router as twin_orchestrator_router
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
@@ -188,6 +189,7 @@ for r in (
     deprecation_pulse_router,
     architecture_board_router,
     ai_pm_router,
+    operating_manual_router,
     twin_orchestrator_router,
 ):
     app.include_router(r)

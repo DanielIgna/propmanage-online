@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, ShieldCheck, Scale, Wallet, FolderKanban,
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
   LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, Sparkles, Bot, Zap, Inbox,
-  UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb, Bug, Compass, Layers
+  UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb, Bug, Compass, Layers, BookOpenCheck
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { API } from "../DashShared";
@@ -79,6 +79,7 @@ const NAV_SECTIONS = [
   {
     title: "STRATEGIE & R&D",
     items: [
+      { id: "operating_manual", label: "Manual de Operare", icon: BookOpenCheck, badge: "START AICI", href: "/admin/operating-manual" },
       { id: "ai_governance", label: "AI Governance Center", icon: Shield, badge: "NEW", href: "/admin/ai-governance" },
       { id: "architecture_board", label: "Architecture Review Board", icon: Compass, badge: "NEW", href: "/admin/architecture-board" },
       { id: "ai_pm", label: "AI Product Manager", icon: Layers, badge: "NEW", href: "/admin/ai-pm" },

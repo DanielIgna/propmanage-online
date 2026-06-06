@@ -43,6 +43,19 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 ---
 
 ## Recent additions (Feb 2026)
+- **Phase 84 — Operating Manual + In-app documentation** ✅ (Feb 12 2026)
+  - New `/app/docs/OPERATING_MANUAL.md` (547 lines, 26 KB Romanian) — comprehensive how-to:
+    - 13 secțiuni: principii siguranță, Smart Pipeline, fiecare modul nou (Governance/Arch/AI PM/Pulse/BugMem/Autonomy/FounderGate/FutureIdeas), Progressive Disclosure (Junior→Verified→Pro), Roadmap per modul, 8 scenarii frecvente cheat-sheet
+    - Pentru fiecare modul: ce face / când îl folosești / pași concreți / ce afectezi dacă greșești / cum repari
+    - Răspunde explicit la întrebările user-ului: coordonare agenți A→Z, evitare ștergeri (snapshots, dry_run), pipeline arch→pm→todos, activare zone DEV in Autonomy (weights override), Stagii Progressive Disclosure (experience_tier auto-promotion)
+  - New backend route `/api/admin/operating-manual` (read-only markdown server)
+  - New admin page `/admin/operating-manual` cu:
+    - ReactMarkdown rendering custom-themed (h1/h2/h3 jerarhic, tabele, code blocks, blockquotes)
+    - TOC sticky lateral + cuprins mobile collapsible
+    - Search live în conținut (filtrare per secțiune ##)
+    - Linkuri ancore per secțiune
+  - Sidebar STRATEGIE & R&D: link "Manual de Operare" cu badge **START AICI** plasat primul (user-friendly entry point)
+  - Yarn dep: `react-markdown` (added)
 - **Phase 83 — Governance Ecosystem Foundation: Health + Permissions + Pulse + Architecture Board + AI PM** ✅ (Feb 12 2026)
 
   Major architecture push transforming PropManage from "multiple AI tools" into "a self-monitoring, self-governing platform" — pre-empts Marketplace V2 & Atlas in user's revised priority order.

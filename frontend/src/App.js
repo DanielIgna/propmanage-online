@@ -59,6 +59,7 @@ import AIGovernancePage from "./pages/admin/AIGovernancePage";
 import BugMemoryAggregatorPage from "./pages/admin/BugMemoryAggregatorPage";
 import ArchitectureBoardPage from "./pages/admin/ArchitectureBoardPage";
 import AIProductManagerPage from "./pages/admin/AIProductManagerPage";
+import OperatingManualPage from "./pages/admin/OperatingManualPage";
 import ContractPage from "./pages/ContractPage";
 import { trackPageView } from "@/lib/analytics";
 import { useDynamicSEO } from "@/lib/useDynamicSEO";
@@ -1601,6 +1602,7 @@ function App() {
               <Route path="/admin/bug-memory" element={<BugMemoryAggregatorPage />} />
               <Route path="/admin/architecture-board" element={<ArchitectureBoardPage />} />
               <Route path="/admin/ai-pm" element={<AIProductManagerPage />} />
+              <Route path="/admin/operating-manual" element={<OperatingManualPage />} />
               <Route path="/contracts/:id" element={<ContractPage />} />
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />
               <Route path="/ghiduri" element={<GhiduriIndex />} />
