@@ -9,7 +9,7 @@ import {
   Shield, ChevronLeft, Loader2, Brain, Activity, Coins,
   History, AlertTriangle, Users, Eye, Sparkles,
   ArchiveRestore, CheckCircle2, ArchiveX, CalendarClock,
-  RotateCcw, X,
+  RotateCcw, X, HeartPulse, KeyRound, Mail, Bell,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -45,9 +45,12 @@ const CATEGORY_LABEL = {
 
 const TABS = [
   { id: "agents",      label: "Agenți",            icon: Users },
+  { id: "health",      label: "Health",            icon: HeartPulse },
+  { id: "permissions", label: "Permissions",       icon: KeyRound },
   { id: "costs",       label: "Costuri",           icon: Coins },
   { id: "audit",       label: "Audit Trail",       icon: History },
   { id: "deprecation", label: "Deprecation Plan",  icon: ArchiveX },
+  { id: "pulse",       label: "Deprecation Pulse", icon: Bell },
 ];
 
 const AIGovernancePage = () => {
@@ -57,23 +60,38 @@ const AIGovernancePage = () => {
   const [costs, setCosts] = useState(null);
   const [audit, setAudit] = useState([]);
   const [depPlan, setDepPlan] = useState(null);
+  const [health, setHealth] = useState(null);
+  const [perms, setPerms] = useState(null);
+  const [pulseCfg, setPulseCfg] = useState(null);
+  const [pulsePreview, setPulsePreview] = useState(null);
+  const [pulseHistory, setPulseHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [depModal, setDepModal] = useState(null);  // agent obj being deprecated
   const [busy, setBusy] = useState(false);
 
   const refresh = async () => {
-    const [s, a, c, au, dp] = await Promise.all([
+    const [s, a, c, au, dp, h, pm, pc, pp, ph] = await Promise.all([
       ax.get("/api/admin/ai-governance/summary"),
       ax.get("/api/admin/ai-governance/agents"),
       ax.get("/api/admin/ai-governance/costs"),
       ax.get("/api/admin/ai-governance/audit-trail"),
       ax.get("/api/admin/ai-governance/deprecation-plan"),
+      ax.get("/api/admin/ai-governance/health"),
+      ax.get("/api/admin/ai-governance/permissions-matrix"),
+      ax.get("/api/admin/deprecation-pulse/config"),
+      ax.get("/api/admin/deprecation-pulse/preview"),
+      ax.get("/api/admin/deprecation-pulse/history?limit=10"),
     ]);
     setSummary(s.data);
     setAgents(a.data.agents || []);
     setCosts(c.data);
     setAudit(au.data.events || []);
     setDepPlan(dp.data);
+    setHealth(h.data);
+    setPerms(pm.data);
+    setPulseCfg(pc.data);
+    setPulsePreview(pp.data);
+    setPulseHistory(ph.data.items || []);
   };
 
   useEffect(() => {
@@ -101,6 +119,34 @@ const AIGovernancePage = () => {
     setBusy(true);
     try {
       await ax.post(`/api/admin/ai-governance/agents/${slug}/undeprecate`, {});
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const savePulseConfig = async (patch) => {
+    setBusy(true);
+    try {
+      const { data } = await ax.put("/api/admin/deprecation-pulse/config", patch);
+      setPulseCfg(data);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendPulseNow = async () => {
+    if (!window.confirm("Trimit acum Deprecation Pulse către destinatarii configurați?")) return;
+    setBusy(true);
+    try {
+      const { data } = await ax.post("/api/admin/deprecation-pulse/send-now", {});
+      if (data.skipped) {
+        alert(`Trimitere săritată: ${data.skipped}`);
+      } else if (!data.ok) {
+        alert(`Eroare email: ${data.error || "unknown"}`);
+      } else {
+        alert(`Pulse trimis. ${data.subject}`);
+      }
       await refresh();
     } finally {
       setBusy(false);
@@ -174,12 +220,15 @@ const AIGovernancePage = () => {
 
             <div className="bg-[#0e0e10] border border-white/10 rounded-2xl p-6">
               {tab === "agents"      && <AgentsTab agents={agents} onDeprecate={setDepModal} onRestore={handleRestore} />}
+              {tab === "health"      && <HealthTab health={health} />}
+              {tab === "permissions" && <PermissionsTab perms={perms} />}
               {tab === "costs"       && <CostsTab costs={costs} />}
               {tab === "audit"       && <AuditTab events={audit} />}
               {tab === "deprecation" && <DeprecationTab plan={depPlan} onRestore={handleRestore} onDeprecate={(slug) => {
                 const agent = agents.find(a => a.slug === slug);
                 if (agent) setDepModal(agent);
               }} />}
+              {tab === "pulse"       && <PulseTab cfg={pulseCfg} preview={pulsePreview} history={pulseHistory} onSave={savePulseConfig} onSendNow={sendPulseNow} busy={busy} />}
             </div>
           </>
         )}
@@ -579,6 +628,253 @@ const AuditTab = ({ events }) => {
           {e.at && <div className="text-[10px] text-stone-500 shrink-0">{new Date(e.at).toLocaleString("ro-RO")}</div>}
         </div>
       ))}
+    </div>
+  );
+};
+
+// ============================================================================
+// HEALTH TAB
+// ============================================================================
+const HEALTH_COLOR = {
+  healthy:    "bg-emerald-500/15 border-emerald-500/50 text-emerald-300",
+  degraded:   "bg-amber-500/15 border-amber-500/50 text-amber-300",
+  silent:     "bg-stone-500/15 border-stone-500/50 text-stone-400",
+  error:      "bg-red-500/15 border-red-500/50 text-red-300",
+  deprecated: "bg-red-500/10 border-red-500/40 text-red-200",
+};
+const HealthTab = ({ health }) => {
+  if (!health) return null;
+  const c = health.counts;
+  return (
+    <div className="space-y-5" data-testid="gov-health-tab">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <KPI label="Overall" value={health.overall.toUpperCase()} icon={HeartPulse} color={health.overall === "healthy" ? "emerald" : (health.overall === "degraded" ? "amber" : "blue")} />
+        <KPI label="Healthy" value={c.healthy || 0} icon={CheckCircle2} color="emerald" />
+        <KPI label="Degraded" value={c.degraded || 0} icon={AlertTriangle} color="amber" />
+        <KPI label="Silent" value={c.silent || 0} icon={Eye} color="blue" />
+        <KPI label="Deprecated" value={c.deprecated || 0} icon={ArchiveX} color="amber" />
+      </div>
+      <div className="rounded-xl border border-white/10 divide-y divide-white/5">
+        {health.rows.map((r) => (
+          <div key={r.slug} className="px-4 py-3 flex items-start gap-3 hover:bg-white/[0.02]" data-testid={`gov-health-${r.slug}`}>
+            <span className={`shrink-0 text-[10px] uppercase px-2 py-0.5 rounded-full border ${HEALTH_COLOR[r.health.status] || HEALTH_COLOR.silent}`}>
+              {r.health.status}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm text-white truncate">{r.name}</div>
+              <div className="text-[10px] font-mono text-stone-500">{r.slug} · {r.category} · {r.provider}</div>
+              <div className="text-[11px] text-stone-400 mt-1">{r.health.reason}</div>
+            </div>
+            <div className="shrink-0 text-right text-[10px] text-stone-500">
+              <div>24h: <strong className="text-stone-300 font-mono">{r.items_24h}</strong></div>
+              <div>7d: <strong className="text-stone-300 font-mono">{r.items_7d}</strong></div>
+              {r.latest_activity_at && <div className="mt-0.5">Ultim: {new Date(r.latest_activity_at).toLocaleString("ro-RO")}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// PERMISSIONS TAB
+// ============================================================================
+const RISK_BADGE = ["emerald", "blue", "amber", "amber", "red"];
+const PERM_BORDER = {
+  read: "border-stone-500/30",
+  suggest: "border-blue-500/30",
+  "execute-with-approval": "border-amber-500/30",
+  execute: "border-amber-500/40",
+  autonomous: "border-red-500/40",
+};
+const PermissionsTab = ({ perms }) => {
+  if (!perms) return null;
+  return (
+    <div className="space-y-5" data-testid="gov-perms-tab">
+      <div className="bg-violet-500/5 border border-violet-500/30 rounded-xl p-4 text-xs text-violet-100">
+        <strong className="block mb-2 text-violet-200">Principii:</strong>
+        <ul className="space-y-1 ml-4 list-disc">
+          {perms.principles.map((p, i) => (<li key={i}>{p}</li>))}
+        </ul>
+      </div>
+
+      {perms.risk_hotspots.length > 0 && (
+        <div className="bg-red-500/5 border border-red-500/30 rounded-xl p-4" data-testid="gov-perms-hotspots">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="w-4 h-4 text-red-300" />
+            <strong className="text-red-200 text-sm">Risc hotspots ({perms.risk_hotspots.length})</strong>
+          </div>
+          <div className="space-y-1.5">
+            {perms.risk_hotspots.map(h => (
+              <div key={h.slug} className="text-xs text-stone-300 flex items-center gap-2">
+                <span className="font-mono text-[10px] text-stone-500">{h.slug}</span>
+                <span className="text-stone-100">{h.name}</span>
+                <span className="text-[10px] uppercase px-1.5 py-0.5 rounded border bg-red-500/10 border-red-500/40 text-red-300">{h.permission_level}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid md:grid-cols-2 gap-3">
+        {perms.groups.map(g => {
+          const colorIdx = Math.min(g.risk_level, RISK_BADGE.length - 1);
+          const colorKey = RISK_BADGE[colorIdx];
+          const headerCls = {
+            emerald: "bg-emerald-500/10 border-emerald-500/30 text-emerald-200",
+            blue: "bg-blue-500/10 border-blue-500/30 text-blue-200",
+            amber: "bg-amber-500/10 border-amber-500/30 text-amber-200",
+            red: "bg-red-500/10 border-red-500/30 text-red-200",
+          }[colorKey];
+          return (
+            <div key={g.permission_level} className={`bg-white/[0.02] border ${PERM_BORDER[g.permission_level] || "border-white/10"} rounded-xl p-4`} data-testid={`gov-perm-${g.permission_level}`}>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <div className={`inline-block text-[10px] uppercase px-2 py-0.5 rounded-full border ${headerCls}`}>
+                    Risc {g.risk_level} · {g.label}
+                  </div>
+                </div>
+                <span className="text-2xl font-mono text-white">{g.count}</span>
+              </div>
+              {g.agents.length === 0 ? (
+                <div className="text-xs text-stone-500 italic">Niciun agent.</div>
+              ) : (
+                <div className="space-y-1.5">
+                  {g.agents.map(a => (
+                    <div key={a.slug} className="text-xs text-stone-300 flex items-center gap-1.5">
+                      <span className="text-stone-100">{a.name}</span>
+                      <span className="font-mono text-[10px] text-stone-500">{a.slug}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// PULSE TAB (Deprecation Pulse settings + manual trigger + history)
+// ============================================================================
+const PulseTab = ({ cfg, preview, history, onSave, onSendNow, busy }) => {
+  return cfg ? <PulseTabInner cfgKey={cfg.last_sent_at || "init"} cfg={cfg} preview={preview} history={history} onSave={onSave} onSendNow={onSendNow} busy={busy} /> : null;
+};
+
+const PulseTabInner = ({ cfg, preview, history, onSave, onSendNow, busy }) => {
+  const [enabled, setEnabled] = useState(cfg.enabled || false);
+  const [recipientsText, setRecipientsText] = useState((cfg.recipients || []).join(", "));
+  const [pulseWindow, setPulseWindow] = useState(cfg.alert_window_days || 30);
+
+  const save = () => {
+    const recipients = recipientsText.split(",").map(e => e.trim()).filter(Boolean);
+    onSave({ enabled, recipients, alert_window_days: Number(pulseWindow) });
+  };
+
+  const c = preview?.data?.counts || {};
+
+  return (
+    <div className="space-y-5" data-testid="gov-pulse-tab">
+      <div className="bg-violet-500/5 border border-violet-500/30 rounded-xl p-4 text-xs text-violet-100">
+        <strong className="block mb-1 text-violet-200">Deprecation Pulse</strong>
+        Email digest săptămânal (joi 09:30 Europe/Bucharest) cu agenți depreciati &lt; 30 zile până la retragere,
+        overlap colecții cu agenți activi, și provider risk alerts. NU se trimite SMS, NU folosește Twilio.
+      </div>
+
+      {/* PREVIEW KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KPI label="Retrageri viitoare" value={c.upcoming ?? 0} icon={CalendarClock} color="amber" />
+        <KPI label="Overlap" value={c.overlap ?? 0} icon={AlertTriangle} color="amber" />
+        <KPI label="Provider risk" value={c.provider_risk ?? 0} icon={Shield} color="violet" />
+        <KPI label="Total semnale" value={c.total_signals ?? 0} icon={Bell} color="blue" />
+      </div>
+
+      {/* CONFIG */}
+      <div className="bg-white/[0.02] border border-white/10 rounded-xl p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-sm font-semibold text-white">Stare schedule</div>
+            <div className="text-[11px] text-stone-500">
+              {cfg.last_sent_at ? `Ultim trimis: ${new Date(cfg.last_sent_at).toLocaleString("ro-RO")}` : "Nu a fost trimis niciodată"}
+            </div>
+          </div>
+          <button
+            onClick={() => setEnabled(v => !v)}
+            className={`px-3 py-1.5 text-xs rounded-lg border ${enabled ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-200" : "bg-stone-500/10 border-stone-500/30 text-stone-300"}`}
+            data-testid="gov-pulse-toggle"
+          >
+            {enabled ? "Activ" : "Dezactivat"}
+          </button>
+        </div>
+
+        <div>
+          <label className="text-[10px] uppercase tracking-wider text-stone-500">Destinatari (email, separați cu virgulă)</label>
+          <input
+            type="text"
+            value={recipientsText}
+            onChange={(e) => setRecipientsText(e.target.value)}
+            placeholder="founder@propmanage.ro, ops@propmanage.ro"
+            className="w-full mt-1 bg-[#0a0a0b] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-stone-600 focus:outline-none focus:border-white/30"
+            data-testid="gov-pulse-recipients"
+          />
+        </div>
+
+        <div className="flex items-center gap-3">
+          <label className="text-[10px] uppercase tracking-wider text-stone-500">Fereastră alertă (zile)</label>
+          <input
+            type="number"
+            value={pulseWindow}
+            onChange={(e) => setPulseWindow(e.target.value)}
+            min={7}
+            max={180}
+            className="w-24 bg-[#0a0a0b] border border-white/10 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-white/30"
+            data-testid="gov-pulse-window"
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            onClick={save}
+            disabled={busy}
+            className="px-3 py-1.5 text-xs rounded-lg bg-violet-500/20 border border-violet-500/40 text-violet-200 hover:bg-violet-500/30 disabled:opacity-50 inline-flex items-center gap-1.5"
+            data-testid="gov-pulse-save"
+          >
+            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+            Salvează config
+          </button>
+          <button
+            onClick={onSendNow}
+            disabled={busy}
+            className="px-3 py-1.5 text-xs rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-200 hover:bg-amber-500/30 disabled:opacity-50 inline-flex items-center gap-1.5"
+            data-testid="gov-pulse-send-now"
+          >
+            <Mail className="w-3.5 h-3.5" /> Trimite acum
+          </button>
+        </div>
+      </div>
+
+      {/* HISTORY */}
+      <div>
+        <h3 className="text-xs uppercase tracking-wider text-stone-400 mb-2">Istoric ({history.length})</h3>
+        {history.length === 0 ? (
+          <div className="text-center py-6 text-stone-500 text-xs bg-white/[0.02] border border-white/10 rounded-xl">
+            Nu există încă trimiteri. Pornește scheduler-ul sau trimite acum.
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {history.map((h, i) => (
+              <div key={i} className="bg-white/[0.02] border border-white/10 rounded-lg px-3 py-2 text-xs flex items-center gap-2" data-testid={`gov-pulse-hist-${i}`}>
+                <span className={`w-2 h-2 rounded-full ${h.ok ? "bg-emerald-400" : "bg-red-400"}`}></span>
+                <span className="text-stone-300 truncate">{h.subject}</span>
+                <span className="text-stone-500 ml-auto text-[10px] shrink-0">{new Date(h.sent_at).toLocaleString("ro-RO")}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

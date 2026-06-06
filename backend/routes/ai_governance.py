@@ -401,6 +401,143 @@ async def get_costs(user=Depends(require_role("admin"))):
     }
 
 
+# ----- Health monitoring ------------------------------------------------------
+
+def _classify_health(agent: dict, stats: dict, dep: dict | None) -> dict:
+    """Derive a coarse health status for an agent from its live stats."""
+    if dep:
+        return {"status": "deprecated", "reason": dep.get("reason", "marked deprecated"), "since_hours": None}
+
+    items_7d = stats.get("items_7d", 0)
+    items_24h = stats.get("items_24h", 0)
+    total = stats.get("total_items", 0)
+    latest = stats.get("latest_activity_at")
+    provider = agent.get("provider")
+
+    if not agent.get("data_sources"):
+        return {"status": "healthy", "reason": "infra agent (no data sources)", "since_hours": None}
+
+    if total == 0:
+        return {"status": "silent", "reason": "no activity ever recorded", "since_hours": None}
+
+    if items_7d == 0:
+        hours_since = None
+        if latest:
+            try:
+                dt = datetime.fromisoformat(latest.replace("Z", "+00:00"))
+                hours_since = int((datetime.now(timezone.utc) - dt).total_seconds() // 3600)
+            except Exception:  # noqa: BLE001
+                pass
+        return {"status": "silent", "reason": f"no activity in 7d (last: {latest or 'unknown'})", "since_hours": hours_since}
+
+    if items_7d >= 20 and items_24h == 0:
+        return {"status": "degraded", "reason": "active over 7d but silent in 24h", "since_hours": 24}
+
+    if provider in ("gpt_4o",) and items_7d > 0:
+        return {"status": "healthy", "reason": "active · provider gpt_4o (sunset-risk)", "since_hours": None}
+
+    return {"status": "healthy", "reason": f"{items_24h} items in 24h, {items_7d} in 7d", "since_hours": None}
+
+
+@router.get("/health")
+async def get_health(user=Depends(require_role("admin"))):
+    """Per-agent health status + global health KPIs."""
+    deprecations = await _load_deprecations()
+    rows = []
+    counts: dict = {"healthy": 0, "degraded": 0, "silent": 0, "deprecated": 0, "error": 0}
+    for agent in get_agents():
+        stats = await _agent_live_stats(agent)
+        dep = deprecations.get(agent["slug"])
+        health = _classify_health(agent, stats, dep)
+        counts[health["status"]] = counts.get(health["status"], 0) + 1
+        rows.append({
+            "slug": agent["slug"],
+            "name": agent["name"],
+            "category": agent["category"],
+            "provider": agent["provider"],
+            "permission_level": agent["permission_level"],
+            "lifecycle": "deprecated" if dep else agent["lifecycle"],
+            "items_24h": stats.get("items_24h", 0),
+            "items_7d": stats.get("items_7d", 0),
+            "total_items": stats.get("total_items", 0),
+            "latest_activity_at": stats.get("latest_activity_at"),
+            "health": health,
+        })
+    order = {"degraded": 0, "silent": 1, "error": 2, "healthy": 3, "deprecated": 4}
+    rows.sort(key=lambda r: order.get(r["health"]["status"], 9))
+    overall = "healthy"
+    if counts.get("degraded", 0) > 0 or counts.get("error", 0) > 0:
+        overall = "degraded"
+    elif counts.get("silent", 0) >= max(1, len(rows) // 3):
+        overall = "warning"
+    return {
+        "overall": overall,
+        "counts": counts,
+        "total_agents": len(rows),
+        "rows": rows,
+        "computed_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# ----- Permissions matrix -----------------------------------------------------
+
+_PERMISSION_RISK = {
+    "read":                       {"level": 0, "label": "Read-only"},
+    "suggest":                    {"level": 1, "label": "Sugestii"},
+    "execute-with-approval":      {"level": 2, "label": "Execută cu aprobare"},
+    "execute":                    {"level": 3, "label": "Execută direct"},
+    "autonomous":                 {"level": 4, "label": "Autonom"},
+}
+
+
+@router.get("/permissions-matrix")
+async def permissions_matrix(user=Depends(require_role("admin"))):
+    """Group agents by permission_level and surface risk hotspots."""
+    deprecations = await _load_deprecations()
+    groups: dict = {k: [] for k in _PERMISSION_RISK.keys()}
+    risk_hotspots = []
+    for agent in get_agents():
+        if agent["slug"] in deprecations:
+            continue
+        groups.setdefault(agent["permission_level"], []).append({
+            "slug": agent["slug"],
+            "name": agent["name"],
+            "category": agent["category"],
+            "provider": agent["provider"],
+            "lifecycle": agent["lifecycle"],
+            "purpose": agent["purpose"],
+        })
+        if agent["permission_level"] in ("execute", "autonomous") and agent["lifecycle"] == "active":
+            risk_hotspots.append({
+                "slug": agent["slug"],
+                "name": agent["name"],
+                "permission_level": agent["permission_level"],
+                "reason": "Activ + permisiune ridicată — auditează regulat.",
+            })
+
+    out_groups = []
+    for level, meta in _PERMISSION_RISK.items():
+        agents_in = groups.get(level, [])
+        out_groups.append({
+            "permission_level": level,
+            "label": meta["label"],
+            "risk_level": meta["level"],
+            "count": len(agents_in),
+            "agents": agents_in,
+        })
+
+    return {
+        "groups": out_groups,
+        "risk_hotspots": risk_hotspots,
+        "total_active": sum(len(g["agents"]) for g in out_groups),
+        "principles": [
+            "Read = 0 risc; Suggest = 1; Execute-with-approval = 2; Execute = 3; Autonomous = 4",
+            "Orice agent 'execute' sau 'autonomous' trebuie auditat lunar.",
+            "Promovarea unui agent la un nivel mai înalt va trece prin Founder Gate (FG-2 când va fi activ).",
+        ],
+    }
+
+
 # Unified audit trail across existing audit sources
 _AUDIT_SOURCES = [
     {"collection": "qa_sessions",                  "kind": "qa",          "date_field": "created_at", "title_field": "title"},

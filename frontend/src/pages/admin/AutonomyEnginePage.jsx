@@ -49,7 +49,7 @@ const ScoreRing = ({ score, color, size = 220, strokeWidth = 14, target }) => {
           <circle
             cx={size / 2} cy={size / 2} r={r}
             stroke="#3f3f46" strokeWidth={2} fill="none"
-            strokeDasharray={c} strokeDashoffset={targetOffset}
+            strokeDashoffset={targetOffset}
             strokeLinecap="round" strokeDasharray="4 6"
           />
         )}
@@ -216,9 +216,29 @@ export const AutonomyEnginePage = () => {
     }
   };
 
-  useEffect(() => { load(false); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const [a, b] = await Promise.all([
+          ax.get("/api/admin/autonomy/score"),
+          ax.get("/api/admin/autonomy/history", { params: { days: 30 } }),
+        ]);
+        if (cancelled) return;
+        setReport(a.data);
+        setHistory(b.data.items || []);
+      } catch (e) {
+        if (!cancelled) setError(e?.response?.data?.detail || "Eroare la încărcare");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const takeSnap = async () => {
+    if (snapping) return;
     setSnapping(true);
     try {
       await ax.post("/api/admin/autonomy/snapshot");
@@ -322,6 +342,26 @@ export const AutonomyEnginePage = () => {
             <AlertTriangle className="w-4 h-4 text-[#d4ff3a]" />
             <h2 className="font-serif text-xl">Recomandări prioritizate</h2>
             <span className="text-[10px] text-stone-500">({report.recommendations.length})</span>
+            {report.recommendations.length > 0 && (
+              <button
+                onClick={async () => {
+                  if (!window.confirm("Materializez recomandările ca TODO-uri în /admin/todo?")) return;
+                  try {
+                    const r = await fetch(`${API}/api/admin/autonomy/generate-tasks`, {
+                      method: "POST", credentials: "include",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ max_items: 6 }),
+                    });
+                    const data = await r.json();
+                    alert(`${data.counts?.injected || 0} TODO-uri create, ${data.counts?.skipped || 0} duplicate.`);
+                  } catch (e) { alert("Eroare: " + e.message); }
+                }}
+                className="ml-auto text-[10px] inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#d4ff3a]/15 border border-[#d4ff3a]/40 text-[#d4ff3a] hover:bg-[#d4ff3a]/25"
+                data-testid="autonomy-generate-tasks"
+              >
+                Materializează ca TODO-uri →
+              </button>
+            )}
           </div>
           {report.recommendations.length === 0 ? (
             <div className="text-sm text-emerald-300 flex items-center gap-2 py-4">

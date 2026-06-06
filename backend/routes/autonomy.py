@@ -72,6 +72,86 @@ async def force_snapshot(user=Depends(require_role("admin"))):
     return snap
 
 
+# ============================================================================
+# V2: TASK GENERATION (from recommendations → admin_todos)
+# ============================================================================
+_PRIORITY_TODO_MAP = {"critical": "high", "high": "high", "medium": "medium", "low": "low"}
+_AREA_LABEL = {
+    "operational": "Operațional",
+    "technical": "Tehnic",
+    "security": "Securitate",
+    "dev": "Dev",
+    "ai": "AI",
+}
+
+
+@router.post("/generate-tasks")
+async def generate_tasks(
+    payload: dict = Body(default={}),
+    user=Depends(require_role("admin")),
+):
+    """Materialize current recommendations as actionable TODOs in admin_todos.
+
+    Body (optional):
+      - max_items: int (default 6 — same as engine's hard cap)
+      - min_impact: float (default 0.0 — filter low-impact recs)
+      - dry_run: bool (default false — preview without insert)
+
+    De-duplicates by text (case-insensitive). Returns list of injected + skipped.
+    """
+    max_items = int(payload.get("max_items", 6))
+    min_impact = float(payload.get("min_impact", 0.0))
+    dry_run = bool(payload.get("dry_run", False))
+
+    # Always use a fresh report (no cache) so generated tasks reflect reality
+    cfg = await _load_targets()
+    report = await compute_autonomy_scores(weights=cfg["weights"], targets=cfg["targets"])
+    recs = report.get("recommendations", []) or []
+    recs = [r for r in recs if float(r.get("impact_points", 0)) >= min_impact][:max_items]
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    injected = []
+    skipped = []
+    for r in recs:
+        area = r.get("area", "")
+        area_label = _AREA_LABEL.get(area, area)
+        priority = _PRIORITY_TODO_MAP.get(r.get("priority", "medium"), "medium")
+        text = f"[Autonomy · {area_label}] {r.get('action','(no action)')}"
+        text = text[:500]
+        # de-dupe (case-insensitive)
+        existing = await db.admin_todos.find_one({"text": {"$regex": f"^{text[:60]}", "$options": "i"}})
+        if existing:
+            skipped.append({"text": text, "reason": "duplicate"})
+            continue
+        todo_doc = {
+            "id": str(uuid.uuid4()),
+            "text": text,
+            "priority": priority,
+            "done": False,
+            "source": f"autonomy_v2:{area}",
+            "topic_title": f"Autonomy Engine · {area_label}",
+            "created_at": now_iso,
+            "meta": {
+                "impact_points": r.get("impact_points"),
+                "tier_at_creation": report.get("tier"),
+                "general_score_at_creation": report.get("scores", {}).get("general"),
+            },
+        }
+        if not dry_run:
+            await db.admin_todos.insert_one({**todo_doc})
+        injected.append({k: v for k, v in todo_doc.items() if k != "_id"})
+
+    return {
+        "ok": True,
+        "dry_run": dry_run,
+        "injected": injected,
+        "skipped": skipped,
+        "counts": {"injected": len(injected), "skipped": len(skipped), "considered": len(recs)},
+        "general_score": report.get("scores", {}).get("general"),
+        "tier": report.get("tier"),
+    }
+
+
 @router.get("/targets")
 async def get_targets(user=Depends(require_role("admin"))):
     cfg = await _load_targets()

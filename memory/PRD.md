@@ -43,6 +43,45 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 ---
 
 ## Recent additions (Feb 2026)
+- **Phase 83 — Governance Ecosystem Foundation: Health + Permissions + Pulse + Architecture Board + AI PM** ✅ (Feb 12 2026)
+
+  Major architecture push transforming PropManage from "multiple AI tools" into "a self-monitoring, self-governing platform" — pre-empts Marketplace V2 & Atlas in user's revised priority order.
+
+  **P1 — AI Governance Center extensions**:
+  - `GET /api/admin/ai-governance/health` — per-agent status (healthy/degraded/silent/error/deprecated) derived from data-source activity; overall KPI rollup
+  - `GET /api/admin/ai-governance/permissions-matrix` — agents grouped by permission_level (read/suggest/execute-with-approval/execute/autonomous) + risk hotspots (active + high-permission)
+  - Frontend tabs added: **Health** + **Permissions** (with risk hotspots banner)
+
+  **P2 — Deprecation Pulse** (new module `routes/deprecation_pulse.py`):
+  - Weekly email digest (Thursdays 09:30 Europe/Bucharest, APScheduler job `deprecation_pulse_weekly`)
+  - 3 alert buckets: upcoming retirements (<window days), overlap alerts (active agent shares data_sources with deprecated), provider risk (gpt_4o, claude_haiku flagged)
+  - Endpoints: `GET/PUT /config`, `POST /send-now`, `GET /preview`, `GET /history`
+  - Frontend tab **Deprecation Pulse** in AI Governance (config form, KPIs, manual trigger, history)
+  - Mongo: `deprecation_pulse_config`, `deprecation_pulse_history`
+
+  **P3 — Architecture Review Board** (new module `routes/architecture_board.py`):
+  - Anti-redundancy gate. Submit a feature idea → Claude (Haiku 4.5 for <10s response) checks overlap with 36 indexed modules
+  - Returns: `verdict` (build_new / extend_existing / merge_proposal / reject_duplicate), `overlap_score` 0-100, overlapping_modules with weights, suggested_actions, risk_of_redundancy
+  - Persisted in `architecture_reviews` collection. New admin page `/admin/architecture-board`
+  - Verified: submitting "AI Code Reviewer" → correctly detected 95% overlap with `ai_dev_team` → verdict `reject_duplicate`
+
+  **P4 — Autonomy Engine V2** (extension):
+  - New endpoint `POST /api/admin/autonomy/generate-tasks` — materializes engine recommendations as TODOs in admin_todos board
+  - Dedupe by text (case-insensitive), priority mapping (critical/high → high, etc.), source=`autonomy_v2:{area}`, meta with tier + general_score at creation
+  - Frontend: button "Materializează ca TODO-uri" in Recomandări section of Autonomy page (with confirm)
+
+  **P5 — AI Product Manager** (new module `routes/ai_pm.py`):
+  - Idea → Epic → Features → User Stories breakdown via Claude Haiku 4.5 (~16s response)
+  - Schema: epic (title/goal/success_metric), max 3 features (P0-P3 priority + effort days + max 2 stories with as_a/i_want/so_that + acceptance criteria), max 3 risks, max 3 out_of_scope
+  - `POST /api/admin/ai-pm/breakdown` + history endpoints + `POST /breakdowns/{id}/inject-todos` (bulk inject features as TODOs)
+  - Persisted in `ai_pm_breakdowns`. New admin page `/admin/ai-pm`
+
+  **Sidebar Admin** (STRATEGIE & R&D section): added Architecture Review Board (Compass icon), AI Product Manager (Layers icon) — all marked NEW
+
+  **Tested via curl**: all 5 endpoints respond correctly, Claude integration returns valid JSON in <20s for both Arch Board + AI PM. Frontend lint clean for all new/modified files.
+
+  **Decision**: Founder-Gate FG-1 Twilio SMS remains DEFERRED. NO Twilio integration added.
+
 - **Phase 82 — Bug Memory Aggregator UI + AI Governance Deprecation Plan** ✅ (Feb 12 2026)
   - **Bug Memory Aggregator** (closes Phase 1 of Enterprise Architecture Roadmap):
     - New admin page `/admin/bug-memory` (read-only) unifies QA Copilot findings + AI Investigator findings

@@ -88,6 +88,9 @@ from routes.future_ideas_digest import router as future_ideas_digest_router, run
 from routes.founder_gate_admin import router as founder_gate_admin_router
 from routes.ai_governance import router as ai_governance_router
 from routes.bug_memory_aggregator import router as bug_memory_router
+from routes.deprecation_pulse import router as deprecation_pulse_router, run_deprecation_pulse_job
+from routes.architecture_board import router as architecture_board_router
+from routes.ai_pm import router as ai_pm_router
 from routes.twin_orchestrator import router as twin_orchestrator_router
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
@@ -182,6 +185,9 @@ for r in (
     founder_gate_admin_router,
     ai_governance_router,
     bug_memory_router,
+    deprecation_pulse_router,
+    architecture_board_router,
+    ai_pm_router,
     twin_orchestrator_router,
 ):
     app.include_router(r)
@@ -241,6 +247,14 @@ async def startup():
             run_future_ideas_digest_job,
             CronTrigger(day_of_week="mon", hour=9, minute=15, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="future_ideas_digest",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        # AI Governance — Deprecation Pulse, Thursdays 09:30 Europe/Bucharest
+        scheduler.add_job(
+            run_deprecation_pulse_job,
+            CronTrigger(day_of_week="thu", hour=9, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="deprecation_pulse_weekly",
             replace_existing=True,
             misfire_grace_time=7200,
         )

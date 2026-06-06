@@ -57,6 +57,8 @@ import FutureIdeasVault from "./pages/admin/FutureIdeasVault";
 import FounderGatePage from "./pages/admin/FounderGatePage";
 import AIGovernancePage from "./pages/admin/AIGovernancePage";
 import BugMemoryAggregatorPage from "./pages/admin/BugMemoryAggregatorPage";
+import ArchitectureBoardPage from "./pages/admin/ArchitectureBoardPage";
+import AIProductManagerPage from "./pages/admin/AIProductManagerPage";
 import ContractPage from "./pages/ContractPage";
 import { trackPageView } from "@/lib/analytics";
 import { useDynamicSEO } from "@/lib/useDynamicSEO";
@@ -1597,6 +1599,8 @@ function App() {
               <Route path="/admin/founder-gate" element={<FounderGatePage />} />
               <Route path="/admin/ai-governance" element={<AIGovernancePage />} />
               <Route path="/admin/bug-memory" element={<BugMemoryAggregatorPage />} />
+              <Route path="/admin/architecture-board" element={<ArchitectureBoardPage />} />
+              <Route path="/admin/ai-pm" element={<AIProductManagerPage />} />
               <Route path="/contracts/:id" element={<ContractPage />} />
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />
               <Route path="/ghiduri" element={<GhiduriIndex />} />
