@@ -152,6 +152,7 @@ class AppSettingsUpdate(BaseModel):
     company: Optional[CompanySettings] = None
     seo: Optional[SEOSettings] = None
     founder_contact: Optional[FounderContact] = None
+    enable_founder_gate: Optional[bool] = None  # Founder Approval Gate feature flag (default OFF)
 
 
 # ---------- Public (read-only safe subset) ----------
