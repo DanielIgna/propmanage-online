@@ -43,6 +43,26 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 ---
 
 ## Recent additions (Feb 2026)
+- **Phase 82 — Bug Memory Aggregator UI + AI Governance Deprecation Plan** ✅ (Feb 12 2026)
+  - **Bug Memory Aggregator** (closes Phase 1 of Enterprise Architecture Roadmap):
+    - New admin page `/admin/bug-memory` (read-only) unifies QA Copilot findings + AI Investigator findings
+    - Stats cards (QA / AI / total), search bar over `/api/admin/bug-memory/search`, recent unified feed via `/api/admin/bug-memory/recent`
+    - Filters: severity (P0/P1/P2/P3), source (qa_copilot/ai_investigator), reset
+    - Backend `routes/bug_memory_aggregator.py` already existed; only frontend was missing
+  - **AI Governance — Deprecation Plan**:
+    - New backend endpoints: `POST /api/admin/ai-governance/agents/{slug}/deprecate` + `/undeprecate`, `GET /deprecation-plan`
+    - New Mongo collection `ai_agent_deprecations` (persists lifecycle override + reason + replacement + target_retirement_date + impact snapshot + history)
+    - Live merging in `/agents` endpoint: deprecated entries surface with `lifecycle="deprecated"` + full deprecation metadata
+    - Frontend new "Deprecation Plan" tab in `/admin/ai-governance` with: timeline view, KPI cards (active/restored/legacy candidates), suggested legacy candidates list (Concierge + Investigator), restore button, history of restorations
+    - Modal "Marchează ca depreciat" on each agent card with reason/replacement/target-date fields
+    - Impact snapshot captures data sources + provider + activity stats at decision time (audit-friendly)
+  - **Founder-Gate FG-1 (Twilio SMS) marked DEFERRED**:
+    - User decision (Feb 2026): NO Twilio integration now. Re-evaluation after beta validation + real clients
+    - `futureIdeas.js` updated: FG-1 description prefixed `(⏸️ DEFERRED)`, deliverables tagged `[BLOCKED]`, open question answer changed to option (d) DEFERRED
+    - NO Twilio account created, NO `twilio` dependency added, NO DNS changes
+  - Sidebar Admin: added Bug Memory Aggregator under STRATEGIE & R&D (Bug icon, NEW badge)
+  - Tested via curl: deprecate → lifecycle overlay → restore → history all pass end-to-end
+
 - **Phase 81 — "Send to Emergent Chat" + Auto-Backfill ToDo Board** ✅ (Feb 6 2026)
   - **Buton "Trimite în chat"** în PromptModal: copiază prompt + `postMessage` la `window.parent` cu `type=emergent.chat.inject` (best-effort pentru IDE embedding) + banner verde cu instrucțiuni Ctrl+V
   - **Backend `POST /api/admin/todos/bulk`** pentru batch-creation cu de-duplicare după text

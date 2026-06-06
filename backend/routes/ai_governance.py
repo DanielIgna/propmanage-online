@@ -1,19 +1,24 @@
-"""AI Governance Center — API (Phase 1, observability-only)
+"""AI Governance Center — API (Phase 1, observability + lifecycle management)
 
-Read-only endpoints over the existing AI ecosystem. Aggregates data from
-existing collections without modifying any agent or audit source.
+Read-only observability over the existing AI ecosystem PLUS an operational
+deprecation workflow that lets the founder retire legacy agents in a
+controlled fashion (without touching the static registry source code).
 
 Endpoints:
-  GET /api/admin/ai-governance/summary       — high-level KPIs
-  GET /api/admin/ai-governance/agents        — list all agents with live stats
-  GET /api/admin/ai-governance/agents/{slug} — single agent detail with metrics
-  GET /api/admin/ai-governance/costs         — rough monthly cost estimate
-  GET /api/admin/ai-governance/audit-trail   — unified recent events across sources
+  GET  /api/admin/ai-governance/summary             — high-level KPIs
+  GET  /api/admin/ai-governance/agents              — list all agents with live stats
+  GET  /api/admin/ai-governance/agents/{slug}       — single agent detail with metrics
+  GET  /api/admin/ai-governance/costs               — rough monthly cost estimate
+  GET  /api/admin/ai-governance/audit-trail         — unified recent events across sources
+  GET  /api/admin/ai-governance/deprecation-plan    — timeline of deprecations
+  POST /api/admin/ai-governance/agents/{slug}/deprecate     — mark agent as deprecated
+  POST /api/admin/ai-governance/agents/{slug}/undeprecate   — restore lifecycle
 """
 import logging
+import uuid
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 
 from db import db
 from deps import require_role
@@ -21,6 +26,11 @@ from ai_governance.agent_registry import (
     get_agents, get_agent, agents_by_category, registry_summary,
     PROVIDER_AVG_COST_PER_CALL_EUR,
 )
+
+# Persistent deprecation overrides live in this collection. Each doc:
+#   { _id, slug, status: "deprecated"|"restored", reason, replacement,
+#     target_retirement_date, impact: {...}, by, by_email, at, history: [...] }
+DEPRECATION_COLLECTION = "ai_agent_deprecations"
 
 logger = logging.getLogger("propmanage.ai_governance")
 router = APIRouter(prefix="/api/admin/ai-governance", tags=["ai-governance"])
@@ -125,13 +135,47 @@ async def get_summary(user=Depends(require_role("admin"))):
     }
 
 
+async def _load_deprecations() -> dict:
+    """Return {slug: deprecation_doc} for all *active* (status=deprecated) overrides."""
+    out: dict = {}
+    try:
+        cur = db[DEPRECATION_COLLECTION].find({"status": "deprecated"})
+        async for d in cur:
+            d.pop("_id", None)
+            out[d["slug"]] = d
+    except Exception as e:  # noqa: BLE001
+        logger.debug(f"[governance] load deprecations failed: {e}")
+    return out
+
+
+def _merge_deprecation(agent: dict, dep: dict | None) -> dict:
+    """Overlay deprecation metadata onto static agent dict (non-destructive)."""
+    if not dep:
+        return agent
+    return {
+        **agent,
+        "lifecycle": "deprecated",
+        "deprecation": {
+            "reason": dep.get("reason"),
+            "replacement": dep.get("replacement"),
+            "target_retirement_date": dep.get("target_retirement_date"),
+            "impact": dep.get("impact", {}),
+            "by": dep.get("by"),
+            "by_email": dep.get("by_email"),
+            "at": dep.get("at"),
+        },
+    }
+
+
 @router.get("/agents")
 async def list_agents(user=Depends(require_role("admin"))):
     """Return all agents with live stats from their data sources."""
+    deprecations = await _load_deprecations()
     out = []
     for agent in get_agents():
         stats = await _agent_live_stats(agent)
-        out.append({**agent, "live": stats})
+        merged = _merge_deprecation(agent, deprecations.get(agent["slug"]))
+        out.append({**merged, "live": stats})
     return {"agents": out}
 
 
@@ -145,8 +189,176 @@ async def get_one_agent(slug: str, user=Depends(require_role("admin"))):
     agent = get_agent(slug)
     if not agent:
         raise HTTPException(404, f"Agent not found: {slug}")
+    deprecations = await _load_deprecations()
+    merged = _merge_deprecation(agent, deprecations.get(slug))
     stats = await _agent_live_stats(agent)
-    return {**agent, "live": stats}
+    return {**merged, "live": stats}
+
+
+# ----- Deprecation lifecycle --------------------------------------------------
+
+@router.post("/agents/{slug}/deprecate")
+async def deprecate_agent(
+    slug: str,
+    payload: dict = Body(...),
+    user=Depends(require_role("admin")),
+):
+    """Mark a legacy/active agent as deprecated.
+
+    Body:
+      reason: str (required)
+      replacement: str (optional — slug or human-readable name)
+      target_retirement_date: ISO date (optional, default now+90d)
+    """
+    agent = get_agent(slug)
+    if not agent:
+        raise HTTPException(404, f"Agent not found: {slug}")
+
+    reason = (payload.get("reason") or "").strip()
+    if not reason or len(reason) < 4:
+        raise HTTPException(400, "Reason is required (min 4 chars).")
+    replacement = (payload.get("replacement") or "").strip() or None
+    target_iso = (payload.get("target_retirement_date") or "").strip()
+    if target_iso:
+        try:
+            datetime.fromisoformat(target_iso.replace("Z", "+00:00"))
+        except Exception:  # noqa: BLE001
+            raise HTTPException(400, "Invalid target_retirement_date (use ISO 8601).")
+    else:
+        target_iso = (datetime.now(timezone.utc) + timedelta(days=90)).date().isoformat()
+
+    # Capture an impact snapshot from live stats — so the timeline shows what
+    # this deprecation will affect at decision-time.
+    stats = await _agent_live_stats(agent)
+    impact = {
+        "data_sources": agent.get("data_sources", []),
+        "items_total_at_decision": stats.get("total_items", 0),
+        "items_24h_at_decision": stats.get("items_24h", 0),
+        "items_7d_at_decision": stats.get("items_7d", 0),
+        "latest_activity_at": stats.get("latest_activity_at"),
+        "provider": agent.get("provider"),
+        "category": agent.get("category"),
+        "previous_lifecycle": agent.get("lifecycle"),
+    }
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "slug": slug,
+        "status": "deprecated",
+        "reason": reason,
+        "replacement": replacement,
+        "target_retirement_date": target_iso,
+        "impact": impact,
+        "by": user.get("id"),
+        "by_email": user.get("email"),
+        "at": now_iso,
+    }
+    history_entry = {
+        "action": "deprecate",
+        "at": now_iso,
+        "by_email": user.get("email"),
+        "reason": reason,
+        "replacement": replacement,
+        "target_retirement_date": target_iso,
+    }
+
+    existing = await db[DEPRECATION_COLLECTION].find_one({"slug": slug})
+    if existing:
+        await db[DEPRECATION_COLLECTION].update_one(
+            {"slug": slug},
+            {"$set": {**doc}, "$push": {"history": history_entry}},
+        )
+    else:
+        await db[DEPRECATION_COLLECTION].insert_one({
+            **doc, "id": str(uuid.uuid4()), "history": [history_entry],
+        })
+    return {"ok": True, "slug": slug, "deprecation": doc}
+
+
+@router.post("/agents/{slug}/undeprecate")
+async def undeprecate_agent(
+    slug: str,
+    payload: dict = Body(default={}),
+    user=Depends(require_role("admin")),
+):
+    """Restore an agent from the deprecation list (audit-logged)."""
+    existing = await db[DEPRECATION_COLLECTION].find_one({"slug": slug})
+    if not existing:
+        raise HTTPException(404, f"Agent {slug} is not deprecated.")
+    note = (payload.get("note") or "").strip() or None
+    now_iso = datetime.now(timezone.utc).isoformat()
+    history_entry = {
+        "action": "restore",
+        "at": now_iso,
+        "by_email": user.get("email"),
+        "note": note,
+    }
+    await db[DEPRECATION_COLLECTION].update_one(
+        {"slug": slug},
+        {"$set": {"status": "restored", "restored_at": now_iso}, "$push": {"history": history_entry}},
+    )
+    return {"ok": True, "slug": slug, "status": "restored"}
+
+
+@router.get("/deprecation-plan")
+async def deprecation_plan(user=Depends(require_role("admin"))):
+    """Return the deprecation timeline (active + historical) sorted by target date."""
+    plan = []
+    history_only = []
+    try:
+        cur = db[DEPRECATION_COLLECTION].find({}).sort("target_retirement_date", 1)
+        async for d in cur:
+            d.pop("_id", None)
+            agent = get_agent(d["slug"]) or {}
+            entry = {
+                "slug": d["slug"],
+                "name": agent.get("name", d["slug"]),
+                "category": agent.get("category"),
+                "provider": agent.get("provider"),
+                "purpose": agent.get("purpose"),
+                "status": d.get("status"),
+                "reason": d.get("reason"),
+                "replacement": d.get("replacement"),
+                "target_retirement_date": d.get("target_retirement_date"),
+                "impact": d.get("impact", {}),
+                "by_email": d.get("by_email"),
+                "at": d.get("at"),
+                "restored_at": d.get("restored_at"),
+                "history": d.get("history", []),
+            }
+            if d.get("status") == "deprecated":
+                plan.append(entry)
+            else:
+                history_only.append(entry)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[governance] deprecation_plan failed: {e}")
+
+    # Suggest legacy candidates from static registry that are not yet planned
+    deprecated_slugs = {p["slug"] for p in plan}
+    suggestions = []
+    for a in get_agents():
+        if a["lifecycle"] == "legacy" and a["slug"] not in deprecated_slugs:
+            suggestions.append({
+                "slug": a["slug"],
+                "name": a["name"],
+                "category": a["category"],
+                "purpose": a["purpose"],
+                "provider": a["provider"],
+            })
+
+    return {
+        "plan": plan,
+        "history": history_only,
+        "suggested_candidates": suggestions,
+        "counts": {
+            "active_deprecations": len(plan),
+            "restored": len(history_only),
+            "legacy_candidates": len(suggestions),
+        },
+    }
+
+
+# ----- Costs (deprecation-aware) ---------------------------------------------
 
 
 @router.get("/costs")

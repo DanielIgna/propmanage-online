@@ -87,6 +87,8 @@ from routes.future_ideas import router as future_ideas_router
 from routes.future_ideas_digest import router as future_ideas_digest_router, run_future_ideas_digest_job
 from routes.founder_gate_admin import router as founder_gate_admin_router
 from routes.ai_governance import router as ai_governance_router
+from routes.bug_memory_aggregator import router as bug_memory_router
+from routes.twin_orchestrator import router as twin_orchestrator_router
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
@@ -179,6 +181,8 @@ for r in (
     future_ideas_digest_router,
     founder_gate_admin_router,
     ai_governance_router,
+    bug_memory_router,
+    twin_orchestrator_router,
 ):
     app.include_router(r)
 

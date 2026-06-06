@@ -153,6 +153,7 @@ class AppSettingsUpdate(BaseModel):
     seo: Optional[SEOSettings] = None
     founder_contact: Optional[FounderContact] = None
     enable_founder_gate: Optional[bool] = None  # Founder Approval Gate feature flag (default OFF)
+    enable_twin_orchestrator: Optional[bool] = None  # Twin Orchestrator AI insights flag (default OFF)
 
 
 # ---------- Public (read-only safe subset) ----------
