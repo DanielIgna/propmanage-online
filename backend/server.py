@@ -86,6 +86,7 @@ from routes.experience_spaces_bootstrap import router as es_bootstrap_router
 from routes.future_ideas import router as future_ideas_router
 from routes.future_ideas_digest import router as future_ideas_digest_router, run_future_ideas_digest_job
 from routes.founder_gate_admin import router as founder_gate_admin_router
+from routes.ai_governance import router as ai_governance_router
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
@@ -177,6 +178,7 @@ for r in (
     future_ideas_router,
     future_ideas_digest_router,
     founder_gate_admin_router,
+    ai_governance_router,
 ):
     app.include_router(r)
 
