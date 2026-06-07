@@ -214,6 +214,7 @@ async def me(user: dict = Depends(get_current_user)):
             "email": 1, "role": 1, "password_hash": 1, "google_auth": 1,
             "dual_role_enabled": 1, "active_view": 1,
             "avatar": 1, "avatar_source": 1, "picture": 1,
+            "experience_tier": 1, "experience_tier_locked": 1,
         },
     )
     user["tutorial_seen"] = bool((doc or {}).get("tutorial_seen", False))
@@ -229,6 +230,9 @@ async def me(user: dict = Depends(get_current_user)):
     user["avatar"] = (doc or {}).get("avatar") or user.get("avatar")
     user["avatar_source"] = (doc or {}).get("avatar_source")
     user["picture"] = (doc or {}).get("picture") or ""
+    # Experience tier (Progressive Disclosure) — default "junior" for legacy users
+    user["experience_tier"] = (doc or {}).get("experience_tier") or "junior"
+    user["experience_tier_locked"] = bool((doc or {}).get("experience_tier_locked", False))
     # Enforce admin whitelist on every /me call to catch direct DB tampering or stale tokens.
     if doc:
         fresh = {"_id": doc["_id"], "email": doc.get("email"), "role": doc.get("role")}

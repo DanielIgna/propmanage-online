@@ -43,6 +43,32 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 ---
 
 ## Recent additions (Feb 2026)
+- **Phase 85 — Progressive Disclosure (Experience Tiers) system** ✅ (Feb 12 2026)
+  - New backend module `routes/experience_tiers.py` cu sistem complet de tier-uri (junior → regular → verified → pro)
+  - **Tier auto-promotion criteria** (configurabile via `experience_tier_config`):
+    - junior → regular: 7 zile activ + 3 acțiuni completate
+    - regular → verified: 30 zile + 10 acțiuni + rating ≥ 4.5
+    - verified → pro: 90 zile + 30 acțiuni + email verified + KYC complete
+  - **Mongo collections**: `experience_tier_config` (singleton), `experience_tier_history` (audit log promovări)
+  - **User fields adăugate**: `experience_tier`, `experience_tier_locked`, `experience_tier_set_at`
+  - **Endpoints**:
+    - Admin: `/config` (GET/PUT), `/users` (list cu progress), `/users/{id}` (detail), `/users/{id}/override` + `/unlock`, `/run-promotion-job` (manual trigger cu dry_run), `/stats`, `/history`
+    - Self: `/api/me/experience-tier` (user-side: vede propriul tier + progres)
+  - **Cron job**: zilnic 03:30 Europe/Bucharest (`experience_tier_daily_promotion`)
+  - **`/auth/me` extins**: returnează `experience_tier` + `experience_tier_locked` în fiecare răspuns
+  - **Frontend primitives** (`/app/frontend/src/lib/experienceTier.jsx`):
+    - `useTier()` hook → returnează tier, tierLabel, meetsTier(min), hasFeature(key), features list
+    - `<TierGate min="regular" fallback={...}>` → conditional rendering
+    - `<TierBadge />` → badge inline cu sparkles
+    - `<UpgradeHint requiredTier="..." />` → nudge prietenos pentru juniori
+  - **Admin page `/admin/experience-tiers`** cu 4 tab-uri:
+    - Overview: distribuție per tier × role, status cron, features per tier (collapsible)
+    - Useri: căutare + filtre (role, tier), buton Override (modal cu lock toggle), buton Unlock pentru cei locked
+    - Istoric: ultimele 30 promovări (cine, când, de la → la, motiv)
+    - Configurare: toggle on/off cron, vizualizare criterii
+  - **Sidebar**: link nou "Experience Tiers" în STRATEGIE & R&D
+  - **Manual de Operare actualizat**: cap 11 rescris complet cu instrucțiuni pentru sistemul implementat (cum testezi cu conturi de test, exemple de cod TierGate pentru viitoare aplicări)
+  - **Verificat live**: 555 useri scanați (338 clienți + 217 specialiști), 1 eligibil pentru promovare detectat corect (client@propmanage.io: 14 zile + 4 acțiuni ≥ thresholds), self-tier endpoint funcțional pentru user-side
 - **Phase 84 — Operating Manual + In-app documentation** ✅ (Feb 12 2026)
   - New `/app/docs/OPERATING_MANUAL.md` (547 lines, 26 KB Romanian) — comprehensive how-to:
     - 13 secțiuni: principii siguranță, Smart Pipeline, fiecare modul nou (Governance/Arch/AI PM/Pulse/BugMem/Autonomy/FounderGate/FutureIdeas), Progressive Disclosure (Junior→Verified→Pro), Roadmap per modul, 8 scenarii frecvente cheat-sheet

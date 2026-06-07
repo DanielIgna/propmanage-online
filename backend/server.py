@@ -92,6 +92,11 @@ from routes.deprecation_pulse import router as deprecation_pulse_router, run_dep
 from routes.architecture_board import router as architecture_board_router
 from routes.ai_pm import router as ai_pm_router
 from routes.operating_manual import router as operating_manual_router
+from routes.experience_tiers import (
+    router as experience_tiers_router,
+    self_router as experience_tiers_self_router,
+    run_promotion_job as run_experience_tier_promotion_job,
+)
 from routes.twin_orchestrator import router as twin_orchestrator_router
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
@@ -190,6 +195,8 @@ for r in (
     architecture_board_router,
     ai_pm_router,
     operating_manual_router,
+    experience_tiers_router,
+    experience_tiers_self_router,
     twin_orchestrator_router,
 ):
     app.include_router(r)
@@ -257,6 +264,14 @@ async def startup():
             run_deprecation_pulse_job,
             CronTrigger(day_of_week="thu", hour=9, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="deprecation_pulse_weekly",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        # Experience Tiers — daily auto-promotion, 03:30 Europe/Bucharest
+        scheduler.add_job(
+            run_experience_tier_promotion_job,
+            CronTrigger(hour=3, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="experience_tier_daily_promotion",
             replace_existing=True,
             misfire_grace_time=7200,
         )

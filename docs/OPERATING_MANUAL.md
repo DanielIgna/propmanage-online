@@ -369,48 +369,80 @@ Backlog strategic cu propuneri R&D. Fiecare propunere are: descriere, complexita
 <a id="11-stages"></a>
 ## 11. 🎓 Stagii Progressive Disclosure (Junior → Verified → Pro)
 
-### Conceptul tău
-Vrei interfețe simple la început, apoi treptat să apară funcții noi pe măsură ce user-ul (client/specialist/operator) se familiarizează.
+**Status actual**: Sistemul Progressive Disclosure este **IMPLEMENTAT** și funcțional. Gestionare 100% din `/admin/experience-tiers`.
 
-### Cum se implementează corect (recomandare)
+### Cum îl folosești în 5 pași
 
-**Schema sugerată** — adăugăm în user document un câmp `experience_tier`:
+1. **Mergi la `/admin/experience-tiers`** → tab Overview vezi distribuția actuală
+2. **Rulează "Dry-run"** ca să vezi câți useri sunt eligibili pentru promovare fără să-i promovezi
+3. **Rulează "Rulează acum"** dacă vrei să-i promovezi imediat
+4. **Tab Useri**: vezi fiecare user + cerințele lipsă; folosește "Override" pentru cazuri speciale (VIP, beta testers)
+5. **Tab Configurare**: dezactivează cron-ul temporar dacă vrei, sau modifică praguri (via API PUT)
+
+### Cum aplici tier-gating în pagini Client/Specialist/Operator
+Primitivele sunt în `/app/frontend/src/lib/experienceTier.jsx`. Cere agentului:
+```
+Aplică TierGate cu min="verified" pe butonul "Bulk Export" din ClientDashboard.
+Pentru juniori, afișează <UpgradeHint requiredTier="verified" />.
+```
+
+### Schema implementată
 
 ```
 experience_tier: "junior" | "regular" | "verified" | "pro"
+experience_tier_locked: bool   // admin override blochează auto-promotion
+experience_tier_set_at: ISO    // ultima schimbare
 ```
 
-**Triggers automate de promovare** (cron job zilnic):
-| Tier | Criteriu promovare automată |
-|------|-----------------------------|
+### Cron automat
+- Rulează **zilnic la 03:30 Europe/Bucharest**
+- Scanează toți userii cu role `client` sau `specialist`
+- Promovează automat pe cei eligibili (sărit userii locked)
+- Audit log în collection `experience_tier_history`
+
+### Triggers automate de promovare (configurabile)
+| Tier | Criteriu (default) |
+|------|-----------------|
 | junior → regular | 7 zile activ + 3 cereri/oferte completate |
 | regular → verified | 30 zile activ + 10 cereri completate + rating >= 4.5 |
 | verified → pro | 90 zile + 30 cereri completate + email verificat + KYC complet |
 
-**Cum afectează UI**:
-```javascript
-// Exemplu — în ClientDashboard.jsx
-{user.experience_tier === "junior" && <SimpleQuickActions />}
-{["regular", "verified", "pro"].includes(user.experience_tier) && <AdvancedFilters />}
-{user.experience_tier === "pro" && <BulkOperations />}
-```
+### Features per tier (cum afectează UI)
+- **Junior**: basic_dashboard, simple_request_creation, essential_messages
+- **Regular**: + advanced_filters, saved_searches, request_templates, comparison_view, weekly_summary_email
+- **Verified**: + bulk_operations, advanced_analytics, priority_matching, custom_notifications, export_data
+- **Pro**: + api_access, white_label_reports, priority_support, early_access_features, dedicated_account_manager
 
-### Pași concreți pentru a-l implementa
-1. **Mergi la Architecture Board** → submit titlu "Progressive Disclosure / Experience Tiers" → vezi verdictul
-2. **Dacă build_new** → mergi la AI PM → descompune ideea
-3. **Injectează TODO-urile** → cere-mi (în chat) să construiesc
-4. **Eu construiesc**:
-   - Câmp `experience_tier` în User model
-   - Cron job zilnic care promovează automat
-   - Endpoint admin pentru override manual (`/api/admin/users/{id}/promote-tier`)
-   - UI feature flags în dashboards (Client + Specialist + Operator)
-5. **Test în preview**: creez 4 conturi cu tier-uri diferite și verifici că UI-ul se schimbă
-6. **Rollback safety**: dacă strică ceva, schimbi back tier-ul în "junior" → UI revine simplu
+### Cum folosești primitivele în cod (pentru tine — informativ)
+```jsx
+import { useTier, TierGate, TierBadge, UpgradeHint } from "../lib/experienceTier";
+
+// 1) Hook pentru logică
+const { tier, meetsTier, hasFeature } = useTier();
+if (hasFeature("bulk_operations")) { ... }
+
+// 2) Component gate
+<TierGate min="regular" fallback={<UpgradeHint requiredTier="regular" />}>
+  <AdvancedFilters />
+</TierGate>
+
+// 3) Badge profil
+<TierBadge />
+```
 
 ### Ce afectezi în RĂU dacă greșești
 - Configurezi criteriile prea strict → niciun user nu promovează → UI simplu permanent (nu e dramatic)
 - Configurezi prea relaxat → toți devin "pro" repede → UI complex pentru începători (frustration)
-- **Soluție**: criterii ajustabile dintr-un settings page admin
+- Override manual greșit → un user vede UI greșit → tu schimbi din admin în secunde
+- **Soluție rollback**: din Admin → tab Useri → găsește user → "Override" către tier-ul anterior
+
+### Cum testezi UI-ul progressive cu conturi de test
+1. Logează-te ca admin → `/admin/experience-tiers` → tab Useri
+2. Selectează un cont de test (ex: `client@propmanage.io`) → click "Override"
+3. Setează tier "junior" → check "Lock" → submit
+4. Logout, login cu acel cont → vezi UI simplificat
+5. Repetă cu "verified" → vezi UI complet
+6. Inversezi cu "Override" back la junior + Unlock
 
 ---
 
