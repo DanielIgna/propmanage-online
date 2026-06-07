@@ -43,6 +43,24 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 ---
 
 ## Recent additions (Feb 2026)
+- **Phase 87 — TierGate aplicat: TierToolsPanel + Header Badge + Test Guide + Pre-Deploy Analysis** ✅ (Feb 12 2026)
+  - **`<TierToolsPanel role>`** (`/app/frontend/src/lib/TierToolsPanel.jsx`): demonstrative panel cu:
+    - **10 unelte pentru Client** (Filtre avansate, Căutări salvate, Comparare oferte, Operațiuni în masă, Export, Analytics, Notificări custom, Support prioritar, API access)
+    - **9 unelte pentru Specialist** (Filtre oportunități, Matching prioritar, Aplicare în masă, Analytics business, Export raport, White-label reports, etc.)
+    - Layout: secțiune "Deblocate" (verde, click → demo alert) + secțiuni per tier locked (blue/emerald/violet, cu lacăt)
+    - Toate acțiunile sunt DEMO (alert info-only) — zero impact pe fluxuri existente
+  - **TierBadgeMini** în header DashShared.jsx — afișează tier-ul lângă email-ul userului (badge mic colorat per tier)
+  - Mount-uri:
+    - `ClientDashboard.jsx` → `<TierToolsPanel role="client" />` în tab "Solicită serviciu"
+    - `SpecialistDashboard.jsx` → `<TierToolsPanel role="specialist" />` în tab "Oportunități"
+  - **Test Guide complet** (`/app/docs/TIER_TESTING_GUIDE.md`, 10 KB):
+    - 8 scenarii test (4 tier-uri × 2 roluri) cu pași literali + ce-trebuie-să-vezi + ce-NU-trebuie-să-vezi
+    - Test de siguranță (confirmare zero impact pe fluxuri existente)
+    - Reset complet după testare (override back la junior)
+    - **Pre-Deploy Analysis** (7 secțiuni A→G): modificări vizibile pentru useri, module noi admin, sisteme cron, date noi DB, checklist verificări, plan rollback, ce să NU faci la deploy
+  - Test guide accesibil din admin: `/admin/operating-manual` → tab nou **"Ghid testare Tiers + Pre-Deploy"**
+  - Backend endpoint nou: `/api/admin/operating-manual/tier-testing`
+  - Bug-fixes colaterale: ClientDashboard `topup()` refactorizat pentru react-hooks/immutability (try-finally → promise chain), escape pe `"` în literale Romanian
 - **Phase 86 — Tier Up Celebration (email + in-app banner)** ✅ (Feb 12 2026)
   - Hook automat în `_set_tier()` care declanșează 3 acțiuni la PROMOVARE (upward only — nu și pe downgrade/lateral):
     1. **Email branded** (via Resend, layout PropManage existent) cu lista funcțiilor noi deblocate, în română

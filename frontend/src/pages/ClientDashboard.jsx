@@ -24,6 +24,7 @@ import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
 import { RequestTimelineModal, LastActionBanner } from "./ActivityTimeline";
 import { TierCelebrationBanner } from "../lib/TierCelebrationBanner";
+import { TierToolsPanel } from "../lib/TierToolsPanel";
 
 export const ClientDashboard = () => {
   const { user, refreshUser } = useAuth();
@@ -147,6 +148,7 @@ export const ClientDashboard = () => {
   return (
     <DashLayout role="client" title={title} bottomNav={<BottomNav tabs={tabs} active={tab} onChange={setTab} dataPrefix="client-tab" />}>
       <TierCelebrationBanner />
+      {tab === "request" && <TierToolsPanel role="client" />}
       {tab === "request" && (
         <RequestZone
           user={user} prop={prop} properties={properties} requests={requests}
@@ -636,7 +638,7 @@ const JobsZone = ({ requests, searchQ, setSearchQ, filterCat, setFilterCat, filt
           <div className="text-center py-16">
             <ClipboardList className="w-12 h-12 text-stone-700 mx-auto mb-3" />
             <div className="text-sm text-stone-400">Nicio solicitare încă</div>
-            <div className="text-xs text-stone-600 mt-1">Plasează prima ta cerere din tab-ul "Solicită".</div>
+            <div className="text-xs text-stone-600 mt-1">Plasează prima ta cerere din tab-ul &quot;Solicită&quot;.</div>
           </div>
         )}
         {requests.map(r => (
@@ -859,24 +861,24 @@ const WalletTopupBar = ({ onSuccess }) => {
   const [busy, setBusy] = useState(false);
   const presets = [100, 250, 500, 1000];
 
-  const topup = async (val) => {
+  const topup = (val) => {
     const amt = parseFloat(val || amount);
     if (!amt || amt <= 0 || amt > 50000) {
       alert("Sumă invalidă (1-50,000 RON)");
       return;
     }
     setBusy(true);
-    try {
-      const { data } = await axios.post(`${API}/wallet/topup-checkout-session`, {
-        amount: amt,
-        origin: window.location.origin,
+    axios.post(`${API}/wallet/topup-checkout-session`, {
+      amount: amt,
+      origin: window.location.origin,
+    })
+      .then(({ data }) => {
+        window.location.href = data.checkout_url;
+      })
+      .catch((e) => {
+        alert(formatApiError(e));
+        setBusy(false);
       });
-      // Redirect to Stripe Checkout (or demo success page)
-      window.location.href = data.checkout_url;
-    } catch (e) {
-      alert(formatApiError(e));
-      setBusy(false);
-    }
   };
 
   return (

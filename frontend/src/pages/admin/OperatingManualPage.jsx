@@ -39,6 +39,7 @@ const MD_COMPONENTS = {
 };
 
 const OperatingManualPage = () => {
+  const [doc, setDoc] = useState("manual"); // "manual" | "tier-testing"
   const [content, setContent] = useState("");
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -48,12 +49,17 @@ const OperatingManualPage = () => {
 
   useEffect(() => {
     let cancelled = false;
+    const url = doc === "tier-testing"
+      ? "/api/admin/operating-manual/tier-testing"
+      : "/api/admin/operating-manual";
     (async () => {
+      setLoading(true);
       try {
-        const { data } = await ax.get("/api/admin/operating-manual");
+        const { data } = await ax.get(url);
         if (cancelled) return;
         setContent(data.content || "");
         setMeta({ size: data.size_bytes, lines: data.line_count });
+        setError(null);
       } catch (e) {
         if (!cancelled) setError(e?.response?.data?.detail || e.message);
       } finally {
@@ -61,7 +67,7 @@ const OperatingManualPage = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [doc]);
 
   // Extract TOC headings (## level 2)
   const toc = useMemo(() => {
@@ -94,7 +100,7 @@ const OperatingManualPage = () => {
           <ChevronLeft className="w-3.5 h-3.5" /> Înapoi la Admin Dashboard
         </Link>
 
-        <div className="flex items-start gap-3 mb-6">
+        <div className="flex items-start gap-3 mb-4">
           <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
             <BookOpenCheck className="w-5 h-5 text-amber-300" />
           </div>
@@ -113,6 +119,28 @@ const OperatingManualPage = () => {
             data-testid="om-toc-toggle"
           >
             <List className="w-3.5 h-3.5" /> Cuprins
+          </button>
+        </div>
+
+        {/* DOC SWITCHER */}
+        <div className="flex gap-1 mb-4 border-b border-white/10" data-testid="om-doc-switch">
+          <button
+            onClick={() => { setDoc("manual"); setSearch(""); }}
+            className={`px-3 py-2 text-xs uppercase tracking-wider transition-colors border-b-2 ${
+              doc === "manual" ? "border-amber-400 text-white" : "border-transparent text-stone-500 hover:text-white"
+            }`}
+            data-testid="om-doc-manual"
+          >
+            Manual de Operare
+          </button>
+          <button
+            onClick={() => { setDoc("tier-testing"); setSearch(""); }}
+            className={`px-3 py-2 text-xs uppercase tracking-wider transition-colors border-b-2 ${
+              doc === "tier-testing" ? "border-emerald-400 text-white" : "border-transparent text-stone-500 hover:text-white"
+            }`}
+            data-testid="om-doc-tier-testing"
+          >
+            Ghid testare Tiers + Pre-Deploy
           </button>
         </div>
 

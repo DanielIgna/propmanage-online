@@ -230,7 +230,10 @@ export const DashLayout = ({ children, role, title, bottomNav }) => {
             </button>
             <div className="hidden md:block text-right">
               <div className="text-sm font-medium truncate max-w-[160px]">{user.name}</div>
-              <div className="text-[10px] text-stone-500 truncate max-w-[160px]">{user.email}</div>
+              <div className="text-[10px] text-stone-500 truncate max-w-[160px] flex items-center gap-1 justify-end">
+                <span className="truncate">{user.email}</span>
+                {(role === "client" || role === "specialist") && <TierBadgeMini tier={user.experience_tier || "junior"} />}
+              </div>
             </div>
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-stone-600 to-stone-800 flex items-center justify-center font-medium text-sm overflow-hidden" data-testid="dash-avatar">
               {avatarSrc ? (
@@ -284,3 +287,27 @@ export const StatusBadge = ({ status }) => {
   }[status] || { c: "stone", l: status };
   return <span className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-${cfg.c}-500/15 text-${cfg.c}-400 border border-${cfg.c}-500/20`}>{cfg.l}</span>;
 };
+
+// Tier mini-badge for dashboard header. Imported via inline definition to
+// avoid circular dep with /lib/experienceTier (which uses useAuth).
+const TIER_BADGE_STYLE = {
+  junior:   "bg-stone-500/10 border-stone-500/30 text-stone-300",
+  regular:  "bg-blue-500/10 border-blue-500/30 text-blue-300",
+  verified: "bg-emerald-500/10 border-emerald-500/30 text-emerald-300",
+  pro:      "bg-violet-500/10 border-violet-500/30 text-violet-300",
+};
+const TIER_BADGE_LABEL = { junior: "Junior", regular: "Regular", verified: "Verified", pro: "Pro" };
+const TierBadgeMini = ({ tier }) => {
+  const t = tier || "junior";
+  const cls = TIER_BADGE_STYLE[t] || TIER_BADGE_STYLE.junior;
+  return (
+    <span
+      className={`inline-flex items-center text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${cls}`}
+      title={`Experience tier: ${TIER_BADGE_LABEL[t]}`}
+      data-testid="dash-tier-badge"
+    >
+      {TIER_BADGE_LABEL[t]}
+    </span>
+  );
+};
+

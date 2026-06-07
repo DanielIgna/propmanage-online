@@ -18,6 +18,7 @@ import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
 import { RequestTimelineModal, ScheduleProposalModal, LastActionBanner } from "./ActivityTimeline";
 import { TierCelebrationBanner } from "../lib/TierCelebrationBanner";
+import { TierToolsPanel } from "../lib/TierToolsPanel";
 
 export const SpecialistDashboard = () => {
   const { user, refreshUser } = useAuth();
@@ -89,7 +90,7 @@ export const SpecialistDashboard = () => {
             <FileCheck className="w-5 h-5 text-amber-400" />
             <div>
               <div className="text-sm font-medium">Cont neverificat</div>
-              <div className="text-xs text-stone-400">Încarcă documentele pentru a primi badge "VERIFIED" și acces complet.</div>
+              <div className="text-xs text-stone-400">Încarcă documentele pentru a primi badge &quot;VERIFIED&quot; și acces complet.</div>
             </div>
           </div>
           <button onClick={() => setShowDocs(true)} className="pm-btn pm-btn-primary pm-btn-sm" data-testid="upload-docs-cta">
@@ -98,6 +99,7 @@ export const SpecialistDashboard = () => {
         </div>
       )}
 
+      {tab === "opportunities" && <TierToolsPanel role="specialist" />}
       {tab === "opportunities" && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
