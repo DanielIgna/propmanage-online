@@ -6,6 +6,7 @@ import { Building2, Home, Wrench, ShieldCheck, Settings, LogOut, Languages, Bell
 import { useAuth } from "../auth";
 import { useI18n } from "../i18n";
 import { AIAssistant } from "./AIAssistant";
+import { VoucherExpiryAlert } from "../lib/VoucherExpiryAlert";
 
 export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -225,6 +226,7 @@ export const DashLayout = ({ children, role, title, bottomNav }) => {
             )}
             <ThemeToggle />
             <NotificationsBell />
+            {(role === "client" || role === "specialist") && <VoucherExpiryAlert />}
             <button onClick={toggle} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 hover:bg-white/5 rounded-full text-xs uppercase tracking-wider" data-testid="dash-lang">
               <Languages className="w-3.5 h-3.5" />{lang.toUpperCase()}
             </button>

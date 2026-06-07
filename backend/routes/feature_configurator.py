@@ -475,6 +475,40 @@ async def send_test_voucher_email(payload: dict = Body(...), user=Depends(requir
         raise HTTPException(500, f"Email send failed: {str(e)[:200]}")
 
 
+@router.post("/vouchers/create-test")
+async def create_test_voucher(payload: dict = Body(...), user=Depends(require_role("admin"))):
+    """Create a REAL test voucher with custom expiry for a target user.
+
+    Useful to test VoucherExpiryAlert widget without waiting weeks.
+    Body: { user_email: str, percent?: int (50), expires_in_days?: int (3) }
+    """
+    target_email = (payload.get("user_email") or "").strip()
+    if "@" not in target_email:
+        raise HTTPException(400, "Invalid user_email")
+    target_user = await db.users.find_one({"email": target_email})
+    if not target_user:
+        raise HTTPException(404, f"User not found: {target_email}")
+    percent = int(payload.get("percent") or 50)
+    expires_in_days = int(payload.get("expires_in_days") or 3)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    expires_at = (datetime.now(timezone.utc) + timedelta(days=expires_in_days)).isoformat()
+    voucher_doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": str(target_user["_id"]),
+        "user_email": target_email,
+        "code": _voucher_code(),
+        "percent": percent,
+        "source": "admin_test",
+        "reason": f"TEST voucher creat manual de admin (expirare în {expires_in_days}z)",
+        "status": "active",
+        "issued_at": now_iso,
+        "expires_at": expires_at,
+    }
+    await db.user_vouchers.insert_one({**voucher_doc})
+    voucher_doc.pop("_id", None)
+    return voucher_doc
+
+
 # ----------------------------------------------------------------------
 # Quest evaluation cron
 # ----------------------------------------------------------------------
