@@ -511,3 +511,16 @@ Admin: `admin@propmanage.io` / `Admin123!`
 - `/app/frontend/src/pages/verified-estate/SellMyProperty.jsx` (NEW — landing placeholder)
 - `/app/backend/server.py` (registered router + seed hook)
 - `/app/frontend/src/App.js` (3 new routes + nav link)
+
+
+## Update — 7 Feb 2026 · Resend Email Fix + Voucher Expiry Widget verified
+- 🔴 **FIXED P0 — Resend Email Delivery**: `RESEND_API_KEY` was empty in `/app/backend/.env`, causing PROVIDER to fall back to `console` mode (fake success — emails were only logged, never sent). User-facing symptom: voucher emails not arriving at `danieligna1@gmail.com`. Fix: added the real Resend production key + switched `SENDER_EMAIL` to `PropManage <noreply@propmanage.ro>` (verified domain). Verified via direct send: 4 emails delivered with Resend IDs (test email + 3 vouchers at 30%/50%/90%).
+- ✅ **Voucher Expiry Alert Widget verified**: Component `/app/frontend/src/lib/VoucherExpiryAlert.jsx` already existed and is wired into `DashShared.jsx` navbar. Renders pulsing red badge when active vouchers expire in < 7 days; dropdown lists urgent vouchers sorted by days left with click-to-copy code. E2E tested on `client@propmanage.io` with 4 urgent vouchers visible.
+- Test endpoint `POST /api/admin/feature-configurator/vouchers/create-test` body schema: `{user_email, percent, expires_in_days, reason?}` (NOT `email`).
+
+## Backlog (next pickup)
+- P1: Marketplace Economics V2 (Dynamic Fee, Lead Gating, Max 5 offers, Sub-categories) — awaits user "Start MKT-V2" command.
+- P2: Twin Orchestrator AI Agent & KG extensions.
+- P2: Experience Spaces V2 (Isolated implementation).
+- P3: Design System Unification (PropManage Atlas).
+- DEFERRED: Founder-Gate FG-1 Twilio SMS — DO NOT IMPLEMENT until user explicit request.
