@@ -39,6 +39,7 @@ from pydantic import BaseModel, Field
 
 from db import db
 from deps import require_role, get_current_user
+from email_service import send_email, _layout
 
 logger = logging.getLogger("propmanage.feature_config")
 router = APIRouter(prefix="/api/admin/feature-configurator", tags=["feature-configurator"])
@@ -406,29 +407,81 @@ async def voucher_stats(user=Depends(require_role("admin"))):
 
 
 # ----------------------------------------------------------------------
+# Voucher email (used by quest evaluation cron)
+# ----------------------------------------------------------------------
+async def _send_voucher_email(email: str, quest_title: str, voucher_code: str, percent: int, expires_at: str):
+    """Branded congratulation email when user earns a voucher via quest."""
+    try:
+        expires_date = datetime.fromisoformat(expires_at.replace("Z", "+00:00")).strftime("%d %B %Y")
+    except Exception:  # noqa: BLE001
+        expires_date = expires_at[:10]
+
+    body = f"""
+    <tr><td style="padding:32px;">
+      <div style="font-size:11px;letter-spacing:.08em;color:#d4ff3a;text-transform:uppercase;margin-bottom:8px;">Quest completat</div>
+      <h1 style="margin:0 0 12px 0;font-size:28px;color:#fff;line-height:1.2;">🎁 Ai câștigat un voucher!</h1>
+      <p style="margin:0 0 14px 0;font-size:15px;color:#d4d4d8;line-height:1.6;">
+        Felicitări — ai completat quest-ul <strong style="color:#fff;">"{quest_title}"</strong>.
+        Ca recompensă, ai primit un voucher de <strong style="color:#d4ff3a;">{percent}% reducere</strong>.
+      </p>
+      <div style="background:#1a1a1d;border:2px dashed #d4ff3a55;border-radius:14px;padding:24px;margin:24px 0;text-align:center;">
+        <div style="font-size:10px;letter-spacing:.12em;color:#a1a1aa;text-transform:uppercase;margin-bottom:6px;">Cod voucher</div>
+        <div style="font-family:'Courier New',monospace;font-size:28px;font-weight:700;color:#d4ff3a;letter-spacing:.05em;">{voucher_code}</div>
+        <div style="font-size:11px;color:#71717a;margin-top:10px;">Valabil până: <strong style="color:#a1a1aa;">{expires_date}</strong></div>
+      </div>
+      <p style="margin:0 0 14px 0;font-size:13px;color:#a1a1aa;line-height:1.5;">
+        Codul tău e salvat automat în dashboard, sub secțiunea <strong style="color:#d4d4d8;">Quest-uri &amp; Recompense</strong>.
+        Aplicarea efectivă pe următoarea ta comandă/lead se face manual deocamdată — păstrează codul pentru când vine timpul.
+      </p>
+      <p style="margin:0;font-size:12px;color:#71717a;font-style:italic;">
+        Continuă să fii activ pe platformă — următoarele quest-uri îți pot aduce vouchere de până la 90% reducere!
+      </p>
+    </td></tr>
+    """
+    html = _layout(
+        title="Voucher câștigat — PropManage",
+        preheader=f"Ai un voucher {percent}% de la quest-ul {quest_title}",
+        body_html=body,
+        cta_url="https://propmanage.ro/dashboard",
+        cta_label="Vezi voucherele mele",
+    )
+    await send_email(email, f"🎁 Voucher {percent}% — quest-ul '{quest_title}' completat!", html)
+
+
+# ----------------------------------------------------------------------
 # Quest evaluation cron
 # ----------------------------------------------------------------------
 async def _count_event_for_user(user_id: str, event: str, since_iso: str) -> tuple:
-    """Returns (count, current_rating). Maps event to specific Mongo queries."""
+    """Returns (count, current_rating). Maps event to specific Mongo queries.
+
+    Uses $or on updated_at OR created_at because legacy requests don't have
+    updated_at populated.
+    """
+    time_filter = {"$or": [
+        {"updated_at": {"$gte": since_iso}},
+        {"created_at": {"$gte": since_iso}},
+    ]}
     if event == "client_request_completed":
         return await db.requests.count_documents({
-            "client_id": user_id,
-            "status": {"$in": ["completed", "confirmed"]},
-            "updated_at": {"$gte": since_iso},
+            "$and": [
+                {"client_id": user_id, "status": {"$in": ["completed", "confirmed"]}},
+                time_filter,
+            ],
         }), 0.0
     if event == "spec_lead_accepted":
         return await db.requests.count_documents({
-            "assigned_specialist_id": user_id,
-            "status": {"$in": ["accepted", "in_progress", "completed", "confirmed"]},
-            "updated_at": {"$gte": since_iso},
+            "$and": [
+                {"assigned_specialist_id": user_id, "status": {"$in": ["accepted", "in_progress", "completed", "confirmed"]}},
+                time_filter,
+            ],
         }), 0.0
     if event == "spec_request_completed":
         count = await db.requests.count_documents({
-            "assigned_specialist_id": user_id,
-            "status": {"$in": ["completed", "confirmed"]},
-            "updated_at": {"$gte": since_iso},
+            "$and": [
+                {"assigned_specialist_id": user_id, "status": {"$in": ["completed", "confirmed"]}},
+                time_filter,
+            ],
         })
-        # Fetch rating
         try:
             u = await db.users.find_one({"_id": ObjectId(user_id)}, {"rating": 1})
             rating = float((u or {}).get("rating") or 0)

@@ -43,6 +43,25 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 ---
 
 ## Recent additions (Feb 2026)
+- **Phase 89 — Voucher Email + Quest Evaluation Fix** ✅ (Feb 12 2026)
+  - **`_send_voucher_email()`** în `routes/feature_configurator.py` — email branded la fiecare voucher câștigat:
+    - Design PropManage existent (layout cu logo, dark theme)
+    - Cod voucher mare cu border dashed (vizibil, ușor de copiat)
+    - Detalii: nume quest, procent, dată expirare formatată RO
+    - CTA către dashboard pentru a vedea voucherele
+    - Wrapped în try/except — nu blochează emisia voucher-ului dacă email-ul eșuează
+  - **Bug-fix critical în `_count_event_for_user`**: query-ul filtra după `updated_at` care nu există în request-urile legacy. Schimbat în `$or: [updated_at >= since, created_at >= since]` — acum quest-urile detectează corect request-urile reale
+  - **Validare live end-to-end**:
+    - Run cron real → **9 vouchere emise** către useri reali din DB
+    - `client@propmanage.io` câștigat 2 vouchere (30% + 50%) din quest-urile "Primii pași" și "Explorator activ"
+    - 2 emails branded trimise prin Resend
+    - 2 notificări in-app create
+    - User-side `/api/me/quests` arată: Primii pași ✅, Explorator activ ✅, Power user 80% (4/5)
+    - User-side `/api/me/vouchers` returnează ambele codes cu expirare 30 zile
+  - **3 teste anterioare PASS**:
+    - Matrice: schimb `client_advanced_filters` regular→verified detectat corect
+    - Perechi: warning "tier mismatch" afișat la modificare, dispărut la restore (ok_matches=7)
+    - Quest run real: 555 useri scanați, 9 emise (cu fix-ul)
 - **Phase 88 — Feature Configurator + Quests + Vouchers (Gamification Layer)** ✅ (Feb 12 2026)
   - **Backend complet** (`routes/feature_configurator.py`) cu 3 sisteme interconectate:
     - **Feature Config**: matrice editabilă de 30 features (18 client + 12 specialist) cu tier configurabil per fiecare (junior/regular/verified/pro) + enable/disable
