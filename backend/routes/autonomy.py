@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, Body, HTTPException
+from fastapi import APIRouter, Depends, Query, Body, HTTPException, BackgroundTasks
 
 from db import db
 from deps import require_role
@@ -73,15 +73,17 @@ async def force_snapshot(user=Depends(require_role("admin"))):
 
 
 @router.post("/boost-dev")
-async def boost_dev_score(user=Depends(require_role("admin"))):
+async def boost_dev_score(background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
     """One-click action to improve DEV sub-score:
-      1) Trigger a release gate run (impact: +45% weight signal)
-      2) Mark stale open QA findings (>14d) as 'dismissed' (impact: +30% weight signal)
-      3) Re-take autonomy snapshot so the new score is visible immediately
+      1) Trigger a release gate run IN BACKGROUND (avoids Cloudflare 100s timeout)
+      2) Mark stale open QA findings (>14d) as 'dismissed' (fast)
+      3) Re-take autonomy snapshot so the new score is visible immediately (fast)
 
-    Idempotent and safe to call repeatedly. Returns a summary of what changed.
+    Returns immediately. Release gate result is persisted to release_gate_runs
+    and can be checked via GET /api/admin/autonomy/boost-dev/last-gate.
+    Idempotent and safe to call repeatedly.
     """
-    summary = {"release_gate": None, "qa_findings_dismissed": 0, "new_dev_score": None, "previous_dev_score": None}
+    summary = {"release_gate": {"status": "scheduled_in_background"}, "qa_findings_dismissed": 0, "new_dev_score": None, "previous_dev_score": None}
 
     # Snapshot the previous DEV score for comparison
     try:
@@ -91,20 +93,34 @@ async def boost_dev_score(user=Depends(require_role("admin"))):
     except Exception:  # noqa: BLE001
         pass
 
-    # 1) Release Gate run
-    try:
-        from qa_automation import run_release_gate
-        gate = await run_release_gate(triggered_by=f"boost-dev:{user['id']}", email_admins=False)
-        summary["release_gate"] = {
-            "id": gate.get("id"),
-            "blocked": (gate.get("summary") or {}).get("blocked"),
-            "p0_fail": (gate.get("summary") or {}).get("p0_fail"),
-        }
-    except Exception as e:  # noqa: BLE001
-        logger.warning(f"boost-dev: release gate failed: {e}")
-        summary["release_gate"] = {"error": str(e)[:200]}
+    # 1) Release Gate run — IN BACKGROUND (post-response) so we never hit Cloudflare 100s limit
+    async def _run_gate_bg():
+        try:
+            from qa_automation import run_release_gate
+            gate = await run_release_gate(triggered_by=f"boost-dev-bg:{user['id']}", email_admins=False)
+            # Mark completion so user can poll status if needed
+            await db.boost_dev_runs.insert_one({
+                "user_id": user["id"],
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+                "gate_id": gate.get("id"),
+                "blocked": (gate.get("summary") or {}).get("blocked"),
+                "p0_fail": (gate.get("summary") or {}).get("p0_fail"),
+            })
+            # Re-take snapshot after gate finishes so the score reflects fresh data
+            _CACHE["data"] = None
+            await take_autonomy_snapshot()
+            logger.info(f"[boost-dev] background gate done: blocked={(gate.get('summary') or {}).get('blocked')}")
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[boost-dev] background gate failed: {e}")
+            await db.boost_dev_runs.insert_one({
+                "user_id": user["id"],
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+                "error": str(e)[:200],
+            })
 
-    # 2) Dismiss stale QA findings (> 14 days old, still status "open"/no status)
+    background_tasks.add_task(_run_gate_bg)
+
+    # 2) Dismiss stale QA findings (fast — runs synchronously)
     try:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=14)).isoformat()
         dismissed_count = 0
@@ -127,7 +143,7 @@ async def boost_dev_score(user=Depends(require_role("admin"))):
         logger.warning(f"boost-dev: dismiss findings failed: {e}")
         summary["qa_findings_dismissed_error"] = str(e)[:200]
 
-    # 3) Force fresh snapshot + invalidate cache
+    # 3) Force fresh snapshot + invalidate cache (FAST — uses cached data, no gate dependency)
     try:
         _CACHE["data"] = None
         snap = await take_autonomy_snapshot()
@@ -140,6 +156,16 @@ async def boost_dev_score(user=Depends(require_role("admin"))):
         summary["snapshot_error"] = str(e)[:200]
 
     return {"ok": True, "summary": summary}
+
+
+@router.get("/boost-dev/last-gate")
+async def get_last_boost_gate(user=Depends(require_role("admin"))):
+    """Poll the last background release gate result triggered by Boost DEV."""
+    last = await db.boost_dev_runs.find_one({}, sort=[("completed_at", -1)])
+    if not last:
+        return {"status": "no_runs"}
+    last.pop("_id", None)
+    return {"status": "ok", "run": last}
 
 
 # ============================================================================
