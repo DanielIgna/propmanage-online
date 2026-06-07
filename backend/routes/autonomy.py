@@ -128,10 +128,16 @@ async def boost_dev_score(user=Depends(require_role("admin"))):
         summary["qa_findings_dismissed_error"] = str(e)[:200]
 
     # 3) Force fresh snapshot + invalidate cache
-    _CACHE["data"] = None
-    snap = await take_autonomy_snapshot()
-    summary["new_dev_score"] = (snap.get("breakdown_summary") or {}).get("dev")
-    summary["new_general_score"] = (snap.get("scores") or {}).get("general")
+    try:
+        _CACHE["data"] = None
+        snap = await take_autonomy_snapshot()
+        if snap.get("error"):
+            summary["snapshot_error"] = snap["error"]
+        summary["new_dev_score"] = (snap.get("breakdown_summary") or {}).get("dev")
+        summary["new_general_score"] = (snap.get("scores") or {}).get("general")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"boost-dev: snapshot failed: {e}")
+        summary["snapshot_error"] = str(e)[:200]
 
     return {"ok": True, "summary": summary}
 

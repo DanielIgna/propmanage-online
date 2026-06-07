@@ -258,7 +258,21 @@ export const AutonomyEnginePage = () => {
       setBoostResult(data.summary);
       await load(true);
     } catch (e) {
-      setBoostResult({ error: e?.response?.data?.detail || "Eroare boost" });
+      const status = e?.response?.status;
+      let msg;
+      if (status === 404) {
+        msg = "Endpoint indisponibil pe acest mediu — necesită REDEPLOY la producție.";
+      } else if (status === 401 || status === 403) {
+        msg = "Acces interzis — trebuie să fii logat ca admin.";
+      } else if (status === 500) {
+        msg = `Eroare server (500): ${e?.response?.data?.detail || e?.message || "necunoscută"}`;
+      } else if (!status) {
+        msg = `Network/timeout: ${e?.message || "verifică conexiunea sau backend-ul"}`;
+      } else {
+        msg = `HTTP ${status}: ${e?.response?.data?.detail || e?.message || "vezi consola"}`;
+      }
+      console.error("[BoostDEV] failed:", e);
+      setBoostResult({ error: msg, http_status: status });
     } finally { setBoosting(false); }
   };
 
@@ -312,7 +326,13 @@ export const AutonomyEnginePage = () => {
         {boostResult && (
           <div className="mt-4 rounded-2xl border border-violet-500/30 bg-violet-500/5 p-4 text-sm" data-testid="autonomy-boost-result">
             {boostResult.error ? (
-              <div className="text-red-300 flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> {boostResult.error}</div>
+              <div className="space-y-1">
+                <div className="text-red-300 flex items-center gap-2 font-semibold"><AlertTriangle className="w-4 h-4" /> Boost eșuat{boostResult.http_status ? ` (HTTP ${boostResult.http_status})` : ""}</div>
+                <div className="text-stone-300 text-xs">{boostResult.error}</div>
+                {boostResult.http_status === 404 && (
+                  <div className="text-amber-300 text-xs mt-2">💡 Endpoint-ul `POST /api/admin/autonomy/boost-dev` a fost creat în PREVIEW. Trebuie să faci <strong>Save to GitHub</strong> → <strong>Redeploy</strong> pe Emergent ca să apară în producție.</div>
+                )}
+              </div>
             ) : (
               <div className="space-y-1.5 text-stone-200">
                 <div className="flex items-center gap-2 text-violet-300 font-semibold mb-1"><Zap className="w-4 h-4" /> Boost DEV — rezultat</div>
