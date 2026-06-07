@@ -448,6 +448,33 @@ async def _send_voucher_email(email: str, quest_title: str, voucher_code: str, p
     await send_email(email, f"🎁 Voucher {percent}% — quest-ul '{quest_title}' completat!", html)
 
 
+@router.post("/vouchers/test-email")
+async def send_test_voucher_email(payload: dict = Body(...), user=Depends(require_role("admin"))):
+    """Send a sample voucher email to a given address — for admin verification of branding/delivery.
+
+    Body: { email: "user@example.com", percent?: int (default 50), quest_title?: str }
+    Doesn't create a real voucher in DB — purely a delivery test.
+    """
+    email = (payload.get("email") or "").strip()
+    if "@" not in email:
+        raise HTTPException(400, "Invalid email")
+    percent = int(payload.get("percent") or 50)
+    quest_title = payload.get("quest_title") or "Test voucher delivery"
+    code = _voucher_code()
+    expires_at = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+    try:
+        await _send_voucher_email(
+            email=email,
+            quest_title=quest_title,
+            voucher_code=code,
+            percent=percent,
+            expires_at=expires_at,
+        )
+        return {"ok": True, "email": email, "sample_code": code, "percent": percent}
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"Email send failed: {str(e)[:200]}")
+
+
 # ----------------------------------------------------------------------
 # Quest evaluation cron
 # ----------------------------------------------------------------------
