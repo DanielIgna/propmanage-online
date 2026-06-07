@@ -25,6 +25,7 @@ import { SettingsPanel } from "./SettingsPanel";
 import { RequestTimelineModal, LastActionBanner } from "./ActivityTimeline";
 import { TierCelebrationBanner } from "../lib/TierCelebrationBanner";
 import { TierToolsPanel } from "../lib/TierToolsPanel";
+import { QuestPanel } from "../lib/QuestPanel";
 
 export const ClientDashboard = () => {
   const { user, refreshUser } = useAuth();
@@ -148,6 +149,7 @@ export const ClientDashboard = () => {
   return (
     <DashLayout role="client" title={title} bottomNav={<BottomNav tabs={tabs} active={tab} onChange={setTab} dataPrefix="client-tab" />}>
       <TierCelebrationBanner />
+      {tab === "request" && <QuestPanel />}
       {tab === "request" && <TierToolsPanel role="client" />}
       {tab === "request" && (
         <RequestZone

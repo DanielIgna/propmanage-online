@@ -43,6 +43,29 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 ---
 
 ## Recent additions (Feb 2026)
+- **Phase 88 — Feature Configurator + Quests + Vouchers (Gamification Layer)** ✅ (Feb 12 2026)
+  - **Backend complet** (`routes/feature_configurator.py`) cu 3 sisteme interconectate:
+    - **Feature Config**: matrice editabilă de 30 features (18 client + 12 specialist) cu tier configurabil per fiecare (junior/regular/verified/pro) + enable/disable
+    - **Feature Pairs**: 7 perechi default Client↔Specialist cu validation warnings (non-bloc) când tier-urile sau enabled mismatch
+    - **Quests**: 6 quest-uri default (Primii pași 30%, Explorator activ 50%, Power user 90% pentru client + similare pentru specialist) cu condiții configurabile (target_event, target_count, days_window, min_rating, reward_voucher_pct)
+    - **Vouchers**: auto-issued la quest completion cu cod random `PM-XXXXXXXX`, 30 zile expirare, status (active/used/expired). Vouchere GENERICE — aplicare manuală
+  - **Cron job nou**: zilnic 03:45 Europe/Bucharest (`quests_daily_evaluation`) — scanează userii, evaluează quest-urile active, issue vouchere automat
+  - **Bootstrap inteligent**: collections se populează cu default-uri la primul GET
+  - **API endpoints**:
+    - Admin: GET/PUT config, PUT feature, POST reset-defaults, CRUD pairs, GET pairs/validate, CRUD quests, GET vouchers + stats, POST quests/run-now
+    - User: GET /api/me/quests (progress per quest), GET /api/me/vouchers
+  - **Frontend Admin** (`/admin/feature-configurator`) cu 4 tab-uri:
+    - **Matrice**: tabel features × roluri × tier-uri cu radio buttons + ON/OFF toggle per celulă, filtru rol, grupare per categorie
+    - **Perechi**: listă perechi cu badges (client/specialist), form add (dropdown features), warnings banner amber non-blocking
+    - **Quest-uri**: list cu stats (completed/in_progress), toggle activ/oprit, Dry-run + Rulează acum
+    - **Vouchere**: KPI cards (active/used/expired) + listă codes cu copy
+  - **User-side: QuestPanel** (`/app/frontend/src/lib/QuestPanel.jsx`) mounted automat în ClientDashboard + SpecialistDashboard:
+    - Vouchere active cu **copy-to-clipboard** + expirare
+    - Quest-uri active cu **progress bar gradient amber→emerald**
+    - Quest-uri completate (chips verzi)
+    - Self-fetching, ascuns dacă user n-are nimic
+  - **Sidebar**: link nou "Feature Configurator" cu badge **GAMIFY** în STRATEGIE & R&D
+  - **Verificat live**: 30 features bootstrap, 7 perechi valide, 6 quests active, 555 useri scanați (0 vouchere emise — niciun user real n-are 3 requests completed în 30 zile, ceea ce e corect)
 - **Phase 87 — TierGate aplicat: TierToolsPanel + Header Badge + Test Guide + Pre-Deploy Analysis** ✅ (Feb 12 2026)
   - **`<TierToolsPanel role>`** (`/app/frontend/src/lib/TierToolsPanel.jsx`): demonstrative panel cu:
     - **10 unelte pentru Client** (Filtre avansate, Căutări salvate, Comparare oferte, Operațiuni în masă, Export, Analytics, Notificări custom, Support prioritar, API access)

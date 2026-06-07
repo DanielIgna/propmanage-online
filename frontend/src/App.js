@@ -61,6 +61,7 @@ import ArchitectureBoardPage from "./pages/admin/ArchitectureBoardPage";
 import AIProductManagerPage from "./pages/admin/AIProductManagerPage";
 import OperatingManualPage from "./pages/admin/OperatingManualPage";
 import ExperienceTiersPage from "./pages/admin/ExperienceTiersPage";
+import FeatureConfiguratorPage from "./pages/admin/FeatureConfiguratorPage";
 import ContractPage from "./pages/ContractPage";
 import { trackPageView } from "@/lib/analytics";
 import { useDynamicSEO } from "@/lib/useDynamicSEO";
@@ -1605,6 +1606,7 @@ function App() {
               <Route path="/admin/ai-pm" element={<AIProductManagerPage />} />
               <Route path="/admin/operating-manual" element={<OperatingManualPage />} />
               <Route path="/admin/experience-tiers" element={<ExperienceTiersPage />} />
+              <Route path="/admin/feature-configurator" element={<FeatureConfiguratorPage />} />
               <Route path="/contracts/:id" element={<ContractPage />} />
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />
               <Route path="/ghiduri" element={<GhiduriIndex />} />

@@ -97,6 +97,11 @@ from routes.experience_tiers import (
     self_router as experience_tiers_self_router,
     run_promotion_job as run_experience_tier_promotion_job,
 )
+from routes.feature_configurator import (
+    router as feature_configurator_router,
+    self_router as feature_configurator_self_router,
+    evaluate_quests_job,
+)
 from routes.twin_orchestrator import router as twin_orchestrator_router
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
@@ -197,6 +202,8 @@ for r in (
     operating_manual_router,
     experience_tiers_router,
     experience_tiers_self_router,
+    feature_configurator_router,
+    feature_configurator_self_router,
     twin_orchestrator_router,
 ):
     app.include_router(r)
@@ -272,6 +279,14 @@ async def startup():
             run_experience_tier_promotion_job,
             CronTrigger(hour=3, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="experience_tier_daily_promotion",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        # Quests — daily evaluation + voucher issuance, 03:45 Europe/Bucharest
+        scheduler.add_job(
+            evaluate_quests_job,
+            CronTrigger(hour=3, minute=45, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="quests_daily_evaluation",
             replace_existing=True,
             misfire_grace_time=7200,
         )

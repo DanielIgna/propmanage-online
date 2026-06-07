@@ -19,6 +19,7 @@ import { SettingsPanel } from "./SettingsPanel";
 import { RequestTimelineModal, ScheduleProposalModal, LastActionBanner } from "./ActivityTimeline";
 import { TierCelebrationBanner } from "../lib/TierCelebrationBanner";
 import { TierToolsPanel } from "../lib/TierToolsPanel";
+import { QuestPanel } from "../lib/QuestPanel";
 
 export const SpecialistDashboard = () => {
   const { user, refreshUser } = useAuth();
@@ -99,6 +100,7 @@ export const SpecialistDashboard = () => {
         </div>
       )}
 
+      {tab === "opportunities" && <QuestPanel />}
       {tab === "opportunities" && <TierToolsPanel role="specialist" />}
       {tab === "opportunities" && (
         <>
