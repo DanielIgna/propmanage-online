@@ -49,6 +49,7 @@ from pydantic import BaseModel, Field
 
 from db import db
 from deps import require_role, get_current_user
+from email_service import send_email, _layout
 
 logger = logging.getLogger("propmanage.experience_tiers")
 router = APIRouter(prefix="/api/admin/experience-tiers", tags=["experience-tiers"])
@@ -223,6 +224,110 @@ async def _user_progress(user: dict, cfg: dict) -> dict:
     }
 
 
+async def _send_tier_celebration(user_id: str, user_email: str, from_tier: str, to_tier: str):
+    """Best-effort celebration on tier promotion: email + in-app notification + dashboard banner flag.
+
+    Failures here MUST NOT break the promotion itself.
+    """
+    if from_tier == to_tier:
+        return
+    # New features unlocked (only the delta — what's new at the to_tier)
+    new_features = TIER_FEATURES.get(to_tier, [])
+    feature_labels_ro = {
+        "advanced_filters": "Filtre avansate",
+        "saved_searches": "Căutări salvate",
+        "request_templates": "Șabloane cereri",
+        "comparison_view": "Vedere comparativă",
+        "weekly_summary_email": "Email sumar săptămânal",
+        "bulk_operations": "Operațiuni în masă",
+        "advanced_analytics": "Analize avansate",
+        "priority_matching": "Matching prioritar",
+        "custom_notifications": "Notificări personalizate",
+        "export_data": "Export date",
+        "api_access": "Acces API",
+        "white_label_reports": "Rapoarte white-label",
+        "priority_support": "Support prioritar",
+        "early_access_features": "Acces early la features",
+        "dedicated_account_manager": "Account manager dedicat",
+    }
+    pretty_features = [feature_labels_ro.get(f, f) for f in new_features]
+
+    tier_label_ro = {"junior": "Junior", "regular": "Regular", "verified": "Verificat", "pro": "Pro"}
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # 1) Mark dashboard banner pending (consumed on next login)
+    try:
+        oid = ObjectId(user_id)
+        await db.users.update_one(
+            {"_id": oid},
+            {"$set": {
+                "tier_celebration_pending": {
+                    "from": from_tier,
+                    "to": to_tier,
+                    "new_features": new_features,
+                    "created_at": now_iso,
+                }
+            }},
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[tier_celebration] banner flag failed: {e}")
+
+    # 2) In-app notification (best-effort)
+    try:
+        await db.notifications.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "type": "tier_promotion",
+            "title": f"🎉 Felicitări! Ai fost promovat la {tier_label_ro.get(to_tier, to_tier)}",
+            "message": f"Ai deblocat {len(new_features)} funcții noi pe platformă.",
+            "data": {"from": from_tier, "to": to_tier, "new_features": new_features},
+            "read": False,
+            "created_at": now_iso,
+        })
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[tier_celebration] notification insert failed: {e}")
+
+    # 3) Email (Resend via email_service.send_email)
+    if user_email:
+        try:
+            features_html = "".join([
+                f'<li style="padding:6px 0;color:#d4d4d8;font-size:14px;">✨ {f}</li>'
+                for f in pretty_features
+            ]) or '<li style="color:#a1a1aa;font-size:13px;">Funcționalitățile complete devin disponibile pe dashboard.</li>'
+            body = f"""
+            <tr><td style="padding:32px;">
+              <div style="font-size:11px;letter-spacing:.08em;color:#d4ff3a;text-transform:uppercase;margin-bottom:8px;">Promovare automată</div>
+              <h1 style="margin:0 0 12px 0;font-size:28px;color:#fff;line-height:1.2;">🎉 Felicitări!</h1>
+              <p style="margin:0 0 14px 0;font-size:15px;color:#d4d4d8;line-height:1.6;">
+                Ai fost promovat de la <strong style="color:#fff;">{tier_label_ro.get(from_tier, from_tier)}</strong>
+                la <strong style="color:#d4ff3a;">{tier_label_ro.get(to_tier, to_tier)}</strong>
+                pentru activitatea ta pe PropManage.
+              </p>
+              <div style="background:#1a1a1d;border:1px solid #ffffff15;border-radius:14px;padding:18px;margin:20px 0;">
+                <div style="font-size:11px;letter-spacing:.08em;color:#a1a1aa;text-transform:uppercase;margin-bottom:8px;">Ai deblocat</div>
+                <ul style="margin:0;padding:0 0 0 4px;list-style:none;">{features_html}</ul>
+              </div>
+              <p style="margin:0;font-size:13px;color:#a1a1aa;line-height:1.5;">
+                Funcționalitățile noi apar automat pe dashboard la următoarea conectare. Mulțumim că faci parte din ecosistemul PropManage.
+              </p>
+            </td></tr>
+            """
+            html = _layout(
+                title="Felicitări — promovare PropManage",
+                preheader=f"Ai fost promovat la {tier_label_ro.get(to_tier, to_tier)} — vezi ce ai deblocat",
+                body_html=body,
+                cta_url="https://propmanage.ro/dashboard",
+                cta_label="Vezi dashboard-ul",
+            )
+            await send_email(
+                user_email,
+                f"🎉 Ai fost promovat la {tier_label_ro.get(to_tier, to_tier)} pe PropManage",
+                html,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[tier_celebration] email send failed for {user_email}: {e}")
+
+
 async def _set_tier(user_id: str, new_tier: str, reason: str, by_email: str, locked: bool = False):
     now_iso = datetime.now(timezone.utc).isoformat()
     try:
@@ -250,6 +355,12 @@ async def _set_tier(user_id: str, new_tier: str, reason: str, by_email: str, loc
         "by_email": by_email,
         "at": now_iso,
     })
+    # Trigger celebration only on actual upward promotions (not lateral/downgrade)
+    if prev != new_tier and _tier_index(new_tier) > _tier_index(prev):
+        try:
+            await _send_tier_celebration(user_id, existing.get("email"), prev, new_tier)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[tier_celebration] outer hook failed: {e}")
     return {"user_id": user_id, "from": prev, "to": new_tier, "locked": locked, "at": now_iso}
 
 
@@ -466,3 +577,54 @@ async def my_tier(user=Depends(get_current_user)):
         raise HTTPException(404, "User not found")
     cfg = await _load_config()
     return await _user_progress(u, cfg)
+
+
+@self_router.get("/tier-celebration")
+async def get_tier_celebration(user=Depends(get_current_user)):
+    """Return the pending celebration banner (if any) for the current user."""
+    try:
+        oid = ObjectId(user["id"])
+    except Exception:  # noqa: BLE001
+        raise HTTPException(400, "Invalid user")
+    u = await db.users.find_one({"_id": oid}, {"tier_celebration_pending": 1})
+    pending = (u or {}).get("tier_celebration_pending")
+    if not pending:
+        return {"pending": None}
+    feature_labels_ro = {
+        "advanced_filters": "Filtre avansate",
+        "saved_searches": "Căutări salvate",
+        "request_templates": "Șabloane cereri",
+        "comparison_view": "Vedere comparativă",
+        "weekly_summary_email": "Email sumar săptămânal",
+        "bulk_operations": "Operațiuni în masă",
+        "advanced_analytics": "Analize avansate",
+        "priority_matching": "Matching prioritar",
+        "custom_notifications": "Notificări personalizate",
+        "export_data": "Export date",
+        "api_access": "Acces API",
+        "white_label_reports": "Rapoarte white-label",
+        "priority_support": "Support prioritar",
+        "early_access_features": "Acces early la features",
+        "dedicated_account_manager": "Account manager dedicat",
+    }
+    new_features_pretty = [feature_labels_ro.get(f, f) for f in (pending.get("new_features") or [])]
+    return {
+        "pending": {
+            "from": pending.get("from"),
+            "to": pending.get("to"),
+            "new_features": pending.get("new_features") or [],
+            "new_features_pretty": new_features_pretty,
+            "created_at": pending.get("created_at"),
+        }
+    }
+
+
+@self_router.post("/tier-celebration/dismiss")
+async def dismiss_tier_celebration(user=Depends(get_current_user)):
+    """Clear the pending celebration banner once the user has seen it."""
+    try:
+        oid = ObjectId(user["id"])
+    except Exception:  # noqa: BLE001
+        raise HTTPException(400, "Invalid user")
+    await db.users.update_one({"_id": oid}, {"$unset": {"tier_celebration_pending": ""}})
+    return {"ok": True}

@@ -17,6 +17,7 @@ import { API, DashLayout, Stat, StatusBadge, NavigateButtons } from "./DashShare
 import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
 import { RequestTimelineModal, ScheduleProposalModal, LastActionBanner } from "./ActivityTimeline";
+import { TierCelebrationBanner } from "../lib/TierCelebrationBanner";
 
 export const SpecialistDashboard = () => {
   const { user, refreshUser } = useAuth();
@@ -81,6 +82,7 @@ export const SpecialistDashboard = () => {
 
   return (
     <DashLayout role="specialist" title={title} bottomNav={<BottomNav tabs={tabs} active={tab} onChange={setTab} dataPrefix="spec-tab" />}>
+      <TierCelebrationBanner />
       {!user?.verified && (
         <div className="mb-6 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3" data-testid="verify-banner">
           <div className="flex items-center gap-3">

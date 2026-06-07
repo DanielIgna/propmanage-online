@@ -23,6 +23,7 @@ import { API, DashLayout, Stat, StatusBadge, NavigateButtons } from "./DashShare
 import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
 import { RequestTimelineModal, LastActionBanner } from "./ActivityTimeline";
+import { TierCelebrationBanner } from "../lib/TierCelebrationBanner";
 
 export const ClientDashboard = () => {
   const { user, refreshUser } = useAuth();
@@ -145,6 +146,7 @@ export const ClientDashboard = () => {
 
   return (
     <DashLayout role="client" title={title} bottomNav={<BottomNav tabs={tabs} active={tab} onChange={setTab} dataPrefix="client-tab" />}>
+      <TierCelebrationBanner />
       {tab === "request" && (
         <RequestZone
           user={user} prop={prop} properties={properties} requests={requests}

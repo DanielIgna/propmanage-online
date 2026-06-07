@@ -43,6 +43,18 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 ---
 
 ## Recent additions (Feb 2026)
+- **Phase 86 — Tier Up Celebration (email + in-app banner)** ✅ (Feb 12 2026)
+  - Hook automat în `_set_tier()` care declanșează 3 acțiuni la PROMOVARE (upward only — nu și pe downgrade/lateral):
+    1. **Email branded** (via Resend, layout PropManage existent) cu lista funcțiilor noi deblocate, în română
+    2. **Notificare in-app** inserată în `notifications` collection (type=`tier_promotion`, read=false)
+    3. **Banner pe dashboard** la următoarea conectare (flag `tier_celebration_pending` pe user doc)
+  - User-facing endpoints: `GET /api/me/tier-celebration` (returnează pending dacă există + traduceri RO ale features), `POST /api/me/tier-celebration/dismiss` (clear flag după ce-l vezi)
+  - Nou component frontend `/app/frontend/src/lib/TierCelebrationBanner.jsx` cu:
+    - Gradient theme per tier (regular=blue, verified=emerald, pro=violet)
+    - Listă feature chips în RO (Filtre avansate, Operațiuni în masă etc.)
+    - Buton "Am înțeles, mulțumesc!" + X dismiss icon
+  - Mount automat în `ClientDashboard.jsx` + `SpecialistDashboard.jsx` la top, deasupra conținutului. Self-fetching, zero props necesare.
+  - **Verificat live end-to-end**: admin promovează client (junior→regular) → email queued + notification creată + `pending` returnat corect cu 5 features în RO + dismiss curăță flag-ul + reset back la junior pentru clean state
 - **Phase 85 — Progressive Disclosure (Experience Tiers) system** ✅ (Feb 12 2026)
   - New backend module `routes/experience_tiers.py` cu sistem complet de tier-uri (junior → regular → verified → pro)
   - **Tier auto-promotion criteria** (configurabile via `experience_tier_config`):
