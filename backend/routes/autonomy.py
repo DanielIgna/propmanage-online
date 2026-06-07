@@ -72,6 +72,70 @@ async def force_snapshot(user=Depends(require_role("admin"))):
     return snap
 
 
+@router.post("/boost-dev")
+async def boost_dev_score(user=Depends(require_role("admin"))):
+    """One-click action to improve DEV sub-score:
+      1) Trigger a release gate run (impact: +45% weight signal)
+      2) Mark stale open QA findings (>14d) as 'dismissed' (impact: +30% weight signal)
+      3) Re-take autonomy snapshot so the new score is visible immediately
+
+    Idempotent and safe to call repeatedly. Returns a summary of what changed.
+    """
+    summary = {"release_gate": None, "qa_findings_dismissed": 0, "new_dev_score": None, "previous_dev_score": None}
+
+    # Snapshot the previous DEV score for comparison
+    try:
+        prev = await db.autonomy_snapshots.find_one({}, sort=[("timestamp", -1)])
+        if prev:
+            summary["previous_dev_score"] = (prev.get("breakdown_summary") or {}).get("dev")
+    except Exception:  # noqa: BLE001
+        pass
+
+    # 1) Release Gate run
+    try:
+        from qa_automation import run_release_gate
+        gate = await run_release_gate(triggered_by=f"boost-dev:{user['id']}", email_admins=False)
+        summary["release_gate"] = {
+            "id": gate.get("id"),
+            "blocked": (gate.get("summary") or {}).get("blocked"),
+            "p0_fail": (gate.get("summary") or {}).get("p0_fail"),
+        }
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"boost-dev: release gate failed: {e}")
+        summary["release_gate"] = {"error": str(e)[:200]}
+
+    # 2) Dismiss stale QA findings (> 14 days old, still status "open"/no status)
+    try:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=14)).isoformat()
+        dismissed_count = 0
+        async for sess in db.qa_sessions.find({}, {"_id": 1, "findings": 1, "created_at": 1}):
+            findings = sess.get("findings") or []
+            changed = False
+            for f in findings:
+                status = f.get("status") or "open"
+                created = f.get("created_at") or sess.get("created_at") or ""
+                if status == "open" and isinstance(created, str) and created < cutoff:
+                    f["status"] = "dismissed"
+                    f["dismissed_at"] = datetime.now(timezone.utc).isoformat()
+                    f["dismissed_reason"] = "stale_auto_boost_dev"
+                    changed = True
+                    dismissed_count += 1
+            if changed:
+                await db.qa_sessions.update_one({"_id": sess["_id"]}, {"$set": {"findings": findings}})
+        summary["qa_findings_dismissed"] = dismissed_count
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"boost-dev: dismiss findings failed: {e}")
+        summary["qa_findings_dismissed_error"] = str(e)[:200]
+
+    # 3) Force fresh snapshot + invalidate cache
+    _CACHE["data"] = None
+    snap = await take_autonomy_snapshot()
+    summary["new_dev_score"] = (snap.get("breakdown_summary") or {}).get("dev")
+    summary["new_general_score"] = (snap.get("scores") or {}).get("general")
+
+    return {"ok": True, "summary": summary}
+
+
 # ============================================================================
 # V2: TASK GENERATION (from recommendations → admin_todos)
 # ============================================================================

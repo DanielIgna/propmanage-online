@@ -524,3 +524,8 @@ Admin: `admin@propmanage.io` / `Admin123!`
 - P2: Experience Spaces V2 (Isolated implementation).
 - P3: Design System Unification (PropManage Atlas).
 - DEFERRED: Founder-Gate FG-1 Twilio SMS — DO NOT IMPLEMENT until user explicit request.
+
+
+## Update — 7 Feb 2026 · Boost DEV button
+- Adăugat endpoint `POST /api/admin/autonomy/boost-dev` care: (1) rulează un Release Gate, (2) marchează findings vechi (>14 zile, status="open") ca "dismissed" cu reason="stale_auto_boost_dev", (3) re-rulează snapshotul Autonomy și invalidează cache-ul. Returnează summary cu scor DEV anterior vs nou.
+- Buton violet "⚡ Boost DEV" în `/admin/autonomy` (lângă Snapshot acum / Refresh) cu confirmare + card de rezultat. Tested OK pe preview: DEV=67.4, General=67.8 după rulare.

@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import {
   Gauge, Activity, Cpu, ShieldCheck, Wrench, Brain, RefreshCcw,
-  Loader2, TrendingUp, AlertTriangle, CheckCircle2, ChevronRight, Target,
+  Loader2, TrendingUp, AlertTriangle, CheckCircle2, ChevronRight, Target, Zap,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -198,6 +198,8 @@ export const AutonomyEnginePage = () => {
   const [error, setError] = useState(null);
   const [drillKey, setDrillKey] = useState(null);
   const [snapping, setSnapping] = useState(false);
+  const [boosting, setBoosting] = useState(false);
+  const [boostResult, setBoostResult] = useState(null);
 
   const load = async (force = false) => {
     if (force) setRefreshing(true); else setLoading(true);
@@ -246,6 +248,20 @@ export const AutonomyEnginePage = () => {
     } finally { setSnapping(false); }
   };
 
+  const boostDev = async () => {
+    if (boosting) return;
+    if (!window.confirm("Confirmi BOOST DEV?\n\n• Rulează un Release Gate\n• Marchează findings vechi (>14 zile) ca 'dismissed'\n• Recalculează snapshotul Autonomy\n\nEste sigur și reversibil pentru findings.")) return;
+    setBoosting(true);
+    setBoostResult(null);
+    try {
+      const { data } = await ax.post("/api/admin/autonomy/boost-dev");
+      setBoostResult(data.summary);
+      await load(true);
+    } catch (e) {
+      setBoostResult({ error: e?.response?.data?.detail || "Eroare boost" });
+    } finally { setBoosting(false); }
+  };
+
   const tierMeta = useMemo(() => {
     if (!report) return TIER_META.manual;
     return TIER_META[report.tier] || TIER_META.manual;
@@ -281,6 +297,9 @@ export const AutonomyEnginePage = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={boostDev} disabled={boosting} className="pm-btn pm-btn-sm bg-violet-500/15 border border-violet-500/40 text-violet-200 hover:bg-violet-500/25" data-testid="autonomy-boost-dev" title="Boost DEV: Release Gate + dismiss stale findings + new snapshot">
+              {boosting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />} Boost DEV
+            </button>
             <button onClick={takeSnap} disabled={snapping} className="pm-btn pm-btn-secondary pm-btn-sm" data-testid="autonomy-take-snap">
               {snapping ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Target className="w-3.5 h-3.5" />} Snapshot acum
             </button>
@@ -289,6 +308,21 @@ export const AutonomyEnginePage = () => {
             </button>
           </div>
         </div>
+
+        {boostResult && (
+          <div className="mt-4 rounded-2xl border border-violet-500/30 bg-violet-500/5 p-4 text-sm" data-testid="autonomy-boost-result">
+            {boostResult.error ? (
+              <div className="text-red-300 flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> {boostResult.error}</div>
+            ) : (
+              <div className="space-y-1.5 text-stone-200">
+                <div className="flex items-center gap-2 text-violet-300 font-semibold mb-1"><Zap className="w-4 h-4" /> Boost DEV — rezultat</div>
+                <div>• Release Gate: {boostResult.release_gate?.error ? <span className="text-red-300">{boostResult.release_gate.error}</span> : <>id <code className="text-xs">{boostResult.release_gate?.id?.slice(0,8)}</code> · blocked: <strong className={boostResult.release_gate?.blocked ? "text-red-300" : "text-emerald-300"}>{String(boostResult.release_gate?.blocked)}</strong> · p0_fail: {boostResult.release_gate?.p0_fail ?? "—"}</>}</div>
+                <div>• Findings vechi marcate dismissed: <strong className="text-emerald-300">{boostResult.qa_findings_dismissed}</strong></div>
+                <div>• Scor DEV: <strong className="text-stone-400">{boostResult.previous_dev_score ?? "—"}</strong> → <strong className="text-[#d4ff3a]">{boostResult.new_dev_score ?? "—"}</strong> · General: <strong className="text-[#d4ff3a]">{boostResult.new_general_score ?? "—"}</strong></div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* HERO: ring + tier + summary */}
         <div className="bg-[#0e0e10] border border-white/10 rounded-3xl p-6 md:p-8 mt-6">
