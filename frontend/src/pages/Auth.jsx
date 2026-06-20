@@ -229,9 +229,12 @@ export const RegisterPage = () => {
       if (form.role === "specialist" && form.coverage_zones.length === 0) {
         throw new Error("Selectează cel puțin o zonă de acoperire");
       }
+      const phoneDigits = (form.phone || "").replace(/[^\d+]/g, "");
+      if (!phoneDigits) throw new Error("Numărul de telefon este obligatoriu");
+      if (!/^\+?\d{8,15}$/.test(phoneDigits)) throw new Error("Format telefon invalid. Folosește +40 7XX XXX XXX sau 07XX XXX XXX");
       if (!form.terms_accepted) throw new Error("Trebuie să accepți Termenii și Condițiile");
       if (!form.privacy_policy_accepted) throw new Error("Trebuie să accepți Politica de Confidențialitate");
-      const u = await register(form);
+      const u = await register({ ...form, phone: phoneDigits });
       navigate(`/${u.role}`);
     } catch (err) {
       setError(err.message || formatApiError(err));
@@ -275,11 +278,13 @@ export const RegisterPage = () => {
                 data-testid="register-password" />
             </div>
             <div>
-              <label className="text-xs uppercase tracking-wider text-stone-400 mb-1.5 block">Telefon (opțional)</label>
+              <label className="text-xs uppercase tracking-wider text-stone-400 mb-1.5 block">Telefon <span className="text-red-400">*</span></label>
               <input type="tel" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}
-                placeholder="+40 7XX XXX XXX"
+                placeholder="+40 7XX XXX XXX sau 07XX XXX XXX"
+                required
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#d4ff3a]/50"
                 data-testid="register-phone" />
+              <div className="text-[10px] text-stone-500 mt-1">Necesar pentru contactare directă (consultanță DigiTwin, suport, confirmare servicii)</div>
             </div>
             <div>
               <label className="text-xs uppercase tracking-wider text-stone-400 mb-1.5 block">{t("register.role")}</label>
@@ -386,7 +391,7 @@ export const RegisterPage = () => {
               </label>
             </div>
 
-            <button type="submit" disabled={loading || !form.terms_accepted || !form.privacy_policy_accepted} className="btn-accent w-full py-3 rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed" data-testid="register-submit">
+            <button type="submit" disabled={loading || !form.terms_accepted || !form.privacy_policy_accepted || !form.phone || !form.name || !form.email} className="btn-accent w-full py-3 rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed" data-testid="register-submit">
               {loading ? t("common.loading") : t("register.submit")}
             </button>
           </form>
