@@ -643,3 +643,21 @@ Admin: `admin@propmanage.io` / `Admin123!`
 - Specialist profile page can show BOTH old and new reviews
 - `user.rating` recalculated to include V2 dimension averages
 
+
+## Sprint Roadmap — confirmed by user (7 Feb 2026)
+
+Order of execution (user prefers redeploy after each):
+- ✅ **Sprint A** — Specialist Progression Foundation (DONE, awaiting redeploy)
+- ✅ **Sprint B** — Multi-dim + Cross + Double-blind Reviews (DONE, awaiting redeploy)
+- 🟡 **Sprint C** — Multi-Offer Flow + Hybrid Ranking + Fairness Rotation + Sponsorizat badge (NEXT, ~30-45 credits)
+- 🟠 **Sprint D** — Premium Marketplace profil extins specialist Nivel 3 (~20-30 credits)
+- 🟢 **Sprint E** — AI Review Quality Detection (~22-33 credits, RISK — needs lawyer review)
+- 🆕 **Sprint F** — BI & Marketplace Optimization Engine (BI-MOE) (~60-90 credits)
+  - Read-only analytics + recommendations
+  - Demand Index, Fee Analytics, Specialist Performance Score, Conversion Funnel, Client Analysis, Premium Candidates, Automated Alerts, Admin Insights Dashboard
+  - ML-ready data pipelines (NO ML in this sprint — just infrastructure)
+  - GDPR: data anonymization layer for analytics
+  - Saved in Future Ideas Vault: `future_ideas.slug = sprint-f-bi-moe`
+  - Principle: "Observe → Analyze → Report → Recommend — Admin decides manually"
+  - Depends on Sprint A/B/C data being live
+
