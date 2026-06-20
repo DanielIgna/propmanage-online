@@ -1,7 +1,7 @@
 // Unified user management: list, filter, edit, ban
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { Search, Download, Edit2, Ban, CheckCircle2, X, UserCheck, Trash2, AlertTriangle } from "lucide-react";
+import { Search, Download, Edit2, Ban, CheckCircle2, X, UserCheck, Trash2, AlertTriangle, Mail, Phone, Megaphone, MailX, PhoneOff } from "lucide-react";
 import { AdminCard, AdminBtn } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
 import { ImpersonateModal } from "./ImpersonateModal";
@@ -84,6 +84,9 @@ export const AdminUsers = () => {
   const [data, setData] = useState({ items: [], total: 0 });
   const [q, setQ] = useState("");
   const [role, setRole] = useState("");
+  const [emailVerifiedFilter, setEmailVerifiedFilter] = useState("");
+  const [phoneVerifiedFilter, setPhoneVerifiedFilter] = useState("");
+  const [marketingFilter, setMarketingFilter] = useState("");
   const [skip, setSkip] = useState(0);
   const [editing, setEditing] = useState(null);
   const [impersonating, setImpersonating] = useState(null);
@@ -95,11 +98,14 @@ export const AdminUsers = () => {
     const params = { skip, limit: 25 };
     if (q) params.q = q;
     if (role) params.role = role;
+    if (emailVerifiedFilter !== "") params.email_verified = emailVerifiedFilter === "yes";
+    if (phoneVerifiedFilter !== "") params.phone_verified = phoneVerifiedFilter === "yes";
+    if (marketingFilter !== "") params.marketing_consent = marketingFilter === "yes";
     axios.get(`${API}/admin/users`, { params })
       .then(r => setData(r.data))
       .finally(() => setLoading(false));
   };
-  useEffect(() => { load(); }, [skip, role]);
+  useEffect(() => { load(); }, [skip, role, emailVerifiedFilter, phoneVerifiedFilter, marketingFilter]);
 
   const onSearch = (e) => { e.preventDefault(); setSkip(0); load(); };
 
@@ -134,6 +140,21 @@ export const AdminUsers = () => {
             <option value="operator">Operator</option>
             <option value="admin">Admin</option>
           </select>
+          <select value={emailVerifiedFilter} onChange={e => { setEmailVerifiedFilter(e.target.value); setSkip(0); }} className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="users-email-verified-filter" title="Email verificat">
+            <option value="">Email: toți</option>
+            <option value="yes">✉ Verificat</option>
+            <option value="no">✉ Neverificat</option>
+          </select>
+          <select value={phoneVerifiedFilter} onChange={e => { setPhoneVerifiedFilter(e.target.value); setSkip(0); }} className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="users-phone-verified-filter" title="Telefon verificat">
+            <option value="">Telefon: toți</option>
+            <option value="yes">📱 Verificat</option>
+            <option value="no">📱 Neverificat</option>
+          </select>
+          <select value={marketingFilter} onChange={e => { setMarketingFilter(e.target.value); setSkip(0); }} className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="users-marketing-filter" title="Acord marketing">
+            <option value="">Marketing: toți</option>
+            <option value="yes">📣 Acceptat</option>
+            <option value="no">📣 Refuzat</option>
+          </select>
           <AdminBtn variant="secondary" onClick={exportCsv} data-testid="users-export-csv">
             <Download className="w-3.5 h-3.5 inline mr-1.5" /> CSV
           </AdminBtn>
@@ -158,6 +179,9 @@ export const AdminUsers = () => {
                 <th className="text-left py-2 px-3 text-xs font-bold uppercase tracking-wider text-slate-500">Rol</th>
                 <th className="text-left py-2 px-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tier</th>
                 <th className="text-right py-2 px-3 text-xs font-bold uppercase tracking-wider text-slate-500">Wallet</th>
+                <th className="text-center py-2 px-3 text-xs font-bold uppercase tracking-wider text-slate-500" title="Email verificat">✉</th>
+                <th className="text-center py-2 px-3 text-xs font-bold uppercase tracking-wider text-slate-500" title="Telefon verificat">📱</th>
+                <th className="text-center py-2 px-3 text-xs font-bold uppercase tracking-wider text-slate-500" title="Marketing">📣</th>
                 <th className="text-center py-2 px-3 text-xs font-bold uppercase tracking-wider text-slate-500">Status</th>
                 <th className="text-right py-2 px-3 text-xs font-bold uppercase tracking-wider text-slate-500">Acțiuni</th>
               </tr>
@@ -174,6 +198,15 @@ export const AdminUsers = () => {
                     {u.tier && <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${u.tier === "VERIFIED" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400" : u.tier === "PREMIUM" ? "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" : "bg-slate-100 dark:bg-slate-800"}`}>{u.tier}</span>}
                   </td>
                   <td className="py-2.5 px-3 text-right tabular-nums">{Number(u.wallet_balance || 0).toFixed(2)}</td>
+                  <td className="py-2.5 px-3 text-center" title={u.email_verified ? "Email verificat" : "Email NEverificat"}>
+                    {u.email_verified ? <Mail className="w-3.5 h-3.5 text-emerald-500 inline" /> : <MailX className="w-3.5 h-3.5 text-amber-500 inline" />}
+                  </td>
+                  <td className="py-2.5 px-3 text-center" title={u.phone_verified ? "Telefon verificat" : "Telefon NEverificat"}>
+                    {u.phone_verified ? <Phone className="w-3.5 h-3.5 text-emerald-500 inline" /> : <PhoneOff className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 inline" />}
+                  </td>
+                  <td className="py-2.5 px-3 text-center" title={u.marketing_consent ? "Acord marketing acceptat" : "Refuzat marketing"}>
+                    {u.marketing_consent ? <Megaphone className="w-3.5 h-3.5 text-emerald-500 inline" /> : <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>}
+                  </td>
                   <td className="py-2.5 px-3 text-center">
                     {u.banned ? (
                       <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400">Banned</span>
@@ -204,7 +237,7 @@ export const AdminUsers = () => {
                 </tr>
               ))}
               {!loading && data.items.length === 0 && (
-                <tr><td colSpan="7" className="text-center py-8 text-slate-500">Niciun user găsit</td></tr>
+                <tr><td colSpan="10" className="text-center py-8 text-slate-500">Niciun user găsit</td></tr>
               )}
             </tbody>
           </table>

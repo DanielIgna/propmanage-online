@@ -11,6 +11,8 @@ import { AuthProvider, useAuth } from "./auth";
 import { I18nProvider, useI18n } from "./i18n";
 import { useABTest } from "./ab";
 import { LoginPage, RegisterPage } from "./pages/Auth";
+import { EmailVerifyPage } from "./pages/EmailVerifyPage";
+import { CookieBanner } from "./components/CookieBanner";
 import { ThemeToggle } from "./pages/DashShared";
 import { ClientDashboard, SpecialistDashboard, AdminDashboard, OperatorDashboard } from "./pages/Dashboards";
 import { AuthCallback } from "./pages/AuthCallback";
@@ -1581,6 +1583,7 @@ function App() {
               <Route path="/status" element={<StatusPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              <Route path="/verify-email" element={<EmailVerifyPage />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/marketplace" element={<PublicMarketplace />} />
               <Route path="/marketplace/:slug" element={<MarketplaceLanding />} />
@@ -1626,6 +1629,7 @@ function App() {
             <TutorialOverlay />
             <RoleTour />
             <AIConciergeBubble />
+            <CookieBanner />
             </ErrorBoundary>
           </BrowserRouter>
         </AuthProvider>

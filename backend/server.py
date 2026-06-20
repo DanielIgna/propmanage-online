@@ -219,6 +219,12 @@ async def startup():
         await seed_verified_estate_demo()
     except Exception as e:
         logger.warning(f"Verified Estate demo seed failed: {e}")
+    # GDPR Phase 1 — backfill existing users with consent + verification fields (idempotent)
+    try:
+        from consent_backfill import run_consent_backfill
+        await run_consent_backfill()
+    except Exception as e:
+        logger.warning(f"Consent backfill failed: {e}")
     if not scheduler.running:
         scheduler.add_job(
             run_daily_digests,

@@ -178,6 +178,9 @@ export const RegisterPage = () => {
     coverage_zones: ["Bucuresti-Sector1"],
     zone: "Bucuresti-Sector1",
     referrer_id: referrerId || undefined,
+    terms_accepted: false,
+    privacy_policy_accepted: false,
+    marketing_consent: false,
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -226,6 +229,8 @@ export const RegisterPage = () => {
       if (form.role === "specialist" && form.coverage_zones.length === 0) {
         throw new Error("Selectează cel puțin o zonă de acoperire");
       }
+      if (!form.terms_accepted) throw new Error("Trebuie să accepți Termenii și Condițiile");
+      if (!form.privacy_policy_accepted) throw new Error("Trebuie să accepți Politica de Confidențialitate");
       const u = await register(form);
       navigate(`/${u.role}`);
     } catch (err) {
@@ -349,7 +354,39 @@ export const RegisterPage = () => {
             )}
 
             {error && <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3" data-testid="register-error">{error}</div>}
-            <button type="submit" disabled={loading} className="btn-accent w-full py-3 rounded-xl font-medium disabled:opacity-50" data-testid="register-submit">
+
+            {/* GDPR consent checkboxes — terms + privacy mandatory, marketing optional */}
+            <div className="space-y-2.5 pt-2 border-t border-white/5">
+              <label className="flex items-start gap-2.5 cursor-pointer group" data-testid="consent-terms-wrap">
+                <input type="checkbox" checked={form.terms_accepted}
+                  onChange={e => setForm({...form, terms_accepted: e.target.checked})}
+                  className="mt-0.5 w-4 h-4 rounded accent-[#d4ff3a] shrink-0"
+                  data-testid="consent-terms" />
+                <span className="text-xs text-stone-300 leading-relaxed">
+                  Accept <Link to="/terms" target="_blank" className="text-[#d4ff3a] underline hover:no-underline">Termenii și Condițiile</Link> <span className="text-red-400">*</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2.5 cursor-pointer group" data-testid="consent-privacy-wrap">
+                <input type="checkbox" checked={form.privacy_policy_accepted}
+                  onChange={e => setForm({...form, privacy_policy_accepted: e.target.checked})}
+                  className="mt-0.5 w-4 h-4 rounded accent-[#d4ff3a] shrink-0"
+                  data-testid="consent-privacy" />
+                <span className="text-xs text-stone-300 leading-relaxed">
+                  Accept <Link to="/privacy" target="_blank" className="text-[#d4ff3a] underline hover:no-underline">Politica de Confidențialitate</Link> și prelucrarea datelor mele personale conform GDPR <span className="text-red-400">*</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2.5 cursor-pointer group" data-testid="consent-marketing-wrap">
+                <input type="checkbox" checked={form.marketing_consent}
+                  onChange={e => setForm({...form, marketing_consent: e.target.checked})}
+                  className="mt-0.5 w-4 h-4 rounded accent-[#d4ff3a] shrink-0"
+                  data-testid="consent-marketing" />
+                <span className="text-xs text-stone-400 leading-relaxed">
+                  Sunt de acord să primesc oferte, promoții și comunicări comerciale prin email, SMS sau telefon (opțional, poți retrage oricând)
+                </span>
+              </label>
+            </div>
+
+            <button type="submit" disabled={loading || !form.terms_accepted || !form.privacy_policy_accepted} className="btn-accent w-full py-3 rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed" data-testid="register-submit">
               {loading ? t("common.loading") : t("register.submit")}
             </button>
           </form>

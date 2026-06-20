@@ -7,6 +7,7 @@ import { useAuth } from "../auth";
 import { useI18n } from "../i18n";
 import { AIAssistant } from "./AIAssistant";
 import { VoucherExpiryAlert } from "../lib/VoucherExpiryAlert";
+import { EmailVerificationBanner } from "../components/EmailVerificationBanner";
 
 export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -193,6 +194,7 @@ export const DashLayout = ({ children, role, title, bottomNav }) => {
 
   return (
     <div className="min-h-screen bg-[#0a0a0b] text-stone-100">
+      <EmailVerificationBanner />
       <header className="border-b border-white/5 sticky top-0 z-40 bg-[#0a0a0b]/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4 sm:gap-8 min-w-0">

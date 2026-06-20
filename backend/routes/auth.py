@@ -15,7 +15,7 @@ from typing import Optional, Dict, List, Literal, Any
 import uuid
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, Query
 from pydantic import BaseModel, Field
 
 from db import db
@@ -26,7 +26,7 @@ from core_utils import (
 from deps import get_current_user, require_role, block_in_impersonation, block_impersonation_dep
 from services import send_email, VAPID_PUBLIC_KEY
 from models import (
-    RegisterIn, LoginIn, TotpVerifyIn, ALLOWED_SPECIALTIES,
+    RegisterIn, LoginIn, TotpVerifyIn, ALLOWED_SPECIALTIES, ConsentUpdateIn,
 )
 from email_service import send_template, tpl_welcome
 from digest import DIGEST_BUILDERS, run_daily_digests
@@ -61,11 +61,42 @@ router = APIRouter(prefix="/api", tags=["auth"])
 
 
 # ============= REGISTER =============
+async def _record_consent(user_id: str, email: str, consent_type: str, accepted: bool, ip: str = "", user_agent: str = "", source: str = "register"):
+    """Append immutable entry to consent_audit_log. Never raises."""
+    try:
+        await db.consent_audit_log.insert_one({
+            "user_id": user_id,
+            "email": email,
+            "consent_type": consent_type,  # terms | privacy | marketing | cookies_*
+            "accepted": bool(accepted),
+            "ip": ip[:64],
+            "user_agent": user_agent[:200],
+            "source": source,  # register | settings | cookie_banner
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as _e:  # noqa: BLE001
+        import logging
+        logging.getLogger("propmanage.consent").warning(f"[consent_audit_log] {_e}")
+
+
+def _gen_email_verification_token() -> str:
+    import secrets
+    return secrets.token_urlsafe(32)
+
+
 @router.post("/auth/register")
-async def register(data: RegisterIn, response: Response):
+async def register(data: RegisterIn, request: Request, response: Response):
     email = data.email.lower()
+    # GDPR gate: terms + privacy MUST be accepted explicitly
+    if not data.terms_accepted:
+        raise HTTPException(400, "Trebuie să accepți Termenii și Condițiile pentru a continua")
+    if not data.privacy_policy_accepted:
+        raise HTTPException(400, "Trebuie să accepți Politica de Confidențialitate pentru a continua")
     if await db.users.find_one({"email": email}):
         raise HTTPException(400, "Email already registered")
+    now_iso = datetime.now(timezone.utc).isoformat()
+    verif_token = _gen_email_verification_token()
+    verif_expires = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
     user = {
         "email": email,
         "password_hash": hash_password(data.password),
@@ -78,7 +109,16 @@ async def register(data: RegisterIn, response: Response):
         "reviews_count": 0,
         "verified": False,
         "tier": "ENTRY" if data.role == "specialist" else None,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": now_iso,
+        # GDPR + verification
+        "terms_accepted": True,
+        "privacy_policy_accepted": True,
+        "marketing_consent": bool(data.marketing_consent),
+        "consent_updated_at": now_iso,
+        "email_verified": False,
+        "phone_verified": False,
+        "email_verification_token": verif_token,
+        "email_verification_expires_at": verif_expires,
     }
     if data.role == "specialist":
         cats = data.service_categories or ([data.specialty] if data.specialty else [])
@@ -105,13 +145,27 @@ async def register(data: RegisterIn, response: Response):
             pass
     result = await db.users.insert_one(user)
     uid = str(result.inserted_id)
+    # Record consent in immutable audit log
+    ip = (request.client.host if request and request.client else "") or ""
+    ua = request.headers.get("user-agent", "") if request else ""
+    await _record_consent(uid, email, "terms", True, ip, ua, source="register")
+    await _record_consent(uid, email, "privacy", True, ip, ua, source="register")
+    await _record_consent(uid, email, "marketing", bool(data.marketing_consent), ip, ua, source="register")
     access = create_access_token(uid, email, data.role)
     refresh = create_refresh_token(uid)
     set_auth_cookies(response, access, refresh)
     user["id"] = uid
     user.pop("_id", None)
     user.pop("password_hash", None)
+    user.pop("email_verification_token", None)  # never leak to FE
     await send_template(tpl_welcome, data.name, data.role, to=email)
+    # Send email verification link (best-effort)
+    try:
+        from email_service import tpl_email_verification
+        await send_template(tpl_email_verification, data.name, verif_token, to=email)
+    except Exception as _e:  # noqa: BLE001
+        import logging
+        logging.getLogger("propmanage.auth").warning(f"[EmailVerify] send failed: {_e}")
     # Schedule 3-email onboarding drip for new specialists (Day 1, 3, 7) — best-effort
     if data.role == "specialist":
         try:
@@ -1381,3 +1435,105 @@ async def preview_my_digest(user: dict = Depends(get_current_user)):
         raise HTTPException(400, "Rol fără digest configurat.")
     digest = await builder(user)
     return digest or {"summary": "Niciun conținut relevant astăzi.", "cards": "", "empty": True}
+
+
+# ============================================================================
+# CONSENT MANAGEMENT (GDPR — terms, privacy, marketing, cookies)
+# ============================================================================
+@router.patch("/me/consent")
+async def update_my_consent(data: ConsentUpdateIn, request: Request, user: dict = Depends(get_current_user)):
+    """Update user's consent preferences. Records every change in consent_audit_log."""
+    payload = data.model_dump(exclude_none=True)
+    if not payload:
+        raise HTTPException(400, "Nothing to update")
+    ip = (request.client.host if request and request.client else "") or ""
+    ua = request.headers.get("user-agent", "") if request else ""
+    updates = {"consent_updated_at": datetime.now(timezone.utc).isoformat()}
+    for key, val in payload.items():
+        updates[key] = bool(val)
+        # Map field to consent_type for audit log
+        ctype = key.replace("_accepted", "").replace("_consent", "")
+        await _record_consent(user["id"], user["email"], ctype, bool(val), ip, ua, source="settings")
+    await db.users.update_one({"_id": ObjectId(user["id"])}, {"$set": updates})
+    return {"ok": True, "updated": list(payload.keys())}
+
+
+@router.post("/cookies/consent")
+async def record_cookie_consent(data: ConsentUpdateIn, request: Request):
+    """Public endpoint — anonymous users can record cookie preferences (banner)."""
+    payload = data.model_dump(exclude_none=True)
+    ip = (request.client.host if request and request.client else "") or ""
+    ua = request.headers.get("user-agent", "") if request else ""
+    # If user is logged in, also persist on their profile
+    try:
+        user = await get_current_user(request)
+    except Exception:
+        user = None
+    for key, val in payload.items():
+        if "cookies" not in key:
+            continue
+        ctype = key.replace("_accepted", "")
+        if user:
+            await db.users.update_one(
+                {"_id": ObjectId(user["id"])},
+                {"$set": {key: bool(val), "consent_updated_at": datetime.now(timezone.utc).isoformat()}},
+            )
+            await _record_consent(user["id"], user["email"], ctype, bool(val), ip, ua, source="cookie_banner")
+        else:
+            await _record_consent("anonymous", "", ctype, bool(val), ip, ua, source="cookie_banner")
+    return {"ok": True}
+
+
+# ============================================================================
+# EMAIL VERIFICATION
+# ============================================================================
+@router.get("/auth/verify-email")
+async def verify_email(token: str = Query(...)):
+    """Verify email via token from link. Idempotent."""
+    if not token or len(token) < 16:
+        raise HTTPException(400, "Invalid token")
+    doc = await db.users.find_one({"email_verification_token": token})
+    if not doc:
+        raise HTTPException(404, "Token invalid sau expirat")
+    expires = doc.get("email_verification_expires_at")
+    if expires and isinstance(expires, str):
+        try:
+            if datetime.fromisoformat(expires.replace("Z", "+00:00")) < datetime.now(timezone.utc):
+                raise HTTPException(410, "Token expirat. Cere unul nou.")
+        except ValueError:
+            pass
+    if doc.get("email_verified"):
+        return {"ok": True, "already_verified": True}
+    await db.users.update_one(
+        {"_id": doc["_id"]},
+        {"$set": {"email_verified": True, "email_verified_at": datetime.now(timezone.utc).isoformat()},
+         "$unset": {"email_verification_token": "", "email_verification_expires_at": ""}},
+    )
+    return {"ok": True, "verified": True}
+
+
+_resend_attempts: Dict[str, datetime] = {}
+
+@router.post("/auth/resend-verification")
+async def resend_verification(user: dict = Depends(get_current_user)):
+    """Re-send verification email. Rate-limited: 1 every 5 minutes per user."""
+    if user.get("email_verified"):
+        return {"ok": True, "already_verified": True}
+    last = _resend_attempts.get(user["id"])
+    if last and (datetime.now(timezone.utc) - last).total_seconds() < 300:
+        wait_sec = 300 - int((datetime.now(timezone.utc) - last).total_seconds())
+        raise HTTPException(429, f"Așteaptă {wait_sec}s înainte de retrimitere")
+    token = _gen_email_verification_token()
+    expires = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+    await db.users.update_one(
+        {"_id": ObjectId(user["id"])},
+        {"$set": {"email_verification_token": token, "email_verification_expires_at": expires}},
+    )
+    try:
+        from email_service import tpl_email_verification
+        await send_template(tpl_email_verification, user.get("name", ""), token, to=user["email"])
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[ResendVerify] failed: {e}")
+        raise HTTPException(500, "Trimiterea emailului a eșuat")
+    _resend_attempts[user["id"]] = datetime.now(timezone.utc)
+    return {"ok": True, "sent": True}

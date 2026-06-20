@@ -181,6 +181,20 @@ def tpl_welcome(name: str, role: str) -> dict:
     return {"subject": f"Bine ai venit pe PropManage, {name}!", "html": _layout("Bine ai venit pe PropManage", f"Hi {name}, contul tău este gata!", body, f"{APP_URL}/{role}", "Mergi la dashboard")}
 
 
+def tpl_email_verification(name: str, token: str) -> dict:
+    """Confirmation email with verification link. Expires in 24h."""
+    verify_url = f"{APP_URL}/verify-email?token={token}"
+    body = f"""
+      <p>Bună {name or ''},</p>
+      <p>Mulțumim că ți-ai creat cont pe <strong style="color:#d4ff3a;">PropManage</strong>!</p>
+      <p>Pentru a-ți activa toate funcționalitățile contului (notificări, vouchere, mesagerie), te rugăm să confirmi adresa de email apăsând butonul de mai jos:</p>
+      <p style="color:#a8a8b0; font-size:12px; margin-top:24px;">Linkul este valabil <strong>24 de ore</strong>. Dacă nu tu ai creat contul, ignoră acest mesaj.</p>
+      <p style="color:#666; font-size:11px; margin-top:16px; word-break:break-all;">Link alternativ: <span style="color:#a8a8b0;">{verify_url}</span></p>
+    """
+    return {"subject": "✉️ Confirmă adresa de email PropManage", "html": _layout("Confirmă emailul", f"Click pe buton pentru activare {name}", body, verify_url, "Confirmă email")}
+
+
+
 def tpl_trust_badge_invite(name: str) -> dict:
     """Sent to newly VERIFIED specialists. Encourages embed on site/CV/LinkedIn."""
     svg_url = f"{APP_URL}/api/public/trust-badge.svg"
