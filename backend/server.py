@@ -103,6 +103,7 @@ from routes.feature_configurator import (
     evaluate_quests_job,
 )
 from routes.twin_orchestrator import router as twin_orchestrator_router
+from routes.specialist_progression import router_admin as sp_admin_router, router_public as sp_public_router, run_auto_promotion
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
@@ -205,6 +206,8 @@ for r in (
     feature_configurator_router,
     feature_configurator_self_router,
     twin_orchestrator_router,
+    sp_admin_router,
+    sp_public_router,
 ):
     app.include_router(r)
 
@@ -244,6 +247,14 @@ async def startup():
             take_autonomy_snapshot,
             CronTrigger(hour=3, minute=15, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="autonomy_snapshot_daily",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        # Sprint A — Auto-promotion engine: daily 03:30 (after autonomy snapshot)
+        scheduler.add_job(
+            run_auto_promotion,
+            CronTrigger(hour=3, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="specialist_auto_promotion_daily",
             replace_existing=True,
             misfire_grace_time=3600,
         )

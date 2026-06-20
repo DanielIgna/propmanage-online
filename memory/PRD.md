@@ -565,3 +565,41 @@ Admin: `admin@propmanage.io` / `Admin123!`
 - 🟡 Marketplace Economics V2 (awaits "Start MKT-V2")
 - 🟢 Twin Orchestrator AI, Experience Spaces V2, PropManage Atlas Design System
 
+
+## Update — 7 Feb 2026 · Sprint A — Specialist Progression Foundation
+**Scope: Tier infrastructure + Dynamic Fee System + Auto-Promotion + Policy Docs + dual-role become-client + Rating badge UI.**
+
+### Backend (`/app/backend/routes/specialist_progression.py` — NEW, 1 file)
+- `fee_configs` collection (singleton + history audit): admin-configurable fees per category/zone/season, min 5 RON, max 50 RON, with `multi_offer_enabled` feature flag
+- `tier_rules` collection: admin thresholds for Nivel 2 (VERIFIED) and Nivel 3 (PREMIUM) promotion + `soft_demote_below_rating` (visual flag only, NO ban/suspension per "marketplace neutru" policy)
+- `policy_documents` collection (versioned): 5 slugs (`terms, privacy, reviews_policy, suspensions_policy, ranking_policy`), with optional `requires_reacceptance` flag
+- `tier_promotion_runs` audit collection: tracks every cron + manual run
+- Auto-promotion engine: scans all specialists, ONLY promotes upward (never demotes), flags `tier_warning_low_rating` for soft warning
+- Cron job: `specialist_auto_promotion_daily` at 03:30 Europe/Bucharest
+
+### New endpoints (10)
+- Admin: `GET/PUT /api/admin/fee-config`, `GET/PUT /api/admin/tier-rules`, `GET/POST /api/admin/policy-docs`, `POST /api/admin/run-auto-promotion`, `GET /api/admin/tier-promotion-runs`
+- Public: `GET /api/fee-config/effective?category=&zone=`, `GET /api/policy-docs/{slug}`, `POST /api/auth/become-client` (inverse dual-role)
+
+### Frontend (2 new files + 1 extension)
+- `pages/admin/SpecialistProgressionPage.jsx` (NEW): 4-tab admin panel (Fees / Tier Rules / Policies / History)
+- `components/RatingBadge.jsx` (NEW): color-coded badge — Green ≥4.5, Yellow 3.5-4.4, Red <3.5 + "sub medie" warning chip
+- `MarketplaceLanding.jsx`: replaced legacy `<Star>` with `<RatingBadge>` for consistent UX
+- New route in App.js: `/admin/specialist-progression`
+
+### Tested E2E (preview)
+- Fee config save/read: OK · Effective fee resolution (most-specific match): OK
+- Auto-promotion: scanned 250 specialists in <1s, 0 promotions (correct — most already optimal)
+- Policy doc create: OK (versioned) · Public read by slug: OK
+- become-client (client@) → dual_role_enabled=true: OK
+- UI smoke: all 4 tabs render correctly, rating badge integrated in marketplace cards
+
+### Backward compatibility
+- LEGACY `accept` endpoint (45 RON hardcoded) untouched — still works
+- Existing `tier` field (ENTRY/VERIFIED/PREMIUM) unchanged — only auto-promo logic added
+- Existing reviews, marketplace, dashboards — zero impact
+- New collections are additive — no schema migrations
+
+### Status
+**Ready for redeploy. Next: Sprint B (Multi-dim Reviews + Cross Reviews + Marketplace Multi-Offer flow).**
+
