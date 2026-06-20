@@ -175,6 +175,14 @@ async def register(data: RegisterIn, request: Request, response: Response):
     except Exception as _e:  # noqa: BLE001
         import logging
         logging.getLogger("propmanage.auth").warning(f"[EmailVerify] send failed: {_e}")
+    # Sprint C bonus — Welcome voucher for new specialists (50% off first lead fee)
+    if data.role == "specialist":
+        try:
+            from routes.marketplace_offers import issue_welcome_voucher_for_specialist
+            await issue_welcome_voucher_for_specialist(uid, email)
+        except Exception as _e:  # noqa: BLE001
+            import logging
+            logging.getLogger("propmanage.auth").warning(f"[WelcomeVoucher] failed: {_e}")
     # Schedule 3-email onboarding drip for new specialists (Day 1, 3, 7) — best-effort
     if data.role == "specialist":
         try:

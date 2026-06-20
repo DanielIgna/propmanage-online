@@ -12,6 +12,7 @@ import { I18nProvider, useI18n } from "./i18n";
 import { useABTest } from "./ab";
 import { LoginPage, RegisterPage } from "./pages/Auth";
 import { EmailVerifyPage } from "./pages/EmailVerifyPage";
+import { ClientRequestOffersPage } from "./pages/ClientRequestOffersPage";
 import { CookieBanner } from "./components/CookieBanner";
 import { ThemeToggle } from "./pages/DashShared";
 import { ClientDashboard, SpecialistDashboard, AdminDashboard, OperatorDashboard } from "./pages/Dashboards";
@@ -1585,6 +1586,7 @@ function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/verify-email" element={<EmailVerifyPage />} />
+              <Route path="/client/requests/:requestId/offers" element={<ClientRequestOffersPage />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/marketplace" element={<PublicMarketplace />} />
               <Route path="/marketplace/:slug" element={<MarketplaceLanding />} />

@@ -661,3 +661,62 @@ Order of execution (user prefers redeploy after each):
   - Principle: "Observe → Analyze → Report → Recommend — Admin decides manually"
   - Depends on Sprint A/B/C data being live
 
+
+## Update — 7 Feb 2026 · Sprint C — Multi-Offer + Hybrid Ranking + Sponsorizat + Welcome Voucher
+**Scope: Multiple specialists apply to one request with custom fee. Client browses ranked list. Hybrid ranking. Sponsored badge. Welcome voucher 50% for new specialists.**
+
+### Backend (`/app/backend/routes/marketplace_offers.py` — NEW, 1 file)
+- New collection `marketplace_offers`: `{request_id, specialist_id, fee_ron, priority_fee_ron, fee_paid_total, message, status, sponsored, created_at}`
+- Feature-flagged via `fee_configs.multi_offer_enabled` (defaults to FALSE — admin toggles ON)
+- Anti-self-application: client_id ≠ specialist_id
+- Anti-duplicate: 1 active offer per (request, specialist)
+- Max 5 offers per request hard-cap (user spec)
+- Fee 5-50 RON hard-bounded (matches Sprint A config)
+- Wallet deducted on submission; no refund on withdraw (platform policy)
+
+### Hybrid Ranking
+`score = fee_norm × 0.35 + rating × 0.30 + tier × 0.20 + recency × 0.10 + fairness × 0.05`
+- Fairness Rotation: 0 boost on day 1, linear ramp during day 2 (24-48h), full +5% during day 3 (48-72h), 0 after day 3
+- Recency: exp decay with 72h half-life
+- Sponsored badge: top 1-2 with `priority_fee_ron > 0` on hybrid sort
+- Sort modes: `hybrid` (default), `rating`, `fee`, `newest`
+
+### New endpoints (4 + 1 helper)
+- `POST /api/requests/{id}/offers` (specialist applies, pays fee)
+- `GET /api/requests/{id}/offers?sort=...` (client browses ranked list — RBAC: client/admin/applied-specialists only)
+- `POST /api/requests/{id}/offers/{offer_id}/accept` (client picks winner — closes others as 'lost')
+- `POST /api/requests/{id}/offers/{offer_id}/withdraw` (specialist withdraws — no refund)
+- Helper: `issue_welcome_voucher_for_specialist(user_id, email)` — auto-issues 50% voucher (30 days) on register
+
+### Frontend (3 new files)
+- `components/MarketplaceOffers.jsx` (NEW):
+  - `<OfferApplyForm>` — specialist UI: fee, priority_fee, dates, hours, message
+  - `<OffersList>` — client UI: sortable ranked list with sponsored badge, tier badge, rating badge, low-rating warning
+  - `<SponsoredBadge>` — reusable component
+- `pages/ClientRequestOffersPage.jsx` (NEW): page at `/client/requests/:requestId/offers`
+
+### Welcome Voucher (BONUS — Sprint C)
+- Trigger: in `/api/auth/register`, after welcome email
+- Only for `role=specialist`
+- Idempotent via `user.welcome_voucher_issued` flag
+- Code format: `WELCOME-XXXXXXXX` · 50% · 30 days expiry · `source=auto_welcome_specialist`
+- Real email sent via Resend with code highlighted
+- **Tested**: `welcomespec1@example.com` registered → `WELCOME-8ED018E1` issued ✅
+
+### Backward compatibility 100%
+- Legacy `POST /api/requests/{id}/accept` (45 RON hard) — UNTOUCHED
+- New offers flow only activates when admin toggles `multi_offer_enabled=true`
+- Existing requests/offers schema additive
+- All existing routes work unchanged
+
+### Status
+**Ready for redeploy. Admin must toggle `multi_offer_enabled` ON to activate new flow.**
+
+## Roadmap update
+- ✅ Sprint A — Foundation (DONE)
+- ✅ Sprint B — Reviews V2 (DONE)
+- ✅ Sprint C — Multi-Offer + Hybrid + Welcome Voucher (DONE)
+- 🟡 Sprint D — Premium Marketplace (next, ~20-30 cr)
+- 🟢 Sprint E — AI Review Quality (~22-33 cr, after lawyer)
+- 🆕 Sprint F — BI-MOE (~60-90 cr, user committed to implementing)
+
