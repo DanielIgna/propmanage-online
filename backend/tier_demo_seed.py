@@ -148,14 +148,25 @@ TIER_DEMO_USERS = [
 
 async def seed_tier_demo_users():
     """Idempotent seed of tier-specific demo accounts for admin QA testing."""
+    # Map new tier (Sprint A) -> legacy experience_tier (used by TierToolsPanel/QuestPanel)
+    TIER_TO_EXPERIENCE = {
+        "ENTRY": "junior",
+        "JUNIOR": "junior",
+        "VERIFIED": "verified",
+        "ADVANCED": "verified",
+        "PREMIUM": "pro",
+        "TOP": "pro",
+    }
     created = 0
     updated = 0
     for u in TIER_DEMO_USERS:
+        experience_tier = TIER_TO_EXPERIENCE.get(u.get("tier"), "junior")
         existing = await db.users.find_one({"email": u["email"]})
         if existing:
             # Update tier/stats only — preserve consents and any data the user may have
             update_fields = {
                 "tier": u.get("tier"),
+                "experience_tier": experience_tier,
                 "rating": u.get("rating"),
                 "reviews_count": u.get("reviews_count", 0),
                 "wallet_balance": float(u.get("wallet_balance", 0)),
@@ -166,7 +177,8 @@ async def seed_tier_demo_users():
             }
             if u["role"] == "specialist":
                 update_fields["specialty"] = u.get("specialty")
-                update_fields["service_categories"] = [u.get("specialty"), "interior_design"] if u.get("specialty") else []
+                _cats = [u.get("specialty"), "interior_design"] if u.get("specialty") else []
+                update_fields["service_categories"] = list(dict.fromkeys([c for c in _cats if c]))
                 update_fields["coverage_zones"] = ["Bucuresti-Sector1", "Bucuresti-Sector2"]
                 update_fields["availability_status"] = "available"
                 update_fields["jobs_completed"] = u.get("jobs_completed", 0)
@@ -192,7 +204,7 @@ async def seed_tier_demo_users():
             "verified": u.get("verified", False),
             "tier": u.get("tier"),
             "specialty": u.get("specialty"),
-            "service_categories": [u.get("specialty"), "interior_design"] if u["role"] == "specialist" and u.get("specialty") else [],
+            "service_categories": list(dict.fromkeys([c for c in ([u.get("specialty"), "interior_design"] if u["role"] == "specialist" and u.get("specialty") else []) if c])),
             "coverage_zones": ["Bucuresti-Sector1", "Bucuresti-Sector2"] if u["role"] == "specialist" else [],
             "availability_status": "available" if u["role"] == "specialist" else None,
             "zone": "Bucuresti-Sector1" if u["role"] == "client" else None,
