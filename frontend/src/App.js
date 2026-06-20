@@ -13,6 +13,7 @@ import { useABTest } from "./ab";
 import { LoginPage, RegisterPage } from "./pages/Auth";
 import { EmailVerifyPage } from "./pages/EmailVerifyPage";
 import { ClientRequestOffersPage } from "./pages/ClientRequestOffersPage";
+import { PremiumProfileEditorPage } from "./pages/PremiumProfileEditorPage";
 import { CookieBanner } from "./components/CookieBanner";
 import { ThemeToggle } from "./pages/DashShared";
 import { ClientDashboard, SpecialistDashboard, AdminDashboard, OperatorDashboard } from "./pages/Dashboards";
@@ -1587,6 +1588,7 @@ function App() {
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/verify-email" element={<EmailVerifyPage />} />
               <Route path="/client/requests/:requestId/offers" element={<ClientRequestOffersPage />} />
+              <Route path="/specialist/premium-profile" element={<PremiumProfileEditorPage />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/marketplace" element={<PublicMarketplace />} />
               <Route path="/marketplace/:slug" element={<MarketplaceLanding />} />

@@ -720,3 +720,42 @@ Order of execution (user prefers redeploy after each):
 - 🟢 Sprint E — AI Review Quality (~22-33 cr, after lawyer)
 - 🆕 Sprint F — BI-MOE (~60-90 cr, user committed to implementing)
 
+
+## Update — 7 Feb 2026 · Sprint D — Premium Marketplace (Nivel 3)
+
+### Backend (`/app/backend/routes/premium_marketplace.py` — NEW)
+- Extended specialist profile: `bio_extended, portfolio_images[12], services_detailed[20], certifications[15], team_members[10], languages[8], response_time_target_hours, accepts_emergency_calls, showcase_video_url`
+- Stored as nested `users.premium_profile` (zero migration, additive)
+- Public visibility: ONLY for tier=PREMIUM (Nivel 3)
+
+### New endpoints (4)
+- `GET /api/me/premium-profile` (specialist views own)
+- `PUT /api/me/premium-profile` (specialist edits own — works regardless of tier; visibility gated on read)
+- `GET /api/marketplace/premium?category=&zone=` (public list of PREMIUM specialists, sorted by rating)
+- `GET /api/specialists/{id}/premium` (public single card — 404 if not PREMIUM)
+
+### Frontend (`pages/PremiumProfileEditorPage.jsx` — NEW)
+- Editor with 9 sections: bio, portfolio (URLs), services (name/desc/price/duration), certifications, team, languages, response time, emergency, video
+- Reusable `ListEditor` component for repeatable items (simple strings OR objects)
+- Warning banner for non-PREMIUM specialists: "Profilul Premium e vizibil DOAR la PREMIUM tier"
+- Sticky save bar at bottom
+- Route: `/specialist/premium-profile`
+
+### Tested
+- Backend: get/put own, list public — all OK
+- Save profile by specialist@ → 6 fields updated, persisted
+- UI: editor renders, warning shown for VERIFIED user, save btn works
+
+### Backward compatibility 100%
+- Zero impact on existing user schema (nested field only)
+- Existing marketplace endpoints UNTOUCHED
+- New `/marketplace/premium` is a SEPARATE endpoint
+
+## Sprint roadmap state — 7 Feb 2026
+- ✅ Sprint A — Foundation
+- ✅ Sprint B — Reviews V2
+- ✅ Sprint C — Multi-Offer + Hybrid + Welcome Voucher
+- ✅ Sprint D — Premium Marketplace
+- 🟢 Sprint E — AI Review Quality Detection (next, ~22-33 cr, needs lawyer review beforehand)
+- 🆕 Sprint F — BI-MOE (committed by user, ~60-90 cr)
+
