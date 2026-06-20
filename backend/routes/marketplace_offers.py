@@ -322,6 +322,12 @@ async def issue_welcome_voucher_for_specialist(user_id: str, user_email: str):
             await send_email(to=user_email, subject="🎁 Bun venit pe PropManage — voucher 50%", html=html)
         except Exception as e:  # noqa: BLE001
             logger.warning(f"[welcome_voucher] email send failed: {e}")
+        # NEW: Auto-create a "Hello" community post with MEMBER_OF_THE_WEEK badge
+        try:
+            from routes.community import auto_create_welcome_topic
+            await auto_create_welcome_topic(user_id=user_id, user_name=u.get("name") or "Specialist nou", role="specialist")
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[welcome_voucher] community post failed: {e}")
         return code
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[welcome_voucher] failed: {e}")

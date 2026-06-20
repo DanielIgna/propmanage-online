@@ -26,7 +26,7 @@ Categories:
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 import uuid
 
@@ -260,7 +260,52 @@ async def community_stats():
     }
 
 
-# ============= SEED (idempotent) =============
+# ============= AUTO WELCOME TOPIC (called from welcome voucher flow) =============
+async def auto_create_welcome_topic(user_id: str, user_name: str, role: str = "specialist"):
+    """
+    Auto-create a 'Hello' community post when a new user receives the welcome voucher.
+    Adds MEMBER_OF_THE_WEEK badge for 7 days. Idempotent per user.
+    Called from routes.marketplace_offers.issue_welcome_voucher_for_specialist
+    and (future) from client registration flow.
+    """
+    # Idempotency: check if user already has a welcome post
+    existing = await db.community_topics.find_one({
+        "author_id": user_id,
+        "tags": {"$in": ["welcome_post"]},
+    })
+    if existing:
+        return None
+
+    role_label = "Specialist" if role == "specialist" else "Proprietar"
+    title = f"Salutare, sunt {user_name.split()[0] if user_name else 'nou'}! Mă alătur PropManage 👋"
+    body = (
+        f"Bună tuturor!\n\n"
+        f"Tocmai m-am înregistrat ca **{role_label.lower()}** pe PropManage și voiam să mă prezint comunității. "
+        f"Aștept cu interes să cunosc oamenii de aici și să găsesc parteneriate de încredere.\n\n"
+        f"Dacă ai un sfat util pentru un nou membru, te rog lasă un comentariu mai jos. Mulțumesc! 🙌"
+    )
+    now = _now_iso()
+    week_from_now = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+    doc = {
+        "id": str(uuid.uuid4()),
+        "category": "forum",
+        "title": title,
+        "body": body,
+        "author_id": user_id,
+        "author_name": user_name or "Nou venit",
+        "author_role": role,
+        "replies_count": 0,
+        "likes_count": 0,
+        "pinned": False,
+        "tags": ["welcome_post", "member_of_the_week"],
+        "badge": "MEMBER_OF_THE_WEEK",
+        "badge_expires_at": week_from_now,
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.community_topics.insert_one(doc)
+    return doc.get("id")
+
 async def seed_community_demo():
     """Seed a few demo topics if collection is empty."""
     count = await db.community_topics.count_documents({})
@@ -315,7 +360,10 @@ async def seed_community_demo():
             "author_role": t["author_role"],
             "replies_count": 0,
             "likes_count": 0,
-            "pinned": t["category"] == "faq",  # FAQ items get pinned
+            "pinned": t["category"] == "faq",
+            "tags": [],
+            "badge": None,
+            "badge_expires_at": None,
             "created_at": now,
             "updated_at": now,
         }

@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 63 - tested 3 NEW enhancements on top of UI Redesign Phases 0-4: (1) MutationObserver-injected tour data-testid attributes, (2) welcome voucher -> Community 'Hello' auto-post with MEMBER_OF_THE_WEEK badge, (3) SettingsPanel Row hoist fix. ALL 3 features pass end-to-end. Backend: 6/6 pytest cases green (specialist + client welcome topic creation, badge fields validation, idempotency on duplicate registration, no regression on /api/community/{stats,topics,replies,likes/toggle}). Frontend: community badge chip 'MEMBRU AL SAPTAMANII' with data-testid community-badge-week-{id} and pm-row-accent-primary border-left renders for 7+ welcome topics (forum tab). Tour testids verified (tour-popover, tour-title, tour-description, tour-next, tour-prev, tour-skip, tour-progress) after replay-tour-btn -> tutorial-skip -> driver.js drive. SettingsPanel Profil / Schimba parola / replay-tour-btn visible (Row module-scope hoist works).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter63_welcome_topic.py",
+    "/app/test_reports/pytest/iter63.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "RoleTour.jsx: tour-done testid only appears on the final tour step (when driver.js renders the done button) — confirmed by code path (DRIVER_TESTID_MAP includes driver-popover-done-btn). My polling found tour-done=False on step 1/6 which is expected.",
+    "TutorialOverlay does not auto-render in some fresh-registration sessions (possibly tutorial_seen flag race with /me refetch). The flow still works via Settings -> Reia turul ghidat replay button. Recommend ensuring tutorial-overlay deterministically renders after first successful /me response (currently it returns null if tutorial_seen===undefined, which is the steady state for an instant after register).",
+    "Backend auto_create_welcome_topic correctly idempotent per author_id (verified: re-registering same email returns 400 'Email already registered' and topic count stays at 1). Note that idempotency key is author_id NOT author_name - so two distinct users with identical names will both get a welcome topic (correct behavior)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter63_welcome_topic.py"],
+  "success_rate": {"backend": "100% (6/6 pytest)", "frontend": "100% (3/3 features: badge, tour testids, SettingsPanel Row)"},
+  "test_credentials": "client@propmanage.io/Client123! used for regression. Created tour-test-{ts}@propmanage.io and wv-test-{ts}@propmanage.io ephemeral accounts (will auto-purge per agent-context note).",
+  "seed_data_creation": "Created ~4 ephemeral test users (Tour Test User, Test Specialist Iter63, Iter63 Idem {ts}, Test Client Iter63) plus their auto-generated welcome topics. Plus 1 'TEST_iter63_regression_{ts}' demo topic + reply + like by demo client. Demo reset at 02:00 Bucharest will clean these.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All 3 enhancements work. Tour testids only appear AFTER (a) tutorial-overlay is dismissed AND (b) driver.js calls .drive() AND (c) target elements for first step exist in DOM. Easiest way to manually re-verify: login as demo client -> Settings tab -> click replay-tour-btn -> wait for reload+tutorial-overlay -> click tutorial-skip -> the driver popover shows with all tour-* testids. The auto-welcome-topic appears in /community forum tab immediately after any registration (specialist OR client) with badge=MEMBER_OF_THE_WEEK and 7d expiry. Idempotency is per author_id.",
+  "verified_flows": [
+    "POST /api/auth/register specialist (role=specialist, service_categories=[hvac]) -> 200 -> within 1s creates 1 forum topic with tags=[welcome_post, member_of_the_week], badge=MEMBER_OF_THE_WEEK, badge_expires_at ~7d ahead, title starts 'Salutare, sunt...'",
+    "POST /api/auth/register client -> 200 -> auto creates same welcome topic with author_role=client",
+    "Duplicate email re-register -> 400 'Email already registered' + topic count stays at 1 (idempotent)",
+    "GET /api/community/stats and /api/community/topics?category=forum -> 200 (no regression)",
+    "Demo client login -> create topic -> reply -> POST /api/community/likes/toggle {target_type:topic} -> all 200",
+    "Frontend /community forum tab: 7 visible welcome topics rendered with data-testid='community-badge-week-{uuid}' + parent has class 'pm-row-accent pm-row-accent-primary' (primary lime border-left) + chip text 'MEMBRU AL SAPTAMANII' with Sparkles icon",
+    "Frontend tour testids after replay->skip-overlay: tour-popover=true, tour-title='Tur ghidat · Client', tour-description='Hai sa-ti arat cele mai importante 5 zone...', tour-next='Mai departe ->', tour-prev='<- Inapoi', tour-skip=true, tour-progress='1 / 6', .driver-popover class present",
+    "SettingsPanel renders Profil + Schimba parola Row items + replay-tour-btn (module-scope Row hoist fix from react/no-unstable-nested-components confirmed working)"
+  ],
+  "rca_of_the_issue": "No defects. Minor observation: on brand-new register session the TutorialOverlay didn't immediately render in 1 of my trials - non-blocking because replay flow works. Likely a brief gap between /auth/register response and /auth/me returning tutorial_seen=false; TutorialOverlay correctly returns null while tutorial_seen===undefined to avoid flash. Could be tightened by passing the just-registered user object directly into AuthContext without waiting for separate /me roundtrip."
+}

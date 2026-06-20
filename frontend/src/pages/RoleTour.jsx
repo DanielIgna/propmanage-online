@@ -162,6 +162,48 @@ const PER_ROLE_INTRO = {
   admin: { title: "Tur ghidat · Admin", description: "Îți arăt AI Health, QA Playbook, Analytics și Content Tools. Durează ~45 sec." },
 };
 
+// Attach data-testid attributes to driver.js popover elements via MutationObserver.
+// Driver.js renders popovers dynamically, so we observe additions to <body>.
+const DRIVER_TESTID_MAP = {
+  "driver-popover": "tour-popover",
+  "driver-popover-title": "tour-title",
+  "driver-popover-description": "tour-description",
+  "driver-popover-next-btn": "tour-next",
+  "driver-popover-prev-btn": "tour-prev",
+  "driver-popover-close-btn": "tour-skip",
+  "driver-popover-done-btn": "tour-done",
+  "driver-popover-progress-text": "tour-progress",
+};
+
+let driverObserver = null;
+
+const stampTestIds = (root) => {
+  if (!root || !root.querySelectorAll) return;
+  Object.entries(DRIVER_TESTID_MAP).forEach(([cls, tid]) => {
+    const nodes = root.classList && root.classList.contains(cls) ? [root] : root.querySelectorAll(`.${cls}`);
+    nodes.forEach((n) => {
+      if (n && !n.getAttribute("data-testid")) {
+        n.setAttribute("data-testid", tid);
+      }
+    });
+  });
+};
+
+const attachDriverTestIds = () => {
+  // Stamp anything already rendered
+  stampTestIds(document.body);
+  // Detach previous observer if any
+  if (driverObserver) driverObserver.disconnect();
+  driverObserver = new MutationObserver((mutations) => {
+    mutations.forEach((m) => {
+      m.addedNodes.forEach((node) => {
+        if (node.nodeType === 1) stampTestIds(node);
+      });
+    });
+  });
+  driverObserver.observe(document.body, { childList: true, subtree: true });
+};
+
 export const RoleTour = ({ forceStart = false }) => {
   const { user, refreshUser } = useAuth();
   const startedRef = useRef(false);
@@ -223,10 +265,13 @@ export const RoleTour = ({ forceStart = false }) => {
             } catch {
               /* best-effort */
             }
+            if (driverObserver) { driverObserver.disconnect(); driverObserver = null; }
             if (tour) tour.destroy();
           },
         });
         tour.drive();
+        // Inject data-testid attributes on driver.js elements for QA automation
+        attachDriverTestIds();
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error("[RoleTour] driver failed:", e);

@@ -190,7 +190,7 @@ export const AdminSettingsControl = () => {
               <h3 className="font-serif text-lg">Istoric Snapshots (ultimele 30)</h3>
               <span className="text-xs text-stone-500">Snapshot automat zilnic la 04:00 + manuale</span>
             </div>
-            {snapshots.length === 0 && <div className="text-xs text-stone-500 italic py-3">Niciun snapshot. Apasă "Snapshot acum" pentru primul.</div>}
+            {snapshots.length === 0 && <div className="text-xs text-stone-500 italic py-3">Niciun snapshot. Apasă &quot;Snapshot acum&quot; pentru primul.</div>}
             <div className="space-y-1 max-h-[400px] overflow-y-auto">
               {snapshots.map(s => (
                 <div key={s.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/[0.02] border border-white/5 text-xs" data-testid={`snapshot-${s.id}`}>

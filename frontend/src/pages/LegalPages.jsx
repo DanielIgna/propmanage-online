@@ -26,7 +26,7 @@ const Layout = ({ icon: Icon, title, subtitle, children, testid }) => (
 
 export const PrivacyPage = () => (
   <Layout icon={Shield} title="Politică de confidențialitate" subtitle="Ultima actualizare: februarie 2026" testid="privacy-page">
-    <p><strong>PropManage SRL</strong> ("noi", "platforma") respectă confidențialitatea utilizatorilor și se conformează regulamentului GDPR (Regulamentul UE 2016/679) și legislației române privind protecția datelor personale.</p>
+    <p><strong>PropManage SRL</strong> (&quot;noi&quot;, &quot;platforma&quot;) respectă confidențialitatea utilizatorilor și se conformează regulamentului GDPR (Regulamentul UE 2016/679) și legislației române privind protecția datelor personale.</p>
 
     <h2>1. Ce date colectăm</h2>
     <ul>
@@ -59,7 +59,7 @@ export const PrivacyPage = () => (
     <ul>
       <li><strong>Acces</strong>: cere o copie a datelor tale.</li>
       <li><strong>Rectificare</strong>: corectează date inexacte.</li>
-      <li><strong>Ștergere</strong> ("dreptul de a fi uitat"): cere ștergerea contului și a datelor (exceptând cele necesare pentru obligații legale).</li>
+      <li><strong>Ștergere</strong> (&quot;dreptul de a fi uitat&quot;): cere ștergerea contului și a datelor (exceptând cele necesare pentru obligații legale).</li>
       <li><strong>Portabilitate</strong>: primește datele într-un format structurat (JSON / CSV).</li>
       <li><strong>Obiecție</strong>: opune-te procesării pentru anumite scopuri.</li>
       <li><strong>Plângere ANSPDCP</strong>: dacă consideri că drepturile îți sunt încălcate.</li>
@@ -92,7 +92,7 @@ export const PrivacyPage = () => (
 
 export const TermsPage = () => (
   <Layout icon={FileText} title="Termeni și condiții" subtitle="Ultima actualizare: februarie 2026" testid="terms-page">
-    <p>Prin utilizarea platformei <strong>PropManage</strong> ("Platforma"), accepți acești Termeni. Dacă nu ești de acord, te rugăm să nu folosești serviciile.</p>
+    <p>Prin utilizarea platformei <strong>PropManage</strong> (&quot;Platforma&quot;), accepți acești Termeni. Dacă nu ești de acord, te rugăm să nu folosești serviciile.</p>
 
     <h2>1. Cine este responsabil</h2>
     <p>Operator: <strong>PropManage SRL</strong>, sediu social în România. Contact: <a href="mailto:contact@propmanage.ro">contact@propmanage.ro</a>.</p>
@@ -140,7 +140,7 @@ export const TermsPage = () => (
     </ul>
 
     <h2>9. Răspundere</h2>
-    <p>Platforma este "AS IS". Nu garantăm continuitatea serviciului 24/7 (vezi <Link to="/status" className="text-[#d4ff3a]">/status</Link>). Răspunderea noastră maximă este limitată la valoarea comisioanelor încasate în ultimele 12 luni de la utilizator.</p>
+    <p>Platforma este &quot;AS IS&quot;. Nu garantăm continuitatea serviciului 24/7 (vezi <Link to="/status" className="text-[#d4ff3a]">/status</Link>). Răspunderea noastră maximă este limitată la valoarea comisioanelor încasate în ultimele 12 luni de la utilizator.</p>
 
     <h2>10. Reziliere</h2>
     <p>Poți închide contul oricând din setări. Datele tranzacționale rămân arhivate conform <Link to="/privacy" className="text-[#d4ff3a]">Politicii de Confidențialitate</Link>.</p>
@@ -216,7 +216,7 @@ export const CookiePolicyPage = () => (
     <p>Niciun cookie de la <strong>Google Analytics</strong>, <strong>Facebook Pixel</strong>, <strong>LinkedIn Insight</strong> sau alte platforme de reclamă behaviorală.</p>
 
     <h2>4. De ce nu există banner de consimțământ?</h2>
-    <p>Conform Directivei ePrivacy și art. 5(3) PECR, <strong>cookies-urile strict necesare</strong> și cele <strong>funcționale solicitate explicit de utilizator</strong> (cum ar fi „ține-mă logat") nu necesită consimțământ prealabil. Deoarece NU folosim cookies de tracking publicitar, nu există obligativitate de cookie banner.</p>
+    <p>Conform Directivei ePrivacy și art. 5(3) PECR, <strong>cookies-urile strict necesare</strong> și cele <strong>funcționale solicitate explicit de utilizator</strong> (cum ar fi „ține-mă logat&quot;) nu necesită consimțământ prealabil. Deoarece NU folosim cookies de tracking publicitar, nu există obligativitate de cookie banner.</p>
     <p>Dacă vom introduce vreodată cookies non-essentials, vom afișa un banner cu opțiuni granulare (acceptă / refuză / personalizează) ÎNAINTE de a le seta.</p>
 
     <h2>5. Cum controlezi cookies-urile</h2>

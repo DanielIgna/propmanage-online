@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
   Building2, MessageSquare, Users, HelpCircle, Star, Plus,
-  Heart, Reply, ChevronRight, Search, Pin, Send, X,
+  Heart, Reply, ChevronRight, Search, Pin, Send, X, Sparkles,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import {
@@ -152,16 +152,23 @@ export default function CommunityPage() {
               )}
             />
           ) : (
-            topics.map(t => (
+            topics.map(t => {
+              const badgeActive = t.badge === "MEMBER_OF_THE_WEEK" && t.badge_expires_at && new Date(t.badge_expires_at) > new Date();
+              return (
               <PMCard
                 key={t.id}
-                accent={t.pinned ? "primary" : "default"}
+                accent={badgeActive ? "primary" : t.pinned ? "primary" : "default"}
                 onClick={() => setOpenTopic(t)}
                 testid={`community-topic-${t.id}`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      {badgeActive && (
+                        <PMChip variant="primary" icon={Sparkles} testid={`community-badge-week-${t.id}`}>
+                          MEMBRU AL SĂPTĂMÂNII
+                        </PMChip>
+                      )}
                       {t.pinned && <PMChip variant="primary" icon={Pin}>Fixat</PMChip>}
                       <span className="text-[11px] text-stone-500">
                         {t.author_name} · {t.author_role} · {new Date(t.created_at).toLocaleDateString("ro-RO")}
@@ -181,7 +188,8 @@ export default function CommunityPage() {
                   <ChevronRight className="w-5 h-5 text-stone-600 shrink-0" />
                 </div>
               </PMCard>
-            ))
+              );
+            })
           )}
         </div>
       </main>
@@ -313,7 +321,10 @@ const TopicDetailModal = ({ topic, onClose }) => {
         className="bg-stone-950 border border-white/10 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col" data-testid="community-topic-modal">
         <div className="p-6 border-b border-white/10 flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              {topicState.badge === "MEMBER_OF_THE_WEEK" && topicState.badge_expires_at && new Date(topicState.badge_expires_at) > new Date() && (
+                <PMChip variant="primary" icon={Sparkles}>MEMBRU AL SĂPTĂMÂNII</PMChip>
+              )}
               {topicState.pinned && <PMChip variant="primary" icon={Pin}>Fixat</PMChip>}
               <PMChip>{topicState.category}</PMChip>
             </div>

@@ -550,7 +550,7 @@ const UploadFilesModal = ({ project, client, onClose, onUploaded }) => {
               <ol className="mt-2 space-y-1.5 pl-4 list-decimal leading-relaxed">
                 <li>Mergi pe <a href="https://web.connect.trimble.com/" target="_blank" rel="noreferrer" className="text-emerald-400 underline">web.connect.trimble.com</a> și loghează-te (gratuit, 10GB).</li>
                 <li>Creează un proiect → urcă fișierul <code className="text-amber-300">.skp</code> → așteaptă procesarea automată.</li>
-                <li>Click dreapta pe model → <strong>Share</strong> → setează <em>"Anyone with link"</em> → copiază URL-ul și lipește-l aici.</li>
+                <li>Click dreapta pe model → <strong>Share</strong> → setează <em>&quot;Anyone with link&quot;</em> → copiază URL-ul și lipește-l aici.</li>
               </ol>
             </details>
           </div>
@@ -680,7 +680,7 @@ export const OperatorDigitalTwin = () => {
       setLoading(false);
     }
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter]);
+  useEffect(() => { load();   }, [filter]);
 
   const showToast = (msg) => {
     setToast(msg);

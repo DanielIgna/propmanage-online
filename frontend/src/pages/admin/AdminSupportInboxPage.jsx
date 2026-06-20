@@ -57,7 +57,7 @@ export const AdminSupportInboxPage = () => {
               <Inbox className="w-7 h-7 text-[#d4ff3a]" />
               Mesaje de la utilizatori
             </h1>
-            <p className="text-stone-500 text-sm mt-1">Toate mesajele trimise via "Contactează-ne" · Vizibile pentru Admin + Operator</p>
+            <p className="text-stone-500 text-sm mt-1">Toate mesajele trimise via &quot;Contactează-ne&quot; · Vizibile pentru Admin + Operator</p>
           </div>
           <button onClick={load} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-xs" data-testid="inbox-refresh">
             <RefreshCw className="w-3 h-3" /> Refresh

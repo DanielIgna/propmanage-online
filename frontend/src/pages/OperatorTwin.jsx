@@ -275,7 +275,7 @@ export const TwinEditorModal = ({ propertyId, onClose, onSaved }) => {
                   <div className="text-center">
                     <Building2 className="w-12 h-12 text-stone-700 mx-auto mb-2" />
                     <div className="text-sm text-stone-500">Canvas gol</div>
-                    <div className="text-[11px] text-stone-600 mt-1">Selectează "Cameră" sau "Asset" și click pe canvas</div>
+                    <div className="text-[11px] text-stone-600 mt-1">Selectează &quot;Cameră&quot; sau &quot;Asset&quot; și click pe canvas</div>
                   </div>
                 </div>
               )}

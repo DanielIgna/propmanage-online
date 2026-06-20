@@ -17,6 +17,24 @@ import { ClientTwinViewerModal } from "./ClientTwinViewer";
 import DigitalTwinViewer from "../components/DigitalTwinViewer";
 import { pushSupported, getPushStatus, subscribeToPush, unsubscribeFromPush, ensureServiceWorker } from "../push";
 
+// ============= ROW (hoisted out of SettingsPanel to avoid no-unstable-nested-components) =============
+const Row = ({ icon: Icon, title, subtitle, onClick, danger, accent, tid }) => (
+  <button
+    onClick={onClick}
+    className={`w-full flex items-center gap-4 py-4 border-b border-white/5 hover:bg-white/[0.02] transition-colors group ${
+      danger ? "text-red-400" : ""
+    } ${accent ? "bg-[#d4ff3a]/[0.04]" : ""}`}
+    data-testid={tid}
+  >
+    <Icon className={`w-5 h-5 shrink-0 ${danger ? "text-red-400" : accent ? "text-[#d4ff3a]" : "text-stone-400"}`} />
+    <div className="flex-1 text-left">
+      <div className="text-sm font-medium">{title}</div>
+      {subtitle && <div className="text-xs text-stone-500 mt-0.5">{subtitle}</div>}
+    </div>
+    <ChevronRight className="w-4 h-4 text-stone-600 group-hover:text-stone-400 transition-colors" />
+  </button>
+);
+
 // ============= MAIN PANEL =============
 export const SettingsPanel = () => {
   const { user, refreshUser, logout } = useAuth();
@@ -117,22 +135,7 @@ export const SettingsPanel = () => {
     }
   };
 
-  const Row = ({ icon: Icon, title, subtitle, onClick, danger, accent, tid }) => (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-4 py-4 border-b border-white/5 hover:bg-white/[0.02] transition-colors group ${
-        danger ? "text-red-400" : ""
-      } ${accent ? "bg-[#d4ff3a]/[0.04]" : ""}`}
-      data-testid={tid}
-    >
-      <Icon className={`w-5 h-5 shrink-0 ${danger ? "text-red-400" : accent ? "text-[#d4ff3a]" : "text-stone-400"}`} />
-      <div className="flex-1 text-left">
-        <div className="text-sm font-medium">{title}</div>
-        {subtitle && <div className="text-xs text-stone-500 mt-0.5">{subtitle}</div>}
-      </div>
-      <ChevronRight className="w-4 h-4 text-stone-600 group-hover:text-stone-400 transition-colors" />
-    </button>
-  );
+  // Row component is hoisted at module scope (above) — fixes react/no-unstable-nested-components
 
   return (
     <div className="max-w-2xl mx-auto" data-testid="settings-panel">

@@ -183,6 +183,13 @@ async def register(data: RegisterIn, request: Request, response: Response):
         except Exception as _e:  # noqa: BLE001
             import logging
             logging.getLogger("propmanage.auth").warning(f"[WelcomeVoucher] failed: {_e}")
+    # Community auto-welcome post (Feb 2026) — for all new users with MEMBER_OF_THE_WEEK badge
+    try:
+        from routes.community import auto_create_welcome_topic
+        await auto_create_welcome_topic(user_id=uid, user_name=data.name, role=data.role)
+    except Exception as _e:  # noqa: BLE001
+        import logging
+        logging.getLogger("propmanage.auth").warning(f"[CommunityWelcome] failed: {_e}")
     # Schedule 3-email onboarding drip for new specialists (Day 1, 3, 7) — best-effort
     if data.role == "specialist":
         try:

@@ -204,7 +204,7 @@ const SearchPalette = ({ open, onClose, onJump }) => {
         <div className="max-h-[60vh] overflow-y-auto">
           {loading && <div className="px-5 py-6 text-center text-xs text-slate-500"><Loader2 className="w-4 h-4 animate-spin inline" /></div>}
           {!loading && q.length >= 2 && hits.length === 0 && (
-            <div className="px-5 py-10 text-center text-sm text-slate-500">Niciun rezultat pentru "<span className="text-slate-700 dark:text-slate-300">{q}</span>".</div>
+            <div className="px-5 py-10 text-center text-sm text-slate-500">Niciun rezultat pentru &quot;<span className="text-slate-700 dark:text-slate-300">{q}</span>&quot;.</div>
           )}
           {!loading && q.length < 2 && (
             <div className="px-5 py-8 text-center text-xs text-slate-500">

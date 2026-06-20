@@ -315,9 +315,9 @@ export const AdminAIConsole = () => {
                   <Bot className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   Pornește o conversație. Întrebări utile:
                   <div className="mt-3 space-y-1 text-xs">
-                    <div className="italic">"Care sunt cele mai grave probleme acum?"</div>
-                    <div className="italic">"Spune-mi ce s-a întâmplat ieri pe platformă"</div>
-                    <div className="italic">"Cum stă incident response cadence?"</div>
+                    <div className="italic">&quot;Care sunt cele mai grave probleme acum?&quot;</div>
+                    <div className="italic">&quot;Spune-mi ce s-a întâmplat ieri pe platformă&quot;</div>
+                    <div className="italic">&quot;Cum stă incident response cadence?&quot;</div>
                   </div>
                 </div>
               )}
