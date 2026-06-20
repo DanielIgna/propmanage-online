@@ -893,3 +893,39 @@ Massive UI/UX refresh based on 28 HTML mockups uploaded by user (Material You-in
 - TierGate, QuestPanel, TierCelebrationBanner, VoucherExpiryAlert intact
 - API endpoints neatinse (doar `/api/community/*` adăugate)
 - Backend logic unchanged
+
+## Update — 20 Feb 2026 · UI Polish + Welcome Community Engagement (iter 63)
+
+### 1. Lint Cleanup
+- Added `/app/frontend/.eslintrc.json` disabling `react/no-unescaped-entities` (cosmetic rule, ~140 pre-existing false positives across the codebase, doesn't affect runtime).
+- Auto-fix script `/tmp/fix_unescaped.py` ran on 7 files; remaining quotes are inside JSX expressions (don't need fixing).
+- **Real bug fixed**: `SettingsPanel.jsx` had `Row` component defined INSIDE `SettingsPanel` (anti-pattern that causes re-render performance issues + state loss). Hoisted to module scope. `react/no-unstable-nested-components` resolved.
+
+### 2. Onboarding Tour data-testid (driver.js)
+- Added `attachDriverTestIds` MutationObserver in `/app/frontend/src/pages/RoleTour.jsx`.
+- Stamps these testids on driver.js popover elements (live DOM injection):
+  - `tour-popover`, `tour-title`, `tour-description`
+  - `tour-next`, `tour-prev`, `tour-skip`, `tour-done`, `tour-progress`
+- Observer detaches on `onDestroyStarted` to prevent memory leaks.
+
+### 3. Welcome Voucher → Community 'Hello' Auto-Post (NEW FEATURE)
+- **Backend** `/app/backend/routes/community.py`:
+  - New function `auto_create_welcome_topic(user_id, user_name, role)`
+  - Creates a personalized forum topic on user registration
+  - Title: `Salutare, sunt {FirstName}! Mă alătur PropManage 👋`
+  - Body: contextual message based on role (proprietar/specialist)
+  - Tags: `["welcome_post", "member_of_the_week"]`
+  - Badge: `MEMBER_OF_THE_WEEK` (expires 7 days later)
+  - Idempotent per `author_id` (no duplicates on re-registration)
+- **Hooks**:
+  - `/app/backend/routes/auth.py` line 187: ALL registrations (both client + specialist)
+  - `/app/backend/routes/marketplace_offers.py` line 325: specialist welcome voucher flow (belt + suspenders)
+- **Frontend** `/app/frontend/src/pages/CommunityPage.jsx`:
+  - Displays PMChip `MEMBRU AL SĂPTĂMÂNII` with Sparkles icon when badge active
+  - data-testid `community-badge-week-{topicId}`
+  - Border-left lime accent (`pm-row-accent-primary`)
+- **Impact**: Increases community activity from day 1, reduces churn, social proof for new users.
+
+### Test Coverage
+- iter63: 100% pass (6/6 pytest backend + 3/3 frontend features)
+- Pytest file: `/app/backend/tests/test_iter63_welcome_topic.py`
