@@ -990,3 +990,32 @@ Massive UI/UX refresh based on 28 HTML mockups uploaded by user (Material You-in
 - `/app/frontend/src/pages/SpecialistDashboard.jsx`
 - `/app/frontend/src/pages/ClientDashboard.jsx`
 - `/app/memory/test_credentials.md` (added 9 tier accounts)
+
+## Update — 20 Feb 2026 · Tier Progress Widget (iter 65)
+
+### Feature
+**"Progres către următorul tier"** dashboard widget — shows users exactly how to advance.
+
+### Files
+- `/app/frontend/src/lib/tierProgression.js` — Pure logic module:
+  - `SPECIALIST_LADDER` (5 steps: ENTRY→JUNIOR→VERIFIED→ADVANCED→PREMIUM→TOP)
+  - `CLIENT_LADDER` (2 steps: JUNIOR→VERIFIED→PREMIUM)
+  - `getNextTierProgress(user)` returns `{currentTier, nextTier, requirements, unlocks, overallPct, allDone}` or null if at top
+- `/app/frontend/src/components/TierProgressWidget.jsx`:
+  - Compact view: Trophy icon + "Progres către {NEXT_TIER}" chip + actionable nudge message + progress bar
+  - Expandable "Detalii" view: each requirement with checkbox + counter (e.g. "25/50 lucrări"), unlocks pills
+  - At TOP tier: Trophy "Ai atins nivelul maxim 🏆" celebration
+- Mounted on:
+  - `SpecialistDashboard.jsx` (opportunities tab, top position)
+  - `ClientDashboard.jsx` (request tab, after QuestPanel)
+
+### Tested live
+- spec.entry (ENTRY, 0 jobs): "Mai ai 1 lucrare finalizată", 0%, "Deblochezi: Celebrare tier, Status badge JUNIOR"
+- spec.advanced (25 jobs, 4.8 rating): "Mai ai 25 lucrări", 75%, 1 of 2 requirements met (rating done, jobs pending)
+- spec.top: shows "Ai atins nivelul maxim 🏆" widget
+- All data-testids working: tier-progress-widget, tier-progress-next-chip, tier-progress-bar, tier-progress-message, tier-progress-toggle, tier-progress-req-*, tier-progress-unlock-*, tier-progress-max
+
+### Why it matters
+- **Retention through clarity**: users know exactly what to invest time in
+- **Gamification**: clear next-goal + visual reward (unlocks pills)
+- **No backend changes** — reads `tier`, `jobs_completed`, `rating`, `verified`, `kyc_status` from user object

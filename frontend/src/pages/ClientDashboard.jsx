@@ -155,6 +155,7 @@ export const ClientDashboard = () => {
       {tierInfo.canSeeTierCelebration && <TierCelebrationBanner />}
       {tab === "request" && tierInfo.canSeeQuests && <QuestPanel />}
       {tab === "request" && tierInfo.canSeeStats && <TierToolsPanel role="client" />}
+      {tab === "request" && <TierProgressWidget className="mb-4" />}
       {tab === "request" && (
         <RequestZone
           user={user} prop={prop} properties={properties} requests={requests}

@@ -27,6 +27,7 @@ import {
   PMCard, PMCardPrimary, PMStatCard, PMPillButton, PMChip,
   PMSectionHeader, PMEmptyState,
 } from "../components/pm";
+import { TierProgressWidget } from "../components/TierProgressWidget";
 
 export const SpecialistDashboard = () => {
   const { user, refreshUser } = useAuth();
@@ -118,6 +119,8 @@ export const SpecialistDashboard = () => {
       {tab === "opportunities" && tierInfo.canSeeStats && <TierToolsPanel role="specialist" />}
       {tab === "opportunities" && (
         <>
+          {/* Tier progression widget — shows for all tiers (auto-hides at TOP) */}
+          <TierProgressWidget className="mb-4" />
           {/* Welcome hero (only ADVANCED+) */}
           {user?.verified && tierInfo.canSeeBentoHero && user?.tier && user.tier !== "ENTRY" && (
             <PMCardPrimary className="mb-6 pm-fade-in">
