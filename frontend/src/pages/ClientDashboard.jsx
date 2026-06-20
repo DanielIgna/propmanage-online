@@ -28,6 +28,7 @@ import { TierToolsPanel } from "../lib/TierToolsPanel";
 import { QuestPanel } from "../lib/QuestPanel";
 import { useTier } from "../lib/useTier";
 import { PMCard, PMCardPrimary, PMPillButton, PMChip, PMSectionHeader, PMEmptyState } from "../components/pm";
+import { TierProgressWidget } from "../components/TierProgressWidget";
 
 export const ClientDashboard = () => {
   const { user, refreshUser } = useAuth();
