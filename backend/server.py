@@ -104,6 +104,7 @@ from routes.feature_configurator import (
 )
 from routes.twin_orchestrator import router as twin_orchestrator_router
 from routes.specialist_progression import router_admin as sp_admin_router, router_public as sp_public_router, run_auto_promotion
+from routes.reviews_v2 import router as reviews_v2_router
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
@@ -208,6 +209,7 @@ for r in (
     twin_orchestrator_router,
     sp_admin_router,
     sp_public_router,
+    reviews_v2_router,
 ):
     app.include_router(r)
 

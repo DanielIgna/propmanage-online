@@ -8,6 +8,7 @@ import { useI18n } from "../i18n";
 import { AIAssistant } from "./AIAssistant";
 import { VoucherExpiryAlert } from "../lib/VoucherExpiryAlert";
 import { EmailVerificationBanner } from "../components/EmailVerificationBanner";
+import { PendingReviewsWidget } from "../components/MultiDimReviews";
 
 export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -258,6 +259,9 @@ export const DashLayout = ({ children, role, title, bottomNav }) => {
       </header>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-24">
         {title && <h1 className="font-serif text-3xl sm:text-4xl mb-6 sm:mb-8" data-testid="dash-title">{title}</h1>}
+        {(role === "client" || role === "specialist") && (
+          <div className="mb-6"><PendingReviewsWidget /></div>
+        )}
         {children}
       </main>
       {bottomNav}

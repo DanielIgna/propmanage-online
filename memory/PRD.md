@@ -603,3 +603,43 @@ Admin: `admin@propmanage.io` / `Admin123!`
 ### Status
 **Ready for redeploy. Next: Sprint B (Multi-dim Reviews + Cross Reviews + Marketplace Multi-Offer flow).**
 
+
+## Update — 7 Feb 2026 · Sprint B — Multi-dim + Cross + Double-blind Reviews
+**Scope: Multi-dimensional reviews (8 dims c→s + 5 dims s→c) + reverse review (specialist evaluates client) + double-blind 7-day window.**
+
+### Backend (`/app/backend/routes/reviews_v2.py` — NEW, 1 file)
+- 8 dimensions client→specialist: `timeliness, quality, offer_adherence, communication, professionalism, cleanliness, documentation, recommendation`
+- 5 dimensions specialist→client: `seriousness, responsiveness, commitment, punctuality, collaboration`
+- Double-blind logic: reviews hidden 7 days OR until both sides submit (mutual reveal)
+- Anti-self-review: client_id must ≠ specialist_id; can't review yourself
+- Anti-duplicate: 1 review per (request, direction, author)
+- Min dimensions: 3 for c→s, 2 for s→c
+- Stores `version: 2, scores: {dim: 1-5}, dimension_avg, hidden_until, revealed_via`
+- Legacy `user.rating` field kept in sync (avg of dimension_avg across V2 reviews)
+- New field `user.client_rating` + `user.client_reviews_count` for reverse reviews
+
+### New endpoints (6)
+- `POST /api/requests/{req_id}/review-v2` (client → specialist)
+- `POST /api/requests/{req_id}/review-client-v2` (specialist → client, reverse)
+- `GET /api/reviews/specialist/{id}` (multi-dim with double-blind filter + aggregate)
+- `GET /api/reviews/client/{id}` (reverse reviews with same filter)
+- `GET /api/reviews/pending-for-me` (dashboard widget data)
+- `POST /api/admin/reviews/{id}/force-reveal` (admin manual reveal for legal)
+
+### Frontend (2 new files + 1 integration)
+- `components/ReviewFormV2.jsx` + `ReviewFormV2Modal`: NEW — slider UI for 8/5 dims with star rows, comment box max 2000 chars, success state showing double-blind status (mutual or 7-day window)
+- `components/MultiDimReviews.jsx`: NEW — `MultiDimReviewsPanel` (bar chart of all dimensions + reviews list) + `PendingReviewsWidget` (dashboard widget)
+- `pages/DashShared.jsx`: PendingReviewsWidget mounted above main content for client + specialist
+
+### Tested E2E
+- Endpoints respond OK: `GET /reviews/specialist/{id}` → 200, `GET /reviews/pending-for-me` → 401 (auth required, correct)
+- UI smoke: Dashboard renders, **PendingReviewsWidget visible with "1 cerere de evaluat" for client@propmanage.io** (Scurgere baie request)
+- No JS console errors
+
+### Backward compatibility 100%
+- Legacy `POST /api/requests/{req_id}/review` (single rating) — UNTOUCHED, still works
+- Existing reviews in DB without `version` field → treated as legacy, returned by old endpoints
+- New V2 reviews coexist with V1
+- Specialist profile page can show BOTH old and new reviews
+- `user.rating` recalculated to include V2 dimension averages
+
