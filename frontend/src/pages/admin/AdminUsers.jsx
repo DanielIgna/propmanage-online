@@ -140,17 +140,17 @@ export const AdminUsers = () => {
             <option value="operator">Operator</option>
             <option value="admin">Admin</option>
           </select>
-          <select value={emailVerifiedFilter} onChange={e => { setEmailVerifiedFilter(e.target.value); setSkip(0); }} className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="users-email-verified-filter" title="Email verificat">
+          <select value={emailVerifiedFilter} onChange={e => { setEmailVerifiedFilter(e.target.value); setSkip(0); }} className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="filter-email-verified" title="Email verificat">
             <option value="">Email: toți</option>
             <option value="yes">✉ Verificat</option>
             <option value="no">✉ Neverificat</option>
           </select>
-          <select value={phoneVerifiedFilter} onChange={e => { setPhoneVerifiedFilter(e.target.value); setSkip(0); }} className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="users-phone-verified-filter" title="Telefon verificat">
+          <select value={phoneVerifiedFilter} onChange={e => { setPhoneVerifiedFilter(e.target.value); setSkip(0); }} className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="filter-phone-verified" title="Telefon verificat">
             <option value="">Telefon: toți</option>
             <option value="yes">📱 Verificat</option>
             <option value="no">📱 Neverificat</option>
           </select>
-          <select value={marketingFilter} onChange={e => { setMarketingFilter(e.target.value); setSkip(0); }} className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="users-marketing-filter" title="Acord marketing">
+          <select value={marketingFilter} onChange={e => { setMarketingFilter(e.target.value); setSkip(0); }} className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="filter-marketing-consent" title="Acord marketing">
             <option value="">Marketing: toți</option>
             <option value="yes">📣 Acceptat</option>
             <option value="no">📣 Refuzat</option>

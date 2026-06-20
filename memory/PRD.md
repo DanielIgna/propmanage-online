@@ -529,3 +529,39 @@ Admin: `admin@propmanage.io` / `Admin123!`
 ## Update — 7 Feb 2026 · Boost DEV button
 - Adăugat endpoint `POST /api/admin/autonomy/boost-dev` care: (1) rulează un Release Gate, (2) marchează findings vechi (>14 zile, status="open") ca "dismissed" cu reason="stale_auto_boost_dev", (3) re-rulează snapshotul Autonomy și invalidează cache-ul. Returnează summary cu scor DEV anterior vs nou.
 - Buton violet "⚡ Boost DEV" în `/admin/autonomy` (lângă Snapshot acum / Refresh) cu confirmare + card de rezultat. Tested OK pe preview: DEV=67.4, General=67.8 după rulare.
+
+## Update — 7 Feb 2026 · GDPR Phase 1+2+3+5 (Major Auth Extension)
+**User choices: A1 (Phase 1) + C1 (grandfather existing) + D1 (reuse dual_role) + Phase 2 + Phase 3 + Phase 5. Phase 4 (Twilio SMS) DEFERRED.**
+
+### Backend
+- `models.py`: Extended `RegisterIn` with optional `terms_accepted, privacy_policy_accepted, marketing_consent`. Added `ConsentUpdateIn`.
+- `routes/auth.py`: register now validates GDPR consent, generates email verification token (24h expiry), creates 3 entries in `consent_audit_log`. Added endpoints: `PATCH /me/consent`, `POST /cookies/consent`, `GET /auth/verify-email`, `POST /auth/resend-verification` (rate-limited 1/5min).
+- `email_service.py`: Added `tpl_email_verification` template (Romanian).
+- `consent_backfill.py` (NEW): Idempotent startup migration — grandfathers existing users with `email_verified=true, terms_accepted=true, privacy_policy_accepted=true, marketing_consent=false, consent_grandfathered=true`.
+- `server.py`: Calls `run_consent_backfill()` on startup.
+- `routes/admin_console.py`: `/admin/users` accepts new filters `email_verified, phone_verified, marketing_consent`.
+
+### Frontend
+- `pages/Auth.jsx`: 3 consent checkboxes (terms + privacy mandatory with `*` + link to `/terms` `/privacy`; marketing opt-in unchecked default). Submit button disabled until both mandatory checked.
+- `components/CookieBanner.jsx` (NEW): Global GDPR banner with 3 buttons (Accept all / Reject optional / Customize). Customize expands to 3 categories (functional always-on, analytics, marketing). Syncs to `/api/cookies/consent`. Persists in localStorage. Reopenable via floating bottom-left cookie icon.
+- `components/EmailVerificationBanner.jsx` (NEW): Amber banner on top of DashLayout for logged-in users with `email_verified=false` (not shown for grandfathered users). Has "Retrimite emailul" button + dismiss-until-session-end.
+- `pages/EmailVerifyPage.jsx` (NEW): Landing page for `/verify-email?token=xxx` link from email. Success/error states.
+- `pages/admin/AdminUsers.jsx`: 3 new columns (✉ email_verified, 📱 phone_verified, 📣 marketing_consent) + 3 new filter dropdowns with `data-testid=filter-email-verified|phone-verified|marketing-consent`.
+- `App.js`: Mounted `<CookieBanner />` globally; added route `/verify-email`.
+
+### Tested
+- Testing agent v3 run (iteration_61): **Backend 100% (18/18 PASS), Frontend 95% (16/17)**. Zero critical/minor issues; only 1 testid naming alignment fixed post-run.
+- Backfill confirmed: all 737 existing users grandfathered with new fields.
+- Resend email verified working (sent 4 real emails via Resend in previous session).
+
+### Backward compatibility — verified
+- Existing login flow untouched (3 seeded accounts work).
+- `dual_role_enabled` infrastructure untouched (Phase 52 preserved).
+- No DB migrations needed — fields are Optional with defaults.
+- Modules NOT affected: Digital Twin, Cereri Ofertă, Marketplace, Mesagerie, Facturare, AI agents, Vouchers, Quests.
+
+### Backlog (next pickup)
+- ⛔ DEFERRED: Phase 4 Twilio SMS OTP (NOT until user has real clients)
+- 🟡 Marketplace Economics V2 (awaits "Start MKT-V2")
+- 🟢 Twin Orchestrator AI, Experience Spaces V2, PropManage Atlas Design System
+
