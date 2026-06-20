@@ -236,6 +236,11 @@ async def startup():
         await seed_community_demo()
     except Exception as e:
         logger.warning(f"Community demo seed failed: {e}")
+    try:
+        from tier_demo_seed import seed_tier_demo_users
+        await seed_tier_demo_users()
+    except Exception as e:
+        logger.warning(f"Tier demo seed failed: {e}")
     # GDPR Phase 1 — backfill existing users with consent + verification fields (idempotent)
     try:
         from consent_backfill import run_consent_backfill

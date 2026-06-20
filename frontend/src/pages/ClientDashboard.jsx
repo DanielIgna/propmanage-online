@@ -26,11 +26,13 @@ import { RequestTimelineModal, LastActionBanner } from "./ActivityTimeline";
 import { TierCelebrationBanner } from "../lib/TierCelebrationBanner";
 import { TierToolsPanel } from "../lib/TierToolsPanel";
 import { QuestPanel } from "../lib/QuestPanel";
+import { useTier } from "../lib/useTier";
 import { PMCard, PMCardPrimary, PMPillButton, PMChip, PMSectionHeader, PMEmptyState } from "../components/pm";
 
 export const ClientDashboard = () => {
   const { user, refreshUser } = useAuth();
   const { t } = useI18n();
+  const tierInfo = useTier();
   const [properties, setProperties] = useState([]);
   const [requests, setRequests] = useState([]);
   const [notifs, setNotifs] = useState([]);
@@ -133,12 +135,13 @@ export const ClientDashboard = () => {
     } catch (e) { alert(formatApiError(e)); }
   };
 
-  const tabs = [
-    { id: "request", label: "Solicită", icon: SearchIcon, badge: 0 },
-    { id: "jobs", label: "Lucrările mele", icon: ClipboardList, badge: activeJobs.length },
-    { id: "notifications", label: "Notificări", icon: Bell, badge: unreadNotifs },
-    { id: "settings", label: "Setări", icon: SettingsIcon, badge: 0 },
+  const allTabs = [
+    { id: "request", label: "Solicită", icon: SearchIcon, badge: 0, minTier: "JUNIOR" },
+    { id: "jobs", label: "Lucrările mele", icon: ClipboardList, badge: activeJobs.length, minTier: "JUNIOR" },
+    { id: "notifications", label: "Notificări", icon: Bell, badge: unreadNotifs, minTier: "JUNIOR" },
+    { id: "settings", label: "Setări", icon: SettingsIcon, badge: 0, minTier: "JUNIOR" },
   ];
+  const tabs = allTabs.filter(tb => tierInfo.isAtLeast(tb.minTier));
 
   const title = {
     request: `${t("client.welcome")}, ${user?.name?.split(" ")[0] || ""}`,
@@ -149,9 +152,9 @@ export const ClientDashboard = () => {
 
   return (
     <DashLayout role="client" title={title} bottomNav={<BottomNav tabs={tabs} active={tab} onChange={setTab} dataPrefix="client-tab" />}>
-      <TierCelebrationBanner />
-      {tab === "request" && <QuestPanel />}
-      {tab === "request" && <TierToolsPanel role="client" />}
+      {tierInfo.canSeeTierCelebration && <TierCelebrationBanner />}
+      {tab === "request" && tierInfo.canSeeQuests && <QuestPanel />}
+      {tab === "request" && tierInfo.canSeeStats && <TierToolsPanel role="client" />}
       {tab === "request" && (
         <RequestZone
           user={user} prop={prop} properties={properties} requests={requests}

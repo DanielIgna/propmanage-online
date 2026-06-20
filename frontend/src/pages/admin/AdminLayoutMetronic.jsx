@@ -222,9 +222,21 @@ const LiveActivityRail = ({ theme }) => {
 };
 
 const ROLE_PROFILES = [
-  { role: "client", label: "Client", icon: Home, color: "blue", demoEmail: "client@propmanage.io" },
-  { role: "specialist", label: "Specialist", icon: Wrench, color: "emerald", demoEmail: "specialist@propmanage.io" },
-  { role: "operator", label: "Operator", icon: Briefcase, color: "amber", demoEmail: "operator@propmanage.io" },
+  // Base demo accounts (existing)
+  { role: "client", label: "Client (demo)", icon: Home, color: "blue", demoEmail: "client@propmanage.io", tier: "VERIFIED", group: "base" },
+  { role: "specialist", label: "Specialist (demo)", icon: Wrench, color: "emerald", demoEmail: "specialist@propmanage.io", tier: "VERIFIED", group: "base" },
+  { role: "operator", label: "Operator", icon: Briefcase, color: "amber", demoEmail: "operator@propmanage.io", tier: null, group: "base" },
+  // Client tiers
+  { role: "client", label: "Client JUNIOR", icon: Home, color: "slate", demoEmail: "client.junior@propmanage.io", tier: "JUNIOR", group: "client_tiers" },
+  { role: "client", label: "Client VERIFIED", icon: Home, color: "blue", demoEmail: "client.verified@propmanage.io", tier: "VERIFIED", group: "client_tiers" },
+  { role: "client", label: "Client PREMIUM", icon: Home, color: "fuchsia", demoEmail: "client.premium@propmanage.io", tier: "PREMIUM", group: "client_tiers" },
+  // Specialist tiers
+  { role: "specialist", label: "Specialist ENTRY", icon: Wrench, color: "slate", demoEmail: "spec.entry@propmanage.io", tier: "ENTRY", group: "spec_tiers" },
+  { role: "specialist", label: "Specialist JUNIOR", icon: Wrench, color: "cyan", demoEmail: "spec.junior@propmanage.io", tier: "JUNIOR", group: "spec_tiers" },
+  { role: "specialist", label: "Specialist VERIFIED", icon: Wrench, color: "emerald", demoEmail: "spec.verified@propmanage.io", tier: "VERIFIED", group: "spec_tiers" },
+  { role: "specialist", label: "Specialist ADVANCED", icon: Wrench, color: "lime", demoEmail: "spec.advanced@propmanage.io", tier: "ADVANCED", group: "spec_tiers" },
+  { role: "specialist", label: "Specialist PREMIUM", icon: Wrench, color: "fuchsia", demoEmail: "spec.premium@propmanage.io", tier: "PREMIUM", group: "spec_tiers" },
+  { role: "specialist", label: "Specialist TOP", icon: Wrench, color: "yellow", demoEmail: "spec.top@propmanage.io", tier: "TOP", group: "spec_tiers" },
 ];
 
 const QuickProfileSwitch = ({ dark }) => {
@@ -232,7 +244,7 @@ const QuickProfileSwitch = ({ dark }) => {
   const [busy, setBusy] = useState(null);
 
   const enterRole = async (profile) => {
-    setBusy(profile.role);
+    setBusy(profile.demoEmail || profile.role);
     try {
       // Try demo account first (fast path, predictable)
       let target = null;
@@ -253,7 +265,7 @@ const QuickProfileSwitch = ({ dark }) => {
 
       const { data } = await axios.post(`${API}/admin/impersonate`, {
         user_id: target.id,
-        reason: `QA admin — verificare funcționalități rol ${profile.label} (${target.email})`,
+        reason: `QA admin — verificare funcționalități ${profile.label} (${target.email})`,
       });
       window.location.href = data?.redirect_to || `/${profile.role}`;
     } catch (e) {
@@ -285,12 +297,12 @@ const QuickProfileSwitch = ({ dark }) => {
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div
-            className={`absolute right-0 top-full mt-2 w-64 rounded-xl border shadow-2xl z-40 overflow-hidden ${
+            className={`absolute right-0 top-full mt-2 w-80 max-h-[80vh] overflow-y-auto rounded-xl border shadow-2xl z-40 ${
               dark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
             }`}
             data-testid="quick-profile-menu"
           >
-            <div className={`px-3 py-2.5 border-b ${dark ? "border-slate-700" : "border-slate-200"}`}>
+            <div className={`sticky top-0 z-10 px-3 py-2.5 border-b ${dark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"}`}>
               <div className={`text-[10px] uppercase tracking-wider font-bold ${dark ? "text-slate-400" : "text-slate-500"}`}>
                 Intră rapid ca
               </div>
@@ -298,12 +310,17 @@ const QuickProfileSwitch = ({ dark }) => {
                 Sesiune impersonare jurnalizată GDPR · 2h
               </div>
             </div>
-            {ROLE_PROFILES.map(p => (
+
+            {/* Base demo accounts */}
+            <div className={`px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider font-bold ${dark ? "text-slate-500" : "text-slate-400"}`}>
+              Conturi demo principale
+            </div>
+            {ROLE_PROFILES.filter(p => p.group === "base").map(p => (
               <button
-                key={p.role}
+                key={p.demoEmail}
                 onClick={() => { setOpen(false); enterRole(p); }}
-                disabled={busy === p.role}
-                className={`w-full text-left px-3 py-2.5 flex items-center gap-3 text-sm transition-colors ${
+                disabled={busy === p.demoEmail}
+                className={`w-full text-left px-3 py-2 flex items-center gap-3 text-sm transition-colors ${
                   dark ? "hover:bg-slate-800 text-slate-200" : "hover:bg-slate-50 text-slate-700"
                 } disabled:opacity-60`}
                 data-testid={`quick-profile-${p.role}`}
@@ -314,11 +331,70 @@ const QuickProfileSwitch = ({ dark }) => {
                 <div className="flex-1 min-w-0">
                   <div className="font-medium">{p.label}</div>
                   <div className={`text-[11px] truncate ${dark ? "text-slate-500" : "text-slate-400"}`}>
-                    {busy === p.role ? "Se inițializează..." : p.demoEmail}
+                    {busy === p.demoEmail ? "Se inițializează..." : p.demoEmail}
                   </div>
                 </div>
               </button>
             ))}
+
+            {/* Client tier profiles */}
+            <div className={`px-3 pt-3 pb-1 text-[10px] uppercase tracking-wider font-bold border-t ${dark ? "text-blue-400 border-slate-800" : "text-blue-600 border-slate-100"}`}>
+              Client · Tier-uri de progresie
+            </div>
+            {ROLE_PROFILES.filter(p => p.group === "client_tiers").map(p => (
+              <button
+                key={p.demoEmail}
+                onClick={() => { setOpen(false); enterRole(p); }}
+                disabled={busy === p.demoEmail}
+                className={`w-full text-left px-3 py-2 flex items-center gap-3 text-sm transition-colors ${
+                  dark ? "hover:bg-slate-800 text-slate-200" : "hover:bg-slate-50 text-slate-700"
+                } disabled:opacity-60`}
+                data-testid={`quick-profile-${p.tier?.toLowerCase()}-client`}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-${p.color}-500/15`}>
+                  <p.icon className={`w-4 h-4 text-${p.color}-500`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium flex items-center gap-1.5">
+                    {p.label}
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-${p.color}-500/15 text-${p.color}-500 uppercase`}>{p.tier}</span>
+                  </div>
+                  <div className={`text-[11px] truncate ${dark ? "text-slate-500" : "text-slate-400"}`}>
+                    {busy === p.demoEmail ? "Se inițializează..." : p.demoEmail}
+                  </div>
+                </div>
+              </button>
+            ))}
+
+            {/* Specialist tier profiles */}
+            <div className={`px-3 pt-3 pb-1 text-[10px] uppercase tracking-wider font-bold border-t ${dark ? "text-emerald-400 border-slate-800" : "text-emerald-600 border-slate-100"}`}>
+              Specialist · Tier-uri de progresie
+            </div>
+            {ROLE_PROFILES.filter(p => p.group === "spec_tiers").map(p => (
+              <button
+                key={p.demoEmail}
+                onClick={() => { setOpen(false); enterRole(p); }}
+                disabled={busy === p.demoEmail}
+                className={`w-full text-left px-3 py-2 flex items-center gap-3 text-sm transition-colors ${
+                  dark ? "hover:bg-slate-800 text-slate-200" : "hover:bg-slate-50 text-slate-700"
+                } disabled:opacity-60`}
+                data-testid={`quick-profile-${p.tier?.toLowerCase()}-specialist`}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-${p.color}-500/15`}>
+                  <p.icon className={`w-4 h-4 text-${p.color}-500`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium flex items-center gap-1.5">
+                    {p.label}
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-${p.color}-500/15 text-${p.color}-500 uppercase`}>{p.tier}</span>
+                  </div>
+                  <div className={`text-[11px] truncate ${dark ? "text-slate-500" : "text-slate-400"}`}>
+                    {busy === p.demoEmail ? "Se inițializează..." : p.demoEmail}
+                  </div>
+                </div>
+              </button>
+            ))}
+
             <div className={`px-3 py-2 border-t text-[10px] ${dark ? "border-slate-800 text-slate-500" : "border-slate-100 text-slate-400"}`}>
               Pentru utilizatori reali → tab <strong>Toți userii</strong>.
             </div>

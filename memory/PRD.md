@@ -929,3 +929,64 @@ Massive UI/UX refresh based on 28 HTML mockups uploaded by user (Material You-in
 ### Test Coverage
 - iter63: 100% pass (6/6 pytest backend + 3/3 frontend features)
 - Pytest file: `/app/backend/tests/test_iter63_welcome_topic.py`
+
+## Update — 20 Feb 2026 · Tier-Based Progressive Disclosure (iter 64)
+
+### 1. Admin Tier Switcher (P0 — Admin QA tooling)
+- **Backend** `/app/backend/tier_demo_seed.py`:
+  - Idempotent seed of 9 tier-specific demo accounts (3 client + 5 specialist + 1 base TOP)
+  - Each account has pre-set tier, rating, reviews_count, jobs_completed, verified status
+  - All consents pre-accepted (GDPR ok for demo)
+  - Password for all: `Demo123!`
+- **Frontend** `AdminLayoutMetronic.jsx`:
+  - Dropdown "Schimbă profilul" now shows 3 sections: Base demo / Client tiers / Specialist tiers
+  - Each profile shows tier badge color-coded (slate/blue/emerald/lime/fuchsia/yellow)
+  - Click → impersonate → redirect to that user's dashboard
+  - All audited via existing `/api/admin/impersonate` (GDPR jurnalizat 2h)
+
+### 2. Progressive Disclosure Helper
+- **NEW** `/app/frontend/src/lib/useTier.js`:
+  - Hook `useTier()` returns: tier, rank, role, isVerified, reviewsCount, jobsCompleted, isAtLeast(min)
+  - Pre-computed unlock booleans:
+    - `canSeeStats` (VERIFIED+), `canSeeQuests` (VERIFIED+)
+    - `canSeeBentoHero` (ADVANCED+), `canSeePortfolio` (VERIFIED+)
+    - `canSeePremiumProfile` (PREMIUM+), `canSeeBIInsights` (TOP+)
+    - `canSeeVoucherWidget` (ADVANCED+), `canSeeTierCelebration` (JUNIOR+)
+    - Client-specific: `canSeeEchipa`, `canSeeCommunityWidget`, `canSeeNotificationsTab`
+  - Component `<ShowFromTier minTier="VERIFIED">` for inline gating
+
+### 3. SpecialistDashboard.jsx — Progressive Disclosure Applied
+- **ENTRY (new specialists)**:
+  - Only 3 bottom tabs: Oportunități + Lucrările mele + Setări (Notificări HIDDEN)
+  - Quest panel HIDDEN
+  - TierToolsPanel HIDDEN
+  - 4 bento stats HIDDEN
+  - Hero verde HIDDEN
+  - Portfolio & New Project buttons HIDDEN
+  - Premium hint HIDDEN
+  - INSTEAD shows: friendly "Bun venit!" intro card with `Verifică-mi contul` CTA
+- **JUNIOR**: + Notificări tab + TierCelebration
+- **VERIFIED**: + Stats + Quest + Portfolio + TierToolsPanel + Premium hint
+- **ADVANCED**: + Hero verde + Voucher widget
+- **PREMIUM**: + Premium profile editor
+- **TOP**: + BI insights + Twin tools (existing TierGates kicks in)
+
+### 4. ClientDashboard.jsx — Progressive Disclosure Applied
+- Tabs gated to JUNIOR minimum (all clients see all 4 tabs)
+- Quest panel + TierToolsPanel gated to VERIFIED+
+- TierCelebration gated to JUNIOR+ (avoid confusion for brand-new users)
+
+### Testing
+- Manually validated: spec.entry sees 3 tabs + intro card + verify CTA only
+- spec.premium sees ALL features (Quest, advanced tools, stats, premium link, 4 tabs)
+- client.junior sees clean dashboard with "Adaugă proprietate" empty state, no quest
+- All ROLE_PROFILES dropdown entries are clickable in admin
+
+### Updated files
+- `/app/backend/tier_demo_seed.py` (new)
+- `/app/backend/server.py` (seed registration)
+- `/app/frontend/src/lib/useTier.js` (new)
+- `/app/frontend/src/pages/admin/AdminLayoutMetronic.jsx`
+- `/app/frontend/src/pages/SpecialistDashboard.jsx`
+- `/app/frontend/src/pages/ClientDashboard.jsx`
+- `/app/memory/test_credentials.md` (added 9 tier accounts)

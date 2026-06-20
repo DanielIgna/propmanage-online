@@ -22,6 +22,7 @@ import { RequestTimelineModal, ScheduleProposalModal, LastActionBanner } from ".
 import { TierCelebrationBanner } from "../lib/TierCelebrationBanner";
 import { TierToolsPanel } from "../lib/TierToolsPanel";
 import { QuestPanel } from "../lib/QuestPanel";
+import { useTier } from "../lib/useTier";
 import {
   PMCard, PMCardPrimary, PMStatCard, PMPillButton, PMChip,
   PMSectionHeader, PMEmptyState,
@@ -29,6 +30,7 @@ import {
 
 export const SpecialistDashboard = () => {
   const { user, refreshUser } = useAuth();
+  const tierInfo = useTier();
   const [requests, setRequests] = useState([]);
   const [notifs, setNotifs] = useState([]);
   const [chatRequest, setChatRequest] = useState(null);
@@ -74,12 +76,14 @@ export const SpecialistDashboard = () => {
   };
   const unreadNotifs = notifs.filter(n => !n.read).length;
 
-  const tabs = [
-    { id: "opportunities", label: "Oportunități", icon: Target, badge: open.length },
-    { id: "jobs", label: "Lucrările mele", icon: ClipboardCheck, badge: mine.filter(r => r.status !== "confirmed").length },
-    { id: "notifications", label: "Notificări", icon: Bell, badge: unreadNotifs },
-    { id: "settings", label: "Setări", icon: SettingsIcon, badge: 0 },
+  const allTabs = [
+    { id: "opportunities", label: "Oportunități", icon: Target, badge: open.length, minTier: "ENTRY" },
+    { id: "jobs", label: "Lucrările mele", icon: ClipboardCheck, badge: mine.filter(r => r.status !== "confirmed").length, minTier: "ENTRY" },
+    { id: "notifications", label: "Notificări", icon: Bell, badge: unreadNotifs, minTier: "JUNIOR" },
+    { id: "settings", label: "Setări", icon: SettingsIcon, badge: 0, minTier: "ENTRY" },
   ];
+  // Progressive disclosure: hide tabs the specialist hasn't unlocked yet
+  const tabs = allTabs.filter(t => tierInfo.isAtLeast(t.minTier));
 
   const title = {
     opportunities: "Oportunități",
@@ -110,12 +114,12 @@ export const SpecialistDashboard = () => {
         </PMCard>
       )}
 
-      {tab === "opportunities" && <QuestPanel />}
-      {tab === "opportunities" && <TierToolsPanel role="specialist" />}
+      {tab === "opportunities" && tierInfo.canSeeQuests && <QuestPanel />}
+      {tab === "opportunities" && tierInfo.canSeeStats && <TierToolsPanel role="specialist" />}
       {tab === "opportunities" && (
         <>
-          {/* Welcome hero (only when verified - shows tier achievement) */}
-          {user?.verified && user?.tier && user.tier !== "ENTRY" && (
+          {/* Welcome hero (only ADVANCED+) */}
+          {user?.verified && tierInfo.canSeeBentoHero && user?.tier && user.tier !== "ENTRY" && (
             <PMCardPrimary className="mb-6 pm-fade-in">
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div>
@@ -140,8 +144,9 @@ export const SpecialistDashboard = () => {
             </PMCardPrimary>
           )}
 
-          {/* Bento stats */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 pm-fade-in-delay-1">
+          {/* Bento stats — VERIFIED+ only */}
+          {tierInfo.canSeeStats && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 pm-fade-in-delay-1">
             <PMStatCard
               icon={Wallet}
               label="Sold lead-uri"
@@ -168,9 +173,37 @@ export const SpecialistDashboard = () => {
               trailing={user?.verified ? <PMChip variant="success">VERIF</PMChip> : <PMChip variant="warning">PEND</PMChip>}
               testid="spec-stat-tier"
             />
-          </div>
+            </div>
+          )}
 
-          {user?.tier !== "PREMIUM" && (
+          {/* ENTRY/JUNIOR: friendly intro card for newcomers */}
+          {!tierInfo.canSeeStats && (
+            <PMCard className="mb-6 pm-fade-in" testid="spec-newcomer-intro">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-[var(--pm-primary-container)] flex items-center justify-center shrink-0">
+                  <Target className="w-6 h-6 text-[var(--pm-primary)]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-base mb-1">Bun venit, {user?.name?.split(" ")[0] || "specialist"}!</h3>
+                  <p className="text-sm text-stone-400 mb-3">
+                    Mai jos găsești oportunități noi. Acceptă-ți primul job ca să debloci ratings, stats și recompense.
+                  </p>
+                  <div className="flex gap-2 flex-wrap">
+                    {!user?.verified && (
+                      <PMPillButton variant="primary" size="sm" icon={FileCheck} onClick={() => setShowDocs(true)} testid="newcomer-upload-docs">
+                        Verifică-mi contul
+                      </PMPillButton>
+                    )}
+                    <PMPillButton variant="ghost" size="sm" onClick={() => document.querySelector('[data-tour="specialist-leads"]')?.scrollIntoView({behavior:"smooth"})}>
+                      Vezi oportunități
+                    </PMPillButton>
+                  </div>
+                </div>
+              </div>
+            </PMCard>
+          )}
+
+          {user?.tier !== "PREMIUM" && tierInfo.canSeeStats && (
             <div className="mb-4 text-xs text-stone-500 bg-white/3 rounded-xl px-4 py-2.5 inline-flex items-center gap-2" data-testid="premium-hint">
               <Crown className="w-3.5 h-3.5 text-fuchsia-300" />
               Profilul Premium se deblochează la tier PREMIUM (50+ joburi, rating ≥4.7). <Link to="/specialist/premium-profile" className="text-fuchsia-300 hover:underline">Preview editor</Link>
@@ -221,14 +254,16 @@ export const SpecialistDashboard = () => {
         <>
           {user?.verified && (
             <div className="mb-4 flex justify-end gap-2 flex-wrap">
-              {(user?.service_categories || []).includes("interior_design") && (
+              {tierInfo.canSeePortfolio && (user?.service_categories || []).includes("interior_design") && (
                 <PMPillButton variant="primary" size="sm" icon={Plus} onClick={() => setShowNewProject(true)} testid="new-project-btn">
                   Proiect coordonare
                 </PMPillButton>
               )}
-              <PMPillButton variant="ghost" size="sm" icon={ImageIcon} onClick={() => setShowPortfolio(true)} testid="manage-portfolio-btn">
-                Portofoliu
-              </PMPillButton>
+              {tierInfo.canSeePortfolio && (
+                <PMPillButton variant="ghost" size="sm" icon={ImageIcon} onClick={() => setShowPortfolio(true)} testid="manage-portfolio-btn">
+                  Portofoliu
+                </PMPillButton>
+              )}
               <PMPillButton variant="ghost" size="sm" icon={FileCheck} onClick={() => setShowDocs(true)} testid="manage-docs-btn">
                 Documentele mele
               </PMPillButton>
