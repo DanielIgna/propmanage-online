@@ -9,7 +9,7 @@ import {
   User as UserIcon, Settings as SettingsIcon, RefreshCw, Share2, Heart,
   LifeBuoy, MessageCircle, Lock, ChevronRight, X, Mail, Phone, MapPin as MapPinIcon,
   Download, Trash2, AlertTriangle, CheckCircle2, Shield, BellRing, BellOff,
-  Sun, Eye, Globe, Clock, KeyRound, Box, Loader2, Sparkles,
+  Sun, Eye, Globe, Clock, KeyRound, Box, Loader2, Sparkles, Trophy,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { API } from "./DashShared";
@@ -41,6 +41,7 @@ export const SettingsPanel = () => {
   const [modal, setModal] = useState(null);
   const [pushStatus, setPushStatus] = useState("unsupported");
   const [digestEnabled, setDigestEnabled] = useState(true);
+  const [tierMilestoneEnabled, setTierMilestoneEnabled] = useState(true);
   // Digital Twin summary (loaded only for client view)
   const [twinSummary, setTwinSummary] = useState(null);
   const [twinViewerProp, setTwinViewerProp] = useState(null);
@@ -53,6 +54,13 @@ export const SettingsPanel = () => {
   useEffect(() => {
     if (user) setDigestEnabled(!user.digest_disabled);
   }, [user]);
+
+  // Tier milestone preference
+  useEffect(() => {
+    axios.get(`${API}/tier-milestones/preferences`)
+      .then(r => setTierMilestoneEnabled(r.data?.notify_tier_milestones !== false))
+      .catch(() => {});
+  }, []);
 
   // Load DT summary only when user is in Client view (avoids noise for specialists/admins)
   useEffect(() => {
@@ -121,6 +129,16 @@ export const SettingsPanel = () => {
       await axios.post(`${API}/auth/digest-preference`, { enabled: next });
       setDigestEnabled(next);
       await refreshUser();
+    } catch (e) {
+      alert(formatApiError(e));
+    }
+  };
+
+  const toggleTierMilestones = async () => {
+    const next = !tierMilestoneEnabled;
+    try {
+      await axios.patch(`${API}/tier-milestones/preferences`, { notify_tier_milestones: next });
+      setTierMilestoneEnabled(next);
     } catch (e) {
       alert(formatApiError(e));
     }
@@ -280,6 +298,17 @@ export const SettingsPanel = () => {
           }
           onClick={toggleDigest}
           tid="row-digest"
+        />
+        <Row
+          icon={Trophy}
+          title={tierMilestoneEnabled ? "Notificări progres tier: ACTIVE" : "Activează notificări progres tier"}
+          subtitle={
+            tierMilestoneEnabled
+              ? "Primești notificare când atingi 50%, 75% sau 100% pe drumul către următorul tier. Apasă pentru a dezactiva."
+              : "Activează ca să fii anunțat când ești aproape de promovare (Junior → Verified → Premium)."
+          }
+          onClick={toggleTierMilestones}
+          tid="row-tier-milestones"
         />
         {digestEnabled && (
           <Row

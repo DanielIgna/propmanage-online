@@ -334,6 +334,19 @@ async def confirm_complete(req_id: str, user: dict = Depends(require_role("clien
             type_="payment",
             link="/specialist"
         )
+        # Increment jobs_completed for both parties (used by tier progression)
+        try:
+            await db.users.update_one({"_id": ObjectId(req["specialist_id"])}, {"$inc": {"jobs_completed": 1}})
+            await db.users.update_one({"_id": ObjectId(req["client_id"])}, {"$inc": {"jobs_completed": 1}})
+        except Exception:
+            pass
+        # Tier milestone check (50%/75%/100% notifications)
+        try:
+            from routes.tier_milestones import check_tier_milestones
+            await check_tier_milestones(req["specialist_id"])
+            await check_tier_milestones(req["client_id"])
+        except Exception:
+            pass
     return {"ok": True, "tokens_earned": 100}
 
 @router.post("/requests/{req_id}/review")
@@ -367,9 +380,15 @@ async def review_specialist(req_id: str, data: ReviewIn, user: dict = Depends(re
         update["tier"] = "VERIFIED"
     
     await db.users.update_one({"_id": ObjectId(req["specialist_id"])}, {"$set": update})
-    
+
     # Award client +20 tokens for review
     await db.users.update_one({"_id": ObjectId(user["id"])}, {"$inc": {"tokens": 20}})
+    # Tier milestone check after rating change
+    try:
+        from routes.tier_milestones import check_tier_milestones
+        await check_tier_milestones(req["specialist_id"])
+    except Exception:
+        pass
     return {"ok": True, "new_rating": new_rating}
 
 # ============= ACTIVITY EVENTS API =============

@@ -368,6 +368,12 @@ async def verify_specialist(spec_id: str, user: dict = Depends(require_role("adm
         await send_template(tpl_trust_badge_invite, spec.get("name"), to=spec.get("email"))
     except Exception:  # noqa: BLE001
         pass
+    # Tier milestone check after KYC approval (verified field changed)
+    try:
+        from routes.tier_milestones import check_tier_milestones
+        await check_tier_milestones(spec_id)
+    except Exception:
+        pass
     return {"ok": True}
 
 

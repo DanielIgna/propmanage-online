@@ -109,6 +109,7 @@ from routes.marketplace_offers import router as marketplace_offers_router
 from routes.premium_marketplace import router as premium_marketplace_router
 from routes.bi_moe import router as bi_moe_router
 from routes.community import router as community_router, seed_community_demo
+from routes.tier_milestones import router as tier_milestones_router, cron_check_all_users
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
@@ -218,6 +219,7 @@ for r in (
     premium_marketplace_router,
     bi_moe_router,
     community_router,
+    tier_milestones_router,
 ):
     app.include_router(r)
 
@@ -323,6 +325,14 @@ async def startup():
             evaluate_quests_job,
             CronTrigger(hour=3, minute=45, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="quests_daily_evaluation",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        # Tier milestones — daily sweep for missed 50/75/100% notifications, 04:00 Europe/Bucharest
+        scheduler.add_job(
+            cron_check_all_users,
+            CronTrigger(hour=4, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="tier_milestone_daily_sweep",
             replace_existing=True,
             misfire_grace_time=7200,
         )
