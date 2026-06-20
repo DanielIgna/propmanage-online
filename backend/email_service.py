@@ -17,7 +17,7 @@ SENDGRID_KEY = os.environ.get("SENDGRID_API_KEY", "").strip()
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "PropManage <onboarding@resend.dev>")
 ADMIN_EMAILS_RAW = os.environ.get("ADMIN_NOTIFICATION_EMAILS", "")
 ADMIN_EMAILS = [e.strip() for e in ADMIN_EMAILS_RAW.split(",") if e.strip()]
-APP_URL = os.environ.get("APP_PUBLIC_URL", "https://propmanage.io")
+APP_URL = os.environ.get("APP_PUBLIC_URL", "https://propmanage.ro")
 
 PROVIDER = "resend" if RESEND_KEY else ("sendgrid" if SENDGRID_KEY else "console")
 

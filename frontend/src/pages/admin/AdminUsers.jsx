@@ -190,7 +190,10 @@ export const AdminUsers = () => {
               {data.items.map(u => (
                 <tr key={u.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30" data-testid={`user-row-${u.id}`}>
                   <td className="py-2.5 px-3 font-medium">{u.name || "—"}</td>
-                  <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">{u.email}</td>
+                  <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">
+                    <div>{u.email}</div>
+                    {u.phone && <div className="text-[10px] text-slate-500 dark:text-slate-500 font-mono" data-testid={`user-phone-${u.id}`}>📞 {u.phone}</div>}
+                  </td>
                   <td className="py-2.5 px-3">
                     <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">{u.role}</span>
                   </td>
