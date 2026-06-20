@@ -1019,3 +1019,39 @@ Massive UI/UX refresh based on 28 HTML mockups uploaded by user (Material You-in
 - **Retention through clarity**: users know exactly what to invest time in
 - **Gamification**: clear next-goal + visual reward (unlocks pills)
 - **No backend changes** — reads `tier`, `jobs_completed`, `rating`, `verified`, `kyc_status` from user object
+
+## Update — 20 Feb 2026 · Pre-Deploy Smoke Test Suite (iter67)
+
+### Feature
+**Automated dashboard smoke test** that catches the exact bug pattern that escaped to production (TierProgressWidget undefined ReferenceError).
+
+### Files
+- `/app/backend/tests/test_dashboards_smoke.py` — Playwright + asyncio script:
+  - Tests 12 demo profiles (3 base + 3 client tiers + 6 spec tiers)
+  - For each: clear cookies → login admin → impersonate via exact-email match → navigate to dashboard → assert no ErrorBoundary fingerprints + required testid present
+  - Run as standalone script (`python tests/test_dashboards_smoke.py`) or via pytest
+  - Exit code 0 = safe to deploy, 1 = blocker
+- `/app/scripts/smoke-test.sh` — One-liner runner with env var support (`SMOKE_BASE_URL`)
+- `/app/backend/tests/SMOKE_TEST_README.md` — Docs
+
+### Error fingerprints detected
+- `"Ceva nu a mers cum trebuie"` (ErrorBoundary)
+- `"is not defined"` (ReferenceError - catches missing imports like iter66 bug)
+- `"ReferenceError"`, `"TypeError"`
+
+### Verified: 12/12 PASS
+```
+📊 Result: 12 passed · 0 failed · 12 total
+✅ All dashboards healthy. Safe to deploy.
+```
+Runtime: ~90 seconds.
+
+### Workflow
+1. Before deploy: `/app/scripts/smoke-test.sh`
+2. If FAIL → fix code → re-run → deploy
+3. If PASS → deploy with confidence
+
+### To test against production
+```bash
+SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
+```
