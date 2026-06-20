@@ -2,10 +2,11 @@
 // Tabs: Oportunități | Lucrările mele | Notificări | Setări
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { Link } from "react-router-dom";
 import {
   Wallet, Star, Briefcase, Award, Sparkles, FileCheck, MessageSquare, AlertTriangle,
   Palette, Plus, Image as ImageIcon, Target, ClipboardCheck, Bell,
-  Settings as SettingsIcon, Search, RefreshCw, Clock,
+  Settings as SettingsIcon, Search, RefreshCw, Clock, Crown,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { ChatPanel } from "./ChatPanel";
@@ -110,6 +111,19 @@ export const SpecialistDashboard = () => {
             <Stat icon={Briefcase} label="Active" value={mine.filter(r => r.status !== "confirmed").length} sub="In progress" color="cyan" tid="spec-stat-active" />
             <Stat icon={Award} label="Tier" value={user?.tier || "ENTRY"} sub={user?.verified ? "Verified" : "Pending"} tid="spec-stat-tier" />
           </div>
+          {user?.tier === "PREMIUM" && (
+            <div className="mb-4">
+              <Link to="/specialist/premium-profile" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-fuchsia-500/15 border border-fuchsia-500/40 text-fuchsia-200 hover:bg-fuchsia-500/25 transition" data-testid="link-premium-profile">
+                <Crown className="w-4 h-4" /> Editează Profilul Premium
+              </Link>
+            </div>
+          )}
+          {user?.tier !== "PREMIUM" && (
+            <div className="mb-4 text-xs text-stone-500 bg-white/3 rounded-xl px-4 py-2.5 inline-flex items-center gap-2" data-testid="premium-hint">
+              <Crown className="w-3.5 h-3.5 text-fuchsia-300" />
+              Profilul Premium se deblochează la tier PREMIUM (50+ joburi, rating ≥4.7). <Link to="/specialist/premium-profile" className="text-fuchsia-300 hover:underline">Preview editor</Link>
+            </div>
+          )}
           <FilterBar searchQ={searchQ} setSearchQ={setSearchQ} urgentOnly={urgentOnly} setUrgentOnly={setUrgentOnly} urgentCount={open.filter(r => r.priority === "urgent").length} />
           <div className="space-y-3 mt-4 max-w-3xl mx-auto" data-tour="specialist-leads">
             <div className="text-xs uppercase tracking-wider text-stone-500 px-1">{filtered(open).length} oportunități</div>
