@@ -1055,3 +1055,29 @@ Runtime: ~90 seconds.
 ```bash
 SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 ```
+
+## Update — 20 Feb 2026 · GitHub Actions CI Workflow (iter68)
+
+### Files added
+- `/app/.github/workflows/smoke-test.yml` — GitHub Actions workflow:
+  - Triggers: PR la main/master, push în main/master, manual dispatch
+  - Steps: checkout → Python 3.11 → install Playwright+Chromium → run smoke test → upload logs on fail
+  - Timeout: 5 min (real runtime ~3 min)
+  - Configurable via Variables: `SMOKE_BASE_URL`, `SMOKE_ADMIN_EMAIL`
+  - Secret-protected: `SMOKE_ADMIN_PASSWORD`
+- `/app/.github/GITHUB_ACTIONS_SETUP.md` — Setup guide complet (Romanian)
+- `/app/README.md` updated cu:
+  - Badge-uri: Dashboard Smoke Test, Backend FastAPI, Frontend React, Database MongoDB
+  - Secțiune nouă "🛡️ Pre-Deploy Quality Gate"
+  - Link la docs smoke test
+
+### Setup required (user action)
+1. Push to GitHub via "Save to GitHub" Emergent button
+2. Repo Settings → Secrets and variables → Actions:
+   - Add Variable `SMOKE_BASE_URL` = `https://phased-document.preview.emergentagent.com`
+   - Add Secret `SMOKE_ADMIN_PASSWORD` = `Admin123!`
+3. Înlocuiește `USER/REPO` cu calea reală în README badge
+4. Workflow se va activa automat pe primul PR/push
+
+### Benefit
+**Bug-ul iter66 (TierProgressWidget undefined) NU mai poate ajunge niciodată în producție** — workflow-ul blochează merge-ul în main.
