@@ -6,7 +6,8 @@ import { Link } from "react-router-dom";
 import {
   Wallet, Star, Briefcase, Award, Sparkles, FileCheck, MessageSquare, AlertTriangle,
   Palette, Plus, Image as ImageIcon, Target, ClipboardCheck, Bell,
-  Settings as SettingsIcon, Search, RefreshCw, Clock, Crown,
+  Settings as SettingsIcon, Search, RefreshCw, Clock, Crown, MapPin, Flame,
+  CheckCircle2, ShieldCheck, ChevronRight, Inbox, TrendingUp,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { ChatPanel } from "./ChatPanel";
@@ -14,13 +15,17 @@ import { OpenDisputeModal, SpecialistDocumentsModal } from "./AdminModals";
 import { ProposePhaseModal } from "./InteriorDesign";
 import { PortfolioManagerModal } from "./Portfolio";
 import { ProjectListSection } from "./ProjectWorkspace";
-import { API, DashLayout, Stat, StatusBadge, NavigateButtons } from "./DashShared";
+import { API, DashLayout, StatusBadge, NavigateButtons } from "./DashShared";
 import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
 import { RequestTimelineModal, ScheduleProposalModal, LastActionBanner } from "./ActivityTimeline";
 import { TierCelebrationBanner } from "../lib/TierCelebrationBanner";
 import { TierToolsPanel } from "../lib/TierToolsPanel";
 import { QuestPanel } from "../lib/QuestPanel";
+import {
+  PMCard, PMCardPrimary, PMStatCard, PMPillButton, PMChip,
+  PMSectionHeader, PMEmptyState,
+} from "../components/pm";
 
 export const SpecialistDashboard = () => {
   const { user, refreshUser } = useAuth();
@@ -87,70 +92,126 @@ export const SpecialistDashboard = () => {
     <DashLayout role="specialist" title={title} bottomNav={<BottomNav tabs={tabs} active={tab} onChange={setTab} dataPrefix="spec-tab" />}>
       <TierCelebrationBanner />
       {!user?.verified && (
-        <div className="mb-6 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3" data-testid="verify-banner">
-          <div className="flex items-center gap-3">
-            <FileCheck className="w-5 h-5 text-amber-400" />
-            <div>
-              <div className="text-sm font-medium">Cont neverificat</div>
-              <div className="text-xs text-stone-400">Încarcă documentele pentru a primi badge &quot;VERIFIED&quot; și acces complet.</div>
+        <PMCard accent="warning" className="mb-6 !bg-amber-500/5 !border-amber-500/30 pm-fade-in" testid="verify-banner">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                <ShieldCheck className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold">Verifică-ți contul</div>
+                <div className="text-xs text-stone-400">Încarcă documentele pentru badge &quot;VERIFIED&quot; și acces complet.</div>
+              </div>
             </div>
+            <PMPillButton variant="primary" size="sm" onClick={() => setShowDocs(true)} testid="upload-docs-cta">
+              Începe
+            </PMPillButton>
           </div>
-          <button onClick={() => setShowDocs(true)} className="pm-btn pm-btn-primary pm-btn-sm" data-testid="upload-docs-cta">
-            Încarcă documente
-          </button>
-        </div>
+        </PMCard>
       )}
 
       {tab === "opportunities" && <QuestPanel />}
       {tab === "opportunities" && <TierToolsPanel role="specialist" />}
       {tab === "opportunities" && (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <Stat icon={Wallet} label="Sold lead-uri" value={`${user?.wallet_balance?.toFixed(0) || 0}`} sub="RON" color="emerald" tid="spec-stat-wallet" data-tour="specialist-wallet" />
-            <Stat icon={Star} label="Rating" value={user?.rating || "—"} sub={`${user?.reviews_count || 0} reviews`} color="amber" tid="spec-stat-rating" data-tour="specialist-trust-score" />
-            <Stat icon={Briefcase} label="Active" value={mine.filter(r => r.status !== "confirmed").length} sub="In progress" color="cyan" tid="spec-stat-active" />
-            <Stat icon={Award} label="Tier" value={user?.tier || "ENTRY"} sub={user?.verified ? "Verified" : "Pending"} tid="spec-stat-tier" />
-          </div>
-          {user?.tier === "PREMIUM" && (
-            <div className="mb-4">
-              <Link to="/specialist/premium-profile" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-fuchsia-500/15 border border-fuchsia-500/40 text-fuchsia-200 hover:bg-fuchsia-500/25 transition" data-testid="link-premium-profile">
-                <Crown className="w-4 h-4" /> Editează Profilul Premium
-              </Link>
-            </div>
+          {/* Welcome hero (only when verified - shows tier achievement) */}
+          {user?.verified && user?.tier && user.tier !== "ENTRY" && (
+            <PMCardPrimary className="mb-6 pm-fade-in">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <PMChip variant="primary" className="!bg-[var(--pm-on-primary-container)] !text-[var(--pm-primary-container)] !border-transparent mb-2">
+                    {user.tier} SPECIALIST
+                  </PMChip>
+                  <h2 className="text-2xl md:text-3xl font-bold text-[var(--pm-on-primary-container)] mb-1">
+                    Salut, {user.name?.split(" ")[0] || "specialist"}!
+                  </h2>
+                  <div className="flex items-center gap-3 text-sm text-[var(--pm-on-primary-container)] opacity-80">
+                    <span className="flex items-center gap-1"><Star className="w-4 h-4 fill-current" /> {user?.rating || "—"}</span>
+                    <span className="w-1 h-1 rounded-full bg-current opacity-50" />
+                    <span>{user?.reviews_count || 0} recenzii</span>
+                  </div>
+                </div>
+                {user?.tier === "PREMIUM" && (
+                  <Link to="/specialist/premium-profile" data-testid="link-premium-profile">
+                    <PMPillButton variant="on-container" icon={Crown}>Editează Profil Premium</PMPillButton>
+                  </Link>
+                )}
+              </div>
+            </PMCardPrimary>
           )}
+
+          {/* Bento stats */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 pm-fade-in-delay-1">
+            <PMStatCard
+              icon={Wallet}
+              label="Sold lead-uri"
+              value={`${user?.wallet_balance?.toFixed(0) || 0} RON`}
+              testid="spec-stat-wallet"
+            />
+            <PMStatCard
+              icon={Star}
+              label="Rating"
+              value={user?.rating || "—"}
+              trailing={<span className="text-xs text-[var(--pm-text-muted)]">{user?.reviews_count || 0}</span>}
+              testid="spec-stat-rating"
+            />
+            <PMStatCard
+              icon={Briefcase}
+              label="Active"
+              value={mine.filter(r => r.status !== "confirmed").length}
+              testid="spec-stat-active"
+            />
+            <PMStatCard
+              icon={Award}
+              label="Tier"
+              value={user?.tier || "ENTRY"}
+              trailing={user?.verified ? <PMChip variant="success">VERIF</PMChip> : <PMChip variant="warning">PEND</PMChip>}
+              testid="spec-stat-tier"
+            />
+          </div>
+
           {user?.tier !== "PREMIUM" && (
             <div className="mb-4 text-xs text-stone-500 bg-white/3 rounded-xl px-4 py-2.5 inline-flex items-center gap-2" data-testid="premium-hint">
               <Crown className="w-3.5 h-3.5 text-fuchsia-300" />
               Profilul Premium se deblochează la tier PREMIUM (50+ joburi, rating ≥4.7). <Link to="/specialist/premium-profile" className="text-fuchsia-300 hover:underline">Preview editor</Link>
             </div>
           )}
+
           <FilterBar searchQ={searchQ} setSearchQ={setSearchQ} urgentOnly={urgentOnly} setUrgentOnly={setUrgentOnly} urgentCount={open.filter(r => r.priority === "urgent").length} />
-          <div className="space-y-3 mt-4 max-w-3xl mx-auto" data-tour="specialist-leads">
-            <div className="text-xs uppercase tracking-wider text-stone-500 px-1">{filtered(open).length} oportunități</div>
+
+          <div className="space-y-3 mt-4 max-w-3xl mx-auto pm-fade-in-delay-2" data-tour="specialist-leads">
+            <PMSectionHeader title={`${filtered(open).length} oportunități`} />
             {filtered(open).length === 0 && (
-              <div className="text-center py-16">
-                <Target className="w-12 h-12 text-stone-700 mx-auto mb-3" />
-                <div className="text-sm text-stone-400">Niciun lead disponibil</div>
-                <div className="text-xs text-stone-600 mt-1">Verifică din nou în câteva minute.</div>
-              </div>
+              <PMEmptyState
+                icon={Target}
+                title="Niciun lead disponibil"
+                description="Verifică din nou în câteva minute sau ajustează filtrele."
+              />
             )}
             {filtered(open).map(r => (
-              <div key={r.id} className={`bg-white/5 rounded-2xl p-4 ${r.priority === "urgent" ? "ring-2 ring-red-500/40 animate-pulse-soft" : ""}`} data-testid={`open-${r.id}`}>
+              <PMCard
+                key={r.id}
+                accent={r.priority === "urgent" ? "urgent" : "default"}
+                className={r.priority === "urgent" ? "animate-pulse-soft" : ""}
+                testid={`open-${r.id}`}
+              >
                 <div className="flex justify-between items-start mb-2 gap-3">
-                  <div className="min-w-0">
-                    <div className="font-medium text-sm">{r.title}</div>
-                    <div className="text-[10px] text-stone-500">{r.client_name} · {r.property_name}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      {r.priority === "urgent" && <PMChip variant="error" icon={Flame}>URGENT</PMChip>}
+                      <span className="text-[11px] text-stone-500">{r.client_name} · {r.property_name}</span>
+                    </div>
+                    <div className="font-semibold text-sm md:text-base">{r.title}</div>
                   </div>
-                  {r.priority === "urgent" && <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-1 rounded-full uppercase tracking-wider shrink-0">Urgent</span>}
                 </div>
-                <p className="text-xs text-stone-400 mb-3 line-clamp-2">{r.description}</p>
-                <div className="flex justify-between items-center gap-2">
-                  <div className="text-xs text-stone-400">Estimat: <span className="text-white">{r.budget_estimate} RON</span></div>
-                  <button onClick={() => openAccept(r)} className="pm-btn pm-btn-primary pm-btn-sm shrink-0" data-testid={`accept-${r.id}`}>
-                    Acceptă (45 RON)
-                  </button>
+                <p className="text-xs md:text-sm text-stone-400 mb-3 line-clamp-2">{r.description}</p>
+                <div className="flex justify-between items-center gap-2 flex-wrap">
+                  <div className="text-xs text-stone-400">Estimat: <span className="text-white font-semibold">{r.budget_estimate} RON</span></div>
+                  <PMPillButton variant="primary" size="sm" onClick={() => openAccept(r)} testid={`accept-${r.id}`}>
+                    Acceptă · 45 RON
+                  </PMPillButton>
                 </div>
-              </div>
+              </PMCard>
             ))}
           </div>
         </>
@@ -161,16 +222,16 @@ export const SpecialistDashboard = () => {
           {user?.verified && (
             <div className="mb-4 flex justify-end gap-2 flex-wrap">
               {(user?.service_categories || []).includes("interior_design") && (
-                <button onClick={() => setShowNewProject(true)} className="px-4 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-purple-200 border border-purple-500/40 rounded-full text-xs flex items-center gap-2 font-medium" data-testid="new-project-btn">
-                  <Plus className="w-3.5 h-3.5" />Proiect nou coordonare
-                </button>
+                <PMPillButton variant="primary" size="sm" icon={Plus} onClick={() => setShowNewProject(true)} testid="new-project-btn">
+                  Proiect coordonare
+                </PMPillButton>
               )}
-              <button onClick={() => setShowPortfolio(true)} className="px-4 py-2 bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 rounded-full text-xs flex items-center gap-2" data-testid="manage-portfolio-btn">
-                <ImageIcon className="w-3.5 h-3.5" />Portofoliu
-              </button>
-              <button onClick={() => setShowDocs(true)} className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full text-xs flex items-center gap-2" data-testid="manage-docs-btn" data-tour="specialist-kyc">
-                <FileCheck className="w-3.5 h-3.5" />Documentele mele
-              </button>
+              <PMPillButton variant="ghost" size="sm" icon={ImageIcon} onClick={() => setShowPortfolio(true)} testid="manage-portfolio-btn">
+                Portofoliu
+              </PMPillButton>
+              <PMPillButton variant="ghost" size="sm" icon={FileCheck} onClick={() => setShowDocs(true)} testid="manage-docs-btn">
+                Documentele mele
+              </PMPillButton>
             </div>
           )}
           {(user?.service_categories || []).includes("interior_design") && (
@@ -180,55 +241,59 @@ export const SpecialistDashboard = () => {
           )}
           <FilterBar searchQ={searchQ} setSearchQ={setSearchQ} urgentOnly={urgentOnly} setUrgentOnly={setUrgentOnly} urgentCount={open.filter(r => r.priority === "urgent").length} />
           <div className="space-y-3 mt-4 max-w-3xl mx-auto">
-            <div className="text-xs uppercase tracking-wider text-stone-500 px-1">{filtered(mine).length} lucrări</div>
+            <PMSectionHeader title={`${filtered(mine).length} lucrări`} />
             {filtered(mine).length === 0 && (
-              <div className="text-center py-16">
-                <ClipboardCheck className="w-12 h-12 text-stone-700 mx-auto mb-3" />
-                <div className="text-sm text-stone-400">Niciun job acceptat</div>
-                <div className="text-xs text-stone-600 mt-1">Acceptă o oportunitate pentru a începe.</div>
-              </div>
+              <PMEmptyState
+                icon={ClipboardCheck}
+                title="Niciun job acceptat"
+                description="Acceptă o oportunitate pentru a începe."
+              />
             )}
             {filtered(mine).map(r => (
-              <div key={r.id} className="bg-white/5 rounded-2xl p-4" data-testid={`mine-${r.id}`}>
+              <PMCard key={r.id} accent={r.disputed ? "warning" : r.status === "in_progress" ? "primary" : "default"} testid={`mine-${r.id}`}>
                 <div className="flex justify-between items-start mb-2 gap-3">
-                  <div className="font-medium text-sm flex-1 min-w-0">{r.title}</div>
+                  <div className="font-semibold text-sm md:text-base flex-1 min-w-0">{r.title}</div>
                   <StatusBadge status={r.status} />
                 </div>
-                <div className="text-[10px] text-stone-500 mb-3">{r.client_name} · {r.escrow_amount ? `${r.escrow_amount} RON escrow` : "—"}</div>
+                <div className="text-[11px] text-stone-500 mb-3">{r.client_name} · {r.escrow_amount ? `${r.escrow_amount} RON escrow` : "—"}</div>
                 {r.property_address && (
                   <div className="mb-3"><NavigateButtons address={r.property_address} compact /></div>
                 )}
                 <LastActionBanner event={r.last_event} onClick={() => setTimelineRequestId(r.id)} />
                 <div className="flex gap-2 flex-wrap">
-                  <button onClick={() => setTimelineRequestId(r.id)} className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 py-2 px-3 rounded-lg text-xs flex items-center gap-1" data-testid={`spec-timeline-${r.id}`} title="Vezi timeline complet">
-                    <Clock className="w-3 h-3" />
+                  <button onClick={() => setTimelineRequestId(r.id)} className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 py-2 px-3 rounded-full text-xs flex items-center gap-1" data-testid={`spec-timeline-${r.id}`} title="Vezi timeline complet">
+                    <Clock className="w-3 h-3" /> Timeline
                   </button>
                   {r.status === "assigned" && (
-                    <button onClick={() => start(r.id)} className="flex-1 bg-white/10 hover:bg-white/15 py-2 rounded-lg text-xs min-w-[100px]" data-testid={`start-${r.id}`}>Pornește</button>
+                    <PMPillButton variant="ghost" size="sm" onClick={() => start(r.id)} testid={`start-${r.id}`}>
+                      Pornește
+                    </PMPillButton>
                   )}
                   {r.status === "in_progress" && (
-                    <button onClick={() => complete(r.id)} className="pm-btn pm-btn-primary pm-btn-sm flex-1 min-w-[100px]" data-testid={`complete-${r.id}`}>Marchează completă</button>
+                    <PMPillButton variant="primary" size="sm" icon={CheckCircle2} onClick={() => complete(r.id)} testid={`complete-${r.id}`}>
+                      Marchează completă
+                    </PMPillButton>
                   )}
                   {["assigned","in_progress","completed"].includes(r.status) && (
-                    <button onClick={() => setChatRequest(r.id)} className="bg-white/10 hover:bg-white/15 py-2 px-3 rounded-lg text-xs flex items-center gap-1" data-testid={`spec-chat-${r.id}`}>
-                      <MessageSquare className="w-3 h-3" />
-                    </button>
+                    <PMPillButton variant="ghost" size="sm" icon={MessageSquare} onClick={() => setChatRequest(r.id)} testid={`spec-chat-${r.id}`}>
+                      Chat
+                    </PMPillButton>
                   )}
                   {["assigned","in_progress","completed"].includes(r.status) && !r.disputed && (
-                    <button onClick={() => setDisputeFor(r)} className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 py-2 px-3 rounded-lg text-xs flex items-center gap-1" data-testid={`spec-dispute-${r.id}`} title="Deschide dispută">
-                      <AlertTriangle className="w-3 h-3" />
+                    <button onClick={() => setDisputeFor(r)} className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 py-2 px-3 rounded-full text-xs flex items-center gap-1" data-testid={`spec-dispute-${r.id}`} title="Deschide dispută">
+                      <AlertTriangle className="w-3 h-3" /> Dispută
                     </button>
                   )}
                 </div>
-                {r.disputed && <div className="mt-2 w-full bg-amber-500/15 border border-amber-500/40 text-amber-300 py-1.5 rounded-lg text-[11px] text-center">⚠ Dispută în analiză</div>}
+                {r.disputed && <div className="mt-3 w-full bg-amber-500/15 border border-amber-500/40 text-amber-300 py-2 rounded-xl text-xs text-center font-medium">⚠ Dispută în analiză</div>}
                 {r.category === "interior_design" && ["in_progress","completed","confirmed"].includes(r.status) && (
                   <button onClick={() => setProposePhaseFor(r.id)}
-                    className="mt-2 w-full bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 py-1.5 rounded-lg text-[11px] flex items-center justify-center gap-1"
+                    className="mt-3 w-full bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 py-2 rounded-xl text-xs flex items-center justify-center gap-1"
                     data-testid={`propose-phase-${r.id}`}>
-                    <Plus className="w-3 h-3" />Propune fază nouă
+                    <Plus className="w-3.5 h-3.5" />Propune fază nouă
                   </button>
                 )}
-              </div>
+              </PMCard>
             ))}
           </div>
         </>
@@ -237,22 +302,23 @@ export const SpecialistDashboard = () => {
       {tab === "notifications" && (
         <div className="space-y-2 max-w-2xl mx-auto" data-testid="notifications-zone">
           {notifs.length === 0 && (
-            <div className="text-center py-16">
-              <Bell className="w-12 h-12 text-stone-700 mx-auto mb-3" />
-              <div className="text-sm text-stone-400">Nicio notificare</div>
-            </div>
+            <PMEmptyState
+              icon={Bell}
+              title="Nicio notificare"
+              description="Aici vor apărea actualizările pentru lucrările tale."
+            />
           )}
           {notifs.map(n => (
             <button
               key={n.id}
               onClick={async () => { await axios.post(`${API}/notifications/${n.id}/read`).catch(() => {}); loadNotifs(); }}
-              className={`w-full text-left bg-white/5 rounded-2xl p-4 hover:bg-white/[0.08] transition-colors ${!n.read ? "border border-[#d4ff3a]/30" : ""}`}
+              className={`w-full text-left bg-white/5 hover:bg-white/[0.08] transition-colors rounded-2xl p-4 ${!n.read ? "border border-[var(--pm-primary)]/40" : "border border-white/5"}`}
               data-testid={`notif-${n.id}`}
             >
               <div className="flex items-start gap-3">
-                {!n.read && <div className="w-1.5 h-1.5 rounded-full bg-[#d4ff3a] mt-2 shrink-0" />}
+                {!n.read && <div className="w-2 h-2 rounded-full bg-[var(--pm-primary)] mt-2 shrink-0" />}
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium">{n.title}</div>
+                  <div className="text-sm font-semibold">{n.title}</div>
                   <div className="text-xs text-stone-400 mt-1">{n.message}</div>
                   <div className="text-[10px] text-stone-600 mt-2">{new Date(n.created_at).toLocaleString("ro-RO")}</div>
                 </div>
@@ -356,23 +422,23 @@ const NewProjectModal = ({ onClose }) => {
 
 const FilterBar = ({ searchQ, setSearchQ, urgentOnly, setUrgentOnly, urgentCount = 0 }) => (
   <div className="max-w-3xl mx-auto sticky top-[72px] z-10">
-    <div className="glass rounded-2xl p-3 bg-[#0a0a0b]/80 backdrop-blur">
+    <div className="pm-card-glass !p-3">
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
           <input
-            type="text" placeholder="Caută..." value={searchQ} onChange={e => setSearchQ(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-3 py-2.5 text-sm focus:outline-none focus:border-[#d4ff3a]/50"
+            type="text" placeholder="Caută oportunități..." value={searchQ} onChange={e => setSearchQ(e.target.value)}
+            className="w-full bg-white/5 border border-white/10 rounded-full pl-10 pr-3 py-2.5 text-sm focus:outline-none focus:border-[var(--pm-primary)]/50 transition-colors"
             data-testid="spec-search"
           />
         </div>
         <button
           onClick={() => setUrgentOnly?.(!urgentOnly)}
-          className={`shrink-0 px-3 py-2 rounded-xl text-xs font-medium border transition-colors flex items-center gap-1.5 ${urgentOnly ? "bg-red-500/20 border-red-500/50 text-red-300" : "bg-white/5 border-white/10 text-stone-400 hover:text-white"}`}
+          className={`shrink-0 px-4 py-2.5 rounded-full text-xs font-semibold border transition-all flex items-center gap-1.5 ${urgentOnly ? "bg-red-500/20 border-red-500/50 text-red-300 shadow-[0_0_24px_-8px_rgba(239,68,68,0.5)]" : "bg-white/5 border-white/10 text-stone-400 hover:text-white"}`}
           data-testid="spec-urgent-toggle"
           title={urgentOnly ? "Click pentru a vedea toate joburile" : "Click pentru a vedea doar joburile urgente"}
         >
-          🔥 Urgent {urgentCount > 0 && <span className="ml-0.5 text-[10px] bg-red-500 text-white rounded-full px-1.5">{urgentCount}</span>}
+          <Flame className="w-3.5 h-3.5" /> Urgent {urgentCount > 0 && <span className="ml-0.5 text-[10px] bg-red-500 text-white rounded-full px-1.5">{urgentCount}</span>}
         </button>
       </div>
     </div>

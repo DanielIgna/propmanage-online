@@ -272,17 +272,19 @@ export const DashLayout = ({ children, role, title, bottomNav }) => {
   );
 };
 
-// ============= STAT CARD =============
+// ============= STAT CARD (Updated to PM v2 design) =============
 export const Stat = ({ icon: Icon, label, value, sub, color = "lime", tid, ...rest }) => (
-  <div className="glass-strong rounded-2xl p-6" data-testid={tid} {...rest}>
-    <div className="flex items-center justify-between mb-4">
-      <div className={`w-10 h-10 rounded-xl bg-${color}-500/15 border border-${color}-500/30 flex items-center justify-center`}>
-        <Icon className={`w-4 h-4 text-${color}-400`} />
+  <div className="pm-stat" data-testid={tid} {...rest}>
+    <div className="flex items-center justify-between">
+      <div className="pm-stat-icon">
+        <Icon className="w-5 h-5" />
       </div>
-      {sub && <span className="text-[10px] text-stone-500 uppercase tracking-wider">{sub}</span>}
+      {sub && <span className="text-[10px] text-stone-500 uppercase tracking-wider font-semibold">{sub}</span>}
     </div>
-    <div className="font-serif text-3xl mb-1">{value}</div>
-    <div className="text-xs text-stone-400">{label}</div>
+    <div>
+      <p className="pm-stat-label mb-1">{label}</p>
+      <p className="pm-stat-value">{value}</p>
+    </div>
   </div>
 );
 

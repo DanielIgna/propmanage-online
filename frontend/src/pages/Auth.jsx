@@ -126,7 +126,7 @@ export const LoginPage = () => {
               </div>
             )}
             {error && <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3" data-testid="login-error">{error}</div>}
-            <button type="submit" disabled={loading} className="btn-accent w-full py-3 rounded-xl font-medium disabled:opacity-50 flex items-center justify-center gap-2" data-testid="login-submit">
+            <button type="submit" disabled={loading} className="pm-pill pm-pill-primary pm-pill-lg w-full disabled:opacity-50" data-testid="login-submit">
               {loading ? t("common.loading") : t("login.submit")}
               {!loading && <ArrowRight className="w-4 h-4" />}
             </button>

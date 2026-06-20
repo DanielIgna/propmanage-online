@@ -804,3 +804,92 @@ Order of execution (user prefers redeploy after each):
 
 **ALL planned VERIFIED items implemented. Ready for redeploy.**
 
+
+## Update — 20 Feb 2026 · UI Redesign Phase 0-4 (PropManage v2 Design System)
+
+### Goal
+Massive UI/UX refresh based on 28 HTML mockups uploaded by user (Material You-inspired, friendly/modern). Unified design across Specialist, Client, Public, Community zones. Admin keeps dense layout (palette sync only).
+
+### Faza 0 — Design System Foundation ✅
+- **CSS tokens v2** in `/app/frontend/src/index.css`: `--pm-bg`, `--pm-surface*`, `--pm-primary` (lime #d4ff3a), `--pm-text*`, semantic colors, radii, shadows, glow. Light mode override included.
+- **`/app/frontend/src/components/pm/`** — 12 atomic components:
+  - `PMCard`, `PMCardGlass`, `PMCardPrimary` (lime container with subtle blur)
+  - `PMStatCard` (bento-style with icon + label + value + delta/trailing)
+  - `PMPillButton` (rounded-full, variants: primary/on-container/ghost, sizes sm/md/lg)
+  - `PMChip` (variants: default/primary/error/warning/success/info)
+  - `PMSectionHeader` (title + link with arrow)
+  - `PMTaskRow` (border-left urgency accent)
+  - `PMFab` (Floating Action Button)
+  - `PMTopBar` (sticky header with blur)
+  - `PMBottomNav` (mobile bottom navigation)
+  - `PMProgress` (gradient progress bar)
+  - `PMAvatarStack` (overlapping circles)
+  - `PMEmptyState` (icon + title + description + CTA)
+- **Playground** at `/components-v2` — galerie completă pentru QA + dev reference.
+
+### Faza 1 — Specialist Zone ✅
+- `SpecialistDashboard.jsx` refresh complet:
+  - Hero PMCardPrimary cu welcome + tier badge + rating (visible doar non-ENTRY)
+  - 4 PMStatCards bento (Wallet / Rating / Active / Tier)
+  - Verify banner PM-style
+  - Opportunity cards cu PMCard + accent urgency + Flame icon
+  - Filter bar pill-style + buton Urgent cu glow
+  - Jobs cards cu PMCard + StatusBadge păstrat
+  - Notifications cu border verde la unread
+  - Toate `data-testid` păstrate (zero regresie testing)
+
+### Faza 2 — Client Zone ✅
+- `ClientDashboard.jsx`:
+  - Quick action CTA convertit la PMCardPrimary
+  - Stat cards via `DashShared.Stat` actualizat la `.pm-stat` (impactează ambele dashboard-uri automat)
+  - JobsZone refresh: PMCard pentru request rows, PMPillButton acțiuni, PMEmptyState
+  - NotifsZone refresh similar
+- `DashShared.jsx` Stat component rescrisă la PM v2 (impact transversal pe Client + Specialist + Admin).
+
+### Faza 3 — Public Zone + Auth ✅
+- `Marketplace.jsx` PublicMarketplace:
+  - PMTopBar + PMChip "MARKETPLACE PROPMANAGE"
+  - Filter pills cu lime accent
+  - Specialist cards lime cu avatar pătrat verde + rating amber + tier chip + Health badge
+  - PMEmptyState când nu găsește
+- `Auth.jsx` LoginPage: submit button la `pm-pill pm-pill-lg`
+
+### Faza 4 — Community Zone (BRAND NEW) ✅
+- **Backend** `/app/backend/routes/community.py` (270 lines):
+  - 3 collections noi: `community_topics`, `community_replies`, `community_likes`
+  - 4 categorii: forum, groups, faq, reviews
+  - 10 endpoints CRUD: list/create/get/patch/delete topics, list/create replies, toggle likes, my likes, stats
+  - Seed idempotent: 5 demo topics (2 forum, 1 group, 2 FAQ pinned)
+  - Permissions: author or admin can edit/delete; pin = admin only
+- **Frontend** `/app/frontend/src/pages/CommunityPage.jsx`:
+  - Hero PMCardPrimary
+  - 4 category tabs cu icons + counts dinamici
+  - Search bar live
+  - Topic list cu likes/replies counters
+  - Create topic modal (category/title/body)
+  - Topic detail modal cu reply form + likes toggle
+- Rută `/community` în App.js
+- Link "Comunitate" în nav
+
+### Faza 5 — Settings & Subpages (PLANNED, NOT YET STARTED)
+- KYC flow UI (`KYCFlow.jsx`)
+- Subscriptions UI cu Stripe wire (`SubscriptionPlans.jsx`)
+- Settings refresh (Profil/Plăți/Securitate/Identitate/Activitate)
+
+### Faza 6 — Admin Palette Sync (PLANNED)
+- Accent lime la admin dashboard
+- Păstrare layout dens
+
+### Tested live end-to-end
+- Specialist Dashboard: stats render, opportunities cu accent urgency
+- Client Dashboard: hero CTA, jobs zone refresh, notifs
+- Marketplace public: 100+ specialiști cu noul design
+- Community: 6 topics + 1 reply + 1 like funcționale via curl + UI
+- Compilation: ZERO erori
+- Lint: ZERO erori
+
+### Backward compatibility 100%
+- Toate `data-testid` păstrate
+- TierGate, QuestPanel, TierCelebrationBanner, VoucherExpiryAlert intact
+- API endpoints neatinse (doar `/api/community/*` adăugate)
+- Backend logic unchanged

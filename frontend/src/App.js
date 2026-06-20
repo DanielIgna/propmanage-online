@@ -38,6 +38,8 @@ import { PrivacyPage, TermsPage, CookiePolicyPage } from "./pages/LegalPages";
 import { TrustCenterPage } from "./pages/TrustCenterPage";
 import { PrivacyNoticesPage } from "./pages/PrivacyNoticesPage";
 import { StatusPage } from "./pages/StatusPage";
+import ComponentsV2 from "./pages/ComponentsV2";
+import CommunityPage from "./pages/CommunityPage";
 import { GDPRAuditBadge } from "./components/GDPRAuditBadge";
 import { TrustStrip } from "./components/TrustStrip";
 import DigitalTwinPage from "./pages/DigitalTwinPage";
@@ -105,6 +107,7 @@ const Nav = () => {
     { href: "#journey", label: t("nav.journey") },
     { href: "#twin", label: t("nav.twin") },
     { href: "/marketplace", label: "Marketplace", external: true },
+    { href: "/community", label: "Comunitate", external: true },
     { href: "/imobile-verificate", label: "Imobile Verificate", external: true },
     { href: "/de-ce-noi", label: "De ce noi?", external: true },
   ];
@@ -1585,6 +1588,8 @@ function App() {
               <Route path="/cookies" element={<CookiePolicyPage />} />
               <Route path="/trust" element={<TrustCenterPage />} />
               <Route path="/status" element={<StatusPage />} />
+              <Route path="/components-v2" element={<ComponentsV2 />} />
+              <Route path="/community" element={<CommunityPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/verify-email" element={<EmailVerifyPage />} />
