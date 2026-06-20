@@ -759,3 +759,48 @@ Order of execution (user prefers redeploy after each):
 - 🟢 Sprint E — AI Review Quality Detection (next, ~22-33 cr, needs lawyer review beforehand)
 - 🆕 Sprint F — BI-MOE (committed by user, ~60-90 cr)
 
+
+## Update — 7 Feb 2026 · Sprint F — BI-MOE COMPLETE
+
+### Backend (`/app/backend/routes/bi_moe.py` — NEW)
+- 8 READ-ONLY endpoints sub `/api/admin/bi/*`:
+  - `/overview` — KPIs (users, specialists, requests, completion rate, revenue)
+  - `/demand-index?days=` — categorii/zone trending + supply alerts (no_specialists/undersupplied/oversupplied)
+  - `/fee-analytics?days=` — win rate, avg fee won/lost, auto-recommendations
+  - `/conversion-funnel?days=` — published → assigned → in-progress → completed cu % per step
+  - `/specialist-performance?limit=` — Performance Score top/bottom (40% rating + 30% win rate + 30% completed)
+  - `/premium-candidates` — auto-listă specialiști eligibili pentru PREMIUM (≥60% progress)
+  - `/alerts` — conversion drop detection, low-rated specialists, no-supply categories
+  - `/client-analysis?days=` — repeat rate, avg requests/client, budget distribution
+
+### Frontend (`/app/frontend/src/pages/admin/BIMoePage.jsx` — NEW)
+- 8 tabs with KPI cards, ranked lists, funnel bars, alerts
+- READ-ONLY badge prominent
+- Recharts available for future deeper charts (not used in V1 to keep load fast)
+- Mounted in admin sidebar with badge "SPRINT F"
+
+### Progressive UX additions (parallel work in this session)
+- `<GettingStartedWidget>` shown on Junior/Regular dashboards: unlocked features ✓, locked features 🔒, next-tier unlock hints
+- Premium Profile link in Specialist Dashboard for PREMIUM tier; preview hint for non-PREMIUM
+- `/specialist/premium-profile` editor accessible to all specialists
+
+### Tested E2E
+- Backend: `/overview` returns 745 users, 251 specialists, 7605 RON revenue (30d). Alerts endpoint: 0 alerts (healthy preview).
+- UI: BI page renders with all KPIs visible, all 8 tabs accessible.
+- Lint clean.
+
+### GDPR notes
+- All output AGGREGATED (counts, %, averages). NO raw PII exposed in responses.
+- Specialist names/IDs returned ONLY in Performance/Candidates (legitimate admin use case).
+- No client names in /client-analysis.
+
+### Sprint roadmap — FINAL state
+- ✅ Sprint A — Foundation
+- ✅ Sprint B — Reviews V2
+- ✅ Sprint C — Multi-Offer + Welcome Voucher
+- ✅ Sprint D — Premium Marketplace
+- ⛔ Sprint E — AI Review Quality (SKIPPED per user decision; awaits lawyer review for GDPR Art. 22)
+- ✅ Sprint F — BI-MOE (DONE)
+
+**ALL planned VERIFIED items implemented. Ready for redeploy.**
+
