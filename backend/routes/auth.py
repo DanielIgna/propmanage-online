@@ -42,7 +42,7 @@ def _admin_whitelist() -> set:
 
 async def _enforce_admin_role(user: dict) -> dict:
     """If user email is in ADMIN_EMAILS → ensure role=admin. Otherwise demote off admin.
-    Sub-admins (with admin_scope set) are EXEMPT — they keep role=admin even outside the whitelist.
+    Sub-admins (with admin_scope set) are EXEMPT — they keep / are promoted to role=admin.
     Returns the (possibly mutated) user dict; persists changes to DB."""
     if not user:
         return user
@@ -51,6 +51,10 @@ async def _enforce_admin_role(user: dict) -> dict:
     whitelist = _admin_whitelist()
     has_scope = bool(user.get("admin_scope"))  # sub-admin marker
     if email in whitelist and role != "admin":
+        await db.users.update_one({"_id": user["_id"]}, {"$set": {"role": "admin"}})
+        user["role"] = "admin"
+    elif has_scope and role != "admin":
+        # Sub-admin lost role somehow → restore it (so login flow always promotes them)
         await db.users.update_one({"_id": user["_id"]}, {"$set": {"role": "admin"}})
         user["role"] = "admin"
     elif email not in whitelist and role == "admin" and not has_scope:
@@ -300,6 +304,7 @@ async def me(user: dict = Depends(get_current_user)):
             "dual_role_enabled": 1, "active_view": 1,
             "avatar": 1, "avatar_source": 1, "picture": 1,
             "experience_tier": 1, "experience_tier_locked": 1,
+            "admin_scope": 1, "admin_seniority": 1,
         },
     )
     user["tutorial_seen"] = bool((doc or {}).get("tutorial_seen", False))
@@ -320,7 +325,12 @@ async def me(user: dict = Depends(get_current_user)):
     user["experience_tier_locked"] = bool((doc or {}).get("experience_tier_locked", False))
     # Enforce admin whitelist on every /me call to catch direct DB tampering or stale tokens.
     if doc:
-        fresh = {"_id": doc["_id"], "email": doc.get("email"), "role": doc.get("role")}
+        fresh = {
+            "_id": doc["_id"],
+            "email": doc.get("email"),
+            "role": doc.get("role"),
+            "admin_scope": doc.get("admin_scope"),  # sub-admin marker — exempts from demotion
+        }
         await _enforce_admin_role(fresh)
         user["role"] = fresh["role"]
     # `impersonation` field is already injected by get_current_user when applicable.

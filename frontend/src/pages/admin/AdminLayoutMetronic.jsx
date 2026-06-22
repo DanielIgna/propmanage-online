@@ -12,6 +12,36 @@ import { useAuth } from "../../auth";
 import { API } from "../DashShared";
 import { HealthScoreBadge } from "./HealthScoreBadge";
 import { AIAdminTour, ReplayAIAdminTourButton } from "./AIAdminTour";
+import { useAdminScope, filterNavSections } from "../../lib/useAdminScope";
+
+// Scope-color tones for the topbar badge
+const SCOPE_TONES = {
+  general:  { bg: "bg-violet-100  dark:bg-violet-500/15",  text: "text-violet-700  dark:text-violet-300",  label: "Super Admin" },
+  testing:  { bg: "bg-cyan-100    dark:bg-cyan-500/15",    text: "text-cyan-700    dark:text-cyan-300",    label: "Testing" },
+  frontend: { bg: "bg-pink-100    dark:bg-pink-500/15",    text: "text-pink-700    dark:text-pink-300",    label: "Frontend" },
+  backend:  { bg: "bg-blue-100    dark:bg-blue-500/15",    text: "text-blue-700    dark:text-blue-300",    label: "Backend" },
+  security: { bg: "bg-red-100     dark:bg-red-500/15",     text: "text-red-700     dark:text-red-300",     label: "Security" },
+  ai:       { bg: "bg-amber-100   dark:bg-amber-500/15",   text: "text-amber-700   dark:text-amber-300",   label: "AI" },
+  ops:      { bg: "bg-emerald-100 dark:bg-emerald-500/15", text: "text-emerald-700 dark:text-emerald-300", label: "Ops" },
+};
+
+const ScopeBadgeTop = ({ scope }) => {
+  if (!scope) return null;
+  const s = (scope.admin_scope || "general").toLowerCase();
+  const tone = SCOPE_TONES[s] || SCOPE_TONES.general;
+  const seniority = scope.admin_seniority || "senior";
+  return (
+    <div
+      className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium ${tone.bg} ${tone.text}`}
+      title={`Scope: ${s} · Seniority: ${seniority}`}
+      data-testid="admin-scope-badge"
+    >
+      <ShieldCheck className="w-3 h-3" />
+      <span>{tone.label}</span>
+      <span className="text-[9px] font-bold uppercase opacity-70">· {seniority}</span>
+    </div>
+  );
+};
 
 const NAV_SECTIONS = [
   {
@@ -74,6 +104,13 @@ const NAV_SECTIONS = [
     items: [
       { id: "gdpr", label: "GDPR Pack", icon: ShieldCheck, badge: "NEW" },
       { id: "impersonation", label: "Impersonări", icon: ShieldCheck, badge: "NEW" },
+    ],
+  },
+  {
+    title: "RBAC & APROBĂRI",
+    items: [
+      { id: "sub_admins", label: "Sub-Admini", icon: Users, badge: "NEW" },
+      { id: "approvals", label: "Aprobări Admin", icon: ShieldCheck, badge: "NEW" },
     ],
   },
   {
@@ -410,9 +447,13 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
   const navigate = useNavigate();
   const [theme, toggleTheme] = useAdminTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { scope: adminScope } = useAdminScope();
 
   const handleLogout = async () => { await logout(); navigate("/login"); };
   const dark = theme === "dark";
+
+  // Filter nav sections based on current admin's scope (general sees all)
+  const visibleSections = filterNavSections(NAV_SECTIONS, adminScope);
 
   const sidebar = (
     <aside
@@ -431,7 +472,7 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
         </button>
       </div>
       <nav className="flex-1 overflow-y-auto py-4 px-3">
-        {NAV_SECTIONS.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.title} className="mb-6">
             <div className={`px-3 mb-2 text-[10px] font-bold uppercase tracking-wider ${dark ? "text-slate-500" : "text-slate-400"}`}>{section.title}</div>
             <div className="space-y-0.5">
@@ -501,6 +542,7 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
           </button>
           <GlobalSearch theme={theme} />
           <HealthScoreBadge dark={dark} />
+          <ScopeBadgeTop scope={adminScope} />
           <QuickProfileSwitch dark={dark} />
           <ReplayAIAdminTourButton />
           <button onClick={toggleTheme} className={`p-2 rounded-lg ${dark ? "hover:bg-slate-800 text-slate-300" : "hover:bg-slate-100 text-slate-600"}`} data-testid="admin-theme-toggle">

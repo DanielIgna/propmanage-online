@@ -42,6 +42,39 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 
 ---
 
+## Recent additions (Feb 22 2026 — Milestone 2 + 3: HTTP middleware + Approval Workflow)
+- **Admin-Scope HTTP Middleware** ✅ (`backend/middleware_scope.py`)
+  - URL-pattern → required-scope map (`SCOPE_RULES`) applied as FastAPI middleware
+  - Replaces per-endpoint annotations across ~80 admin routes
+  - Examples: `/api/admin/smoke-test/*` → testing, `/api/admin/security` → security, `/api/admin/autonomy` → ops
+  - `/api/admin/sub-admins/me/*` bypassed (any admin reads own scope)
+  - Auto-logs denied requests to `admin_actions_log` with `source: middleware`
+- **Approval Workflow (Milestone 3)** ✅ (`backend/routes/admin_approvals.py`)
+  - Collection `admin_approvals` for cross-scope/junior actions
+  - Helper `maybe_require_approval(user, action, payload, scope, executor)` — auto-executes for super/senior, gates juniors to pending
+  - Registered actions: `create_sub_admin`, `deactivate_sub_admin`, `update_autonomy_targets`
+  - Endpoints: `GET /api/admin/approvals?status=`, `POST /{id}/approve`, `POST /{id}/reject`
+  - On approve, the registered executor runs with the **decider's** privileges
+  - Email-style in-app notifications to requester + senior reviewers
+- **Auth bug fix** ✅ — `_enforce_admin_role` in `auth.py`:
+  - `/auth/me` was DROPPING `admin_scope` field from the projection → sub-admins were silently demoted to operator on every `/me` call
+  - Fix: include `admin_scope` + `admin_seniority` in projection AND in the `fresh` dict
+  - Added PROMOTION branch: sub-admins with scope but role!=admin now auto-restored to admin at login
+- **Frontend** ✅:
+  - `/app/frontend/src/lib/useAdminScope.js` — `useAdminScope()` hook + `SCOPE_VISIBILITY` map + `filterNavSections()` helper
+  - `/app/frontend/src/pages/admin/AdminSubAdmins.jsx` — super-only CRUD page with list/create/edit-scope/reset-pwd/deactivate + audit log modal
+  - `/app/frontend/src/pages/admin/AdminApprovals.jsx` — queue with filter tabs (pending/approved/rejected/all) + approve/reject buttons + payload viewer
+  - `AdminLayoutMetronic.jsx` — sidebar filtered via `filterNavSections`, new section "RBAC & APROBĂRI", topbar `ScopeBadgeTop` showing "Testing · SENIOR" etc.
+  - `AdminConsole.jsx` wired with `sub_admins` + `approvals` tabs
+- **Verified E2E** (all pass):
+  - testing.admin login → sidebar shows ONLY scope-relevant items (13 out of ~40)
+  - Topbar shows "Testing · SENIOR" badge in cyan
+  - testing.admin DENIED via middleware on `/api/admin/security/config` (HTTP 403) and `/api/admin/autonomy/score`
+  - super-admin lists 8 admins in `/admin/sub_admins` page with colored scope chips
+  - Junior approval flow: create_sub_admin pending → super approves → temp.admin created with auto-generated password
+  - Audit log captures every middleware decision with `outcome: allowed|denied`
+
+
 ## Recent additions (Feb 22 2026 — Milestone 1: Sub-Admin RBAC + Autopilot Widget)
 - **Sub-Admin Scoped RBAC** ✅ (Feb 22 2026)
   - New file `/app/backend/sub_admin_deps.py`:

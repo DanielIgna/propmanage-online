@@ -21,6 +21,8 @@ import { AdminImpersonationLogs } from "./AdminImpersonationLogs";
 import { AdminBetaTesters } from "./AdminBetaTesters";
 import { AdminDocs } from "./AdminDocs";
 import { AdminQAPlaybook } from "./AdminQAPlaybook";
+import { AdminSubAdmins } from "./AdminSubAdmins";
+import { AdminApprovals } from "./AdminApprovals";
 
 const TITLES = {
   overview: { title: "Dashboard", subtitle: "Privire de ansamblu asupra platformei" },
@@ -46,6 +48,8 @@ const TITLES = {
   beta_testers: { title: "Beta Testers", subtitle: "Useri noi în beta · Provenance Google/Email · Activitate engagement" },
   docs: { title: "Documentație & Training", subtitle: "Ghiduri training per rol · trimite pe email cu PDF · link-uri tokenizate" },
   qa_playbook: { title: "QA Playbook", subtitle: "105 scenarii de test interactive · AI Test Suggester (Claude Sonnet 4.5) · markdown export" },
+  sub_admins: { title: "Sub-Admini & RBAC", subtitle: "Gestionare conturi admin cu scope · senior/junior · audit log" },
+  approvals: { title: "Aprobări Admin", subtitle: "Queue de cereri pendinte · senior aprobă acțiuni junior · istoric decizii" },
 };
 
 export const AdminDashboard = () => {
@@ -100,6 +104,8 @@ export const AdminDashboard = () => {
       {active === "beta_testers" && <AdminBetaTesters />}
       {active === "docs" && <AdminDocs />}
       {active === "qa_playbook" && <AdminQAPlaybook />}
+      {active === "sub_admins" && <AdminSubAdmins />}
+      {active === "approvals" && <AdminApprovals />}
     </AdminLayoutMetronic>
   );
 };

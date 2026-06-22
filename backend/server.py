@@ -112,6 +112,8 @@ from routes.bi_moe import router as bi_moe_router
 from routes.community import router as community_router, seed_community_demo
 from routes.tier_milestones import router as tier_milestones_router, cron_check_all_users
 from routes.sub_admins import router as sub_admins_router
+from routes.admin_approvals import router as admin_approvals_router
+from middleware_scope import admin_scope_middleware
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
@@ -146,6 +148,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Admin-scope HTTP middleware (Milestone 2): URL-pattern → required-scope map
+app.middleware("http")(admin_scope_middleware)
 logger = logging.getLogger(__name__)
 logger.info(f"CORS configured: origins={_origins} regex={_origin_regex} credentials={_allow_credentials}")
 
@@ -223,6 +227,7 @@ for r in (
     community_router,
     tier_milestones_router,
     sub_admins_router,
+    admin_approvals_router,
 ):
     app.include_router(r)
 
