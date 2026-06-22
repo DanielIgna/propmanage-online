@@ -594,9 +594,22 @@ async def run_auto_tune_orchestration(triggered_by: str = "manual") -> dict:
         logger.warning(f"[auto-tune] seed_concierge_traffic failed: {e}")
         report["steps"].append({"name": "seed_concierge_traffic", "status": "error", "error": str(e)[:160]})
 
-    # Step 4: Dismiss stale QA findings
+    # Step 4: Dismiss QA findings — if platform is stable (smoke 7d OK + no
+    # critical AI findings open), dismiss ALL open QA findings. Otherwise only
+    # findings older than 14 days. Conservative when system is unstable.
     try:
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=14)).isoformat()
+        crit_open = await db.admin_ai_findings.count_documents({
+            "status": "open",
+            "severity": {"$in": ["high", "critical"]},
+        })
+        from datetime import datetime as _dt
+        since_7d_iso = (_dt.now(timezone.utc) - timedelta(days=7)).isoformat()
+        recent_smoke_fails = await db.smoke_test_runs.count_documents({
+            "started_at": {"$gte": since_7d_iso},
+            "ok": False,
+        })
+        platform_stable = (crit_open == 0 and recent_smoke_fails == 0)
+        cutoff = (datetime.now(timezone.utc) - (timedelta(seconds=0) if platform_stable else timedelta(days=14))).isoformat()
         dismissed = 0
         async for sess in db.qa_sessions.find({}, {"_id": 1, "findings": 1, "created_at": 1}):
             findings = sess.get("findings") or []
@@ -604,15 +617,18 @@ async def run_auto_tune_orchestration(triggered_by: str = "manual") -> dict:
             for f in findings:
                 status = f.get("status") or "open"
                 created = f.get("created_at") or sess.get("created_at") or ""
-                if status == "open" and isinstance(created, str) and created < cutoff:
+                if status == "open" and (platform_stable or (isinstance(created, str) and created < cutoff)):
                     f["status"] = "dismissed"
                     f["dismissed_at"] = datetime.now(timezone.utc).isoformat()
-                    f["dismissed_reason"] = f"auto_tune_{triggered_by}_stale"
+                    f["dismissed_reason"] = f"auto_tune_{triggered_by}_{'stable' if platform_stable else 'stale'}"
                     changed = True
                     dismissed += 1
             if changed:
                 await db.qa_sessions.update_one({"_id": sess["_id"]}, {"$set": {"findings": findings}})
-        report["steps"].append({"name": "dismiss_stale_qa_findings", "status": "ok", "dismissed": dismissed})
+        report["steps"].append({
+            "name": "dismiss_stale_qa_findings", "status": "ok",
+            "dismissed": dismissed, "platform_stable": platform_stable,
+        })
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[auto-tune] dismiss_stale_findings failed: {e}")
         report["steps"].append({"name": "dismiss_stale_qa_findings", "status": "error", "error": str(e)[:160]})

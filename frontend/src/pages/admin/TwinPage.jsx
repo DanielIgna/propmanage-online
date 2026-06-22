@@ -1,7 +1,7 @@
 // Twin Orchestrator — natural-language Q&A chat for super-admins.
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { Bot, Send, Loader2, Sparkles, RefreshCw, User } from "lucide-react";
+import { Bot, Send, Loader2, Sparkles, RefreshCw, User, Zap, CheckCircle2 } from "lucide-react";
 import { API } from "../DashShared";
 
 const SUGGESTED_QUESTIONS = [
@@ -13,7 +13,7 @@ const SUGGESTED_QUESTIONS = [
   "Câte KYC-uri sunt în așteptare?",
 ];
 
-const Bubble = ({ role, content, ts }) => {
+const Bubble = ({ role, content, ts, actionProposal, onConfirm, executing, executedResult }) => {
   const isUser = role === "user";
   return (
     <div
@@ -40,6 +40,54 @@ const Bubble = ({ role, content, ts }) => {
           >
             {content}
           </div>
+
+          {/* ACTION PROPOSAL — confirm button under the bubble */}
+          {actionProposal && !executedResult && (
+            <div
+              className="mt-2 p-3 rounded-xl border border-fuchsia-500/40 bg-gradient-to-br from-fuchsia-500/10 to-violet-500/5"
+              data-testid="twin-action-proposal"
+            >
+              <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-bold text-fuchsia-700 dark:text-fuchsia-300 mb-1">
+                <Zap className="w-3 h-3" /> Acțiune propusă
+              </div>
+              <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                {actionProposal.label}
+              </div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {actionProposal.description} · ~{actionProposal.estimated_seconds}s
+              </div>
+              <div className="flex gap-2 mt-2.5">
+                <button
+                  onClick={onConfirm}
+                  disabled={executing}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-gradient-to-r from-fuchsia-500 to-violet-600 text-white font-semibold shadow disabled:opacity-50 inline-flex items-center gap-1.5"
+                  data-testid="twin-action-confirm"
+                >
+                  {executing ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                  {executing ? "Execută..." : "Confirmă & execută"}
+                </button>
+                <span className="text-[10px] text-slate-400 self-center">
+                  Token TTL 5min · single-use
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* EXECUTION RESULT */}
+          {executedResult && (
+            <div
+              className="mt-2 p-3 rounded-xl border border-emerald-500/40 bg-emerald-500/5 text-xs text-emerald-700 dark:text-emerald-300"
+              data-testid="twin-action-result"
+            >
+              <div className="flex items-center gap-2 font-semibold mb-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Executat: {executedResult.label}
+              </div>
+              <pre className="text-[10px] text-slate-600 dark:text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">
+{JSON.stringify(executedResult.result, null, 2).slice(0, 400)}
+              </pre>
+            </div>
+          )}
+
           {ts && (
             <div className={`text-[10px] mt-1 text-slate-400 ${isUser ? "text-right" : ""}`}>
               {new Date(ts).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" })}
@@ -81,7 +129,12 @@ const TwinPage = () => {
       if (!sessionId && data.session_id) setSessionId(data.session_id);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: data.answer, ts: new Date().toISOString() },
+        {
+          role: "assistant",
+          content: data.answer,
+          ts: new Date().toISOString(),
+          actionProposal: data.action_proposal || null,
+        },
       ]);
     } catch (e) {
       const status = e?.response?.status;
@@ -99,6 +152,39 @@ const TwinPage = () => {
       ]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const [executingIdx, setExecutingIdx] = useState(null);
+
+  const confirmAction = async (msgIdx) => {
+    const msg = messages[msgIdx];
+    if (!msg?.actionProposal || executingIdx !== null) return;
+    setExecutingIdx(msgIdx);
+    try {
+      const { data } = await axios.post(`${API}/admin/twin/execute-action`, {
+        action_key: msg.actionProposal.action_key,
+        confirmation_token: msg.actionProposal.confirmation_token,
+        session_id: sessionId,
+      });
+      setMessages((prev) =>
+        prev.map((m, i) =>
+          i === msgIdx ? { ...m, executedResult: data, actionProposal: null } : m
+        )
+      );
+    } catch (e) {
+      const status = e?.response?.status;
+      const detail = e?.response?.data?.detail || e?.message;
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `⚠ Execuție eșuată (HTTP ${status || "?"}): ${detail}`,
+          ts: new Date().toISOString(),
+        },
+      ]);
+    } finally {
+      setExecutingIdx(null);
     }
   };
 
@@ -160,7 +246,12 @@ const TwinPage = () => {
             </div>
           )}
           {messages.map((m, i) => (
-            <Bubble key={i} {...m} />
+            <Bubble
+              key={i}
+              {...m}
+              onConfirm={() => confirmAction(i)}
+              executing={executingIdx === i}
+            />
           ))}
           {loading && (
             <div className="flex justify-start mb-3">
