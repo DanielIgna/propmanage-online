@@ -42,6 +42,22 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 
 ---
 
+## Recent additions (Feb 22 2026 — KYC Auto-Approve threshold)
+- **Backend** (`routes/kyc.py`):
+  - Endpoint-uri config: `GET /api/kyc/admin/config/auto-approve`, `PUT /api/kyc/admin/config/auto-approve` (super-only via `is_super_admin`)
+  - Config salvat în `app_settings.kyc_auto_approve = {enabled, min_score (50-100), block_on_negative_flags}`
+  - Gate auto-approve adăugat la finalul `_run_ai_verification`:
+    - Dacă `enabled && match_score >= min_score && (not block_negative OR no negative flags)`
+    - Marchează status=approved cu `reviewed_by="system_ai"`, `auto_approved=True`, review_note "Auto-approved by AI (score X/100, no negative flags)"
+    - Promovează user la verified+VERIFIED + notif "✅ KYC aprobat automat"
+  - Pattern negative flags: poor/blur_high/covered/mismatch/suspicious/screen_capture/no_id_visible/uncertain/fake/verification_impossible/no_visual_data/images_not_loaded
+- **Frontend** (`AdminKYCQueue.jsx`):
+  - Badge `⚡ Auto ≥ 92` emerald în header când config activ
+  - Buton ⚙ Auto care deschide modal config
+  - Modal cu: checkbox enable, slider 50-100 cu marcaje (permisiv/recomandat/strict), checkbox block_negative, Save/Cancel
+- **Testat live**: super setează enabled=true min_score=92 → API răspunde OK; testing.admin → 403 (doar super)
+
+
 ## Recent additions (Feb 22 2026 — KYC AI Verification cu Claude Sonnet 4.5)
 - **Backend** (`routes/kyc.py`):
   - `_run_ai_verification(kyc_id)` — folosește `emergentintegrations.LlmChat` cu `ImageContent` pe Claude Sonnet 4.5 vision

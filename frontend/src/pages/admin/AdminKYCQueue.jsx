@@ -1,7 +1,7 @@
 // Admin KYC Review queue + detail modal — placed inside Operator/Admin dashboard.
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { ShieldCheck, Eye, CheckCircle2, XCircle, RefreshCw, Sparkles, AlertTriangle } from "lucide-react";
+import { ShieldCheck, Eye, CheckCircle2, XCircle, RefreshCw, Sparkles, AlertTriangle, Zap, Settings } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -263,6 +263,26 @@ export const AdminKYCQueue = () => {
   const [filter, setFilter] = useState("uploaded");
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [autoApprove, setAutoApprove] = useState({ enabled: false, min_score: 92, block_on_negative_flags: true });
+
+  const loadConfig = async () => {
+    try {
+      const r = await axios.get(`${API}/kyc/admin/config/auto-approve`);
+      setAutoApprove(r.data);
+    } catch {
+      // silent
+    }
+  };
+  const saveConfig = async () => {
+    try {
+      await axios.put(`${API}/kyc/admin/config/auto-approve`, autoApprove);
+      setConfigOpen(false);
+    } catch (e) {
+      alert(e.response?.data?.detail || "Eroare la salvare config");
+    }
+  };
+  useEffect(() => { loadConfig(); }, []);
 
   const load = async (status = filter) => {
     setLoading(true);
@@ -301,6 +321,11 @@ export const AdminKYCQueue = () => {
           <ShieldCheck className="w-4 h-4 text-violet-500" />
           KYC · Verificări Identitate
           <span className="text-[10px] text-slate-500 font-normal">({items.length} {filter})</span>
+          {autoApprove.enabled && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 flex items-center gap-1" data-testid="auto-approve-active">
+              <Zap className="w-3 h-3" /> Auto ≥ {autoApprove.min_score}
+            </span>
+          )}
         </h3>
         <div className="flex gap-1 flex-wrap">
           {filterChip("uploaded", "În așteptare")}
@@ -314,6 +339,15 @@ export const AdminKYCQueue = () => {
             data-testid="kyc-refresh"
           >
             <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} />
+          </button>
+          <button
+            onClick={() => setConfigOpen(true)}
+            className="text-[11px] px-2 py-1.5 rounded-md bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 hover:bg-violet-200 flex items-center gap-1"
+            data-testid="kyc-config-toggle"
+            title="Config auto-approve"
+          >
+            <Settings className="w-3 h-3" />
+            Auto
           </button>
         </div>
       </div>
@@ -360,6 +394,93 @@ export const AdminKYCQueue = () => {
         onClose={() => setSelected(null)}
         onDecision={() => load(filter)}
       />
+
+      {configOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setConfigOpen(false)}>
+          <div
+            className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-lg w-full"
+            onClick={(e) => e.stopPropagation()}
+            data-testid="kyc-config-modal"
+          >
+            <h3 className="font-serif text-lg flex items-center gap-2 mb-2">
+              <Zap className="w-5 h-5 text-violet-500" />
+              Auto-Approve KYC
+            </h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Aprobă automat KYC-urile cu scor AI ridicat. Cazurile borderline rămân în review manual.
+              <strong className="text-violet-600 dark:text-violet-400"> Doar super-admin poate modifica.</strong>
+            </p>
+
+            <div className="space-y-4">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoApprove.enabled}
+                  onChange={(e) => setAutoApprove({ ...autoApprove, enabled: e.target.checked })}
+                  className="w-4 h-4 accent-violet-500"
+                  data-testid="config-enabled"
+                />
+                <div>
+                  <div className="text-sm font-medium">Activează auto-approve</div>
+                  <div className="text-[11px] text-slate-500">KYC se aprobă singur dacă AI confirmă cu scor mare</div>
+                </div>
+              </label>
+
+              <div>
+                <label className="text-[11px] uppercase tracking-wider text-slate-500 font-medium">
+                  Scor minim pentru auto-approve: <strong className="text-violet-600 dark:text-violet-400">{autoApprove.min_score}</strong>
+                </label>
+                <input
+                  type="range"
+                  min={50}
+                  max={100}
+                  step={1}
+                  value={autoApprove.min_score}
+                  onChange={(e) => setAutoApprove({ ...autoApprove, min_score: parseInt(e.target.value, 10) })}
+                  className="w-full mt-2 accent-violet-500"
+                  data-testid="config-min-score"
+                />
+                <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                  <span>50 (permisiv)</span>
+                  <span>92 (recomandat)</span>
+                  <span>100 (strict)</span>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoApprove.block_on_negative_flags}
+                  onChange={(e) => setAutoApprove({ ...autoApprove, block_on_negative_flags: e.target.checked })}
+                  className="w-4 h-4 accent-violet-500"
+                  data-testid="config-block-negative"
+                />
+                <div>
+                  <div className="text-sm font-medium">Blochează auto-approve dacă AI ridică flag-uri negative</div>
+                  <div className="text-[11px] text-slate-500">Recomandat ON. Flag-uri: blur, screen_capture, suspicious, etc.</div>
+                </div>
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <button
+                onClick={() => setConfigOpen(false)}
+                className="text-sm px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800"
+                data-testid="config-cancel"
+              >
+                Anulează
+              </button>
+              <button
+                onClick={saveConfig}
+                className="text-sm px-5 py-2 rounded-lg bg-violet-500 text-white hover:bg-violet-600 font-medium"
+                data-testid="config-save"
+              >
+                Salvează
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -201,6 +201,76 @@ async def _run_ai_verification(kyc_id: str) -> dict:
         {"id": kyc_id},
         {"$set": {"ai_verification": result}},
     )
+
+    # Auto-approve gate (config in app_settings.kyc_auto_approve)
+    try:
+        settings = await db.app_settings.find_one({"_id": "app_settings"}) or {}
+        cfg = (settings.get("kyc_auto_approve") or {})
+        enabled = bool(cfg.get("enabled"))
+        min_score = int(cfg.get("min_score", 92))
+        block_negative = bool(cfg.get("block_on_negative_flags", True))
+        if enabled and result.get("match_score") is not None and result["match_score"] >= min_score:
+            has_negative = False
+            if block_negative:
+                neg_patterns = (
+                    "poor", "blur_high", "covered", "mismatch", "suspicious",
+                    "screen_capture", "no_id_visible", "uncertain", "fake",
+                    "verification_impossible", "no_visual_data", "images_not_loaded",
+                )
+                for f in result.get("flags", []):
+                    fl = str(f).lower()
+                    if any(p in fl for p in neg_patterns):
+                        has_negative = True
+                        break
+            if not has_negative:
+                # auto-approve mirroring kyc_approve()
+                fresh_doc = await db.kyc_documents.find_one({"id": kyc_id})
+                if fresh_doc and fresh_doc.get("status") in {"uploaded", "reviewing"}:
+                    now_iso = _now_iso()
+                    auto_note = f"Auto-approved by AI (score {result['match_score']}/100, no negative flags)."
+                    await db.kyc_documents.update_one(
+                        {"id": kyc_id},
+                        {"$set": {
+                            "status": "approved",
+                            "reviewed_at": now_iso,
+                            "reviewed_by": "system_ai",
+                            "reviewed_by_email": "ai-auto@propmanage.io",
+                            "review_note": auto_note,
+                            "auto_approved": True,
+                        }},
+                    )
+                    # Promote the user
+                    try:
+                        from bson import ObjectId as _OID
+                        spec = await db.users.find_one({"_id": _OID(fresh_doc["user_id"])})
+                        if spec and spec.get("role") == "specialist":
+                            await db.users.update_one(
+                                {"_id": spec["_id"]},
+                                {"$set": {
+                                    "verified": True,
+                                    "tier": "VERIFIED",
+                                    "verified_at": now_iso,
+                                    "kyc_id": kyc_id,
+                                    "kyc_approved_at": now_iso,
+                                }},
+                            )
+                            try:
+                                from services import notify
+                                await notify(
+                                    fresh_doc["user_id"],
+                                    "✅ KYC aprobat automat",
+                                    f"AI a confirmat identitatea (scor {result['match_score']}/100). Contul tău este acum VERIFIED.",
+                                    type_="kyc_approved",
+                                    link="/specialist",
+                                )
+                            except Exception:  # noqa: BLE001
+                                pass
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning(f"[kyc.auto_approve] promote user failed: {e}")
+                    logger.info(f"[kyc] auto-approved {kyc_id} (score={result['match_score']})")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[kyc.auto_approve_gate] {e}")
+
     return result
 
 
@@ -209,6 +279,43 @@ async def admin_run_ai_verify(kyc_id: str, user: dict = Depends(require_role("ad
     """Manually re-run AI verification (e.g. after a model update)."""
     result = await _run_ai_verification(kyc_id)
     return {"ok": True, "ai_verification": result}
+
+
+# ============================================================================
+# AUTO-APPROVE CONFIG (super-admin only)
+# ============================================================================
+class AutoApproveConfig(BaseModel):
+    enabled: bool = False
+    min_score: int = Field(92, ge=50, le=100)
+    block_on_negative_flags: bool = True
+
+
+@router.get("/admin/config/auto-approve")
+async def get_auto_approve_config(user: dict = Depends(require_role("admin"))):
+    doc = await db.app_settings.find_one({"_id": "app_settings"}) or {}
+    cfg = doc.get("kyc_auto_approve") or {}
+    return {
+        "enabled": bool(cfg.get("enabled", False)),
+        "min_score": int(cfg.get("min_score", 92)),
+        "block_on_negative_flags": bool(cfg.get("block_on_negative_flags", True)),
+    }
+
+
+@router.put("/admin/config/auto-approve")
+async def set_auto_approve_config(
+    payload: AutoApproveConfig,
+    user: dict = Depends(require_role("admin")),
+):
+    # Only super admin can change this guardrail
+    from sub_admin_deps import is_super_admin
+    if not is_super_admin(user):
+        raise HTTPException(403, "Doar super-admin poate modifica auto-approve.")
+    await db.app_settings.update_one(
+        {"_id": "app_settings"},
+        {"$set": {"kyc_auto_approve": payload.model_dump(), "kyc_auto_approve_updated_at": _now_iso(), "kyc_auto_approve_updated_by": user["id"]}},
+        upsert=True,
+    )
+    return {"ok": True, **payload.model_dump()}
 
 
 
