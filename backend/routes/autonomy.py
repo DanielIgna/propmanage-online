@@ -213,6 +213,23 @@ async def autopilot_run_sweep(user=Depends(require_role("admin"))):
     return {"ok": True, "result": result}
 
 
+@router.get("/autopilot/runs")
+async def autopilot_recent_runs(
+    limit: int = Query(10, ge=1, le=50),
+    user=Depends(require_role("admin")),
+):
+    """Recent autopilot runs (daily_sweep + auto_tune) for the activity feed.
+
+    Used by the Autopilot Activity Card on the admin dashboard.
+    """
+    cursor = db.autopilot_runs.find(
+        {"kind": {"$in": ["daily_sweep", "auto_tune"]}},
+        {"_id": 0},
+    ).sort("ran_at", -1).limit(limit)
+    items = [d async for d in cursor]
+    return {"items": items, "count": len(items)}
+
+
 # ============================================================================
 # V2: TASK GENERATION (from recommendations → admin_todos)
 # ============================================================================
