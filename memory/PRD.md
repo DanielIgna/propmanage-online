@@ -42,6 +42,33 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 
 ---
 
+## Recent additions (Feb 22 2026 — KYC System Complete)
+- **Backend** (`routes/kyc.py`):
+  - Collection `kyc_documents` cu pipeline: not_started → uploaded → reviewing → approved | rejected
+  - Endpoint-uri specialist: `GET /api/kyc/status`, `POST /api/kyc/upload` (3 base64 imgs + nume + CNP masked)
+  - Endpoint-uri admin: `GET /api/kyc/admin/queue`, `GET /api/kyc/admin/{id}`, `POST /{id}/approve|reject`
+  - CNP stocat doar masked (ex: `198******56`), niciodată plain
+  - On approve: user devine `verified=true, tier=VERIFIED, kyc_id=X, kyc_approved_at=...`, rulează tier_milestones hook + notif
+  - Notif admin (general + security) la upload nou
+- **Frontend specialist** (`pages/KYCPage.jsx`):
+  - Drag&drop 3 documente (ID front + back + selfie) cu preview live
+  - Status banner colorat per stare (amber/cyan/emerald/red)
+  - Validare max 3MB per fișier
+  - Form locked după upload până la review
+  - Design 100% consistent: light cards, violet/emerald accents
+- **Frontend admin** (`pages/admin/AdminKYCQueue.jsx`):
+  - Queue cu chips filtru (uploaded/reviewing/approved/rejected/all) + counts
+  - Modal Review KYC cu 3 preview-uri + zoom click + textarea notă + butoane Approve (emerald) / Reject (red)
+  - Integrat în Compliance section sidebar admin
+  - Vizibil pentru `general` + `security` scopes
+- **Route**: `/kyc` adăugat în `App.js`
+- **Testat E2E live** (toate pass):
+  - Specialist upload → status `uploaded`, CNP masked corect `198******56`
+  - Admin queue listează 1 cerere
+  - Admin approve → user `verified=true, tier=VERIFIED, kyc_approved_at=...`
+  - Modal review afișează 3 preview-uri + notă "Documente OK"
+
+
 ## Recent additions (Feb 22 2026 — Sparkline trend pe Productivity Score)
 - **Backend** (`/api/admin/sub-admins/productivity`): adăugat `sparkline` (7 valori) + `sparkline_days` (date ISO ultimele 7 zile, oldest→newest)
   - Calculat din `admin_actions_log` per zi: success rate zilnic × 100, 0 dacă zi idle

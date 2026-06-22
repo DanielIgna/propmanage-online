@@ -1,0 +1,271 @@
+// Admin KYC Review queue + detail modal — placed inside Operator/Admin dashboard.
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import { ShieldCheck, Eye, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+const STATUS_TONE = {
+  uploaded:  "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+  reviewing: "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300",
+  approved:  "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+  rejected:  "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300",
+};
+
+const DocPreview = ({ src, label }) => {
+  const [zoom, setZoom] = useState(false);
+  if (!src) return <div className="rounded-lg bg-slate-100 dark:bg-slate-800 h-48 flex items-center justify-center text-xs text-slate-500">— lipsă —</div>;
+  return (
+    <>
+      <button
+        onClick={() => setZoom(true)}
+        className="block w-full rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 hover:border-violet-500 transition"
+        data-testid={`kyc-preview-${label}`}
+      >
+        <img src={src} alt={label} className="w-full h-48 object-cover" />
+      </button>
+      {zoom && (
+        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4" onClick={() => setZoom(false)}>
+          <img src={src} alt={label} className="max-w-full max-h-full rounded-xl" />
+        </div>
+      )}
+    </>
+  );
+};
+
+const KYCDetailModal = ({ kycId, onClose, onDecision }) => {
+  const [doc, setDoc] = useState(null);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!kycId) return;
+    axios.get(`${API}/kyc/admin/${kycId}`).then((r) => setDoc(r.data)).catch(() => onClose());
+  }, [kycId]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const decide = async (action) => {
+    if (action === "reject" && !note.trim()) {
+      alert("Motivul respingerii e obligatoriu.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await axios.post(`${API}/kyc/admin/${kycId}/${action}`, { note: note.trim() });
+      onDecision(action);
+      onClose();
+    } catch (e) {
+      alert(e.response?.data?.detail || "Eroare");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!kycId) return null;
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-5xl w-full max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+        data-testid="kyc-review-modal"
+      >
+        {doc ? (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-serif text-xl flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-violet-500" />
+                  Review KYC
+                </h3>
+                <div className="text-xs text-slate-500 mt-1">
+                  {doc.user_email} · trimis {new Date(doc.submitted_at).toLocaleString("ro-RO")}
+                </div>
+              </div>
+              <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${STATUS_TONE[doc.status]}`}>{doc.status}</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Buletin · Față</div>
+                <DocPreview src={doc.id_front} label="id-front" />
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Buletin · Verso</div>
+                <DocPreview src={doc.id_back} label="id-back" />
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Selfie</div>
+                <DocPreview src={doc.selfie} label="selfie" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 text-sm">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500">Nume pe buletin</div>
+                <div className="font-medium">{doc.full_name_on_id || "—"}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500">CNP masked</div>
+                <div className="font-mono">{doc.national_id_masked || "—"}</div>
+              </div>
+            </div>
+
+            {["uploaded", "reviewing"].includes(doc.status) && (
+              <div className="border-t border-slate-200 dark:border-slate-700 pt-4 space-y-3">
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Notă review (obligatorie la respingere, opțională la aprobare)"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm"
+                  rows={2}
+                  data-testid="kyc-review-note"
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={onClose}
+                    className="text-sm px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                    data-testid="kyc-review-close"
+                  >
+                    Închide
+                  </button>
+                  <button
+                    onClick={() => decide("reject")}
+                    disabled={busy}
+                    className="text-sm px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 flex items-center gap-1.5"
+                    data-testid="kyc-review-reject"
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                    Respinge
+                  </button>
+                  <button
+                    onClick={() => decide("approve")}
+                    disabled={busy}
+                    className="text-sm px-4 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 flex items-center gap-1.5"
+                    data-testid="kyc-review-approve"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Aprobă & VERIFY
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {doc.review_note && (
+              <div className="mt-3 p-3 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs italic">
+                Notă review: "{doc.review_note}" — de {doc.reviewed_by_email}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="py-12 text-center text-sm text-slate-500">Se încarcă documentele…</div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export const AdminKYCQueue = () => {
+  const [items, setItems] = useState([]);
+  const [counts, setCounts] = useState({});
+  const [filter, setFilter] = useState("uploaded");
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
+
+  const load = async (status = filter) => {
+    setLoading(true);
+    try {
+      const r = await axios.get(`${API}/kyc/admin/queue?status=${status}&limit=80`);
+      setItems(r.data?.items || []);
+      setCounts(r.data?.counts || {});
+    } catch {
+      // silent
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { load(filter); }, [filter]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filterChip = (key, label) => {
+    const count = key === "all"
+      ? Object.values(counts).reduce((a, b) => a + b, 0)
+      : (counts[key] || 0);
+    return (
+      <button
+        key={key}
+        onClick={() => setFilter(key)}
+        className={`text-[11px] px-3 py-1.5 rounded-md ${filter === key ? "bg-violet-500 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"}`}
+        data-testid={`kyc-filter-${key}`}
+      >
+        {label} ({count})
+      </button>
+    );
+  };
+
+  return (
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5" data-testid="admin-kyc-queue">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <h3 className="font-serif text-lg flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-violet-500" />
+          KYC · Verificări Identitate
+          <span className="text-[10px] text-slate-500 font-normal">({items.length} {filter})</span>
+        </h3>
+        <div className="flex gap-1 flex-wrap">
+          {filterChip("uploaded", "În așteptare")}
+          {filterChip("reviewing", "În revizie")}
+          {filterChip("approved", "Aprobate")}
+          {filterChip("rejected", "Respinse")}
+          {filterChip("all", "Toate")}
+          <button
+            onClick={() => load(filter)}
+            className="text-[11px] px-2 py-1.5 rounded-md bg-slate-100 dark:bg-slate-800"
+            data-testid="kyc-refresh"
+          >
+            <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="py-8 text-center text-sm text-slate-500">Se încarcă…</div>
+      ) : items.length === 0 ? (
+        <div className="py-8 text-center text-sm text-slate-500" data-testid="kyc-queue-empty">
+          Nicio cerere {filter !== "all" ? filter : ""}.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {items.map((it) => (
+            <div
+              key={it.id}
+              className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-violet-400 transition"
+              data-testid={`kyc-row-${it.id}`}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-xs">{it.user_email}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${STATUS_TONE[it.status] || ""}`}>{it.status}</span>
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5">
+                  {it.full_name_on_id || it.user_name} · trimis {new Date(it.submitted_at).toLocaleString("ro-RO")}
+                  {it.reviewed_at && ` · revizuit ${new Date(it.reviewed_at).toLocaleString("ro-RO")}`}
+                </div>
+              </div>
+              <button
+                onClick={() => setSelected(it.id)}
+                className="text-xs px-3 py-1.5 rounded-md bg-violet-500 text-white hover:bg-violet-600 flex items-center gap-1"
+                data-testid={`kyc-review-${it.id}`}
+              >
+                <Eye className="w-3 h-3" />
+                Review
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <KYCDetailModal
+        kycId={selected}
+        onClose={() => setSelected(null)}
+        onDecision={() => load(filter)}
+      />
+    </div>
+  );
+};

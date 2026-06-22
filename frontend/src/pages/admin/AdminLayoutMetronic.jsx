@@ -133,6 +133,7 @@ const NAV_SECTIONS = [
     items: [
       { id: "gdpr", label: "GDPR Pack", icon: ShieldCheck, badge: "NEW" },
       { id: "impersonation", label: "Impersonări", icon: ShieldCheck, badge: "NEW" },
+      { id: "kyc", label: "KYC Identitate", icon: ShieldCheck, badge: "NEW" },
     ],
   },
   {

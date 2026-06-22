@@ -26,7 +26,7 @@ export const SCOPE_VISIBILITY = {
     "bug_memory",
   ]),
   security: new Set([
-    "overview", "activity", "ai_security", "gdpr", "impersonation",
+    "overview", "activity", "ai_security", "gdpr", "impersonation", "kyc",
     "audit", "docs", "docs_train", "todo_board", "approvals",
     "trust", "ai_governance",
   ]),

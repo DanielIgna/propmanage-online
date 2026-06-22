@@ -23,6 +23,7 @@ import { AdminDocs } from "./AdminDocs";
 import { AdminQAPlaybook } from "./AdminQAPlaybook";
 import { AdminSubAdmins } from "./AdminSubAdmins";
 import { AdminApprovals } from "./AdminApprovals";
+import { AdminKYCQueue } from "./AdminKYCQueue";
 
 const TITLES = {
   overview: { title: "Dashboard", subtitle: "Privire de ansamblu asupra platformei" },
@@ -50,6 +51,7 @@ const TITLES = {
   qa_playbook: { title: "QA Playbook", subtitle: "105 scenarii de test interactive · AI Test Suggester (Claude Sonnet 4.5) · markdown export" },
   sub_admins: { title: "Sub-Admini & RBAC", subtitle: "Gestionare conturi admin cu scope · senior/junior · audit log" },
   approvals: { title: "Aprobări Admin", subtitle: "Queue de cereri pendinte · senior aprobă acțiuni junior · istoric decizii" },
+  kyc: { title: "KYC · Verificări Identitate", subtitle: "Review documente buletin + selfie · aprobă & marchează VERIFIED" },
 };
 
 export const AdminDashboard = () => {
@@ -106,6 +108,7 @@ export const AdminDashboard = () => {
       {active === "qa_playbook" && <AdminQAPlaybook />}
       {active === "sub_admins" && <AdminSubAdmins />}
       {active === "approvals" && <AdminApprovals />}
+      {active === "kyc" && <AdminKYCQueue />}
     </AdminLayoutMetronic>
   );
 };

@@ -42,6 +42,7 @@ SCOPE_RULES = [
     (re.compile(r"^/api/admin/gdpr"),                    "security"),
     (re.compile(r"^/api/admin/impersonation"),           "security"),
     (re.compile(r"^/api/admin/ai-security"),             "security"),
+    (re.compile(r"^/api/kyc/admin"),                     "security"),
     # ----- AI -----
     (re.compile(r"^/api/admin/ai-(control|pm|governance|dev-team|docs|investigator)"), "ai"),
     (re.compile(r"^/api/admin/concierge"),               "ai"),

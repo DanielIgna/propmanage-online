@@ -44,6 +44,7 @@ import { GDPRAuditBadge } from "./components/GDPRAuditBadge";
 import { TrustStrip } from "./components/TrustStrip";
 import DigitalTwinPage from "./pages/DigitalTwinPage";
 import ReportApprovalPage from "./pages/ReportApprovalPage";
+import KYCPage from "./pages/KYCPage";
 import { EstateBrowse } from "./pages/verified-estate/EstateBrowse";
 import { EstateDetail } from "./pages/verified-estate/EstateDetail";
 import { SellMyProperty } from "./pages/verified-estate/SellMyProperty";
@@ -1595,6 +1596,7 @@ function App() {
               <Route path="/verify-email" element={<EmailVerifyPage />} />
               <Route path="/client/requests/:requestId/offers" element={<ClientRequestOffersPage />} />
               <Route path="/specialist/premium-profile" element={<PremiumProfileEditorPage />} />
+              <Route path="/kyc" element={<KYCPage />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/marketplace" element={<PublicMarketplace />} />
               <Route path="/marketplace/:slug" element={<MarketplaceLanding />} />
