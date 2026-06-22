@@ -134,6 +134,25 @@ async def _check_dashboard(page, profile: dict) -> dict:
     return {"ok": len(errors) == 0, "errors": errors}
 
 
+async def _test_unauthenticated_redirects(page) -> list:
+    """Verify that protected dashboards redirect to /login?next= when no session.
+    Catches regressions on the email-link → auth-guard → post-login redirect flow."""
+    errors = []
+    protected = [("/admin", "next=/admin"), ("/client", "next=/client"), ("/specialist", "next=/specialist")]
+    for path, expected_next in protected:
+        try:
+            await page.context.clear_cookies()
+            await page.goto(f"{BASE_URL}{path}", wait_until="domcontentloaded", timeout=20000)
+            await asyncio.sleep(2)
+            if "/login" not in page.url:
+                errors.append(f"{path}: did NOT redirect to /login (final url: {page.url})")
+            elif expected_next not in page.url:
+                errors.append(f"{path}: missing '{expected_next}' in url (got: {page.url})")
+        except Exception as e:
+            errors.append(f"{path}: exception {e}")
+    return errors
+
+
 async def _run_smoke_test() -> tuple[int, int, list]:
     """Run the smoke test on all profiles. Returns (passed, failed, failures_list)."""
     from playwright.async_api import async_playwright
@@ -146,6 +165,17 @@ async def _run_smoke_test() -> tuple[int, int, list]:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1440, "height": 900})
         page = await context.new_page()
+
+        # Pre-test: unauthenticated → /admin /client /specialist must redirect to /login?next=
+        print("  → unauthenticated dashboard redirects...", end=" ", flush=True)
+        redirect_errors = await _test_unauthenticated_redirects(page)
+        if redirect_errors:
+            failed += 1
+            failures.append({"profile": "UNAUTH_REDIRECTS", "errors": redirect_errors})
+            print(f"❌ FAIL: {redirect_errors}")
+        else:
+            passed += 1
+            print("✅ PASS")
 
         for profile in PROFILES:
             print(f"  → {profile['email']} ({profile['tier']})...", end=" ", flush=True)

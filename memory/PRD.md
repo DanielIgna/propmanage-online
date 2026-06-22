@@ -1081,3 +1081,19 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 
 ### Benefit
 **Bug-ul iter66 (TierProgressWidget undefined) NU mai poate ajunge niciodată în producție** — workflow-ul blochează merge-ul în main.
+
+## Update — 22 Feb 2026 · Email-Link Auth Flow Fix + Smoke Test Extension (iter69)
+
+### Bug Fix
+- Auth-check order corrupted: `if (!user)` was catching both `null` AND `false`, so redirect to `/login` never executed → users clicking email links got stuck on infinite spinner.
+- Fixed: `AdminConsole.jsx`, `DashShared.jsx`, `Auth.jsx` — proper order + `?next=` param + open-redirect protection.
+- Removed broken `.eslintrc.json` (blocked webpack compile).
+
+### Smoke Test Extension
+- New pre-test in `test_dashboards_smoke.py`: `_test_unauthenticated_redirects(page)`
+- Verifies that `/admin`, `/client`, `/specialist` (without session) → redirect to `/login?next={path}`.
+- Catches regressions on the email-link auth-guard flow automatically before deploy.
+
+### Status
+- Preview: verified ✅
+- Production (propmanage.ro): **awaiting user redeploy**
