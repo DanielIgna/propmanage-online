@@ -386,6 +386,44 @@ async def trigger_test_alert(user=Depends(require_role("admin"))):
     return {"ok": True, "result": result}
 
 
+@router.post("/seed-ai-data")
+async def seed_ai_data(user=Depends(require_role("admin"))):
+    """Boost the AI sub-score by seeding the knowledge base + memories.
+
+    Super-admin only. Idempotent — skips docs whose title already exists and
+    skips memories whose summary already exists. Re-invalidates the autonomy
+    cache and takes a fresh snapshot so the dashboard shows the new AI score.
+    """
+    from sub_admin_deps import is_super_admin
+    if not is_super_admin(user):
+        raise HTTPException(403, "Doar super-admin poate rula seed-ul.")
+
+    from scripts.seed_autonomy_data import seed_documents, seed_memories
+
+    # Capture before
+    prev_docs = await db.ai_documents.count_documents({})
+    prev_mems = await db.ai_memories.count_documents({})
+
+    docs_added = await seed_documents()
+    mems_added = await seed_memories(target_total=110)
+
+    # Refresh autonomy
+    _CACHE["data"] = None
+    snap = await take_autonomy_snapshot()
+
+    new_docs = await db.ai_documents.count_documents({})
+    new_mems = await db.ai_memories.count_documents({})
+
+    return {
+        "ok": True,
+        "documents": {"before": prev_docs, "added": docs_added, "after": new_docs},
+        "memories": {"before": prev_mems, "added": mems_added, "after": new_mems},
+        "new_ai_score": (snap.get("breakdown_summary") or {}).get("ai"),
+        "new_general_score": (snap.get("scores") or {}).get("general"),
+        "tier": snap.get("tier"),
+    }
+
+
 # ============================================================================
 # Snapshot job (called from APScheduler)
 # ============================================================================

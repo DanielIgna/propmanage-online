@@ -376,6 +376,29 @@ export const AutonomyEnginePage = () => {
     } finally { setBoosting(false); }
   };
 
+  const [boostingAI, setBoostingAI] = useState(false);
+  const [boostAIResult, setBoostAIResult] = useState(null);
+
+  const boostAI = async () => {
+    if (boostingAI) return;
+    if (!window.confirm("Confirmi BOOST AI?\n\n• Inserează 17 documente interne (PRD, RBAC, KYC, runbooks) în AI Knowledge Base\n• Generează 100+ memorii sintetice din admin_actions_log\n• Recalculează snapshotul Autonomy\n\nIdempotent — sare peste cele care există deja.")) return;
+    setBoostingAI(true);
+    setBoostAIResult(null);
+    try {
+      const { data } = await ax.post("/api/admin/autonomy/seed-ai-data");
+      setBoostAIResult(data);
+      await load(true);
+    } catch (e) {
+      const status = e?.response?.status;
+      const msg = status === 404
+        ? "Endpoint indisponibil — necesită REDEPLOY la producție."
+        : status === 403
+        ? "Doar super-admin poate rula seed-ul."
+        : `HTTP ${status || "?"}: ${e?.response?.data?.detail || e?.message || "eroare necunoscută"}`;
+      setBoostAIResult({ error: msg });
+    } finally { setBoostingAI(false); }
+  };
+
   const tierMeta = useMemo(() => {
     if (!report) return TIER_META.manual;
     return TIER_META[report.tier] || TIER_META.manual;
@@ -414,6 +437,9 @@ export const AutonomyEnginePage = () => {
             <button onClick={boostDev} disabled={boosting} className="pm-btn pm-btn-sm bg-violet-500/15 border border-violet-500/40 text-violet-200 hover:bg-violet-500/25" data-testid="autonomy-boost-dev" title="Boost DEV: Release Gate + dismiss stale findings + new snapshot">
               {boosting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />} Boost DEV
             </button>
+            <button onClick={boostAI} disabled={boostingAI} className="pm-btn pm-btn-sm bg-cyan-500/15 border border-cyan-500/40 text-cyan-200 hover:bg-cyan-500/25" data-testid="autonomy-boost-ai" title="Boost AI: Seed knowledge base + sintetic memorii">
+              {boostingAI ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Brain className="w-3.5 h-3.5" />} Boost AI
+            </button>
             <button onClick={takeSnap} disabled={snapping} className="pm-btn pm-btn-secondary pm-btn-sm" data-testid="autonomy-take-snap">
               {snapping ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Target className="w-3.5 h-3.5" />} Snapshot acum
             </button>
@@ -439,6 +465,24 @@ export const AutonomyEnginePage = () => {
                 <div>• Release Gate: {boostResult.release_gate?.error ? <span className="text-red-300">{boostResult.release_gate.error}</span> : boostResult.release_gate?.status === "scheduled_in_background" ? <span className="text-amber-300">⏳ Rulează în background (~2-3 min). Refresh pagina după 3 min ca să vezi scorul final.</span> : <>id <code className="text-xs">{boostResult.release_gate?.id?.slice(0,8)}</code> · blocked: <strong className={boostResult.release_gate?.blocked ? "text-red-300" : "text-emerald-300"}>{String(boostResult.release_gate?.blocked)}</strong> · p0_fail: {boostResult.release_gate?.p0_fail ?? "—"}</>}</div>
                 <div>• Findings vechi marcate dismissed: <strong className="text-emerald-300">{boostResult.qa_findings_dismissed}</strong></div>
                 <div>• Scor DEV: <strong className="text-stone-400">{boostResult.previous_dev_score ?? "—"}</strong> → <strong className="text-[#d4ff3a]">{boostResult.new_dev_score ?? "—"}</strong> · General: <strong className="text-[#d4ff3a]">{boostResult.new_general_score ?? "—"}</strong></div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {boostAIResult && (
+          <div className="mt-4 rounded-2xl border border-cyan-500/30 bg-cyan-500/5 p-4 text-sm" data-testid="autonomy-boost-ai-result">
+            {boostAIResult.error ? (
+              <div className="space-y-1">
+                <div className="text-red-300 flex items-center gap-2 font-semibold"><AlertTriangle className="w-4 h-4" /> Boost AI eșuat</div>
+                <div className="text-stone-300 text-xs">{boostAIResult.error}</div>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <div className="text-cyan-300 font-semibold flex items-center gap-2"><Brain className="w-4 h-4" /> Boost AI Complete</div>
+                <div>• Documente: <strong className="text-stone-400">{boostAIResult.documents?.before}</strong> → <strong className="text-cyan-200">{boostAIResult.documents?.after}</strong> <span className="text-stone-500">({boostAIResult.documents?.added} adăugate)</span></div>
+                <div>• Memorii: <strong className="text-stone-400">{boostAIResult.memories?.before}</strong> → <strong className="text-cyan-200">{boostAIResult.memories?.after}</strong> <span className="text-stone-500">({boostAIResult.memories?.added} adăugate)</span></div>
+                <div>• Scor AI nou: <strong className="text-[#d4ff3a]">{boostAIResult.new_ai_score ?? "—"}</strong> · General: <strong className="text-[#d4ff3a]">{boostAIResult.new_general_score ?? "—"}</strong> · Tier: <strong className="text-cyan-200">{boostAIResult.tier ?? "—"}</strong></div>
               </div>
             )}
           </div>
