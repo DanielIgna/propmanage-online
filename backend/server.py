@@ -79,6 +79,7 @@ from routes.ai_security import router as ai_security_router
 from routes.settings_snapshots import router as settings_snapshots_router, take_auto_snapshot
 from routes.service_contracts import router as service_contracts_router
 from routes.autonomy import router as autonomy_router, take_autonomy_snapshot, weekly_auto_tune_job
+from routes.twin import router as twin_router
 from autonomy.founder_digest import weekly_founder_digest
 from autonomy.autopilot import bootstrap_autonomy_defaults, daily_autopilot_sweep
 from routes.ai_activity import router as ai_activity_router
@@ -202,6 +203,7 @@ for r in (
     settings_snapshots_router,
     service_contracts_router,
     autonomy_router,
+    twin_router,
     ai_activity_router,
     ai_weekly_briefing_router,
     admin_todos_router,
