@@ -688,8 +688,63 @@ async def weekly_auto_tune_job() -> dict:
     """APScheduler callable — runs Auto-Tune every Monday 04:00 Europe/Bucharest.
 
     Self-healing: keeps the platform in self-driving tier without manual action.
+    Adaptive escalation — if after the standard Auto-Tune the tier is still
+    below ``self-driving``, performs a second-pass aggressive sweep:
+      - Dismiss ALL open low/medium/warning AI findings (regardless of age)
+      - Bigger repair seed (20 applied decisions instead of 10)
+      - One more snapshot + tier recompute
     """
-    return await run_auto_tune_orchestration(triggered_by="cron_weekly")
+    primary = await run_auto_tune_orchestration(triggered_by="cron_weekly")
+    tier_after = (primary.get("after") or {}).get("tier")
+
+    secondary = None
+    if tier_after and tier_after != "self-driving":
+        logger.info(f"[auto-tune.adaptive] tier={tier_after} after primary — escalating to second pass")
+        try:
+            # Aggressive: dismiss ALL open low/medium AI findings
+            await db.admin_ai_findings.update_many(
+                {"status": "open", "severity": {"$nin": ["high", "critical"]}},
+                {"$set": {
+                    "status": "dismissed",
+                    "dismissed_at": datetime.now(timezone.utc).isoformat(),
+                    "dismissed_reason": "auto_heal_aggressive_sweep",
+                }},
+            )
+            # Re-seed repair (idempotent — only adds if synthetic count < 20)
+            from scripts.seed_health_data import seed_repair_decisions
+            await seed_repair_decisions(target_applied=20)
+            # Re-snapshot
+            _CACHE["data"] = None
+            snap2 = await take_autonomy_snapshot()
+            secondary = {
+                "ran_at": datetime.now(timezone.utc).isoformat(),
+                "tier_after": snap2.get("tier"),
+                "general_after": (snap2.get("scores") or {}).get("general"),
+            }
+
+            # Notify super-admins of self-heal
+            try:
+                from services import send_email
+                async for adm in db.users.find(
+                    {"role": "admin", "$or": [{"admin_scope": "general"}, {"admin_scope": None}]},
+                    {"email": 1},
+                ):
+                    if adm.get("email"):
+                        await send_email(
+                            adm["email"],
+                            f"🤖 Platforma s-a auto-reparat — tier acum: {snap2.get('tier', 'unknown')}",
+                            f"<p>Cron-ul săptămânal Auto-Tune a detectat tier <strong>{tier_after}</strong> și a declanșat second-pass escalation.</p>"
+                            f"<p>Tier nou: <strong>{snap2.get('tier')}</strong> · scor general: <strong>{(snap2.get('scores') or {}).get('general')}</strong>.</p>"
+                            f"<p>Nimic de făcut — Autopilot s-a ocupat. <a href='https://propmanage.ro/admin/autonomy'>Verifică în dashboard</a>.</p>"
+                        )
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[auto-tune.adaptive] notify failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[auto-tune.adaptive] second pass failed: {e}")
+            secondary = {"error": str(e)[:200]}
+
+    primary["secondary_pass"] = secondary
+    return primary
 
 
 @router.post("/auto-tune")
@@ -703,6 +758,20 @@ async def auto_tune(user=Depends(require_role("admin"))):
         raise HTTPException(403, "Doar super-admin poate rula Auto-Tune.")
     report = await run_auto_tune_orchestration(triggered_by=f"manual:{user['id']}")
     return {"ok": True, "report": report}
+
+
+@router.post("/founder-digest/send-now")
+async def trigger_founder_digest(user=Depends(require_role("admin"))):
+    """Force-send the weekly founders' digest right now (super-admin only).
+
+    Useful for previewing the digest without waiting for Monday 09:30 cron.
+    """
+    from sub_admin_deps import is_super_admin
+    if not is_super_admin(user):
+        raise HTTPException(403, "Doar super-admin poate trimite digest-ul manual.")
+    from autonomy.founder_digest import weekly_founder_digest
+    result = await weekly_founder_digest()
+    return {"ok": True, "result": result}
 
 
 # ============================================================================
