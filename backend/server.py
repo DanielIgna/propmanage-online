@@ -78,7 +78,7 @@ from routes.ai_dev_team import router as ai_dev_team_router
 from routes.ai_security import router as ai_security_router
 from routes.settings_snapshots import router as settings_snapshots_router, take_auto_snapshot
 from routes.service_contracts import router as service_contracts_router
-from routes.autonomy import router as autonomy_router, take_autonomy_snapshot
+from routes.autonomy import router as autonomy_router, take_autonomy_snapshot, weekly_auto_tune_job
 from autonomy.autopilot import bootstrap_autonomy_defaults, daily_autopilot_sweep
 from routes.ai_activity import router as ai_activity_router
 from routes.ai_weekly_briefing import router as ai_weekly_briefing_router, run_weekly_briefing_job
@@ -289,6 +289,15 @@ async def startup():
             take_autonomy_snapshot,
             CronTrigger(hour=3, minute=15, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="autonomy_snapshot_daily",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        # Auto-Tune weekly orchestrator — every Monday 04:00 Europe/Bucharest.
+        # Self-healing: keeps platform in self-driving tier without manual action.
+        scheduler.add_job(
+            weekly_auto_tune_job,
+            CronTrigger(day_of_week="mon", hour=4, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="autonomy_auto_tune_weekly",
             replace_existing=True,
             misfire_grace_time=3600,
         )
@@ -519,6 +528,7 @@ async def startup():
         logger.info("Daily MongoDB backup scheduler started (03:30 Europe/Bucharest, emails admin).")
         logger.info("Weekly Dev Velocity scheduler started (Mondays 09:30 Europe/Bucharest).")
         logger.info("Autonomy snapshot scheduler started (daily 03:15 Europe/Bucharest).")
+        logger.info("Autonomy Auto-Tune scheduler started (Mondays 04:00 Europe/Bucharest, self-healing).")
         logger.info("Weekly AI Briefing scheduler started (Mondays 09:00 Europe/Bucharest).")
         logger.info("Future Ideas digest scheduler started (Mondays 09:15 Europe/Bucharest).")
 
