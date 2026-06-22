@@ -9,6 +9,7 @@ import { MorningBriefing } from "./MorningBriefing";
 import { AutoMatchPanel } from "./AutoMatchPanel";
 import { AIActivityStream } from "./AIActivityStream";
 import { WeeklyBriefingControl } from "./WeeklyBriefingControl";
+import { AutopilotActivityCard } from "./AutopilotActivityCard";
 
 const KpiCard = ({ icon: Icon, label, value, sub, tone = "blue", testid }) => {
   const tones = {
@@ -48,6 +49,7 @@ export const AdminOverview = () => {
   return (
     <div className="space-y-6">
       <MorningBriefing />
+      <AutopilotActivityCard />
       <AutoMatchPanel />
       <WeeklyBriefingControl />
       <AIActivityStream />

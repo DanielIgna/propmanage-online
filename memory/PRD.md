@@ -42,6 +42,40 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 
 ---
 
+## Recent additions (Feb 22 2026 — Milestone 1: Sub-Admin RBAC + Autopilot Widget)
+- **Sub-Admin Scoped RBAC** ✅ (Feb 22 2026)
+  - New file `/app/backend/sub_admin_deps.py`:
+    - `ALLOWED_SCOPES = {general, testing, frontend, backend, security, ai, ops}`
+    - `ALLOWED_SENIORITY = {junior, senior}`
+    - `is_super_admin(user)` helper
+    - `require_admin_scope(*scopes)` dependency factory + audit logging to `admin_actions_log`
+  - New file `/app/backend/sub_admin_seed.py` — idempotent seed of 4 demo accounts:
+    - `testing.admin@propmanage.io` / `TestAdmin123!` (scope=testing)
+    - `frontend.admin@propmanage.io` / `FrontAdmin123!` (scope=frontend)
+    - `backend.admin@propmanage.io` / `BackAdmin123!` (scope=backend)
+    - `security.admin@propmanage.io` / `SecAdmin123!` (scope=security)
+    - Backfills `admin@propmanage.io` with scope=general (super admin)
+  - New file `/app/backend/routes/sub_admins.py` — CRUD for super-admin:
+    - `GET /api/admin/sub-admins` — list all admins
+    - `POST /api/admin/sub-admins` — create new (custom email + auto-generated password)
+    - `PATCH /api/admin/sub-admins/{id}` — update scope/seniority/active
+    - `POST /api/admin/sub-admins/{id}/reset-password` — returns new password
+    - `DELETE /api/admin/sub-admins/{id}` — soft-deactivate
+    - `GET /api/admin/sub-admins/me/scope` — any admin reads own scope
+    - `GET /api/admin/sub-admins/audit` — super: latest 100 actions
+  - **Bug fix in `routes/auth.py`**: `_enforce_admin_role` was demoting sub-admins to operator (because they're not in ADMIN_EMAILS whitelist). Fixed: sub-admins with `admin_scope` set are exempt.
+  - **Auth lockout**: deactivated admins (`is_active: false`) blocked at login.
+  - **Scope guards applied** to:
+    - `routes/admin_smoketest.py` — all admin routes now require scope=testing
+    - `routes/security_guard.py` — scope=security
+    - `routes/ai_pm.py` — scope=ai
+  - **Verified live** (8/8 tests passing): testing.admin can hit smoke-test routes but is denied on security; security.admin reverse; super-admin can create new sub-admin; audit log records every check.
+- **Autopilot Activity Widget** ✅ (Feb 22 2026)
+  - New `/app/frontend/src/pages/admin/AutopilotActivityCard.jsx` — placed at top of `AdminOverview` (route `/admin`).
+  - Shows: smoke runs in last 24h, auto-resolved findings count, AI top-matches notified, snapshot freshness, monitor states.
+  - Auto-refreshes every 60s + has manual "Sweep acum" button hitting `/api/admin/autonomy/autopilot/run-sweep`.
+
+
 ## Recent additions (Feb 22 2026)
 - **Autonomy Engine Autopilot** ✅ (Feb 22 2026)
   - New module `/app/backend/autonomy/autopilot.py` bundles 3 high-impact automations:

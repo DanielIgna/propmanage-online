@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from db import db
 from deps import require_role
+from sub_admin_deps import require_admin_scope
 from ai_core.provider import call_llm
 
 logger = logging.getLogger("propmanage.ai_pm")
@@ -80,7 +81,7 @@ def _extract_json(text: str) -> dict | None:
 
 
 @router.post("/breakdown")
-async def breakdown(payload: BreakdownIn, user=Depends(require_role("admin"))):
+async def breakdown(payload: BreakdownIn, user=Depends(require_admin_scope("ai"))):
     """Decompose an idea into Epic > Features > Stories tree."""
     system = _build_system_prompt()
     user_msg = _build_user_prompt(payload)
@@ -122,7 +123,7 @@ async def breakdown(payload: BreakdownIn, user=Depends(require_role("admin"))):
 
 
 @router.get("/breakdowns")
-async def list_breakdowns(limit: int = 30, user=Depends(require_role("admin"))):
+async def list_breakdowns(limit: int = 30, user=Depends(require_admin_scope("ai"))):
     cursor = db[BREAKDOWNS_COLLECTION].find({}, {"_id": 0, "raw_response_preview": 0}).sort("submitted_at", -1).limit(limit)
     items = []
     async for d in cursor:
@@ -131,7 +132,7 @@ async def list_breakdowns(limit: int = 30, user=Depends(require_role("admin"))):
 
 
 @router.get("/breakdowns/{breakdown_id}")
-async def get_breakdown(breakdown_id: str, user=Depends(require_role("admin"))):
+async def get_breakdown(breakdown_id: str, user=Depends(require_admin_scope("ai"))):
     doc = await db[BREAKDOWNS_COLLECTION].find_one({"id": breakdown_id}, {"_id": 0})
     if not doc:
         raise HTTPException(404, "Breakdown not found")
@@ -139,7 +140,7 @@ async def get_breakdown(breakdown_id: str, user=Depends(require_role("admin"))):
 
 
 @router.post("/breakdowns/{breakdown_id}/inject-todos")
-async def inject_todos(breakdown_id: str, user=Depends(require_role("admin"))):
+async def inject_todos(breakdown_id: str, user=Depends(require_admin_scope("ai"))):
     """Inject all features from a breakdown into the admin todo board as actionable items."""
     doc = await db[BREAKDOWNS_COLLECTION].find_one({"id": breakdown_id})
     if not doc:
@@ -171,7 +172,7 @@ async def inject_todos(breakdown_id: str, user=Depends(require_role("admin"))):
 
 
 @router.delete("/breakdowns/{breakdown_id}")
-async def delete_breakdown(breakdown_id: str, user=Depends(require_role("admin"))):
+async def delete_breakdown(breakdown_id: str, user=Depends(require_admin_scope("ai"))):
     res = await db[BREAKDOWNS_COLLECTION].delete_one({"id": breakdown_id})
     if res.deleted_count == 0:
         raise HTTPException(404, "Breakdown not found")

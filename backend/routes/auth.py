@@ -42,17 +42,20 @@ def _admin_whitelist() -> set:
 
 async def _enforce_admin_role(user: dict) -> dict:
     """If user email is in ADMIN_EMAILS → ensure role=admin. Otherwise demote off admin.
+    Sub-admins (with admin_scope set) are EXEMPT — they keep role=admin even outside the whitelist.
     Returns the (possibly mutated) user dict; persists changes to DB."""
     if not user:
         return user
     email = (user.get("email") or "").lower()
     role = user.get("role")
     whitelist = _admin_whitelist()
+    has_scope = bool(user.get("admin_scope"))  # sub-admin marker
     if email in whitelist and role != "admin":
         await db.users.update_one({"_id": user["_id"]}, {"$set": {"role": "admin"}})
         user["role"] = "admin"
-    elif email not in whitelist and role == "admin":
+    elif email not in whitelist and role == "admin" and not has_scope:
         # demote stray admins to operator (keeps moderate access for testing)
+        # but NEVER demote sub-admins (who are intentionally given role=admin with a scope)
         await db.users.update_one({"_id": user["_id"]}, {"$set": {"role": "operator"}})
         user["role"] = "operator"
     return user
@@ -253,6 +256,10 @@ async def login(data: LoginIn, request: Request, response: Response):
         if not totp.verify(data.totp_code, valid_window=1):
             _record_failed_login(ip)
             raise HTTPException(401, "Invalid 2FA code")
+
+    # Sub-admin lockout: deactivated admins cannot log in
+    if user.get("role") == "admin" and user.get("is_active") is False:
+        raise HTTPException(403, "Cont dezactivat. Contactează super-administratorul.")
 
     _login_attempts.pop(ip, None)
     user = await _enforce_admin_role(user)

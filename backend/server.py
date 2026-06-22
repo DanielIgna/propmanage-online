@@ -111,6 +111,7 @@ from routes.premium_marketplace import router as premium_marketplace_router
 from routes.bi_moe import router as bi_moe_router
 from routes.community import router as community_router, seed_community_demo
 from routes.tier_milestones import router as tier_milestones_router, cron_check_all_users
+from routes.sub_admins import router as sub_admins_router
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
@@ -221,6 +222,7 @@ for r in (
     bi_moe_router,
     community_router,
     tier_milestones_router,
+    sub_admins_router,
 ):
     app.include_router(r)
 
@@ -255,6 +257,12 @@ async def startup():
         await bootstrap_autonomy_defaults()
     except Exception as e:
         logger.warning(f"Autonomy autopilot bootstrap failed: {e}")
+    # Sub-admin RBAC — seed demo scoped admins (testing/frontend/backend/security)
+    try:
+        from sub_admin_seed import seed_sub_admins
+        await seed_sub_admins()
+    except Exception as e:
+        logger.warning(f"Sub-admin seed failed: {e}")
     if not scheduler.running:
         scheduler.add_job(
             run_daily_digests,
