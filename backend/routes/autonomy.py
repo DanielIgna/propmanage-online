@@ -327,6 +327,65 @@ async def update_targets(
     return await _load_targets()
 
 
+@router.get("/alerts/recent")
+async def get_recent_alerts(
+    limit: int = Query(20, ge=1, le=100),
+    user=Depends(require_role("admin")),
+):
+    """Recent autonomy tier-downgrade alerts (audit / dashboard widget)."""
+    cursor = db.autonomy_alerts.find({}, {"_id": 0}).sort("sent_at", -1).limit(limit)
+    items = [d async for d in cursor]
+    return {"items": items, "count": len(items)}
+
+
+@router.post("/alerts/test")
+async def trigger_test_alert(user=Depends(require_role("admin"))):
+    """Force-trigger a tier-downgrade alert (super-admin only) for end-to-end test.
+
+    Simulates a downgrade from self-driving → autonomous so admins can validate
+    push + email dispatch without waiting for a real drop.
+    """
+    from sub_admin_deps import is_super_admin
+    if not is_super_admin(user):
+        raise HTTPException(403, "Doar super-admin poate trigger-a alerte de test.")
+
+    from autonomy.alerts import check_and_alert_tier_downgrade
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # Insert a synthetic "previous" snapshot 1h in the past at self-driving
+    prev_ts = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    await db.autonomy_snapshots.insert_one({
+        "snap_id": str(uuid.uuid4()),
+        "timestamp": prev_ts,
+        "scores": {"general": 92.0},
+        "tier": "self-driving",
+        "breakdown_summary": {"operational": 90, "technical": 95, "security": 95, "dev": 90, "ai": 88},
+        "recommendations_count": 0,
+        "synthetic_for_alert_test": True,
+    })
+
+    # Synthetic "current" snapshot at autonomous (lower tier)
+    fake_current = {
+        "snap_id": str(uuid.uuid4()),
+        "timestamp": now_iso,
+        "scores": {"general": 78.0},
+        "tier": "autonomous",
+        "breakdown_summary": {"operational": 75, "technical": 80, "security": 90, "dev": 75, "ai": 70},
+        "recommendations_count": 3,
+    }
+    # Bypass dedupe by removing recent test alerts
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=12)).isoformat()
+    await db.autonomy_alerts.delete_many({
+        "prev_tier": "self-driving",
+        "new_tier": "autonomous",
+        "sent_at": {"$gte": cutoff},
+    })
+    result = await check_and_alert_tier_downgrade(fake_current)
+    # Cleanup the synthetic prev so it doesn't pollute trend data
+    await db.autonomy_snapshots.delete_many({"synthetic_for_alert_test": True})
+    return {"ok": True, "result": result}
+
+
 # ============================================================================
 # Snapshot job (called from APScheduler)
 # ============================================================================
@@ -358,6 +417,14 @@ async def take_autonomy_snapshot() -> dict:
         if old_ids:
             await db.autonomy_snapshots.delete_many({"_id": {"$in": old_ids}})
         doc.pop("_id", None)
+
+        # Tier downgrade alert (fire-and-forget — never blocks snapshot)
+        try:
+            from autonomy.alerts import check_and_alert_tier_downgrade
+            await check_and_alert_tier_downgrade(doc)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[autonomy.snapshot] alert check failed: {e}")
+
         return doc
     except Exception as e:  # noqa: BLE001
         logger.error(f"Autonomy snapshot failed: {e}", exc_info=True)
