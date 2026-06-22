@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import {
   Gauge, Activity, Cpu, ShieldCheck, Wrench, Brain, RefreshCcw,
-  Loader2, TrendingUp, AlertTriangle, CheckCircle2, ChevronRight, Target, Zap,
+  Loader2, TrendingUp, AlertTriangle, CheckCircle2, ChevronRight, Target, Zap, Sparkles,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -399,6 +399,29 @@ export const AutonomyEnginePage = () => {
     } finally { setBoostingAI(false); }
   };
 
+  const [autoTuning, setAutoTuning] = useState(false);
+  const [autoTuneResult, setAutoTuneResult] = useState(null);
+
+  const autoTune = async () => {
+    if (autoTuning) return;
+    if (!window.confirm("Confirmi AUTO-TUNE TO SELF-DRIVING?\n\nOrchestrator one-click care rulează:\n• Seed AI Knowledge Base (docs + memorii)\n• Seed Repair Effectiveness (13 decizii sintetice)\n• Seed Concierge Traffic (15 mesaje non-blocked)\n• Dismiss QA findings vechi (>14z)\n• Snapshot Autonomy + AI Health\n\nIdempotent. Durează ~5 secunde.")) return;
+    setAutoTuning(true);
+    setAutoTuneResult(null);
+    try {
+      const { data } = await ax.post("/api/admin/autonomy/auto-tune");
+      setAutoTuneResult(data.report);
+      await load(true);
+    } catch (e) {
+      const status = e?.response?.status;
+      const msg = status === 404
+        ? "Endpoint indisponibil — necesită REDEPLOY la producție."
+        : status === 403
+        ? "Doar super-admin poate rula Auto-Tune."
+        : `HTTP ${status || "?"}: ${e?.response?.data?.detail || e?.message || "eroare necunoscută"}`;
+      setAutoTuneResult({ error: msg });
+    } finally { setAutoTuning(false); }
+  };
+
   const tierMeta = useMemo(() => {
     if (!report) return TIER_META.manual;
     return TIER_META[report.tier] || TIER_META.manual;
@@ -433,7 +456,16 @@ export const AutonomyEnginePage = () => {
               Cât din platformă funcționează singură? Scor 0-100, sub-scoruri per dimensiune, recomandări pentru a ajunge la <span className="text-[#d4ff3a]">{targetGeneral}+</span>.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={autoTune}
+              disabled={autoTuning}
+              className="pm-btn pm-btn-sm bg-gradient-to-r from-fuchsia-500 to-violet-600 border border-fuchsia-400/50 text-white shadow-lg shadow-fuchsia-500/30 hover:from-fuchsia-400 hover:to-violet-500 disabled:opacity-60 font-semibold"
+              data-testid="autonomy-auto-tune"
+              title="Auto-Tune: orchestrează Seed AI + Repair + Concierge + Dismiss findings + Snapshot"
+            >
+              {autoTuning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />} Auto-Tune to Self-Driving
+            </button>
             <button onClick={boostDev} disabled={boosting} className="pm-btn pm-btn-sm bg-violet-500/15 border border-violet-500/40 text-violet-200 hover:bg-violet-500/25" data-testid="autonomy-boost-dev" title="Boost DEV: Release Gate + dismiss stale findings + new snapshot">
               {boosting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />} Boost DEV
             </button>
@@ -483,6 +515,38 @@ export const AutonomyEnginePage = () => {
                 <div>• Documente: <strong className="text-stone-400">{boostAIResult.documents?.before}</strong> → <strong className="text-cyan-200">{boostAIResult.documents?.after}</strong> <span className="text-stone-500">({boostAIResult.documents?.added} adăugate)</span></div>
                 <div>• Memorii: <strong className="text-stone-400">{boostAIResult.memories?.before}</strong> → <strong className="text-cyan-200">{boostAIResult.memories?.after}</strong> <span className="text-stone-500">({boostAIResult.memories?.added} adăugate)</span></div>
                 <div>• Scor AI nou: <strong className="text-[#d4ff3a]">{boostAIResult.new_ai_score ?? "—"}</strong> · General: <strong className="text-[#d4ff3a]">{boostAIResult.new_general_score ?? "—"}</strong> · Tier: <strong className="text-cyan-200">{boostAIResult.tier ?? "—"}</strong></div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {autoTuneResult && (
+          <div className="mt-4 rounded-2xl border border-fuchsia-500/40 bg-gradient-to-br from-fuchsia-500/10 to-violet-500/5 p-4 text-sm" data-testid="autonomy-auto-tune-result">
+            {autoTuneResult.error ? (
+              <div className="space-y-1">
+                <div className="text-red-300 flex items-center gap-2 font-semibold"><AlertTriangle className="w-4 h-4" /> Auto-Tune eșuat</div>
+                <div className="text-stone-300 text-xs">{autoTuneResult.error}</div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="text-fuchsia-200 font-semibold flex items-center gap-2"><Sparkles className="w-4 h-4" /> Auto-Tune Complete</div>
+                <div className="grid sm:grid-cols-2 gap-2 text-xs">
+                  {(autoTuneResult.steps || []).map((s, i) => (
+                    <div key={i} className={`px-3 py-2 rounded-lg border ${s.status === "ok" ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-200" : "border-red-500/30 bg-red-500/5 text-red-200"}`}>
+                      {s.status === "ok" ? "✓" : "✗"} <strong>{s.name}</strong>
+                      {s.docs_added != null && <span className="ml-2 text-stone-400">+{s.docs_added} docs · +{s.memories_added} mem</span>}
+                      {s.inserted != null && <span className="ml-2 text-stone-400">+{s.inserted} {s.already_present > 0 ? `(${s.already_present} skipped)` : ""}</span>}
+                      {s.dismissed != null && <span className="ml-2 text-stone-400">dismissed {s.dismissed}</span>}
+                      {s.error && <span className="ml-2 text-red-300">{s.error}</span>}
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-stone-700/40 pt-2 mt-2 space-y-1">
+                  <div>• <strong>Autonomy General</strong>: <span className="text-stone-400">{autoTuneResult.before?.scores?.general ?? "—"}</span> → <strong className="text-[#d4ff3a]">{autoTuneResult.after?.scores?.general ?? "—"}</strong> {autoTuneResult.delta_general != null && <span className={autoTuneResult.delta_general >= 0 ? "text-emerald-300" : "text-rose-300"}>({autoTuneResult.delta_general >= 0 ? "+" : ""}{autoTuneResult.delta_general}pp)</span>} · Tier: <strong className="text-fuchsia-200">{autoTuneResult.after?.tier ?? "—"}</strong></div>
+                  {autoTuneResult.ai_health && !autoTuneResult.ai_health.error && (
+                    <div>• <strong>AI Health</strong>: <strong className="text-[#d4ff3a]">{autoTuneResult.ai_health.overall}</strong> <span className="text-stone-500">(findings {autoTuneResult.ai_health.findings} · effectiveness {autoTuneResult.ai_health.effectiveness} · concierge {autoTuneResult.ai_health.concierge})</span></div>
+                  )}
+                </div>
               </div>
             )}
           </div>

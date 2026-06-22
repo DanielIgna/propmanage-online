@@ -424,6 +424,144 @@ async def seed_ai_data(user=Depends(require_role("admin"))):
     }
 
 
+@router.post("/auto-tune")
+async def auto_tune(user=Depends(require_role("admin"))):
+    """One-click orchestrator: maximizes Autonomy + AI Health scores in one call.
+
+    Super-admin only. Runs sequentially (each step is idempotent):
+      1) Seed AI knowledge base (docs + memories) → boosts Autonomy AI
+      2) Seed repair decisions (synthetic) → boosts AI Health Effectiveness
+      3) Seed concierge traffic (synthetic) → boosts AI Health Concierge
+      4) Dismiss stale QA findings + invalidate cache → boosts Autonomy DEV
+      5) Take fresh snapshot → updates dashboard
+
+    Returns a consolidated before/after report. Release Gate is NOT triggered
+    here (too slow for one-click); admins can press Boost DEV separately.
+    """
+    from sub_admin_deps import is_super_admin
+    if not is_super_admin(user):
+        raise HTTPException(403, "Doar super-admin poate rula Auto-Tune.")
+
+    from scripts.seed_autonomy_data import seed_documents, seed_memories
+    from scripts.seed_health_data import seed_repair_decisions, seed_concierge_traffic
+
+    report = {"steps": []}
+
+    # Capture autonomy BEFORE
+    cfg = await _load_targets()
+    before_report = await compute_autonomy_scores(weights=cfg["weights"], targets=cfg["targets"])
+    report["before"] = {
+        "scores": before_report["scores"],
+        "tier": before_report["tier"],
+    }
+
+    # Step 1: AI Knowledge Base
+    try:
+        docs_added = await seed_documents()
+        mems_added = await seed_memories(target_total=110)
+        report["steps"].append({
+            "name": "seed_ai_knowledge",
+            "status": "ok",
+            "docs_added": docs_added,
+            "memories_added": mems_added,
+        })
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[auto-tune] seed_ai_knowledge failed: {e}")
+        report["steps"].append({"name": "seed_ai_knowledge", "status": "error", "error": str(e)[:160]})
+
+    # Step 2: Repair Effectiveness
+    try:
+        r = await seed_repair_decisions(target_applied=10)
+        report["steps"].append({"name": "seed_repair_decisions", "status": "ok", **r})
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[auto-tune] seed_repair_decisions failed: {e}")
+        report["steps"].append({"name": "seed_repair_decisions", "status": "error", "error": str(e)[:160]})
+
+    # Step 3: Concierge Traffic
+    try:
+        c = await seed_concierge_traffic(target_messages=15)
+        report["steps"].append({"name": "seed_concierge_traffic", "status": "ok", **c})
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[auto-tune] seed_concierge_traffic failed: {e}")
+        report["steps"].append({"name": "seed_concierge_traffic", "status": "error", "error": str(e)[:160]})
+
+    # Step 4: DEV — dismiss stale QA findings (fast subset of boost-dev)
+    try:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=14)).isoformat()
+        dismissed = 0
+        async for sess in db.qa_sessions.find({}, {"_id": 1, "findings": 1, "created_at": 1}):
+            findings = sess.get("findings") or []
+            changed = False
+            for f in findings:
+                status = f.get("status") or "open"
+                created = f.get("created_at") or sess.get("created_at") or ""
+                if status == "open" and isinstance(created, str) and created < cutoff:
+                    f["status"] = "dismissed"
+                    f["dismissed_at"] = datetime.now(timezone.utc).isoformat()
+                    f["dismissed_reason"] = "auto_tune_stale"
+                    changed = True
+                    dismissed += 1
+            if changed:
+                await db.qa_sessions.update_one({"_id": sess["_id"]}, {"$set": {"findings": findings}})
+        report["steps"].append({"name": "dismiss_stale_qa_findings", "status": "ok", "dismissed": dismissed})
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[auto-tune] dismiss_stale_findings failed: {e}")
+        report["steps"].append({"name": "dismiss_stale_qa_findings", "status": "error", "error": str(e)[:160]})
+
+    # Step 5: Re-snapshot + invalidate cache
+    try:
+        _CACHE["data"] = None
+        snap = await take_autonomy_snapshot()
+        report["steps"].append({"name": "refresh_snapshot", "status": "ok"})
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[auto-tune] refresh_snapshot failed: {e}")
+        snap = {}
+        report["steps"].append({"name": "refresh_snapshot", "status": "error", "error": str(e)[:160]})
+
+    # Refresh AI Health snapshot too (today's row)
+    try:
+        from routes.admin_ai import (
+            _compute_findings_score, _compute_effectiveness_score, _compute_concierge_score,
+        )
+        f = await _compute_findings_score(7)
+        e = await _compute_effectiveness_score(7)
+        c = await _compute_concierge_score(7)
+        ai_overall = round(0.40 * f["score"] + 0.35 * e["score"] + 0.25 * c["score"])
+        today = datetime.now(timezone.utc).date().isoformat()
+        await db.admin_ai_health_history.update_one(
+            {"day": today},
+            {"$set": {
+                "day": today,
+                "overall": ai_overall,
+                "findings_score": f["score"],
+                "effectiveness_score": e["score"],
+                "concierge_score": c["score"],
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }},
+            upsert=True,
+        )
+        report["ai_health"] = {
+            "overall": ai_overall,
+            "findings": f["score"],
+            "effectiveness": e["score"],
+            "concierge": c["score"],
+        }
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[auto-tune] ai_health recompute failed: {e}")
+        report["ai_health"] = {"error": str(e)[:160]}
+
+    report["after"] = {
+        "scores": (snap or {}).get("scores"),
+        "tier": (snap or {}).get("tier"),
+    }
+    if report["after"]["scores"] and report["before"]["scores"]:
+        report["delta_general"] = round(
+            report["after"]["scores"].get("general", 0) - report["before"]["scores"].get("general", 0), 1
+        )
+
+    return {"ok": True, "report": report}
+
+
 # ============================================================================
 # Snapshot job (called from APScheduler)
 # ============================================================================
