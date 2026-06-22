@@ -244,10 +244,23 @@ async def deactivate_sub_admin(admin_id: str, user: dict = Depends(get_current_u
 @router.get("/audit")
 async def audit_log(
     limit: int = 100,
+    scope: Optional[str] = None,
+    outcome: Optional[str] = None,
     user: dict = Depends(get_current_user),
 ):
     _require_super(user)
     limit = min(max(int(limit), 1), 500)
-    cursor = db.admin_actions_log.find({}, {"_id": 0}).sort("ts", -1).limit(limit)
+    q: dict = {}
+    if scope:
+        q["scope"] = scope.lower()
+    if outcome in ("allowed", "denied"):
+        q["outcome"] = outcome
+    cursor = db.admin_actions_log.find(q, {"_id": 0}).sort("ts", -1).limit(limit)
     items = [d async for d in cursor]
-    return {"items": items, "count": len(items)}
+    # Aggregate counts per scope (for chips in UI)
+    counts: dict = {}
+    async for d in db.admin_actions_log.aggregate([
+        {"$group": {"_id": "$scope", "n": {"$sum": 1}}},
+    ]):
+        counts[d.get("_id") or "unknown"] = d.get("n", 0)
+    return {"items": items, "count": len(items), "scope_counts": counts}

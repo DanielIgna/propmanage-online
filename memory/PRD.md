@@ -42,6 +42,21 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 
 ---
 
+## Recent additions (Feb 22 2026 — Audit Log filtrat per scope în Preview mode)
+- **Backend** (`routes/sub_admins.py`):
+  - `GET /api/admin/sub-admins/audit` acceptă acum `?scope=X&outcome=Y` (super-only)
+  - Returnează `scope_counts` agregate pentru chips în UI
+- **Frontend** (`AdminSubAdmins.jsx` + nou `PreviewAuditButton.jsx`):
+  - În audit modal: chip-uri colorate per scope cu counts (TESTING 128, GENERAL 256, SECURITY 3, etc.)
+  - Filtru outcome: all / allowed / denied
+  - State inițial citește `getPreviewScope()` → dacă super e în preview ca "testing", audit log se deschide cu filter pe testing
+- **Floating FAB "Audit · {scope}"** (`PreviewAuditButton.jsx`):
+  - Buton orange bouncing fix-position bottom-right
+  - Apare DOAR când preview e activ (super-only)
+  - Click → modal cu audit pre-filtrat pe scope-ul previewat
+  - Permite super să verifice rapid ce acțiuni a făcut acel scope, fără să iasă din preview
+
+
 ## Recent additions (Feb 22 2026 — Access Matrix + Preview-as)
 - **Access Matrix** (`AdminScopeMatrix.jsx`):
   - Modal cu tabel 7×40: scopes (general/testing/frontend/backend/security/ai/ops) × nav items

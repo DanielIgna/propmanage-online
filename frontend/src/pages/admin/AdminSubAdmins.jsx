@@ -6,6 +6,7 @@ import axios from "axios";
 import { Users, Plus, KeyRound, UserX, Pencil, Copy, Shield } from "lucide-react";
 import { AdminCard } from "./AdminLayoutMetronic";
 import { AdminScopeMatrix } from "./AdminScopeMatrix";
+import { ALL_SCOPES, getPreviewScope } from "../../lib/useAdminScope";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const SCOPES = ["general", "testing", "frontend", "backend", "security", "ai", "ops"];
@@ -178,6 +179,9 @@ const CreateForm = ({ onCreated, onClose }) => {
 export const AdminSubAdmins = () => {
   const [items, setItems] = useState([]);
   const [auditItems, setAuditItems] = useState([]);
+  const [auditCounts, setAuditCounts] = useState({});
+  const [auditScopeFilter, setAuditScopeFilter] = useState(() => getPreviewScope() || "");
+  const [auditOutcomeFilter, setAuditOutcomeFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
@@ -187,17 +191,23 @@ export const AdminSubAdmins = () => {
     try {
       const r = await axios.get(`${API}/admin/sub-admins`);
       setItems(r.data?.items || []);
-    } catch (e) {
-      // 403 = not super admin
+    } catch {
+      // silent — 403 or network error
     } finally {
       setLoading(false);
     }
   };
-  const loadAudit = async () => {
+  const loadAudit = async (scope = auditScopeFilter, outcome = auditOutcomeFilter) => {
     try {
-      const r = await axios.get(`${API}/admin/sub-admins/audit?limit=80`);
+      const params = new URLSearchParams({ limit: "120" });
+      if (scope) params.set("scope", scope);
+      if (outcome) params.set("outcome", outcome);
+      const r = await axios.get(`${API}/admin/sub-admins/audit?${params.toString()}`);
       setAuditItems(r.data?.items || []);
-    } catch {}
+      setAuditCounts(r.data?.scope_counts || {});
+    } catch {
+      // silent
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -246,12 +256,17 @@ export const AdminSubAdmins = () => {
           <div className="flex gap-2">
             <AdminScopeMatrix />
             <button
-              onClick={() => { setAuditOpen(true); loadAudit(); }}
+              onClick={() => { setAuditOpen(true); loadAudit(auditScopeFilter, auditOutcomeFilter); }}
               className="text-[11px] px-3 py-1.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 flex items-center gap-1"
               data-testid="audit-toggle"
             >
               <Shield className="w-3 h-3" />
               Audit Log
+              {getPreviewScope() && (
+                <span className="text-[9px] font-bold uppercase ml-1 px-1.5 py-0.5 rounded bg-amber-200 dark:bg-amber-500/30 text-amber-800 dark:text-amber-200">
+                  {getPreviewScope()}
+                </span>
+              )}
             </button>
             <button
               onClick={() => setCreating(true)}
@@ -331,22 +346,71 @@ export const AdminSubAdmins = () => {
 
       {auditOpen && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setAuditOpen(false)}>
-          <div className="bg-white dark:bg-slate-900 rounded-xl p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} data-testid="audit-modal">
-            <h3 className="font-serif text-lg mb-4 flex items-center gap-2">
-              <Shield className="w-4 h-4" /> Audit Log · ultimele 80 acțiuni
-            </h3>
+          <div className="bg-white dark:bg-slate-900 rounded-xl p-6 max-w-4xl w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} data-testid="audit-modal">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-serif text-lg flex items-center gap-2">
+                <Shield className="w-4 h-4" /> Audit Log
+                <span className="text-[11px] text-slate-500 font-normal">
+                  · {auditItems.length} acțiuni
+                  {auditScopeFilter && ` · filter: ${auditScopeFilter}`}
+                  {getPreviewScope() && auditScopeFilter === getPreviewScope() && (
+                    <span className="ml-1 text-amber-600 dark:text-amber-400">(auto din preview)</span>
+                  )}
+                </span>
+              </h3>
+              <button onClick={() => setAuditOpen(false)} className="text-slate-500 hover:text-slate-700" data-testid="close-audit-x">✕</button>
+            </div>
+
+            {/* Scope filter chips */}
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              <button
+                onClick={() => { setAuditScopeFilter(""); loadAudit("", auditOutcomeFilter); }}
+                className={`text-[10px] px-2 py-1 rounded ${auditScopeFilter === "" ? "bg-slate-700 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
+                data-testid="audit-scope-all"
+              >
+                Toate ({Object.values(auditCounts).reduce((a, b) => a + b, 0)})
+              </button>
+              {ALL_SCOPES.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => { setAuditScopeFilter(s); loadAudit(s, auditOutcomeFilter); }}
+                  className={`text-[10px] px-2 py-1 rounded uppercase font-bold ${auditScopeFilter === s ? "bg-indigo-500 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
+                  data-testid={`audit-scope-${s}`}
+                >
+                  {s} ({auditCounts[s] || 0})
+                </button>
+              ))}
+            </div>
+
+            {/* Outcome filter chips */}
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {["", "allowed", "denied"].map((o) => (
+                <button
+                  key={o || "all"}
+                  onClick={() => { setAuditOutcomeFilter(o); loadAudit(auditScopeFilter, o); }}
+                  className={`text-[10px] px-2 py-1 rounded ${auditOutcomeFilter === o ? "bg-violet-500 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
+                  data-testid={`audit-outcome-${o || "all"}`}
+                >
+                  {o || "all outcomes"}
+                </button>
+              ))}
+            </div>
+
             <table className="w-full text-xs">
-              <thead className="text-[10px] text-slate-500 uppercase tracking-wider">
+              <thead className="text-[10px] text-slate-500 uppercase tracking-wider sticky top-0 bg-white dark:bg-slate-900">
                 <tr><th className="text-left pb-2">Timp</th><th className="text-left pb-2">User</th><th className="text-left pb-2">Scope</th><th className="text-left pb-2">Method</th><th className="text-left pb-2">Path</th><th className="text-left pb-2">Outcome</th></tr>
               </thead>
               <tbody>
+                {auditItems.length === 0 && (
+                  <tr><td colSpan={6} className="py-8 text-center text-slate-500" data-testid="audit-empty">Nicio acțiune pentru filtrele alese.</td></tr>
+                )}
                 {auditItems.map((a, i) => (
-                  <tr key={i} className="border-b border-slate-100 dark:border-slate-800">
+                  <tr key={i} className="border-b border-slate-100 dark:border-slate-800" data-testid={`audit-row-${i}`}>
                     <td className="py-1.5 pr-2 text-[10px] text-slate-500 whitespace-nowrap">{new Date(a.ts).toLocaleString("ro-RO", { dateStyle: "short", timeStyle: "medium" })}</td>
                     <td className="py-1.5 pr-2 font-mono">{a.user_email || "—"}</td>
                     <td className="py-1.5 pr-2"><ScopeBadge scope={a.scope} /></td>
                     <td className="py-1.5 pr-2 font-mono">{a.method}</td>
-                    <td className="py-1.5 pr-2 font-mono text-[10px] truncate max-w-xs">{a.path}</td>
+                    <td className="py-1.5 pr-2 font-mono text-[10px] truncate max-w-xs" title={a.path}>{a.path}</td>
                     <td className="py-1.5">
                       {a.outcome === "allowed" ? (
                         <span className="text-emerald-600 dark:text-emerald-400">✓ allowed</span>

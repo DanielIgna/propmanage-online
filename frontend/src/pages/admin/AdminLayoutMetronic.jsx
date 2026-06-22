@@ -12,7 +12,8 @@ import { useAuth } from "../../auth";
 import { API } from "../DashShared";
 import { HealthScoreBadge } from "./HealthScoreBadge";
 import { AIAdminTour, ReplayAIAdminTourButton } from "./AIAdminTour";
-import { useAdminScope, filterNavSections, setPreviewScope } from "../../lib/useAdminScope";
+import { useAdminScope, filterNavSections, setPreviewScope, getPreviewScope } from "../../lib/useAdminScope";
+import { PreviewAuditButton } from "./PreviewAuditButton";
 
 // Scope-color tones for the topbar badge
 const SCOPE_TONES = {
@@ -592,6 +593,7 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
         </main>
       </div>
       <AIAdminTour />
+      <PreviewAuditButton scope={getPreviewScope()} />
     </div>
   );
 };
