@@ -1,8 +1,10 @@
 // Hook + helpers for admin-scope aware UI (Milestone 2)
+// Supports "Preview as" mode for super-admins via localStorage override.
 import { useEffect, useState } from "react";
 import axios from "axios";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const PREVIEW_KEY = "pm_admin_preview_scope";
 
 // Visibility map: which nav items each scope can see (besides "general" who sees all).
 // Keep in sync with backend middleware_scope.SCOPE_RULES so UI matches reality.
@@ -40,9 +42,29 @@ export const SCOPE_VISIBILITY = {
   ]),
 };
 
+export const ALL_SCOPES = ["general", "testing", "frontend", "backend", "security", "ai", "ops"];
+
+// Cross-tab event for preview mode changes
+const PREVIEW_EVENT = "pm:preview-scope-changed";
+
+export function setPreviewScope(scope) {
+  if (scope && scope !== "general") {
+    localStorage.setItem(PREVIEW_KEY, scope);
+  } else {
+    localStorage.removeItem(PREVIEW_KEY);
+  }
+  window.dispatchEvent(new CustomEvent(PREVIEW_EVENT, { detail: { scope } }));
+}
+
+export function getPreviewScope() {
+  return localStorage.getItem(PREVIEW_KEY) || null;
+}
+
 export function useAdminScope() {
   const [scope, setScope] = useState(null);
+  const [preview, setPreview] = useState(() => getPreviewScope());
   const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     let cancelled = false;
     axios
@@ -54,10 +76,37 @@ export function useAdminScope() {
         if (!cancelled) setScope(null);
       })
       .finally(() => !cancelled && setLoading(false));
+    return () => { cancelled = true; };
+  }, []);
+
+  // Sync across tabs / preview toggle
+  useEffect(() => {
+    const onChange = () => setPreview(getPreviewScope());
+    window.addEventListener(PREVIEW_EVENT, onChange);
+    window.addEventListener("storage", onChange);
     return () => {
-      cancelled = true;
+      window.removeEventListener(PREVIEW_EVENT, onChange);
+      window.removeEventListener("storage", onChange);
     };
   }, []);
+
+  // If super-admin AND a preview scope is active, return an overridden scope
+  // object so the rest of the UI behaves like that scope. Original `_real` kept
+  // so the topbar can show "previewing as".
+  const isSuper = (scope?.admin_scope || "").toLowerCase() === "general";
+  if (scope && isSuper && preview && preview !== "general") {
+    return {
+      scope: {
+        ...scope,
+        admin_scope: preview,
+        admin_seniority: "senior",  // assume senior for preview ergonomics
+        is_super_admin: false,
+        _preview_active: true,
+        _real_scope: scope.admin_scope,
+      },
+      loading,
+    };
+  }
   return { scope, loading };
 }
 

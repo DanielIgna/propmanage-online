@@ -6,13 +6,13 @@ import {
   LayoutDashboard, Users, ShieldCheck, Scale, Wallet, FolderKanban,
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
   LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, Sparkles, Bot, Zap, Inbox,
-  UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb, Bug, Compass, Layers, BookOpenCheck, GraduationCap, Gamepad2, Trophy, BarChart3
+  UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb, Bug, Compass, Layers, BookOpenCheck, GraduationCap, Gamepad2, Trophy, BarChart3, Eye
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { API } from "../DashShared";
 import { HealthScoreBadge } from "./HealthScoreBadge";
 import { AIAdminTour, ReplayAIAdminTourButton } from "./AIAdminTour";
-import { useAdminScope, filterNavSections } from "../../lib/useAdminScope";
+import { useAdminScope, filterNavSections, setPreviewScope } from "../../lib/useAdminScope";
 
 // Scope-color tones for the topbar badge
 const SCOPE_TONES = {
@@ -30,6 +30,34 @@ const ScopeBadgeTop = ({ scope }) => {
   const s = (scope.admin_scope || "general").toLowerCase();
   const tone = SCOPE_TONES[s] || SCOPE_TONES.general;
   const seniority = scope.admin_seniority || "senior";
+  const isPreview = !!scope._preview_active;
+
+  const exitPreview = (e) => {
+    e.stopPropagation();
+    setPreviewScope(null);
+    setTimeout(() => window.location.reload(), 100);
+  };
+
+  if (isPreview) {
+    return (
+      <div
+        className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-200 border-2 border-amber-400 dark:border-amber-500/50 animate-pulse"
+        title={`Preview as: ${s} (real scope: ${scope._real_scope})`}
+        data-testid="admin-scope-badge"
+      >
+        <Eye className="w-3 h-3" />
+        <span className="font-bold uppercase">PREVIEW · {tone.label}</span>
+        <button
+          onClick={exitPreview}
+          className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-200 dark:bg-amber-600/40 hover:bg-amber-300 dark:hover:bg-amber-600/70"
+          data-testid="exit-preview"
+        >
+          ✕ Ieși
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium ${tone.bg} ${tone.text}`}

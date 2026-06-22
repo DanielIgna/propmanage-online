@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Users, Plus, KeyRound, UserX, Pencil, Copy, Shield } from "lucide-react";
 import { AdminCard } from "./AdminLayoutMetronic";
+import { AdminScopeMatrix } from "./AdminScopeMatrix";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const SCOPES = ["general", "testing", "frontend", "backend", "security", "ai", "ops"];
@@ -243,6 +244,7 @@ export const AdminSubAdmins = () => {
         }
         action={
           <div className="flex gap-2">
+            <AdminScopeMatrix />
             <button
               onClick={() => { setAuditOpen(true); loadAudit(); }}
               className="text-[11px] px-3 py-1.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 flex items-center gap-1"

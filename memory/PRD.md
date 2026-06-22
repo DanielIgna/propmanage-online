@@ -42,6 +42,23 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 
 ---
 
+## Recent additions (Feb 22 2026 — Access Matrix + Preview-as)
+- **Access Matrix** (`AdminScopeMatrix.jsx`):
+  - Modal cu tabel 7×40: scopes (general/testing/frontend/backend/security/ai/ops) × nav items
+  - ✓/✗ pentru fiecare combinație, plus summary chips colorate per scope (X / 40 tab-uri)
+  - Buton "Preview" pe fiecare scope (skip general) → setează `pm_admin_preview_scope` în localStorage și redirectează la `/admin`
+  - Accesibil din pagina Sub-Admini prin butonul "Matrice Acces" (indigo)
+- **Preview-as mode** în `lib/useAdminScope.js`:
+  - `setPreviewScope(scope)` / `getPreviewScope()` helpers
+  - `useAdminScope()` returnează un override **doar pentru super-admins** (`is_super_admin && preview != "general"`)
+  - Override include `_preview_active: true` și `_real_scope` pentru topbar
+  - Sub-adminii NU pot folosi preview (security: doar super are dreptul să "vadă ca alt scope")
+  - Acțiunile reale (POST/PUT/DELETE) rămân cu drepturile super (preview e UI-only, nu impersonation real)
+- **Preview indicator** în topbar:
+  - Badge pulsant amber: "👁 PREVIEW · SECURITY" + buton "✕ Ieși" care șterge localStorage și reload
+  - Diferențiat vizual de badge normal (chenar dublu + animație pulse)
+
+
 ## Recent additions (Feb 22 2026 — Milestone 2 + 3: HTTP middleware + Approval Workflow)
 - **Admin-Scope HTTP Middleware** ✅ (`backend/middleware_scope.py`)
   - URL-pattern → required-scope map (`SCOPE_RULES`) applied as FastAPI middleware
