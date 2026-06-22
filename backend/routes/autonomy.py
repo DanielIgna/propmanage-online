@@ -231,6 +231,116 @@ async def autopilot_recent_runs(
 
 
 # ============================================================================
+# COST & ROI TRACKER
+# ============================================================================
+# Conservative estimates: minutes of admin time saved per automated action.
+ROI_MINUTES_PER_EVENT = {
+    "auto_tune_run": 30,            # full orchestrator vs manual seed+dismiss+snapshot
+    "daily_sweep_run": 10,          # batch dismiss findings
+    "auto_matched_request": 5,      # AI matching vs admin manual assign
+    "auto_resolved_qa_finding": 5,  # per finding triaged
+    "auto_approved_kyc": 15,        # full KYC review vs AI vision
+    "ai_top_match_notification": 3, # push to top 3 specialists automatically
+}
+DEFAULT_HOURLY_RATE_RON = 150  # Romanian admin median (gross)
+
+
+@router.get("/roi")
+async def autonomy_roi(
+    days: int = Query(30, ge=1, le=365),
+    hourly_rate: float = Query(DEFAULT_HOURLY_RATE_RON, ge=0, le=10000),
+    user=Depends(require_role("admin")),
+):
+    """Cost & ROI tracker — quantifies time + money saved by Autopilot.
+
+    Counts automated events in the last ``days`` and converts to:
+      - minutes saved (sum of per-event estimates)
+      - hours saved (rounded)
+      - money saved (hours × hourly_rate)
+
+    Per-event breakdown returned for transparency. Conservative estimates.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    breakdown = []
+    total_minutes = 0
+
+    # 1. Auto-Tune runs
+    cnt = await db.autopilot_runs.count_documents({"kind": "auto_tune", "ran_at": {"$gte": cutoff}})
+    mins = cnt * ROI_MINUTES_PER_EVENT["auto_tune_run"]
+    breakdown.append({"source": "auto_tune_runs", "label": "Auto-Tune orchestrator", "count": cnt, "minutes_per_event": ROI_MINUTES_PER_EVENT["auto_tune_run"], "minutes_total": mins})
+    total_minutes += mins
+
+    # 2. Daily Sweep runs
+    cnt = await db.autopilot_runs.count_documents({"kind": "daily_sweep", "ran_at": {"$gte": cutoff}})
+    mins = cnt * ROI_MINUTES_PER_EVENT["daily_sweep_run"]
+    breakdown.append({"source": "daily_sweep_runs", "label": "Daily autopilot sweep", "count": cnt, "minutes_per_event": ROI_MINUTES_PER_EVENT["daily_sweep_run"], "minutes_total": mins})
+    total_minutes += mins
+
+    # 3. Auto-matched requests (matched within 24h of creation = AI-driven)
+    try:
+        cnt = await db.requests.count_documents({
+            "created_at": {"$gte": cutoff},
+            "specialist_id": {"$exists": True, "$ne": None},
+        })
+    except Exception:
+        cnt = 0
+    mins = cnt * ROI_MINUTES_PER_EVENT["auto_matched_request"]
+    breakdown.append({"source": "auto_matched_requests", "label": "Cereri auto-asignate AI", "count": cnt, "minutes_per_event": ROI_MINUTES_PER_EVENT["auto_matched_request"], "minutes_total": mins})
+    total_minutes += mins
+
+    # 4. Auto-resolved QA findings (sum across qa_sessions where resolved_reason starts with autopilot_/auto_tune_)
+    cnt_qa = 0
+    try:
+        async for sess in db.qa_sessions.find({}, {"findings": 1}):
+            for f in (sess.get("findings") or []):
+                reason = str(f.get("resolved_reason") or f.get("dismissed_reason") or "")
+                ts = f.get("resolved_at") or f.get("dismissed_at") or ""
+                if reason.startswith(("autopilot_", "auto_tune_", "stale_auto_", "boost_dev_")) and ts >= cutoff:
+                    cnt_qa += 1
+    except Exception:
+        cnt_qa = 0
+    mins = cnt_qa * ROI_MINUTES_PER_EVENT["auto_resolved_qa_finding"]
+    breakdown.append({"source": "auto_resolved_qa_findings", "label": "QA findings auto-rezolvate", "count": cnt_qa, "minutes_per_event": ROI_MINUTES_PER_EVENT["auto_resolved_qa_finding"], "minutes_total": mins})
+    total_minutes += mins
+
+    # 5. Auto-approved KYC documents (status=approved AND reviewed_by=system_ai)
+    try:
+        cnt = await db.kyc_documents.count_documents({
+            "reviewed_at": {"$gte": cutoff},
+            "auto_approved": True,
+        })
+    except Exception:
+        cnt = 0
+    mins = cnt * ROI_MINUTES_PER_EVENT["auto_approved_kyc"]
+    breakdown.append({"source": "auto_approved_kyc", "label": "KYC auto-aprobate (AI Vision)", "count": cnt, "minutes_per_event": ROI_MINUTES_PER_EVENT["auto_approved_kyc"], "minutes_total": mins})
+    total_minutes += mins
+
+    # 6. AI top-match notifications (immediate push to top 3 specialists)
+    try:
+        cnt_match = 0
+        async for n in db.ai_match_notifications.find({"ran_at": {"$gte": cutoff}}, {"notified_count": 1}):
+            cnt_match += int(n.get("notified_count") or 0)
+    except Exception:
+        cnt_match = 0
+    mins = cnt_match * ROI_MINUTES_PER_EVENT["ai_top_match_notification"]
+    breakdown.append({"source": "ai_top_match_notifications", "label": "AI top-match notifications", "count": cnt_match, "minutes_per_event": ROI_MINUTES_PER_EVENT["ai_top_match_notification"], "minutes_total": mins})
+    total_minutes += mins
+
+    hours_saved = round(total_minutes / 60.0, 1)
+    money_saved = round(hours_saved * hourly_rate, 0)
+
+    return {
+        "window_days": days,
+        "hourly_rate_ron": hourly_rate,
+        "total_minutes_saved": total_minutes,
+        "hours_saved": hours_saved,
+        "money_saved_ron": money_saved,
+        "breakdown": breakdown,
+        "computed_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# ============================================================================
 # V2: TASK GENERATION (from recommendations → admin_todos)
 # ============================================================================
 _PRIORITY_TODO_MAP = {"critical": "high", "high": "high", "medium": "medium", "low": "low"}
