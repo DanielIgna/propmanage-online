@@ -61,6 +61,8 @@ export const AdminDashboard = () => {
     return () => window.removeEventListener("propmanage:nav-admin", handler);
   }, []);
 
+  // Auth state: null = checking, false = not authenticated, object = authenticated
+  if (user === false) return <Navigate to="/login?next=/admin" replace />;
   if (!user) return (
     <div className="min-h-screen flex items-center justify-center bg-stone-950">
       <div className="flex flex-col items-center gap-3">
@@ -69,7 +71,6 @@ export const AdminDashboard = () => {
       </div>
     </div>
   );
-  if (user === false) return <Navigate to="/login" replace />;
   const effectiveRole = user.active_view || user.role;
   if (effectiveRole !== "admin") return <Navigate to={`/${effectiveRole}`} replace />;
 

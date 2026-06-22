@@ -180,8 +180,9 @@ export const DashLayout = ({ children, role, title, bottomNav }) => {
     }
   };
 
+  // Auth state: null = checking, false = not authenticated, object = authenticated
+  if (user === false) return <Navigate to={`/login?next=/${role}`} replace />;
   if (!user) return <div className="min-h-screen flex items-center justify-center text-stone-400">{t("common.loading")}</div>;
-  if (user === false) return <Navigate to="/login" replace />;
 
   // Dual-role: route guard accepts the user when their active_view matches the dashboard role
   const effectiveRole = user.active_view || user.role;

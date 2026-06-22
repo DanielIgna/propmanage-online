@@ -42,15 +42,20 @@ export const LoginPage = () => {
   const [needsTotp, setNeedsTotp] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  
-  if (user && user !== false) return <Navigate to={`/${user.role}`} replace />;
-  
+
+  // Read ?next=/path to redirect after login (e.g., from email links)
+  const nextPath = new URLSearchParams(window.location.search).get("next");
+  const _isSafeNext = (p) => typeof p === "string" && p.startsWith("/") && !p.startsWith("//");
+  const safeNext = _isSafeNext(nextPath) ? nextPath : null;
+
+  if (user && user !== false) return <Navigate to={safeNext || `/${user.role}`} replace />;
+
   const submit = async (e) => {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
       const u = await login(email, password, totpCode || undefined);
-      navigate(`/${u.role}`);
+      navigate(safeNext || `/${u.role}`);
     } catch (err) {
       const status = err?.response?.status;
       const detail = err?.response?.data?.detail;

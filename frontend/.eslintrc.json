@@ -1,7 +1,0 @@
-{
-  "extends": ["react-app"],
-  "rules": {
-    "react/no-unescaped-entities": "off",
-    "no-empty": ["error", { "allowEmptyCatch": true }]
-  }
-}
