@@ -45,6 +45,57 @@ const ScoreRing = ({ score }) => {
   );
 };
 
+// 7-day sparkline showing daily success rate (0-100).
+// Empty points are rendered as gray dots so idle days are still visible.
+const Sparkline = ({ values = [], days = [], width = 90, height = 32 }) => {
+  if (!values || values.length === 0) return null;
+  const max = 100;
+  const padX = 3;
+  const padY = 3;
+  const innerW = width - padX * 2;
+  const innerH = height - padY * 2;
+  const n = values.length;
+  const step = n > 1 ? innerW / (n - 1) : 0;
+  const points = values.map((v, i) => ({
+    x: padX + i * step,
+    y: padY + innerH - (Math.max(0, Math.min(100, v)) / max) * innerH,
+    v,
+    day: days[i],
+  }));
+  const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
+  // Area fill = path + bottom corners
+  const areaPath = `${path} L ${points[points.length - 1].x.toFixed(1)} ${(padY + innerH).toFixed(1)} L ${padX} ${(padY + innerH).toFixed(1)} Z`;
+
+  const first = values[0];
+  const last = values[values.length - 1];
+  const trend = last > first + 5 ? "up" : last < first - 5 ? "down" : "flat";
+  const lineColor = trend === "up" ? "stroke-emerald-500 fill-emerald-500" : trend === "down" ? "stroke-red-500 fill-red-500" : "stroke-slate-400 fill-slate-400";
+  const areaColor = trend === "up" ? "fill-emerald-400/15" : trend === "down" ? "fill-red-400/15" : "fill-slate-400/10";
+
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      className="inline-block"
+      data-testid="sparkline"
+    >
+      <title>{days.map((d, i) => `${d}: ${values[i]}%`).join("\n")}</title>
+      <path d={areaPath} className={areaColor} stroke="none" />
+      <path d={path} className={lineColor} strokeWidth="1.5" fill="none" />
+      {points.map((p, i) => (
+        <circle
+          key={i}
+          cx={p.x}
+          cy={p.y}
+          r={i === points.length - 1 ? 2.2 : 1.4}
+          className={p.v === 0 ? "fill-slate-400 stroke-slate-400" : lineColor}
+        />
+      ))}
+    </svg>
+  );
+};
+
 const fmtTime = (iso) => {
   if (!iso) return "—";
   try {
@@ -168,7 +219,10 @@ export const AdminProductivity = () => {
                     <td className="py-3 pr-3">
                       <div className="flex items-center gap-2">
                         <ScoreRing score={it.score} />
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${tone.text}`}>{tone.label}</span>
+                        <div className="flex flex-col gap-0.5">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${tone.text} w-fit`}>{tone.label}</span>
+                          <Sparkline values={it.sparkline || []} days={it.sparkline_days || []} />
+                        </div>
                       </div>
                     </td>
                     <td className="py-3 pr-3 text-center">
@@ -210,6 +264,7 @@ export const AdminProductivity = () => {
 
       <div className="mt-4 text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
         💡 <strong>Formulă scor</strong>: 60% rata succes (allowed/total) + 25% zile active (max 20/30) + 15% aprobări revizuite (max 5).
+        Sparkline = success rate zilnic ultimele 7 zile (verde = uptrend, roșu = downtrend, gri = flat/idle).
         Idle = 0 acțiuni · Low &lt; 50 · OK 50-74 · Top ≥ 75.
       </div>
     </AdminCard>

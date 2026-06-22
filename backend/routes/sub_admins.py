@@ -275,11 +275,14 @@ async def productivity_scores(user: dict = Depends(get_current_user)):
       + activity_factor * 25                           # active days ratio in last 30d
       + approvals_factor * 15                          # approvals reviewed bonus
     Clamped 0..100. Zero-activity → score 0.
+
+    Also returns a 7-day mini history (one score per day) for sparkline rendering.
     """
     _require_super(user)
     from datetime import datetime, timezone, timedelta
     now = datetime.now(timezone.utc)
     cutoff_30d = (now - timedelta(days=30)).isoformat()
+    cutoff_7d = (now - timedelta(days=7)).isoformat()
 
     # 1. Pull all admins
     admins = []
@@ -288,6 +291,8 @@ async def productivity_scores(user: dict = Depends(get_current_user)):
 
     # 2. Aggregate actions per email (last 30d), success rate, last seen, active days
     actions_by_email: dict = {}
+    # Also a per-email per-day bucket for the 7-day sparkline (last 7 days only)
+    daily_by_email: dict = {}
     async for log in db.admin_actions_log.find(
         {"ts": {"$gte": cutoff_30d}},
         {"_id": 0, "user_email": 1, "outcome": 1, "ts": 1, "path": 1, "method": 1},
@@ -317,6 +322,14 @@ async def productivity_scores(user: dict = Depends(get_current_user)):
             pass
         if log.get("path"):
             rec["unique_paths"].add(log["path"])
+        # Bucket into per-day for last 7d
+        if ts_str >= cutoff_7d:
+            day_key = ts_str[:10]
+            day_bucket = daily_by_email.setdefault(email, {}).setdefault(day_key, {"a": 0, "d": 0})
+            if log.get("outcome") == "allowed":
+                day_bucket["a"] += 1
+            elif log.get("outcome") == "denied":
+                day_bucket["d"] += 1
 
     # 3. Approvals decided & requested per admin id
     approvals_decided: dict = {}
@@ -329,6 +342,10 @@ async def productivity_scores(user: dict = Depends(get_current_user)):
             approvals_decided[ap["decided_by"]] = approvals_decided.get(ap["decided_by"], 0) + 1
         if ap.get("requested_by"):
             approvals_requested[ap["requested_by"]] = approvals_requested.get(ap["requested_by"], 0) + 1
+
+    # Pre-compute the 7-day labels (oldest -> newest)
+    today = now.date()
+    day_labels = [(today - timedelta(days=6 - i)).isoformat() for i in range(7)]
 
     # 4. Build per-admin records + compute score
     items = []
@@ -354,6 +371,19 @@ async def productivity_scores(user: dict = Depends(get_current_user)):
             score = (success_rate * 60.0) + (activity_factor * 25.0) + (approvals_factor * 15.0)
         score = round(min(max(score, 0.0), 100.0), 1)
 
+        # 7-day sparkline: daily score = success_rate of that day * 100 (capped 0-100)
+        # If a day has 0 actions → 0 for that point (idle).
+        days_data = daily_by_email.get(email, {})
+        sparkline = []
+        for day in day_labels:
+            bucket = days_data.get(day)
+            if not bucket or (bucket["a"] + bucket["d"]) == 0:
+                sparkline.append(0)
+            else:
+                day_total = bucket["a"] + bucket["d"]
+                day_score = (bucket["a"] / day_total) * 100
+                sparkline.append(round(day_score, 1))
+
         items.append({
             "id": admin_id,
             "email": email,
@@ -362,6 +392,8 @@ async def productivity_scores(user: dict = Depends(get_current_user)):
             "admin_seniority": a.get("admin_seniority") or "senior",
             "is_active": a.get("is_active", True),
             "score": score,
+            "sparkline": sparkline,
+            "sparkline_days": day_labels,
             "metrics": {
                 "actions_30d": total,
                 "allowed": allowed,

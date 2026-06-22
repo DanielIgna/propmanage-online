@@ -42,6 +42,18 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 
 ---
 
+## Recent additions (Feb 22 2026 — Sparkline trend pe Productivity Score)
+- **Backend** (`/api/admin/sub-admins/productivity`): adăugat `sparkline` (7 valori) + `sparkline_days` (date ISO ultimele 7 zile, oldest→newest)
+  - Calculat din `admin_actions_log` per zi: success rate zilnic × 100, 0 dacă zi idle
+  - Fără cron suplimentar — agregare on-demand
+- **Frontend** (`AdminProductivity.jsx`): componentă `Sparkline` inline SVG
+  - 90×32 px, area-fill + line + dots
+  - Auto-color: **verde** dacă uptrend (last > first+5), **roșu** dacă downtrend (last < first-5), **gri** flat/idle
+  - Last dot mai mare (2.2px) ca să marcheze "azi"
+  - Tooltip pe hover cu valorile per zi
+  - Footer extended cu explicație culori
+
+
 ## Recent additions (Feb 22 2026 — Admin Productivity Score)
 - **Backend** (`routes/sub_admins.py`): nou `GET /api/admin/sub-admins/productivity` (super-only)
   - Calculează per admin pentru ultimele 30 zile: acțiuni totale, allowed/denied, success_rate, active_days, unique_paths, approvals reviewed/requested, last_action_ts
