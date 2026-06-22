@@ -264,3 +264,116 @@ async def audit_log(
     ]):
         counts[d.get("_id") or "unknown"] = d.get("n", 0)
     return {"items": items, "count": len(items), "scope_counts": counts}
+
+
+@router.get("/productivity")
+async def productivity_scores(user: dict = Depends(get_current_user)):
+    """Per-admin productivity score (super-only).
+
+    Score formula (0-100):
+      base = success_rate * 60                         # quality (allowed / total actions)
+      + activity_factor * 25                           # active days ratio in last 30d
+      + approvals_factor * 15                          # approvals reviewed bonus
+    Clamped 0..100. Zero-activity → score 0.
+    """
+    _require_super(user)
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    cutoff_30d = (now - timedelta(days=30)).isoformat()
+
+    # 1. Pull all admins
+    admins = []
+    async for a in db.users.find({"role": "admin"}):
+        admins.append(a)
+
+    # 2. Aggregate actions per email (last 30d), success rate, last seen, active days
+    actions_by_email: dict = {}
+    async for log in db.admin_actions_log.find(
+        {"ts": {"$gte": cutoff_30d}},
+        {"_id": 0, "user_email": 1, "outcome": 1, "ts": 1, "path": 1, "method": 1},
+    ):
+        email = log.get("user_email")
+        if not email:
+            continue
+        rec = actions_by_email.setdefault(email, {
+            "total": 0,
+            "allowed": 0,
+            "denied": 0,
+            "last_ts": None,
+            "active_days": set(),
+            "unique_paths": set(),
+        })
+        rec["total"] += 1
+        if log.get("outcome") == "allowed":
+            rec["allowed"] += 1
+        elif log.get("outcome") == "denied":
+            rec["denied"] += 1
+        ts_str = log.get("ts") or ""
+        try:
+            if not rec["last_ts"] or ts_str > rec["last_ts"]:
+                rec["last_ts"] = ts_str
+            rec["active_days"].add(ts_str[:10])
+        except Exception:  # noqa: BLE001
+            pass
+        if log.get("path"):
+            rec["unique_paths"].add(log["path"])
+
+    # 3. Approvals decided & requested per admin id
+    approvals_decided: dict = {}
+    approvals_requested: dict = {}
+    async for ap in db.admin_approvals.find(
+        {},
+        {"_id": 0, "decided_by": 1, "decided_by_email": 1, "requested_by": 1, "status": 1},
+    ):
+        if ap.get("decided_by") and ap.get("status") in {"approved", "rejected"}:
+            approvals_decided[ap["decided_by"]] = approvals_decided.get(ap["decided_by"], 0) + 1
+        if ap.get("requested_by"):
+            approvals_requested[ap["requested_by"]] = approvals_requested.get(ap["requested_by"], 0) + 1
+
+    # 4. Build per-admin records + compute score
+    items = []
+    for a in admins:
+        email = a.get("email")
+        admin_id = str(a.get("_id"))
+        rec = actions_by_email.get(email, {})
+        total = rec.get("total", 0)
+        allowed = rec.get("allowed", 0)
+        denied = rec.get("denied", 0)
+        active_days = len(rec.get("active_days", set()))
+        unique_paths = len(rec.get("unique_paths", set()))
+        last_ts = rec.get("last_ts")
+
+        # Sub-scores
+        success_rate = (allowed / total) if total > 0 else 0.0
+        activity_factor = min(active_days / 20.0, 1.0)  # 20+ active days in 30d = full
+        approvals_reviewed = approvals_decided.get(admin_id, 0)
+        approvals_factor = min(approvals_reviewed / 5.0, 1.0)  # 5+ decisions = full
+
+        score = 0.0
+        if total > 0:
+            score = (success_rate * 60.0) + (activity_factor * 25.0) + (approvals_factor * 15.0)
+        score = round(min(max(score, 0.0), 100.0), 1)
+
+        items.append({
+            "id": admin_id,
+            "email": email,
+            "name": a.get("name"),
+            "admin_scope": a.get("admin_scope") or "general",
+            "admin_seniority": a.get("admin_seniority") or "senior",
+            "is_active": a.get("is_active", True),
+            "score": score,
+            "metrics": {
+                "actions_30d": total,
+                "allowed": allowed,
+                "denied": denied,
+                "success_rate_pct": round(success_rate * 100, 1),
+                "active_days_30d": active_days,
+                "unique_paths_30d": unique_paths,
+                "approvals_reviewed": approvals_reviewed,
+                "approvals_requested": approvals_requested.get(admin_id, 0),
+                "last_action_ts": last_ts,
+            },
+        })
+
+    items.sort(key=lambda x: (x["score"], x["metrics"]["actions_30d"]), reverse=True)
+    return {"items": items, "count": len(items)}

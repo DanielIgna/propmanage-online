@@ -42,6 +42,19 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 
 ---
 
+## Recent additions (Feb 22 2026 — Admin Productivity Score)
+- **Backend** (`routes/sub_admins.py`): nou `GET /api/admin/sub-admins/productivity` (super-only)
+  - Calculează per admin pentru ultimele 30 zile: acțiuni totale, allowed/denied, success_rate, active_days, unique_paths, approvals reviewed/requested, last_action_ts
+  - Scor 0-100 = `success_rate * 60 + activity_factor * 25 + approvals_factor * 15`
+  - Activity factor saturează la 20 zile active / 30; approvals factor saturează la 5 decizii
+- **Frontend** (`AdminProductivity.jsx`):
+  - Card pus deasupra listei Sub-Admini
+  - Summary: Scor mediu echipă · Admini activi (X/Y) · Top performer
+  - Tabel cu: ScoreRing animat (SVG donut colorat), badge label TOP / OK / LOW / IDLE, breakdown columns (acțiuni 30z, succes %, zile active, aprobări revizuite)
+  - Explanation footer cu formula
+- **Verificat live**: 9 admini afișați; super admin scor 64.2 OK (268 acțiuni 100% succes), security 21.2 LOW (33% succes), testing 16.7 LOW (25.8% succes), restul IDLE
+
+
 ## Recent additions (Feb 22 2026 — Audit Log filtrat per scope în Preview mode)
 - **Backend** (`routes/sub_admins.py`):
   - `GET /api/admin/sub-admins/audit` acceptă acum `?scope=X&outcome=Y` (super-only)

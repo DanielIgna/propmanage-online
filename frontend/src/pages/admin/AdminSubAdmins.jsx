@@ -6,6 +6,7 @@ import axios from "axios";
 import { Users, Plus, KeyRound, UserX, Pencil, Copy, Shield } from "lucide-react";
 import { AdminCard } from "./AdminLayoutMetronic";
 import { AdminScopeMatrix } from "./AdminScopeMatrix";
+import { AdminProductivity } from "./AdminProductivity";
 import { ALL_SCOPES, getPreviewScope } from "../../lib/useAdminScope";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -243,6 +244,7 @@ export const AdminSubAdmins = () => {
 
   return (
     <div className="space-y-6" data-testid="admin-sub-admins-page">
+      <AdminProductivity />
       <AdminCard
         testid="sub-admins-list"
         title={
