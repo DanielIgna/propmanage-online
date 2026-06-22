@@ -42,6 +42,24 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 
 ---
 
+## Recent additions (Feb 22 2026 — KYC AI Verification cu Claude Sonnet 4.5)
+- **Backend** (`routes/kyc.py`):
+  - `_run_ai_verification(kyc_id)` — folosește `emergentintegrations.LlmChat` cu `ImageContent` pe Claude Sonnet 4.5 vision
+  - Trimite `id_front` + `selfie` ca atașamente + system prompt strict JSON
+  - Parse JSON robust (fences ``` removed) → `{match_score: 0-100, flags: [...], summary}`
+  - Auto-fire la upload via `BackgroundTasks` (răspuns API rapid, AI rulează în background ~5-10s)
+  - Endpoint manual `POST /api/kyc/admin/{id}/ai-verify` pentru re-rulare
+  - Rezultatul persistat în `kyc_documents.ai_verification` + inclus în public payload
+- **Frontend** (`AdminKYCQueue.jsx` — componenta `AIVerificationPanel`):
+  - Panel violet/indigo gradient deasupra butoanelor de decizie
+  - Badge MATCH SCORE colorat per range (emerald ≥90, cyan ≥60, amber ≥30, red <30)
+  - Flag chips: roșu pentru `poor/blur_high/covered/mismatch/suspicious/screen_capture/no_id_visible/uncertain`, verde pentru rest
+  - Summary citat italic
+  - Buton "Re-rulează" cu spinner
+- **Testat live**: upload imagini fake 16×16 → Claude răspunde corect cu score 0/100, flags `[images_not_loaded, verification_impossible, no_visual_data]`, summary "Cannot verify - images did not load successfully"
+- **Cost rulare**: ~$0.002/upload (Claude Sonnet 4.5 vision, 2 imagini ~500 input tokens + 100 output tokens)
+
+
 ## Recent additions (Feb 22 2026 — KYC System Complete)
 - **Backend** (`routes/kyc.py`):
   - Collection `kyc_documents` cu pipeline: not_started → uploaded → reviewing → approved | rejected

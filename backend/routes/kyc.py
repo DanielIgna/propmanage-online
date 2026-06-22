@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from typing import Optional, Literal
 
 from bson import ObjectId
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from db import db
@@ -90,6 +90,17 @@ def _public_payload(doc: dict, include_files: bool = False) -> dict:
         payload["id_front"] = doc.get("id_front")
         payload["id_back"] = doc.get("id_back")
         payload["selfie"] = doc.get("selfie")
+    # AI verification result (lightweight, always include if present)
+    ai = doc.get("ai_verification")
+    if ai:
+        payload["ai_verification"] = {
+            "ran_at": ai.get("ran_at"),
+            "model": ai.get("model"),
+            "match_score": ai.get("match_score"),
+            "flags": ai.get("flags") or [],
+            "summary": ai.get("summary"),
+            "error": ai.get("error"),
+        }
     return payload
 
 
@@ -102,9 +113,105 @@ def _mask_cnp(cnp: Optional[str]) -> Optional[str]:
     return f"{s[:3]}******{s[-2:]}"
 
 
-# ============================================================================
-# SPECIALIST ENDPOINTS
-# ============================================================================
+async def _run_ai_verification(kyc_id: str) -> dict:
+    """Call Claude Sonnet vision to cross-check ID + selfie. Returns score + flags.
+
+    Stored on the kyc_documents row as ``ai_verification``. Never raises —
+    on error, sets ``error`` field and an empty score.
+    """
+    import os
+    import json
+    doc = await db.kyc_documents.find_one({"id": kyc_id})
+    if not doc:
+        return {"error": "kyc_not_found"}
+
+    key = os.environ.get("EMERGENT_LLM_KEY", "").strip()
+    if not key:
+        return {"error": "EMERGENT_LLM_KEY missing"}
+
+    result = {
+        "ran_at": _now_iso(),
+        "model": "claude-sonnet-4-5-20250929",
+        "match_score": None,
+        "flags": [],
+        "summary": "",
+        "raw": "",
+        "error": None,
+    }
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+
+        # Strip any data: url prefix already done at upload time; values are pure base64
+        id_front_img = ImageContent(image_base64=doc.get("id_front", ""))
+        selfie_img = ImageContent(image_base64=doc.get("selfie", ""))
+
+        system_msg = (
+            "You are a KYC document verification assistant. You receive a national ID "
+            "(front side) and a live selfie of the same person. Your job: return a "
+            "STRICT JSON object only — no markdown, no commentary. The schema is:\n"
+            "{\"match_score\": <0-100>, \"flags\": [<short_string>, ...], \"summary\": <one-line>}\n\n"
+            "Scoring rules:\n"
+            " - 90-100 = clearly same person, ID readable, no manipulation\n"
+            " - 60-89  = likely same, minor quality issues (blur, lighting)\n"
+            " - 30-59  = uncertain, document or face partially obscured\n"
+            " - 0-29   = mismatch or suspicious (different person, fake ID, screen capture)\n\n"
+            "Flag examples: \"face_match_good\", \"face_match_uncertain\", \"text_blur_high\", "
+            "\"selfie_lighting_poor\", \"id_partially_covered\", \"possible_screen_capture\", "
+            "\"selfie_no_id_visible\", \"id_country_unsupported\".\n\n"
+            "Respond with ONLY the JSON object."
+        )
+        user_text = "Verify these two images: first is the national ID front; second is the live selfie."
+
+        chat = LlmChat(
+            api_key=key,
+            session_id=f"kyc-verify-{kyc_id}",
+            system_message=system_msg,
+        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+
+        text = await chat.send_message(UserMessage(
+            text=user_text,
+            file_contents=[id_front_img, selfie_img],
+        ))
+        result["raw"] = (text or "")[:2000]
+
+        # Parse JSON best-effort (Claude sometimes wraps in ```json fences)
+        cleaned = (text or "").strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.strip("`")
+            if cleaned.lower().startswith("json"):
+                cleaned = cleaned[4:]
+            cleaned = cleaned.strip()
+        try:
+            parsed = json.loads(cleaned)
+            ms = parsed.get("match_score")
+            if isinstance(ms, (int, float)):
+                result["match_score"] = max(0, min(100, int(ms)))
+            flags = parsed.get("flags") or []
+            if isinstance(flags, list):
+                result["flags"] = [str(f)[:60] for f in flags][:10]
+            result["summary"] = str(parsed.get("summary", ""))[:200]
+        except Exception as e:  # noqa: BLE001
+            result["error"] = f"parse_error: {str(e)[:80]}"
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[kyc.ai_verify] {kyc_id}: {e}")
+        result["error"] = f"{type(e).__name__}: {str(e)[:200]}"
+
+    # Persist
+    await db.kyc_documents.update_one(
+        {"id": kyc_id},
+        {"$set": {"ai_verification": result}},
+    )
+    return result
+
+
+@router.post("/admin/{kyc_id}/ai-verify")
+async def admin_run_ai_verify(kyc_id: str, user: dict = Depends(require_role("admin"))):
+    """Manually re-run AI verification (e.g. after a model update)."""
+    result = await _run_ai_verification(kyc_id)
+    return {"ok": True, "ai_verification": result}
+
+
+
 @router.get("/status")
 async def my_kyc_status(user: dict = Depends(get_current_user)):
     """Return the current user's KYC state (any role can call)."""
@@ -126,7 +233,7 @@ async def my_kyc_status(user: dict = Depends(get_current_user)):
 
 
 @router.post("/upload")
-async def upload_kyc(payload: KYCUploadIn, user: dict = Depends(require_role("specialist"))):
+async def upload_kyc(payload: KYCUploadIn, background_tasks: BackgroundTasks, user: dict = Depends(require_role("specialist"))):
     """Specialist uploads ID front + back + selfie. Idempotent if rejected (creates new row)."""
     id_front = _strip_data_url(payload.id_front)
     id_back = _strip_data_url(payload.id_back)
@@ -161,6 +268,8 @@ async def upload_kyc(payload: KYCUploadIn, user: dict = Depends(require_role("sp
         # raw CNP stored hashed/encrypted in a real system; we keep masked only for demo
     }
     await db.kyc_documents.insert_one(doc)
+    # Fire AI verification in background (Claude Sonnet vision)
+    background_tasks.add_task(_run_ai_verification, doc["id"])
     # Notify admins (security scope) + super admin
     try:
         from services import notify
