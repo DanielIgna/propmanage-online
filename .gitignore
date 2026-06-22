@@ -153,3 +153,4 @@ backend/uploads/digital_twin/711de1c5f245490793c90e6f48deab99/296233ff7320.skp
 .env
 .env.*
 *.env
+frontend/node_modules/.cache/default-development/32.pack

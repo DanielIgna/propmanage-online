@@ -11,6 +11,7 @@ import {
 import { useAuth } from "../../auth";
 import { API } from "../DashShared";
 import { HealthScoreBadge } from "./HealthScoreBadge";
+import { AutonomyTierBadge } from "./AutonomyTierBadge";
 import { AIAdminTour, ReplayAIAdminTourButton } from "./AIAdminTour";
 import { useAdminScope, filterNavSections, setPreviewScope, getPreviewScope } from "../../lib/useAdminScope";
 import { PreviewAuditButton } from "./PreviewAuditButton";
@@ -572,6 +573,7 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
           </button>
           <GlobalSearch theme={theme} />
           <HealthScoreBadge dark={dark} />
+          <AutonomyTierBadge dark={dark} />
           <ScopeBadgeTop scope={adminScope} />
           <QuickProfileSwitch dark={dark} />
           <ReplayAIAdminTourButton />
