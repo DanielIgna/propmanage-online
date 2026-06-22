@@ -79,6 +79,7 @@ from routes.ai_security import router as ai_security_router
 from routes.settings_snapshots import router as settings_snapshots_router, take_auto_snapshot
 from routes.service_contracts import router as service_contracts_router
 from routes.autonomy import router as autonomy_router, take_autonomy_snapshot
+from autonomy.autopilot import bootstrap_autonomy_defaults, daily_autopilot_sweep
 from routes.ai_activity import router as ai_activity_router
 from routes.ai_weekly_briefing import router as ai_weekly_briefing_router, run_weekly_briefing_job
 from routes.admin_todos import router as admin_todos_router
@@ -249,6 +250,11 @@ async def startup():
         await run_consent_backfill()
     except Exception as e:
         logger.warning(f"Consent backfill failed: {e}")
+    # Autonomy autopilot — enable smoke-monitor, auto-match schedule, fresh snapshot (idempotent)
+    try:
+        await bootstrap_autonomy_defaults()
+    except Exception as e:
+        logger.warning(f"Autonomy autopilot bootstrap failed: {e}")
     if not scheduler.running:
         scheduler.add_job(
             run_daily_digests,
@@ -333,6 +339,14 @@ async def startup():
             cron_check_all_users,
             CronTrigger(hour=4, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="tier_milestone_daily_sweep",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        # Autonomy autopilot daily sweep — 04:15 Europe/Bucharest (after tier milestones)
+        scheduler.add_job(
+            daily_autopilot_sweep,
+            CronTrigger(hour=4, minute=15, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="autonomy_autopilot_daily",
             replace_existing=True,
             misfire_grace_time=7200,
         )

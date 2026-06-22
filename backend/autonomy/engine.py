@@ -115,11 +115,12 @@ async def _score_technical() -> dict:
     smoke_pass_pct = _pct(passed_smoke, total_smoke, fallback=70.0)
 
     # Signal 2: latest snapshot freshness (< 36h = 100, > 7d = 0)
-    latest_snap = await db.app_settings_snapshots.find_one({}, sort=[("created_at", -1)])
+    # snapshots use `ts` field (set in settings_snapshots._take_snapshot)
+    latest_snap = await db.app_settings_snapshots.find_one({}, sort=[("ts", -1)])
     snap_freshness_pct = 0.0
-    if latest_snap and latest_snap.get("created_at"):
+    if latest_snap and (latest_snap.get("ts") or latest_snap.get("created_at")):
         try:
-            ts = latest_snap["created_at"]
+            ts = latest_snap.get("ts") or latest_snap.get("created_at")
             if isinstance(ts, str):
                 ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
             age_hours = (datetime.now(timezone.utc) - ts).total_seconds() / 3600.0

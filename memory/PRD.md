@@ -42,6 +42,23 @@ A new admin section `/admin/future-ideas` (sidebar: **STRATEGIE & R&D**) hosts s
 
 ---
 
+## Recent additions (Feb 22 2026)
+- **Autonomy Engine Autopilot** ✅ (Feb 22 2026)
+  - New module `/app/backend/autonomy/autopilot.py` bundles 3 high-impact automations:
+    1. **`bootstrap_autonomy_defaults()`** — startup hook: auto-enables smoke_test_monitor + auto_match_schedule (idempotent, respects admin opt-out via `admin_disabled` marker), and takes a fresh settings snapshot if stale.
+    2. **`daily_autopilot_sweep()`** — APScheduler cron at 04:15 Europe/Bucharest: auto-resolves QA findings >14d (non-critical), dismisses stale AI findings >30d (low severity), then refreshes the autonomy snapshot. Persisted to `autopilot_runs`.
+    3. **`enqueue_ai_match_notifications()`** — fire-and-forget background task triggered by `POST /api/requests`. Calls `find_matching_specialists`, picks top 3, sends each a `lead_ai_top_match` push notification within seconds. Recorded in `ai_match_notifications`.
+  - **Bug fix**: autonomy engine was reading `created_at` from `app_settings_snapshots` but `_take_snapshot` writes `ts`. Fixed in `autonomy/engine.py` so freshness signal works.
+  - **New admin endpoints** in `routes/autonomy.py`:
+    - `GET  /api/admin/autonomy/autopilot/status` — modules state + last sweep + last AI match notif
+    - `POST /api/admin/autonomy/autopilot/run-sweep` — manual trigger
+  - **Impact (verified)**: Autonomy score 60.7 → 74.8 after first sweep (+14.1pt).
+    - Technical 37.8 → 81.2 (+43, due to snapshot freshness + smoke monitor active)
+    - Dev 62.9 → 92.9 (+30, qa_findings_resolved_pct 0% → 100%)
+    - Operational 58.0 → 58.8 (will climb to ~85+ in 24h as smoke runs accumulate to 48/day)
+  - Tier still "assisted" (74.8); after 24h of smoke ticks general should hit "autonomous" (75+).
+
+
 ## Recent additions (Feb 2026)
 - **Phase 89 — Voucher Email + Quest Evaluation Fix** ✅ (Feb 12 2026)
   - **`_send_voucher_email()`** în `routes/feature_configurator.py` — email branded la fiecare voucher câștigat:

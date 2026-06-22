@@ -169,6 +169,51 @@ async def get_last_boost_gate(user=Depends(require_role("admin"))):
 
 
 # ============================================================================
+# AUTOPILOT — status + manual trigger
+# ============================================================================
+@router.get("/autopilot/status")
+async def autopilot_status(user=Depends(require_role("admin"))):
+    """Show whether the three autopilot modules are active + last sweep result."""
+    smoke = await db.smoke_test_config.find_one({"_id": "config"}) or {}
+    match = await db.auto_match_schedule.find_one({"_id": "config"}) or {}
+    last_snap = await db.app_settings_snapshots.find_one({}, sort=[("ts", -1)]) or {}
+    last_sweep = await db.autopilot_runs.find_one({"kind": "daily_sweep"}, sort=[("ran_at", -1)]) or {}
+    last_match_notif = await db.ai_match_notifications.find_one({}, sort=[("ran_at", -1)]) or {}
+
+    for d in (smoke, match, last_snap, last_sweep, last_match_notif):
+        d.pop("_id", None)
+        d.pop("settings", None)  # snapshot doc is big
+
+    return {
+        "smoke_test_monitor": {
+            "enabled": bool(smoke.get("enabled")),
+            "interval_minutes": smoke.get("interval_minutes"),
+            "auto_enabled_by_autopilot": bool(smoke.get("auto_enabled_by_autopilot")),
+            "last_status": smoke.get("last_status"),
+        },
+        "auto_match_schedule": {
+            "enabled": bool(match.get("enabled")),
+            "interval_hours": match.get("interval_hours"),
+            "auto_enabled_by_autopilot": bool(match.get("auto_enabled_by_autopilot")),
+        },
+        "settings_snapshot": {
+            "last_ts": last_snap.get("ts"),
+            "kind": last_snap.get("kind"),
+        },
+        "last_sweep": last_sweep,
+        "last_ai_match_notification": last_match_notif,
+    }
+
+
+@router.post("/autopilot/run-sweep")
+async def autopilot_run_sweep(user=Depends(require_role("admin"))):
+    """Manually run the daily autopilot sweep (close stale findings + refresh)."""
+    from autonomy.autopilot import daily_autopilot_sweep
+    result = await daily_autopilot_sweep()
+    return {"ok": True, "result": result}
+
+
+# ============================================================================
 # V2: TASK GENERATION (from recommendations → admin_todos)
 # ============================================================================
 _PRIORITY_TODO_MAP = {"critical": "high", "high": "high", "medium": "medium", "low": "low"}

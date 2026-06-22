@@ -6,7 +6,7 @@ import logging
 from typing import Optional, List, Literal, Dict
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
 from db import db
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api", tags=["requests"])
 
 # ============= REQUESTS =============
 @router.post("/requests")
-async def create_request(data: RequestIn, user: dict = Depends(require_role("client"))):
+async def create_request(data: RequestIn, background_tasks: BackgroundTasks, user: dict = Depends(require_role("client"))):
     prop = await db.properties.find_one({"_id": ObjectId(data.property_id), "owner_id": user["id"]})
     if not prop: raise HTTPException(404, "Property not found")
     doc = {
@@ -60,6 +60,22 @@ async def create_request(data: RequestIn, user: dict = Depends(require_role("cli
             type_="lead_urgent" if is_urgent else "lead",
             link=f"/specialist"
         )
+    # Real-time AI auto-match: notify top 3 specialists with a high-priority push.
+    # Runs in background so the API responds immediately (<5s).
+    try:
+        from autonomy.autopilot import enqueue_ai_match_notifications
+        zone = prop.get("zone") or prop.get("city") or "default"
+        background_tasks.add_task(
+            enqueue_ai_match_notifications,
+            doc["id"],
+            data.category or "",
+            zone,
+            data.title,
+            data.priority or "",
+            data.budget_estimate,
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[requests] failed to enqueue AI match notifications: {e}")
     return doc
 
 @router.get("/requests")
