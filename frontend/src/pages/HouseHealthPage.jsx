@@ -107,7 +107,7 @@ const HouseHealthPage = () => {
             {section === "score" && <ScoreSection data={dashData} />}
             {section === "docs" && <DocumentsSection twinId={twinId} />}
             {section === "history" && <HistorySection twinId={twinId} />}
-            {section === "recommendations" && <RecommendationsSection />}
+            {section === "recommendations" && <RecommendationsSection twinId={twinId} />}
             {["air", "thermal", "humidity", "electric", "radon"].includes(section) && (
               <EvaluationSection twinId={twinId} kind={section} />
             )}
@@ -399,30 +399,219 @@ const EvaluationSection = ({ twinId, kind }) => {
 };
 
 // ============================== RECOMMENDATIONS SECTION ==============================
-const RecommendationsSection = () => (
-  <div className="bg-stone-900/40 border border-stone-800 rounded-2xl p-5" data-testid="hh-recommendations-section">
-    <h2 className="text-lg font-bold mb-2">Recomandări</h2>
-    <p className="text-sm text-stone-400 mb-3">
-      După fiecare evaluare aprobată, specialistul introduce recomandări cu prioritate.
-    </p>
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-      <div className="px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300">
-        <div className="font-bold uppercase tracking-wider mb-1">🚨 Urgent</div>
-        <div className="text-stone-400">Lucrări critice — necesar imediat.</div>
+const PRIORITY_META = {
+  urgent:      { label: "Urgent",        cls: "bg-rose-500/15 text-rose-300 border-rose-500/40",   icon: "🚨" },
+  recommended: { label: "Recomandat",    cls: "bg-amber-500/15 text-amber-300 border-amber-500/40", icon: "⚠" },
+  monitor:     { label: "Monitorizare",  cls: "bg-sky-500/15 text-sky-300 border-sky-500/40",      icon: "👁" },
+};
+
+const CATEGORY_LABELS = {
+  air: "Aer", thermal: "Termic", humidity: "Umiditate", electric: "Electric",
+  radon: "Radon", structural: "Structural", docs: "Documentație", other: "Altele",
+};
+
+const RecommendationsSection = ({ twinId }) => {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [evaluations, setEvaluations] = useState([]);
+  const [form, setForm] = useState({
+    evaluation_id: "", title: "", description: "",
+    priority: "recommended", category: "other",
+    estimated_cost_eur: "", deadline: "",
+  });
+  const [error, setError] = useState("");
+
+  const load = async () => {
+    if (!twinId) return;
+    setLoading(true);
+    try {
+      const r = await axios.get(`${API}/house-health/recommendations`, { params: { twin_project_id: twinId } });
+      setItems(r.data?.items || []);
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    axios.get(`${API}/auth/me`).then((r) => setUser(r.data)).catch(() => {});
+    load();
+    axios.get(`${API}/house-health/evaluations`, { params: { twin_project_id: twinId, status: "approved" } })
+      .then((r) => setEvaluations(r.data?.items || []))
+      .catch(() => {});
+  }, [twinId]);
+
+  const canAdd = user?.role === "specialist" || user?.role === "admin";
+
+  const submit = async () => {
+    setError("");
+    if (!form.evaluation_id) { setError("Selectează evaluarea aprobată."); return; }
+    if (!form.title.trim()) { setError("Titlul e obligatoriu."); return; }
+    try {
+      await axios.post(`${API}/house-health/recommendations`, {
+        ...form,
+        estimated_cost_eur: form.estimated_cost_eur ? parseFloat(form.estimated_cost_eur) : null,
+      });
+      setShowForm(false);
+      setForm({ evaluation_id: "", title: "", description: "", priority: "recommended", category: "other", estimated_cost_eur: "", deadline: "" });
+      await load();
+    } catch (e) {
+      setError(e?.response?.data?.detail || "Eroare salvare");
+    }
+  };
+
+  const updateStatus = async (id, status) => {
+    await axios.patch(`${API}/house-health/recommendations/${id}`, { status });
+    await load();
+  };
+
+  const remove = async (id) => {
+    if (!window.confirm("Ștergi această recomandare?")) return;
+    await axios.delete(`${API}/house-health/recommendations/${id}`);
+    await load();
+  };
+
+  const publish = async (rec) => {
+    if (!window.confirm(`Publici această recomandare ca cerere în marketplace?\n\nSpecialiștii din zona ta vor putea face oferte. Comisionul platformei: ${rec.marketplace_commission_pct || "10"}% din fee-ul lead-ului.`)) return;
+    try {
+      const r = await axios.post(`${API}/house-health/recommendations/${rec.id}/publish-to-marketplace`, {
+        budget_estimate: rec.estimated_cost_eur,
+      });
+      alert(`Publicat în marketplace! Request ID: ${r.data.request_id}. Comision: ${r.data.commission_pct}%.`);
+      await load();
+    } catch (e) {
+      alert(e?.response?.data?.detail || "Eroare la publicare.");
+    }
+  };
+
+  return (
+    <div className="bg-stone-900/40 border border-stone-800 rounded-2xl p-5" data-testid="hh-recommendations-section">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-bold">Recomandări</h2>
+        {canAdd && (
+          <button
+            onClick={() => setShowForm(!showForm)}
+            data-testid="hh-rec-new"
+            className="text-xs px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold inline-flex items-center gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5" /> {showForm ? "Anulează" : "Recomandare nouă"}
+          </button>
+        )}
       </div>
-      <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300">
-        <div className="font-bold uppercase tracking-wider mb-1">⚠ Recomandat</div>
-        <div className="text-stone-400">Intervenții preventive recomandate.</div>
+
+      {showForm && canAdd && (
+        <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-2 mb-3" data-testid="hh-rec-form">
+          <select value={form.evaluation_id} onChange={(e) => setForm({ ...form, evaluation_id: e.target.value })}
+            className="w-full bg-stone-800 border border-stone-700 rounded px-2 py-1.5 text-sm" data-testid="hh-rec-eval">
+            <option value="">— alege evaluarea aprobată —</option>
+            {evaluations.map((ev) => (
+              <option key={ev.id} value={ev.id}>{fmtDate(ev.date)} · {ev.kind}</option>
+            ))}
+          </select>
+          <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Titlu recomandare"
+            className="w-full bg-stone-800 border border-stone-700 rounded px-2 py-1.5 text-sm" data-testid="hh-rec-title" />
+          <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Detalii..." rows={3}
+            className="w-full bg-stone-800 border border-stone-700 rounded px-2 py-1.5 text-sm" data-testid="hh-rec-desc" />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}
+              className="bg-stone-800 border border-stone-700 rounded px-2 py-1.5 text-sm" data-testid="hh-rec-priority">
+              <option value="urgent">Urgent</option>
+              <option value="recommended">Recomandat</option>
+              <option value="monitor">Monitorizare</option>
+            </select>
+            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}
+              className="bg-stone-800 border border-stone-700 rounded px-2 py-1.5 text-sm" data-testid="hh-rec-category">
+              {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+            <input type="number" step="1" min="0" placeholder="Cost € (opt)" value={form.estimated_cost_eur}
+              onChange={(e) => setForm({ ...form, estimated_cost_eur: e.target.value })}
+              className="bg-stone-800 border border-stone-700 rounded px-2 py-1.5 text-sm" data-testid="hh-rec-cost" />
+            <input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+              className="bg-stone-800 border border-stone-700 rounded px-2 py-1.5 text-sm" data-testid="hh-rec-deadline" />
+          </div>
+          {error && <div className="text-xs text-rose-400">{error}</div>}
+          <button onClick={submit} data-testid="hh-rec-save"
+            className="px-3 py-1.5 rounded-lg bg-emerald-500 text-stone-950 text-xs font-bold inline-flex items-center gap-1.5">
+            <Plus className="w-3.5 h-3.5" /> Salvează
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs mb-3">
+        {Object.entries(PRIORITY_META).map(([k, m]) => (
+          <div key={k} className={`px-3 py-2 rounded-lg border ${m.cls}`}>
+            <div className="font-bold uppercase tracking-wider mb-0.5">{m.icon} {m.label}</div>
+            <div className="text-stone-400 text-[11px]">
+              {k === "urgent" ? "Lucrări critice — necesar imediat." :
+               k === "recommended" ? "Intervenții preventive recomandate." :
+               "Atenție în viitor, nu acum."}
+            </div>
+          </div>
+        ))}
       </div>
-      <div className="px-3 py-2 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-300">
-        <div className="font-bold uppercase tracking-wider mb-1">👁 Monitorizare</div>
-        <div className="text-stone-400">Atenție în viitor, nu acum.</div>
-      </div>
+
+      {loading && <div className="text-xs text-stone-500">Se încarcă...</div>}
+      {!loading && items.length === 0 && (
+        <div className="text-xs text-stone-500 italic" data-testid="hh-rec-empty">
+          Nicio recomandare încă. {canAdd ? "Adaugă prima după o evaluare aprobată." : "Specialistul va adăuga recomandări după evaluări."}
+        </div>
+      )}
+
+      <ul className="space-y-2" data-testid="hh-rec-list">
+        {items.map((r, i) => {
+          const m = PRIORITY_META[r.priority] || PRIORITY_META.monitor;
+          return (
+            <li key={r.id} className={`p-3 rounded-lg border ${m.cls.replace("text-", "border-").split(" ").filter(c => c.startsWith("border-")).join(" ")} bg-stone-800/40`} data-testid={`hh-rec-${i}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-bold ${m.cls}`}>{m.icon} {m.label}</span>
+                    <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-stone-700 text-stone-300">{CATEGORY_LABELS[r.category] || r.category}</span>
+                    {r.status === "done" && <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">✓ Done</span>}
+                    {r.status === "dismissed" && <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-stone-700 text-stone-400">Anulat</span>}
+                  </div>
+                  <div className="text-sm font-semibold text-stone-100">{r.title}</div>
+                  {r.description && <div className="text-xs text-stone-400 mt-1 whitespace-pre-wrap">{r.description}</div>}
+                  <div className="flex gap-3 flex-wrap text-[11px] text-stone-500 mt-1">
+                    {r.estimated_cost_eur != null && <span>💰 ~{r.estimated_cost_eur}€</span>}
+                    {r.deadline && <span>📅 până {fmtDate(r.deadline)}</span>}
+                    <span>de {r.created_by_email || "specialist"}</span>
+                    {r.marketplace_request_id && (
+                      <span className="text-cyan-400 font-semibold" data-testid={`hh-rec-published-${i}`}>
+                        ✓ Publicat în marketplace
+                      </span>
+                    )}
+                  </div>
+                  {user?.role === "client" && !r.marketplace_request_id && r.priority !== "monitor" && r.status === "active" && (
+                    <button
+                      onClick={() => publish(r)}
+                      data-testid={`hh-rec-publish-${i}`}
+                      className="mt-2 text-[11px] px-2 py-1 rounded-md bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25 border border-cyan-500/40 inline-flex items-center gap-1 font-semibold"
+                    >
+                      📢 Publică în marketplace
+                    </button>
+                  )}
+                </div>
+                {(canAdd && r.specialist_id === user?.id) || user?.role === "admin" ? (
+                  <div className="flex flex-col gap-1 shrink-0">
+                    {r.status !== "done" && (
+                      <button onClick={() => updateStatus(r.id, "done")} data-testid={`hh-rec-done-${i}`}
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25">
+                        ✓ Done
+                      </button>
+                    )}
+                    <button onClick={() => remove(r.id)} data-testid={`hh-rec-delete-${i}`}
+                      className="text-rose-400 hover:text-rose-300 self-end">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
-    <div className="mt-3 text-[11px] text-stone-500 italic">
-      ℹ Generarea automată a lead-urilor în marketplace e pregătită infrastructural (F4).
-    </div>
-  </div>
-);
+  );
+};
 
 export default HouseHealthPage;

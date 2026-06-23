@@ -267,6 +267,37 @@ async def accept_offer(req_id: str, offer_id: str, user: dict = Depends(require_
     async for ld in losers_cur:
         await notify(ld["specialist_id"], "Ofertă necâștigătoare", f"Clientul a ales un alt specialist pentru '{req.get('title','')}'. Fee-ul rămâne consumat ca cost de lead.", type_="offer_lost", link="/specialist")
     await log_event(req_id, "offer.accepted", actor=user, payload={"offer_id": offer_id, "specialist_id": offer["specialist_id"]})
+
+    # House Health attribution — if this request came from a HH recommendation,
+    # capture commission for later reconciliation. Non-blocking.
+    try:
+        hh_src = req.get("house_health_source")
+        if hh_src and hh_src.get("commission_status") == "pending":
+            offer_fee = float(offer.get("fee_paid_total", 0) or 0)
+            commission_pct = float(hh_src.get("commission_pct", 10.0))
+            commission_amount = round(offer_fee * (commission_pct / 100.0), 2)
+            await db.requests.update_one(
+                {"_id": ObjectId(req_id)},
+                {"$set": {
+                    "house_health_source.commission_status": "captured",
+                    "house_health_source.commission_amount": commission_amount,
+                    "house_health_source.commission_captured_at": now_iso,
+                    "house_health_source.specialist_id": offer["specialist_id"],
+                }},
+            )
+            await db.hh_audit_log.insert_one({
+                "user_id": user["id"],
+                "action": "commission_captured",
+                "resource_id": hh_src.get("recommendation_id"),
+                "request_id": req_id,
+                "specialist_id": offer["specialist_id"],
+                "amount": commission_amount,
+                "commission_pct": commission_pct,
+                "timestamp": now_iso,
+            })
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[house_health] commission capture failed for req=%s: %s", req_id, e)
+
     return {"ok": True, "specialist_id": offer["specialist_id"], "specialist_name": offer.get("specialist_name", "")}
 
 

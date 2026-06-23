@@ -59,6 +59,7 @@ import AIDevTeamPage from "./pages/admin/AIDevTeamPage";
 import AISecurityCenterPage from "./pages/admin/AISecurityCenterPage";
 import AutonomyEnginePage from "./pages/admin/AutonomyEnginePage";
 import TwinPage from "./pages/admin/TwinPage";
+import AdminHouseHealthPage from "./pages/admin/AdminHouseHealthPage";
 import HouseHealthPage from "./pages/HouseHealthPage";
 import AdminTodoBoard from "./pages/admin/AdminTodoBoard";
 import ExperienceSpacesPage from "./pages/admin/ExperienceSpacesPage";
@@ -1616,6 +1617,7 @@ function App() {
               <Route path="/admin/autonomy" element={<AutonomyEnginePage />} />
               <Route path="/admin/twin" element={<TwinPage />} />
               <Route path="/house-health/:twinId" element={<HouseHealthPage />} />
+              <Route path="/admin/house-health" element={<AdminHouseHealthPage />} />
               <Route path="/admin/todo" element={<AdminTodoBoard />} />
               <Route path="/admin/experience-spaces" element={<ExperienceSpacesPage />} />
               <Route path="/admin/future-ideas" element={<FutureIdeasVault />} />
