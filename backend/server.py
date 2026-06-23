@@ -80,7 +80,7 @@ from routes.settings_snapshots import router as settings_snapshots_router, take_
 from routes.service_contracts import router as service_contracts_router
 from routes.autonomy import router as autonomy_router, take_autonomy_snapshot, weekly_auto_tune_job
 from routes.twin import router as twin_router
-from routes.house_health import router as house_health_router
+from routes.house_health import router as house_health_router, admin_router as house_health_admin_router
 from routes.admin_tour import router as admin_tour_router
 from autonomy.founder_digest import weekly_founder_digest
 from autonomy.autopilot import bootstrap_autonomy_defaults, daily_autopilot_sweep
@@ -207,6 +207,7 @@ for r in (
     autonomy_router,
     twin_router,
     house_health_router,
+    house_health_admin_router,
     admin_tour_router,
     ai_activity_router,
     ai_weekly_briefing_router,
