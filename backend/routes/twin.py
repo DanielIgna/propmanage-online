@@ -255,15 +255,19 @@ async def twin_ask(payload: AskRequest, user=Depends(require_role("admin"))):
     proposed_action = _detect_action_intent(payload.question)
     action_proposal = None
     if proposed_action and proposed_action in ALLOWED_ACTIONS:
+        # Check if question also contains scheduling info
+        from twin_schedule import _detect_schedule_intent
+        sched_info = _detect_schedule_intent(payload.question)
+
         meta = ALLOWED_ACTIONS[proposed_action]
         token = secrets.token_urlsafe(24)
-        # Persist single-use token (5-min TTL)
         await db.twin_action_tokens.insert_one({
             "token": token,
             "action_key": proposed_action,
             "user_id": user["id"],
             "session_id": session_id,
             "question": payload.question,
+            "schedule_info": sched_info,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat(),
             "used": False,
@@ -275,6 +279,7 @@ async def twin_ask(payload: AskRequest, user=Depends(require_role("admin"))):
             "estimated_seconds": meta["estimated_seconds"],
             "confirmation_token": token,
             "expires_in_minutes": 5,
+            "schedule_info": sched_info,  # None or {kind, when, label}
         }
 
     try:
@@ -347,6 +352,38 @@ async def twin_execute_action(payload: ExecuteActionRequest, user=Depends(requir
 
     # Execute + audit
     try:
+        # If the token has schedule_info → register a scheduled job (don't execute now)
+        sched_info = tok.get("schedule_info")
+        if sched_info and isinstance(sched_info, dict) and sched_info.get("kind"):
+            from twin_schedule import register_schedule
+            from server import scheduler
+            schedule_id = uuid.uuid4().hex
+            try:
+                doc = await register_schedule(
+                    scheduler=scheduler,
+                    schedule_id=schedule_id,
+                    user_id=user["id"],
+                    user_email=user.get("email"),
+                    action_key=payload.action_key,
+                    schedule_info=sched_info,
+                    question=tok.get("question", ""),
+                )
+            except ValueError as ve:
+                raise HTTPException(400, str(ve))
+            return {
+                "ok": True,
+                "scheduled": True,
+                "action_key": payload.action_key,
+                "label": ALLOWED_ACTIONS.get(payload.action_key, {}).get("label", payload.action_key),
+                "result": {
+                    "schedule_id": schedule_id,
+                    "kind": doc["kind"],
+                    "label": doc["label"],
+                    "status": "active",
+                },
+            }
+
+        # Otherwise execute immediately
         result = await _execute_action(payload.action_key, user)
         await db.twin_actions_log.insert_one({
             "id": uuid.uuid4().hex,
@@ -360,6 +397,7 @@ async def twin_execute_action(payload: ExecuteActionRequest, user=Depends(requir
         })
         return {
             "ok": True,
+            "scheduled": False,
             "action_key": payload.action_key,
             "label": ALLOWED_ACTIONS.get(payload.action_key, {}).get("label", payload.action_key),
             "result": result,
@@ -384,3 +422,29 @@ async def twin_history(
     cursor = db.twin_conversations.find(q, {"_id": 0}).sort("asked_at", -1).limit(min(limit, 100))
     items = [d async for d in cursor]
     return {"items": list(reversed(items)), "count": len(items)}
+
+
+@router.get("/scheduled")
+async def list_schedules(user=Depends(require_role("admin"))):
+    """List active + recent scheduled actions for the current user."""
+    if not is_super_admin(user):
+        raise HTTPException(403, "Doar super-admin.")
+    cursor = db.twin_scheduled_actions.find(
+        {"user_id": user["id"]},
+        {"_id": 0},
+    ).sort("created_at", -1).limit(50)
+    items = [d async for d in cursor]
+    return {"items": items, "count": len(items)}
+
+
+@router.delete("/scheduled/{schedule_id}")
+async def delete_schedule(schedule_id: str, user=Depends(require_role("admin"))):
+    """Cancel a scheduled action (idempotent)."""
+    if not is_super_admin(user):
+        raise HTTPException(403, "Doar super-admin.")
+    from twin_schedule import cancel_schedule
+    from server import scheduler
+    ok = await cancel_schedule(scheduler, schedule_id, user["id"])
+    if not ok:
+        raise HTTPException(404, "Schedule not found")
+    return {"ok": True, "schedule_id": schedule_id}

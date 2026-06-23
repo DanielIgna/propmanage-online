@@ -542,6 +542,13 @@ async def startup():
         logger.info("Autonomy snapshot scheduler started (daily 03:15 Europe/Bucharest).")
         logger.info("Autonomy Auto-Tune scheduler started (Mondays 04:00 Europe/Bucharest, self-healing + adaptive escalation).")
         logger.info("Founders' Digest scheduler started (Mondays 09:30 Europe/Bucharest, 1 email/week to super-admins).")
+        # Hydrate Twin scheduled actions from DB (re-register all active ones)
+        try:
+            from twin_schedule import hydrate_schedules_on_startup
+            n = await hydrate_schedules_on_startup(scheduler)
+            logger.info(f"Twin Scheduled Actions: hydrated {n} active schedules from DB.")
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Twin schedule hydration failed: {e}")
         logger.info("Weekly AI Briefing scheduler started (Mondays 09:00 Europe/Bucharest).")
         logger.info("Future Ideas digest scheduler started (Mondays 09:15 Europe/Bucharest).")
 

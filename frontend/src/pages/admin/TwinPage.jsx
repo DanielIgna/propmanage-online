@@ -1,16 +1,16 @@
 // Twin Orchestrator — natural-language Q&A chat for super-admins.
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { Bot, Send, Loader2, Sparkles, RefreshCw, User, Zap, CheckCircle2 } from "lucide-react";
+import { Bot, Send, Loader2, Sparkles, RefreshCw, User, Zap, CheckCircle2, Clock, X } from "lucide-react";
 import { API } from "../DashShared";
 
 const SUGGESTED_QUESTIONS = [
   "Care e tier-ul curent și de ce?",
   "Câți admini au făcut acțiuni denied astăzi?",
   "Ce ar trebui să fac ca scorul DEV să crească?",
-  "A scăzut scorul săptămâna asta?",
-  "Cine sunt cei mai activi admini?",
-  "Câte KYC-uri sunt în așteptare?",
+  "Twin, rulează Auto-Tune în fiecare luni la 06:00",
+  "Twin, trimite digest în fiecare 1 a lunii la 09:00",
+  "Twin, ia un snapshot mâine la 09:00",
 ];
 
 const Bubble = ({ role, content, ts, actionProposal, onConfirm, executing, executedResult }) => {
@@ -48,7 +48,8 @@ const Bubble = ({ role, content, ts, actionProposal, onConfirm, executing, execu
               data-testid="twin-action-proposal"
             >
               <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-bold text-fuchsia-700 dark:text-fuchsia-300 mb-1">
-                <Zap className="w-3 h-3" /> Acțiune propusă
+                <Zap className="w-3 h-3" />
+                {actionProposal.schedule_info ? "Programare propusă" : "Acțiune propusă"}
               </div>
               <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 {actionProposal.label}
@@ -56,6 +57,12 @@ const Bubble = ({ role, content, ts, actionProposal, onConfirm, executing, execu
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 {actionProposal.description} · ~{actionProposal.estimated_seconds}s
               </div>
+              {actionProposal.schedule_info && (
+                <div className="mt-2 text-xs px-2 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-700 dark:text-cyan-300 inline-flex items-center gap-1.5">
+                  ⏰ <strong>{actionProposal.schedule_info.label}</strong>
+                  <span className="text-[10px] opacity-75">({actionProposal.schedule_info.kind === "cron" ? "recurent" : "o singură dată"})</span>
+                </div>
+              )}
               <div className="flex gap-2 mt-2.5">
                 <button
                   onClick={onConfirm}
@@ -64,7 +71,9 @@ const Bubble = ({ role, content, ts, actionProposal, onConfirm, executing, execu
                   data-testid="twin-action-confirm"
                 >
                   {executing ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-                  {executing ? "Execută..." : "Confirmă & execută"}
+                  {executing
+                    ? (actionProposal.schedule_info ? "Programează..." : "Execută...")
+                    : (actionProposal.schedule_info ? "Confirmă & programează" : "Confirmă & execută")}
                 </button>
                 <span className="text-[10px] text-slate-400 self-center">
                   Token TTL 5min · single-use
@@ -303,9 +312,99 @@ const TwinPage = () => {
         </div>
       )}
 
+      <ScheduledActionsPanel />
+
       <div className="mt-3 text-[11px] text-slate-400 dark:text-slate-500">
         🔒 Doar super-admin · Citește read-only din MongoDB · Powered by Claude Sonnet 4.5
       </div>
+    </div>
+  );
+};
+
+// =========================== SCHEDULED ACTIONS PANEL ===========================
+const ScheduledActionsPanel = () => {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [cancelling, setCancelling] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const { data } = await axios.get(`${API}/admin/twin/scheduled`);
+      setItems(data?.items || []);
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { load(); }, []);
+
+  const cancel = async (id) => {
+    if (!window.confirm("Anulezi această programare?")) return;
+    setCancelling(id);
+    try {
+      await axios.delete(`${API}/admin/twin/scheduled/${id}`);
+      await load();
+    } finally {
+      setCancelling(null);
+    }
+  };
+
+  const active = items.filter((i) => i.status === "active");
+
+  return (
+    <div className="mt-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-4" data-testid="twin-scheduled-panel">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4 text-cyan-500" />
+          <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+            Programări active <span className="text-xs text-slate-400 font-normal">({active.length})</span>
+          </div>
+        </div>
+        <button
+          onClick={load}
+          disabled={loading}
+          className="text-[11px] px-2 py-1 rounded text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 inline-flex items-center gap-1"
+          data-testid="twin-scheduled-refresh"
+        >
+          <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} />
+        </button>
+      </div>
+      {active.length === 0 ? (
+        <div className="text-xs text-slate-400 dark:text-slate-500 italic" data-testid="twin-scheduled-empty">
+          Nicio programare activă. Spune-i lui Twin: &bdquo;rulează Auto-Tune în fiecare luni la 06:00&rdquo;.
+        </div>
+      ) : (
+        <ul className="space-y-1.5" data-testid="twin-scheduled-list">
+          {active.map((s, i) => (
+            <li
+              key={s.id}
+              className="flex flex-wrap items-center gap-2 text-[12px] px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/40"
+              data-testid={`twin-scheduled-${i}`}
+            >
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${s.kind === "cron" ? "bg-cyan-500/15 text-cyan-600 dark:text-cyan-300" : "bg-amber-500/15 text-amber-600 dark:text-amber-300"}`}>
+                {s.kind === "cron" ? "recurent" : "o dată"}
+              </span>
+              <span className="font-medium text-slate-700 dark:text-slate-200">{s.action_key}</span>
+              <span className="text-slate-500 dark:text-slate-400">→ {s.label}</span>
+              {s.run_count > 0 && (
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400">✓ rulat de {s.run_count}× </span>
+              )}
+              <button
+                onClick={() => cancel(s.id)}
+                disabled={cancelling === s.id}
+                className="ml-auto text-[10px] text-rose-500 hover:text-rose-700 inline-flex items-center gap-1 disabled:opacity-50"
+                data-testid={`twin-scheduled-cancel-${i}`}
+                title="Anulează programarea"
+              >
+                {cancelling === s.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                Anulează
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };
