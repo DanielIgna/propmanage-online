@@ -13,6 +13,7 @@ import { API } from "../DashShared";
 import { HealthScoreBadge } from "./HealthScoreBadge";
 import { AutonomyTierBadge } from "./AutonomyTierBadge";
 import { AIAdminTour, ReplayAIAdminTourButton } from "./AIAdminTour";
+import { AdminTourV2Wrapper } from "./AdminTourV2";
 import { useAdminScope, filterNavSections, setPreviewScope, getPreviewScope } from "../../lib/useAdminScope";
 import { PreviewAuditButton } from "./PreviewAuditButton";
 
@@ -597,6 +598,7 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
         </main>
       </div>
       <AIAdminTour />
+      <AdminTourV2Wrapper />
       <PreviewAuditButton scope={getPreviewScope()} />
     </div>
   );

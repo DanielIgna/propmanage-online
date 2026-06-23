@@ -29,6 +29,7 @@ import { QuestPanel } from "../lib/QuestPanel";
 import { useTier } from "../lib/useTier";
 import { PMCard, PMCardPrimary, PMPillButton, PMChip, PMSectionHeader, PMEmptyState } from "../components/pm";
 import { TierProgressWidget } from "../components/TierProgressWidget";
+import HouseHealthCard from "./HouseHealthCard";
 
 export const ClientDashboard = () => {
   const { user, refreshUser } = useAuth();
@@ -574,6 +575,7 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setP
 
       {/* Projects where this client is a member (read-only view) */}
       <ProjectListSection title="Proiectele tale de amenajare" />
+      <HouseHealthCard />
     </>
   );
 };
