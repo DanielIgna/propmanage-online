@@ -4,6 +4,41 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 
+## 🏠 House Health — F4.1 + F4.2 + F4.4 Complete (Feb 23 2026)
+
+**F4.1 — Admin Plans CRUD + Scoring config** (`/app/backend/routes/house_health_plans.py`):
+- `GET /api/house-health/plans` — public active plans list
+- `GET|POST|PATCH|DELETE /api/admin/house-health/plans[/{id}]` — admin CRUD (soft delete = active=false)
+- `GET /api/house-health/scoring-config` + `PUT /api/admin/house-health/scoring-config`
+- Weights validated server-side: must sum to 100 across {air, thermal, humidity, electric, docs, maintenance, radon}.
+- Thresholds validated: 0 < fair < good < excellent ≤ 100.
+- Admin UI: `/admin/house-health` with two tabs (Planuri, Formula scor) — sidebar link added in `AdminLayoutMetronic.jsx`.
+
+**F4.2 — Recommendations CRUD** (`/app/backend/routes/house_health_recommendations.py`):
+- `POST /api/house-health/recommendations` — specialist or admin
+- `GET /api/house-health/recommendations?twin_project_id=...` — client owner / specialist (own) / admin (all)
+- `PATCH /api/house-health/recommendations/{id}` — mutate (specialist owner or admin)
+- `DELETE /api/house-health/recommendations/{id}` — same scope
+- Priorities: urgent | recommended | monitor. Categories: air | thermal | humidity | electric | radon | structural | docs | other.
+
+**F4.4 — Marketplace Lead Automation** (same file):
+- `POST /api/house-health/recommendations/{id}/publish-to-marketplace` — client only; creates a `db.requests` entry with `house_health_source` attribution (recommendation_id, evaluation_id, plan_slug, commission_pct captured from active subscription). Only urgent/recommended priorities can publish.
+- Commission status lifecycle: `pending → captured` (set in `routes/marketplace_offers.py` on `offer.accept` — non-blocking, logs warning on error).
+- `GET /api/house-health/marketplace-stats` — client view (own published list) or admin view (platform totals + by_status breakdown).
+- Frontend: client gets "📢 Publică în marketplace" button on actionable recommendations; once published, shows "✓ Publicat în marketplace" badge.
+
+**Tests**: `/app/backend/tests/test_house_health_f4.py` — 15 tests, all green. Combined with F1-F3 tests: **39/39 passing**.
+
+**Testing agent regression**: 14/14 frontend flows pass; zero critical bugs.
+
+**DB schema additions**:
+- `hh_plans` `{id, slug (unique), name, description, price_eur, currency, billing_period, trial_days, features[], stripe_price_id, lead_commission_pct, sort_order, active, created_at, created_by, updated_at, updated_by}`
+- `hh_scoring_config` singleton `{_id:"default", weights, thresholds, updated_at, updated_by}`
+- `hh_recommendations` `{id, evaluation_id, twin_project_id, specialist_id, title, description, priority, category, estimated_cost_eur, deadline, status (active|done|dismissed), marketplace_request_id, marketplace_published_at, marketplace_commission_pct, created_at, created_by_email}`
+- Existing `requests` extended with optional `house_health_source` `{recommendation_id, evaluation_id, twin_project_id, plan_id, plan_slug, commission_pct, commission_status, commission_amount?, commission_captured_at?, specialist_id?, published_at}`.
+
+
+
 ## 🏠 House Health (Sănătatea Casei) — F2 + F3 Complete (Feb 23 2026)
 
 **Status**: F1 + F2 + F3 production-ready. **F4 (scoring formula + Stripe subscriptions + admin plan CRUD)** is the next P0 milestone.
