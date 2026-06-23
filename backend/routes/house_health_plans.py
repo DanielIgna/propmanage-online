@@ -147,6 +147,17 @@ async def admin_create_plan(payload: PlanIn, user=Depends(require_role("admin"))
         "updated_at": None,
     })
     await db.hh_plans.insert_one(doc)
+
+    # Auto-provision Stripe Product/Price (non-blocking; safe if Stripe unreachable).
+    try:
+        from routes.house_health_billing import auto_provision_stripe_price
+        price_id = await auto_provision_stripe_price(doc)
+        if price_id and price_id != doc.get("stripe_price_id"):
+            await db.hh_plans.update_one({"id": plan_id}, {"$set": {"stripe_price_id": price_id}})
+            doc["stripe_price_id"] = price_id
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[house_health.plans] auto-provision skipped/failed: %s", e)
+
     doc.pop("_id", None)
     await db.hh_audit_log.insert_one({
         "user_id": user["id"], "action": "plan_created",

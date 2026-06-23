@@ -61,6 +61,7 @@ import AutonomyEnginePage from "./pages/admin/AutonomyEnginePage";
 import TwinPage from "./pages/admin/TwinPage";
 import AdminHouseHealthPage from "./pages/admin/AdminHouseHealthPage";
 import HouseHealthPage from "./pages/HouseHealthPage";
+import HouseHealthUpgradePage, { HouseHealthUpgradeSuccess } from "./pages/HouseHealthUpgradePage";
 import AdminTodoBoard from "./pages/admin/AdminTodoBoard";
 import ExperienceSpacesPage from "./pages/admin/ExperienceSpacesPage";
 import FutureIdeasVault from "./pages/admin/FutureIdeasVault";
@@ -1617,6 +1618,8 @@ function App() {
               <Route path="/admin/autonomy" element={<AutonomyEnginePage />} />
               <Route path="/admin/twin" element={<TwinPage />} />
               <Route path="/house-health/:twinId" element={<HouseHealthPage />} />
+              <Route path="/house-health/upgrade" element={<HouseHealthUpgradePage />} />
+              <Route path="/house-health/upgrade/success" element={<HouseHealthUpgradeSuccess />} />
               <Route path="/admin/house-health" element={<AdminHouseHealthPage />} />
               <Route path="/admin/todo" element={<AdminTodoBoard />} />
               <Route path="/admin/experience-spaces" element={<ExperienceSpacesPage />} />

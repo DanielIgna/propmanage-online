@@ -92,7 +92,7 @@ const HouseHealthCard = () => {
             <button
               className="mt-3 px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-white text-xs font-semibold shadow inline-flex items-center gap-1.5"
               data-testid="house-health-cta-subscribe"
-              onClick={() => window.alert("Abonamentele House Health vor fi disponibile în F4. Vorbește cu admin pentru un trial.")}
+              onClick={() => { window.location.href = "/house-health/upgrade"; }}
             >
               <BadgeCheck className="w-3.5 h-3.5" /> Activează abonament
             </button>

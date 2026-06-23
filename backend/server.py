@@ -83,6 +83,7 @@ from routes.twin import router as twin_router
 from routes.house_health import router as house_health_router, admin_router as house_health_admin_router
 from routes.house_health_plans import public_router as hh_plans_public_router, admin_router as hh_plans_admin_router
 from routes.house_health_recommendations import router as hh_recommendations_router
+from routes.house_health_billing import router as hh_billing_router, webhook_router as hh_webhook_router, seed_default_plans as hh_seed_default_plans
 from routes.admin_tour import router as admin_tour_router
 from autonomy.founder_digest import weekly_founder_digest
 from autonomy.autopilot import bootstrap_autonomy_defaults, daily_autopilot_sweep
@@ -213,6 +214,8 @@ for r in (
     hh_plans_public_router,
     hh_plans_admin_router,
     hh_recommendations_router,
+    hh_billing_router,
+    hh_webhook_router,
     admin_tour_router,
     ai_activity_router,
     ai_weekly_briefing_router,
@@ -253,6 +256,10 @@ scheduler = AsyncIOScheduler(timezone=pytz.timezone(BUCHAREST_TZ_NAME))
 @app.on_event("startup")
 async def startup():
     await seed()
+    try:
+        await hh_seed_default_plans()
+    except Exception as e:
+        logger.warning(f"House Health plans seed failed: {e}")
     try:
         await seed_verified_estate_demo()
     except Exception as e:
