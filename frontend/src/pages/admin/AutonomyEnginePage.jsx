@@ -39,11 +39,14 @@ const TierAlertsPanel = () => {
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState(null);
+  const [includeTest, setIncludeTest] = useState(false);
 
-  const load = async () => {
+  const load = async (showTests = includeTest) => {
     setLoading(true);
     try {
-      const r = await ax.get("/api/admin/autonomy/alerts/recent", { params: { limit: 10 } });
+      const r = await ax.get("/api/admin/autonomy/alerts/recent", {
+        params: { limit: 10, include_test: showTests },
+      });
       setItems(r.data?.items || []);
     } catch {
       setItems([]);
@@ -51,7 +54,7 @@ const TierAlertsPanel = () => {
       setLoading(false);
     }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(includeTest); }, [includeTest]);
 
   const sendTest = async () => {
     setTesting(true);
@@ -60,8 +63,8 @@ const TierAlertsPanel = () => {
       const r = await ax.post("/api/admin/autonomy/alerts/test");
       const d = r.data?.result?.downgrade;
       if (r.data?.result?.alerted && d) {
-        setTestMsg(`✅ Alert trimis (${d.push_count} push · ${d.email_count} email).`);
-        await load();
+        setTestMsg(`✅ Alert trimis (${d.push_count} push · ${d.email_count} email). Activează "Arată test" pentru a-l vedea în listă.`);
+        await load(includeTest);
       } else {
         setTestMsg(`ℹ ${r.data?.result?.reason || "Nu s-a trimis"}`);
       }
@@ -83,6 +86,15 @@ const TierAlertsPanel = () => {
             Verificare după fiecare snapshot zilnic (03:15). De-dup pe 12h.
           </p>
         </div>
+        <label className="text-[11px] flex items-center gap-1.5 text-stone-400 cursor-pointer select-none" data-testid="tier-alerts-toggle-test">
+          <input
+            type="checkbox"
+            checked={includeTest}
+            onChange={(e) => setIncludeTest(e.target.checked)}
+            className="accent-violet-500"
+          />
+          🧪 Arată test
+        </label>
         <button
           onClick={sendTest}
           disabled={testing}
@@ -103,16 +115,36 @@ const TierAlertsPanel = () => {
       <div className="mt-4 space-y-2" data-testid="tier-alerts-list">
         {loading && <div className="text-xs text-stone-500">Se încarcă...</div>}
         {!loading && items.length === 0 && (
-          <div className="text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2 inline-flex items-center gap-2">
-            <CheckCircle2 className="w-3.5 h-3.5" /> Niciun downgrade înregistrat — platforma e stabilă.
+          <div className="text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2 inline-flex items-center gap-2" data-testid="tier-alerts-empty">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            {includeTest
+              ? "Niciun downgrade înregistrat (inclusiv test) — platforma e stabilă."
+              : "Niciun downgrade real înregistrat — platforma e stabilă."}
           </div>
         )}
         {!loading && items.map((a, i) => {
           const delta = Number(a.delta || 0);
           const ts = a.sent_at ? new Date(a.sent_at).toLocaleString("ro-RO", { dateStyle: "short", timeStyle: "short" }) : "—";
+          const isTest = a.is_test === true;
           return (
-            <div key={i} className="flex flex-wrap items-center gap-3 border border-rose-500/30 bg-rose-500/5 rounded-xl px-3 py-2" data-testid={`tier-alert-${i}`}>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-200">
+            <div
+              key={i}
+              className={`flex flex-wrap items-center gap-3 border rounded-xl px-3 py-2 ${
+                isTest
+                  ? "border-amber-500/40 bg-amber-500/5"
+                  : "border-rose-500/30 bg-rose-500/5"
+              }`}
+              data-testid={`tier-alert-${i}`}
+            >
+              {isTest && (
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-200 border border-amber-400/40"
+                  data-testid="tier-alert-test-badge"
+                >
+                  🧪 TEST
+                </span>
+              )}
+              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${isTest ? "bg-stone-600/40 text-stone-300" : "bg-rose-500/20 text-rose-200"}`}>
                 {a.prev_tier} → {a.new_tier}
               </span>
               <span className="text-sm text-stone-100 tabular-nums">

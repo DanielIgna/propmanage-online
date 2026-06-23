@@ -457,10 +457,16 @@ async def update_targets(
 @router.get("/alerts/recent")
 async def get_recent_alerts(
     limit: int = Query(20, ge=1, le=100),
+    include_test: bool = Query(False, description="Include test alerts (synthetic) in the response"),
     user=Depends(require_role("admin")),
 ):
-    """Recent autonomy tier-downgrade alerts (audit / dashboard widget)."""
-    cursor = db.autonomy_alerts.find({}, {"_id": 0}).sort("sent_at", -1).limit(limit)
+    """Recent autonomy tier-downgrade alerts (audit / dashboard widget).
+
+    By default test alerts (``is_test=True``) are hidden — pass
+    ``?include_test=true`` to see them.
+    """
+    q = {} if include_test else {"is_test": {"$ne": True}}
+    cursor = db.autonomy_alerts.find(q, {"_id": 0}).sort("sent_at", -1).limit(limit)
     items = [d async for d in cursor]
     return {"items": items, "count": len(items)}
 
@@ -508,6 +514,12 @@ async def trigger_test_alert(user=Depends(require_role("admin"))):
         "sent_at": {"$gte": cutoff},
     })
     result = await check_and_alert_tier_downgrade(fake_current)
+    # Tag the alert as test so UI can filter it out by default
+    if result.get("alerted") and (result.get("downgrade") or {}).get("sent_at"):
+        await db.autonomy_alerts.update_one(
+            {"sent_at": result["downgrade"]["sent_at"]},
+            {"$set": {"is_test": True}},
+        )
     # Cleanup the synthetic prev so it doesn't pollute trend data
     await db.autonomy_snapshots.delete_many({"synthetic_for_alert_test": True})
     return {"ok": True, "result": result}
