@@ -570,6 +570,12 @@ async def admin_reject_evaluation(eval_id: str, payload: ApprovalAction, user=De
             "rejection_reason": (payload.note or "")[:500],
         }},
     )
+    await db.hh_audit_log.insert_one({
+        "user_id": user["id"],
+        "action": "evaluation_rejected",
+        "resource_id": eval_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
     return {"ok": True, "status": "rejected"}
 
 

@@ -3,6 +3,45 @@
 ## Original problem statement
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
+
+## 🏠 House Health (Sănătatea Casei) — F2 + F3 Complete (Feb 23 2026)
+
+**Status**: F1 + F2 + F3 production-ready. **F4 (scoring formula + Stripe subscriptions + admin plan CRUD)** is the next P0 milestone.
+
+**F2 — Documents + History timeline** (`/app/backend/routes/house_health.py`):
+- `POST /api/house-health/documents` — multipart upload supports BOTH local file (20MB cap) AND external link (Google Drive / Dropbox / OneDrive / custom). XOR enforced (returns 400 if both or neither supplied).
+- `GET /api/house-health/documents?twin_project_id=...&category=...` — owner-only list.
+- `DELETE /api/house-health/documents/{id}` — owner-only, cleans up local files from `/app/backend/uploads/house_health`.
+- `GET /api/house-health/documents/{id}/download` — secure download for local docs.
+- `GET /api/house-health/history/{twin_id}` — chronological timeline merging approved evaluations + `category=hh_report` docs.
+- 10 doc categories: certificat_energetic, carte_tehnica, cadastru, extras_cf, facturi_renovari, garantii, manuale, procese_verbale, hh_report, other.
+
+**F3 — Specialist Evaluations + Admin Approval**:
+- `POST /api/house-health/evaluations` — specialist/admin only; creates draft eval with kind ∈ {air, thermal, humidity, electric, radon}.
+- `POST /api/house-health/evaluations/{id}/upload` — specialist attaches files (20MB cap).
+- `POST /api/house-health/evaluations/{id}/submit` — draft → pending_approval.
+- `GET /api/house-health/evaluations` — role-scoped (client: own twin only; specialist: own only; admin: all).
+- `POST /api/admin/house-health/evaluations/{id}/approve` + `/reject` — admin only, both write to `hh_audit_log`.
+- `GET /api/house-health/equipment-catalog` — static catalog of allowed equipment per kind (Testo 405i/605i for air, Testo 860i for thermal, Bosch D-Tect 200C for humidity, Testo 745/UNI-T UT682D for electric, radon detector future).
+
+**Frontend** — `/app/frontend/src/pages/HouseHealthPage.jsx` (route `/house-health/:twinId`):
+- Single page, 9 left-sidebar tabs (Scor, Calitatea aerului, Analiză termică, Umiditate & infiltrații, Siguranță electrică, Radon, Documentație tehnică, Istoric verificări, Recomandări).
+- Romanian-only UI. Dark `bg-stone-950` theme matches rest of client app.
+- All interactive elements have `data-testid` prefixed `hh-*` (sidebar tabs, doc upload form, eval items, etc).
+
+**Testing**:
+- `/app/backend/tests/test_house_health.py` — 24 pytest tests, 100% pass (eligibility, dashboard, equipment catalog, document XOR + ownership + delete, evaluation lifecycle draft→submit→approve/reject, history merge, role scoping).
+- Full e2e UI tested via screenshot tool: all 9 tabs render, document upload (local + link) refreshes list, approved eval shows in Air tab and History timeline.
+
+**DB schema confirmed**:
+- `hh_subscriptions` `{user_id, plan, status, expires_at, created_at}`
+- `hh_evaluations` `{id, twin_project_id, kind, specialist_id, status, equipment, observations, measurements, attachments[], approved_at, approved_by, rejected_at, rejected_by, rejection_reason}`
+- `hh_documents` `{id, user_id, twin_project_id, category, storage, file_url|external_link, external_type, doc_date, expires_at, mime, size_bytes}`
+- `hh_audit_log` `{user_id, action, resource_id, timestamp}` — written on approve + reject (symmetry added Feb 23).
+
+**Demo seeded for QA**: feature flag `app_settings.house_health.enabled=true`; `client@propmanage.io` has active `premium` subscription + Digital Twin `2d0a899472b34e32a8eaf79b88d7c012`.
+
+
 ## 🚀 Autonomy Engine — Self-Driving Tier (Feb 2026)
 
 **Achieved**: General score `94.4/100` → tier `self-driving` (>=90). Up from `76.5/100`.
