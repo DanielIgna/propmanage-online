@@ -60,6 +60,7 @@ import AISecurityCenterPage from "./pages/admin/AISecurityCenterPage";
 import AutonomyEnginePage from "./pages/admin/AutonomyEnginePage";
 import TwinPage from "./pages/admin/TwinPage";
 import AdminHouseHealthPage from "./pages/admin/AdminHouseHealthPage";
+import ManualTesterPage from "./pages/admin/ManualTesterPage";
 import HouseHealthPage from "./pages/HouseHealthPage";
 import HouseHealthUpgradePage, { HouseHealthUpgradeSuccess } from "./pages/HouseHealthUpgradePage";
 import AdminTodoBoard from "./pages/admin/AdminTodoBoard";
@@ -1621,6 +1622,7 @@ function App() {
               <Route path="/house-health/upgrade" element={<HouseHealthUpgradePage />} />
               <Route path="/house-health/upgrade/success" element={<HouseHealthUpgradeSuccess />} />
               <Route path="/admin/house-health" element={<AdminHouseHealthPage />} />
+              <Route path="/admin/manual-tester" element={<ManualTesterPage />} />
               <Route path="/admin/todo" element={<AdminTodoBoard />} />
               <Route path="/admin/experience-spaces" element={<ExperienceSpacesPage />} />
               <Route path="/admin/future-ideas" element={<FutureIdeasVault />} />

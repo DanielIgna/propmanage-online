@@ -84,6 +84,7 @@ from routes.house_health import router as house_health_router, admin_router as h
 from routes.house_health_plans import public_router as hh_plans_public_router, admin_router as hh_plans_admin_router
 from routes.house_health_recommendations import router as hh_recommendations_router
 from routes.house_health_billing import router as hh_billing_router, webhook_router as hh_webhook_router, seed_default_plans as hh_seed_default_plans
+from routes.manual_tester import router as manual_tester_router
 from routes.admin_tour import router as admin_tour_router
 from autonomy.founder_digest import weekly_founder_digest
 from autonomy.autopilot import bootstrap_autonomy_defaults, daily_autopilot_sweep
@@ -216,6 +217,7 @@ for r in (
     hh_recommendations_router,
     hh_billing_router,
     hh_webhook_router,
+    manual_tester_router,
     admin_tour_router,
     ai_activity_router,
     ai_weekly_briefing_router,

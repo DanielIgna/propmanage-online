@@ -128,6 +128,7 @@ const NAV_SECTIONS = [
       { id: "autonomy", label: "Autonomy Engine", icon: Sparkles, badge: "NEW", href: "/admin/autonomy" },
       { id: "twin", label: "Twin Orchestrator", icon: Bot, badge: "AI", href: "/admin/twin" },
       { id: "house_health", label: "House Health", icon: Heart, badge: "NEW", href: "/admin/house-health" },
+      { id: "manual_tester", label: "Tester Manual", icon: Bug, badge: "QA", href: "/admin/manual-tester" },
       { id: "todo_board", label: "ToDo Board", icon: FileText, badge: "NEW", href: "/admin/todo" },
       { id: "experience_spaces", label: "Experience Spaces", icon: Sparkles, badge: "BETA", href: "/admin/experience-spaces" },
     ],
