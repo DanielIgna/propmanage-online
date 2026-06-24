@@ -10,35 +10,14 @@ import { VoucherExpiryAlert } from "../lib/VoucherExpiryAlert";
 import { EmailVerificationBanner } from "../components/EmailVerificationBanner";
 import { PendingReviewsWidget } from "../components/MultiDimReviews";
 import { GettingStartedWidget } from "../components/GettingStartedWidget";
+import { ThemeSwitcher } from "../components/ThemeSwitcher";
 
 export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 // ============= THEME TOGGLE (light/dark) =============
 export const ThemeToggle = () => {
-  const [theme, setTheme] = useState(() => {
-    if (typeof window === "undefined") return "dark";
-    return localStorage.getItem("pm_theme") || "dark";
-  });
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("pm_theme", theme);
-  }, [theme]);
-  const toggle = () => setTheme(t => t === "dark" ? "light" : "dark");
-  return (
-    <button
-      onClick={toggle}
-      className="p-2 hover:bg-white/5 rounded-full transition-colors flex items-center justify-center"
-      data-testid="theme-toggle"
-      title={theme === "dark" ? "Comută la mod luminos" : "Comută la mod întunecat"}
-      aria-label="Toggle theme"
-    >
-      {theme === "dark" ? (
-        <Sun className="w-4 h-4 text-amber-300" />
-      ) : (
-        <Moon className="w-4 h-4 text-indigo-400" />
-      )}
-    </button>
-  );
+  // Bridge: wraps the new multi-theme switcher so existing call sites stay working.
+  return <ThemeSwitcher compact />;
 };
 
 // ============= NAVIGATE BUTTONS (Google Maps / Waze deep-links) =============

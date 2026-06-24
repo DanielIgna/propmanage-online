@@ -4,6 +4,29 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 
+## 🌾 Tema "Warm Linen 2026" (Feb 24 2026)
+
+**Concept**: light theme inspirat din paleta Pantone 2025-2026 (Mocha Mousse + earth tones), aliniat trend-ului "warm minimalism" 2026.
+
+**Selector**: dropdown în header dashboard (peste cele 3 dashboard-uri: client, specialist, admin), persistă în `localStorage.propmanage_theme`. Default rămâne `default` (dark).
+
+**Implementare** (`/app/frontend/src/styles/themes.css`):
+- CSS overrides cu `[data-theme="warm-linen"]` și `!important` pe ~30 utility classes Tailwind (stone-*, white/*).
+- Background `#f7f3ec` (cream warm), text `#1c1917-#57534e` (taupe ladder), cards albe `#ffffff`, borders `#d9d2c6` (taupe pal).
+- Accente: emerald `#047857`, cyan `#0e7490`, rose `#be123c`, amber `#b45309` — toate ajustate pentru contrast pe cream.
+- Tranziții fluide 200ms la schimbare temă.
+
+**Components noi**:
+- `/app/frontend/src/contexts/ThemeContext.jsx` — provider cu localStorage persistence + setări `data-theme` pe `<html>`.
+- `/app/frontend/src/components/ThemeSwitcher.jsx` — dropdown cu 2 opțiuni (Dark / Warm Linen 2026), feedback "✓ activ", click-outside-to-close.
+- `ThemeToggle` din `DashShared.jsx` re-implementat ca wrapper compact pe `ThemeSwitcher` (backward compatible).
+
+**Suite UX General** (`/app/backend/routes/manual_tester.py`): extins de la 4 la **9 cazuri de test** care acoperă noua funcționalitate de theme + cazurile originale (mobile, cookie banner, loading states, focus states, button contrast). Cu testarea acestor 9 cazuri toate PASS, UX General atinge 100% pass-rate.
+
+**Capturi**: 3 noi în `/app/screenshots/` (10-12).
+
+
+
 ## 📊 Compounding QA — Trends dashboard (Feb 24 2026)
 
 `/admin/manual-tester` are acum 2 view-uri: **Runner** și **Trends 30d**.

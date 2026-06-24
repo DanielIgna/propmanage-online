@@ -363,10 +363,37 @@ SUITES = [
         "description": "Probleme generale de UI/UX.",
         "cases": [
             {
+                "id": "ux_theme_switcher_visible",
+                "title": "Switcher de temă vizibil în header dashboard",
+                "steps": [
+                    "Login ca client/admin/specialist",
+                    "Verifică header-ul dashboard-ului",
+                ],
+                "expected": "Apare butonul de schimbare temă (icon Sun/Moon). Click → dropdown cu cele 2 teme: Dark (default) + Warm Linen 2026.",
+            },
+            {
+                "id": "ux_theme_warm_linen",
+                "title": "Tema 'Warm Linen 2026' aplică background cream",
+                "steps": [
+                    "Click pe theme switcher → selectează 'Warm Linen 2026'",
+                    "Navighează pe /house-health/{twinId}, /admin/manual-tester",
+                ],
+                "expected": "Background devine cream (#f7f3ec), text negru/taupe, accente emerald închis. Toate paginile arată coerent în tema light. Tranziții fluide.",
+            },
+            {
+                "id": "ux_theme_persistence",
+                "title": "Preferința de temă persistă peste refresh",
+                "steps": [
+                    "Selectează 'Warm Linen 2026'",
+                    "Refresh pagina (F5)",
+                ],
+                "expected": "Tema rămâne 'Warm Linen' după refresh (salvată în localStorage cheia `propmanage_theme`).",
+            },
+            {
                 "id": "ux_dark_mode",
-                "title": "Dark theme consistent",
-                "steps": ["Navigează prin: client, specialist, admin, house-health"],
-                "expected": "Niciun ecran cu background alb pe paginile autentificate. Text lizibil în orice ecran.",
+                "title": "Tema dark e implicită pentru utilizatori noi",
+                "steps": ["Browser nou / Incognito", "Mergi la /login"],
+                "expected": "Background stone-950, tema dark e folosită implicit. Niciun flash de cream la încărcare.",
             },
             {
                 "id": "ux_mobile_responsive",
@@ -381,13 +408,28 @@ SUITES = [
                 "id": "ux_cookie_banner",
                 "title": "Cookie banner nu blochează interacțiunile",
                 "steps": ["Login proaspăt, observă cookie banner-ul"],
-                "expected": "Banner-ul nu acoperă butoanele critice. Click pe 'Accept toate' îl face să dispară.",
+                "expected": "Banner-ul nu acoperă butoanele critice. Click pe 'Accept toate' îl face să dispară. În tema light, stilizat coerent.",
             },
             {
                 "id": "ux_loading_states",
                 "title": "Spinner-uri vs ecran gol",
                 "steps": ["Navighează la o pagină care încarcă date"],
                 "expected": "Apare un spinner / skeleton, NU ecran gol cu flash de date.",
+            },
+            {
+                "id": "ux_button_contrast",
+                "title": "Contrast butoane corect în ambele teme",
+                "steps": [
+                    "Verifică butoane principale în dark",
+                    "Schimbă pe Warm Linen 2026 și re-verifică",
+                ],
+                "expected": "Toate butoanele au contrast suficient (text vs background). Niciun text invizibil pe propriul background.",
+            },
+            {
+                "id": "ux_focus_states",
+                "title": "Focus states vizibile (keyboard nav)",
+                "steps": ["Folosește Tab pe orice formular (login, docs upload)"],
+                "expected": "Fiecare element focusat are un ring vizibil pe contur. Util pentru navigare cu tastatura.",
             },
         ],
     },

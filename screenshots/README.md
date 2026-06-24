@@ -4,6 +4,11 @@ Capturi din **preview environment** demonstrând ce am construit/testat în acea
 
 ## 📸 Capturi
 
+### ▶ TEMA NOUĂ "WARM LINEN 2026" (Feb 24 2026)
+- `10_light_theme_house_health.jpeg` — House Health în tema light cream cu accente emerald
+- `11_light_theme_trends.jpeg` — Trends dashboard în Warm Linen (alerta UX regression vizibilă pe cream cald)
+- `12_theme_switcher_open.jpeg` — Dropdown switcher temă deschis în header dashboard (Dark / Warm Linen 2026 cu badge ✓ activ)
+
 ### 1️⃣ Tester Manual · Trends 30d (NOU) — `01_manual_tester_trends.png`
 Dashboard-ul Compounding QA:
 - Selector fereastră: **7d / 14d / 30d / 90d**

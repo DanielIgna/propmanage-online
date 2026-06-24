@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./auth";
 import { I18nProvider, useI18n } from "./i18n";
+import { ThemeProvider } from "./contexts/ThemeContext";
 import { useABTest } from "./ab";
 import { LoginPage, RegisterPage } from "./pages/Auth";
 import { EmailVerifyPage } from "./pages/EmailVerifyPage";
@@ -1577,6 +1578,7 @@ const PreviewBanner = () => (
 function App() {
   return (
     <div className="App">
+      <ThemeProvider>
       <I18nProvider>
         <AuthProvider>
           <BrowserRouter>
@@ -1660,6 +1662,7 @@ function App() {
           </BrowserRouter>
         </AuthProvider>
       </I18nProvider>
+      </ThemeProvider>
     </div>
   );
 }
