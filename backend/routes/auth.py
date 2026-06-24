@@ -316,6 +316,36 @@ async def me(user: dict = Depends(get_current_user)):
     # Dual-role view state (multi-profile system)
     user["dual_role_enabled"] = bool((doc or {}).get("dual_role_enabled", False))
     user["active_view"] = (doc or {}).get("active_view") or user.get("role")
+    # SELF-HEALING: prevent the impossible state where dual_role_enabled=True
+    # but the user has NO specialist profile data (no service_categories, no
+    # coverage_zones, no specialist_onboarded_at) AND role is not "specialist".
+    # This state can be reached via manual DB edits / admin testing and would
+    # cause the dashboard guard (DashShared) to bounce the user to the wrong
+    # role-specific dashboard. Auto-correct it here so the user gets a coherent
+    # session on the very next request.
+    if user["dual_role_enabled"] and user.get("role") != "specialist":
+        has_spec_profile = bool(
+            (doc or {}).get("service_categories")
+            or (doc or {}).get("coverage_zones")
+            or (doc or {}).get("specialist_onboarded_at")
+            or (doc or {}).get("specialist_profile_id")
+        )
+        if not has_spec_profile:
+            await db.users.update_one(
+                {"_id": ObjectId(user["id"])},
+                {"$set": {"dual_role_enabled": False, "active_view": user.get("role")}},
+            )
+            user["dual_role_enabled"] = False
+            user["active_view"] = user.get("role")
+            try:
+                import logging as _lg
+                _lg.getLogger("propmanage.auth").info(
+                    "[auth/me] self-healed dual_role state for user=%s role=%s "
+                    "(had dual_role_enabled=True but no specialist profile)",
+                    user.get("email"), user.get("role"),
+                )
+            except Exception:  # noqa: BLE001
+                pass
     # Avatar metadata for source-aware UI (Google sync / uploaded)
     user["avatar"] = (doc or {}).get("avatar") or user.get("avatar")
     user["avatar_source"] = (doc or {}).get("avatar_source")
@@ -569,6 +599,27 @@ async def switch_view(data: SwitchViewIn, user: dict = Depends(get_current_user)
             403,
             "Profilul dublu nu este activ. Adaugă întâi profilul de Specialist din Setări → 'Devino Specialist'.",
         )
+    # Additional integrity check: if switching to "specialist", verify a real
+    # specialist profile exists. Prevents desynced state where dual_role_enabled
+    # is true but no specialist data is set.
+    if data.view == "specialist" and user.get("role") != "specialist":
+        full = await db.users.find_one({"_id": ObjectId(user["id"])})
+        has_spec_profile = bool(
+            (full or {}).get("service_categories")
+            or (full or {}).get("coverage_zones")
+            or (full or {}).get("specialist_onboarded_at")
+            or (full or {}).get("specialist_profile_id")
+        )
+        if not has_spec_profile:
+            # Self-heal: clear stale dual-role flag.
+            await db.users.update_one(
+                {"_id": ObjectId(user["id"])},
+                {"$set": {"dual_role_enabled": False, "active_view": user.get("role")}},
+            )
+            raise HTTPException(
+                403,
+                "Nu ai un profil de Specialist activ. Adaugă unul din Setări → 'Devino Specialist'.",
+            )
     await db.users.update_one(
         {"_id": ObjectId(user["id"])},
         {"$set": {"active_view": data.view}}
