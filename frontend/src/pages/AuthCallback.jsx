@@ -45,10 +45,26 @@ export const AuthCallback = () => {
         navigate(`/${data.role || "client"}`, { replace: true });
       } catch (e) {
         const status = e?.response?.status;
-        const detail = e?.response?.data?.detail || e.message || "Autentificare eșuată";
+        const hasDetail = !!e?.response?.data?.detail;
+        let detail = e?.response?.data?.detail || e.message || "Autentificare eșuată";
+        // Gateway-style empty-body 5xx (502 Bad Gateway / 504 Gateway Timeout /
+        // 520-524 Cloudflare) → no JSON detail, axios shows the bare status code.
+        const isGatewayErr = status && !hasDetail && (status === 502 || status === 504 || (status >= 520 && status <= 524));
+        if (isGatewayErr) {
+          detail = `Serverul Emergent OAuth (upstream) e momentan inaccesibil sau prea lent (HTTP ${status} — ${status === 502 ? "Bad Gateway" : status === 504 ? "Gateway Timeout" : "Cloudflare origin empty"}). ` +
+            "Încearcă din nou peste 30s-1min, sau folosește email + parolă mai jos.";
+          // Ping a beacon so /admin/auth-health can track ingress-level failures
+          // that didn't reach the backend retry loop. Fire-and-forget.
+          axios.post(`${API}/auth/health-beacon`, {
+            status_code: status,
+            where: "auth_callback",
+            note: (e.message || "").slice(0, 200),
+          }).catch(() => {});
+        } else if (status === 503 && hasDetail) {
+          detail = e.response.data.detail;
+        }
         setError(`[${status || "network"}] ${detail}`);
         console.error("[GoogleOAuth] Failed:", status, detail, e);
-        // No auto-redirect — let user see the actual error and choose what to do.
       }
     })();
   }, [navigate, refreshUser]);

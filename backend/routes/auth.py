@@ -11,10 +11,11 @@ import base64 as b64
 import httpx
 import pyotp
 import qrcode
-from typing import Optional, Dict, List, Literal
+from typing import Optional, Dict, List, Literal, Any
+import uuid
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, Query
 from pydantic import BaseModel, Field
 
 from db import db
@@ -25,7 +26,7 @@ from core_utils import (
 from deps import get_current_user, require_role, block_in_impersonation, block_impersonation_dep
 from services import send_email, VAPID_PUBLIC_KEY
 from models import (
-    RegisterIn, LoginIn, TotpVerifyIn, ALLOWED_SPECIALTIES,
+    RegisterIn, LoginIn, TotpVerifyIn, ALLOWED_SPECIALTIES, ConsentUpdateIn,
 )
 from email_service import send_template, tpl_welcome
 from digest import DIGEST_BUILDERS, run_daily_digests
@@ -41,17 +42,24 @@ def _admin_whitelist() -> set:
 
 async def _enforce_admin_role(user: dict) -> dict:
     """If user email is in ADMIN_EMAILS → ensure role=admin. Otherwise demote off admin.
+    Sub-admins (with admin_scope set) are EXEMPT — they keep / are promoted to role=admin.
     Returns the (possibly mutated) user dict; persists changes to DB."""
     if not user:
         return user
     email = (user.get("email") or "").lower()
     role = user.get("role")
     whitelist = _admin_whitelist()
+    has_scope = bool(user.get("admin_scope"))  # sub-admin marker
     if email in whitelist and role != "admin":
         await db.users.update_one({"_id": user["_id"]}, {"$set": {"role": "admin"}})
         user["role"] = "admin"
-    elif email not in whitelist and role == "admin":
+    elif has_scope and role != "admin":
+        # Sub-admin lost role somehow → restore it (so login flow always promotes them)
+        await db.users.update_one({"_id": user["_id"]}, {"$set": {"role": "admin"}})
+        user["role"] = "admin"
+    elif email not in whitelist and role == "admin" and not has_scope:
         # demote stray admins to operator (keeps moderate access for testing)
+        # but NEVER demote sub-admins (who are intentionally given role=admin with a scope)
         await db.users.update_one({"_id": user["_id"]}, {"$set": {"role": "operator"}})
         user["role"] = "operator"
     return user
@@ -60,24 +68,73 @@ router = APIRouter(prefix="/api", tags=["auth"])
 
 
 # ============= REGISTER =============
+async def _record_consent(user_id: str, email: str, consent_type: str, accepted: bool, ip: str = "", user_agent: str = "", source: str = "register"):
+    """Append immutable entry to consent_audit_log. Never raises."""
+    try:
+        await db.consent_audit_log.insert_one({
+            "user_id": user_id,
+            "email": email,
+            "consent_type": consent_type,  # terms | privacy | marketing | cookies_*
+            "accepted": bool(accepted),
+            "ip": ip[:64],
+            "user_agent": user_agent[:200],
+            "source": source,  # register | settings | cookie_banner
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as _e:  # noqa: BLE001
+        import logging
+        logging.getLogger("propmanage.consent").warning(f"[consent_audit_log] {_e}")
+
+
+def _gen_email_verification_token() -> str:
+    import secrets
+    return secrets.token_urlsafe(32)
+
+
 @router.post("/auth/register")
-async def register(data: RegisterIn, response: Response):
+async def register(data: RegisterIn, request: Request, response: Response):
     email = data.email.lower()
+    # GDPR gate: terms + privacy MUST be accepted explicitly
+    if not data.terms_accepted:
+        raise HTTPException(400, "Trebuie să accepți Termenii și Condițiile pentru a continua")
+    if not data.privacy_policy_accepted:
+        raise HTTPException(400, "Trebuie să accepți Politica de Confidențialitate pentru a continua")
+    # Phone required (validation only — verification via SMS deferred until Twilio)
+    phone_raw = (data.phone or "").strip()
+    if not phone_raw:
+        raise HTTPException(400, "Numărul de telefon este obligatoriu")
+    import re
+    phone_digits = re.sub(r"[^\d+]", "", phone_raw)
+    # Accept: +40XXXXXXXXX (12 chars), 0XXXXXXXXX (10 digits), or +XXX... international (8-15 digits)
+    if not (re.match(r"^\+?\d{8,15}$", phone_digits)):
+        raise HTTPException(400, "Format telefon invalid. Folosește +40 7XX XXX XXX sau 07XX XXX XXX")
     if await db.users.find_one({"email": email}):
         raise HTTPException(400, "Email already registered")
+    now_iso = datetime.now(timezone.utc).isoformat()
+    verif_token = _gen_email_verification_token()
+    verif_expires = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
     user = {
         "email": email,
         "password_hash": hash_password(data.password),
         "name": data.name,
         "role": data.role,
-        "phone": data.phone,
+        "phone": phone_digits,
         "wallet_balance": 500.0 if data.role == "specialist" else 0.0,
         "tokens": 0,
         "rating": 5.0 if data.role == "specialist" else None,
         "reviews_count": 0,
         "verified": False,
         "tier": "ENTRY" if data.role == "specialist" else None,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": now_iso,
+        # GDPR + verification
+        "terms_accepted": True,
+        "privacy_policy_accepted": True,
+        "marketing_consent": bool(data.marketing_consent),
+        "consent_updated_at": now_iso,
+        "email_verified": False,
+        "phone_verified": False,
+        "email_verification_token": verif_token,
+        "email_verification_expires_at": verif_expires,
     }
     if data.role == "specialist":
         cats = data.service_categories or ([data.specialty] if data.specialty else [])
@@ -104,13 +161,42 @@ async def register(data: RegisterIn, response: Response):
             pass
     result = await db.users.insert_one(user)
     uid = str(result.inserted_id)
+    # Record consent in immutable audit log
+    ip = (request.client.host if request and request.client else "") or ""
+    ua = request.headers.get("user-agent", "") if request else ""
+    await _record_consent(uid, email, "terms", True, ip, ua, source="register")
+    await _record_consent(uid, email, "privacy", True, ip, ua, source="register")
+    await _record_consent(uid, email, "marketing", bool(data.marketing_consent), ip, ua, source="register")
     access = create_access_token(uid, email, data.role)
     refresh = create_refresh_token(uid)
     set_auth_cookies(response, access, refresh)
     user["id"] = uid
     user.pop("_id", None)
     user.pop("password_hash", None)
+    user.pop("email_verification_token", None)  # never leak to FE
     await send_template(tpl_welcome, data.name, data.role, to=email)
+    # Send email verification link (best-effort)
+    try:
+        from email_service import tpl_email_verification
+        await send_template(tpl_email_verification, data.name, verif_token, to=email)
+    except Exception as _e:  # noqa: BLE001
+        import logging
+        logging.getLogger("propmanage.auth").warning(f"[EmailVerify] send failed: {_e}")
+    # Sprint C bonus — Welcome voucher for new specialists (50% off first lead fee)
+    if data.role == "specialist":
+        try:
+            from routes.marketplace_offers import issue_welcome_voucher_for_specialist
+            await issue_welcome_voucher_for_specialist(uid, email)
+        except Exception as _e:  # noqa: BLE001
+            import logging
+            logging.getLogger("propmanage.auth").warning(f"[WelcomeVoucher] failed: {_e}")
+    # Community auto-welcome post (Feb 2026) — for all new users with MEMBER_OF_THE_WEEK badge
+    try:
+        from routes.community import auto_create_welcome_topic
+        await auto_create_welcome_topic(user_id=uid, user_name=data.name, role=data.role)
+    except Exception as _e:  # noqa: BLE001
+        import logging
+        logging.getLogger("propmanage.auth").warning(f"[CommunityWelcome] failed: {_e}")
     # Schedule 3-email onboarding drip for new specialists (Day 1, 3, 7) — best-effort
     if data.role == "specialist":
         try:
@@ -175,6 +261,10 @@ async def login(data: LoginIn, request: Request, response: Response):
             _record_failed_login(ip)
             raise HTTPException(401, "Invalid 2FA code")
 
+    # Sub-admin lockout: deactivated admins cannot log in
+    if user.get("role") == "admin" and user.get("is_active") is False:
+        raise HTTPException(403, "Cont dezactivat. Contactează super-administratorul.")
+
     _login_attempts.pop(ip, None)
     user = await _enforce_admin_role(user)
     uid = str(user["_id"])
@@ -186,6 +276,11 @@ async def login(data: LoginIn, request: Request, response: Response):
     access = create_access_token(uid, email, user.get("role", "client"))
     refresh = create_refresh_token(uid)
     set_auth_cookies(response, access, refresh)
+    # Clean any leftover impersonation stash cookie so a fresh login never
+    # auto-resumes a previous "View as User" session. Without this, an admin
+    # who closed the browser mid-impersonation would re-open the app and still
+    # see the red "Vizionezi ca …" banner from the past session.
+    response.delete_cookie("admin_access_token", path="/")
     return serialize_doc(user)
 
 
@@ -201,16 +296,41 @@ async def logout(response: Response):
 @router.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
     # Load tutorial seen flag fresh from DB so it reflects across sessions
-    doc = await db.users.find_one({"_id": ObjectId(user["id"])}, {"tutorial_seen": 1, "ai_admin_tour_seen": 1, "dashboard_tour_completed": 1, "email": 1, "role": 1, "password_hash": 1, "google_auth": 1})
+    doc = await db.users.find_one(
+        {"_id": ObjectId(user["id"])},
+        {
+            "tutorial_seen": 1, "ai_admin_tour_seen": 1, "dashboard_tour_completed": 1,
+            "email": 1, "role": 1, "password_hash": 1, "google_auth": 1,
+            "dual_role_enabled": 1, "active_view": 1,
+            "avatar": 1, "avatar_source": 1, "picture": 1,
+            "experience_tier": 1, "experience_tier_locked": 1,
+            "admin_scope": 1, "admin_seniority": 1,
+        },
+    )
     user["tutorial_seen"] = bool((doc or {}).get("tutorial_seen", False))
     user["ai_admin_tour_seen"] = bool((doc or {}).get("ai_admin_tour_seen", False))
     user["dashboard_tour_completed"] = bool((doc or {}).get("dashboard_tour_completed", False))
     # `has_password` lets frontend show "Backup password" button only for Google-only accounts
     user["has_password"] = bool((doc or {}).get("password_hash"))
     user["google_auth"] = bool((doc or {}).get("google_auth"))
+    # Dual-role view state (multi-profile system)
+    user["dual_role_enabled"] = bool((doc or {}).get("dual_role_enabled", False))
+    user["active_view"] = (doc or {}).get("active_view") or user.get("role")
+    # Avatar metadata for source-aware UI (Google sync / uploaded)
+    user["avatar"] = (doc or {}).get("avatar") or user.get("avatar")
+    user["avatar_source"] = (doc or {}).get("avatar_source")
+    user["picture"] = (doc or {}).get("picture") or ""
+    # Experience tier (Progressive Disclosure) — default "junior" for legacy users
+    user["experience_tier"] = (doc or {}).get("experience_tier") or "junior"
+    user["experience_tier_locked"] = bool((doc or {}).get("experience_tier_locked", False))
     # Enforce admin whitelist on every /me call to catch direct DB tampering or stale tokens.
     if doc:
-        fresh = {"_id": doc["_id"], "email": doc.get("email"), "role": doc.get("role")}
+        fresh = {
+            "_id": doc["_id"],
+            "email": doc.get("email"),
+            "role": doc.get("role"),
+            "admin_scope": doc.get("admin_scope"),  # sub-admin marker — exempts from demotion
+        }
         await _enforce_admin_role(fresh)
         user["role"] = fresh["role"]
     # `impersonation` field is already injected by get_current_user when applicable.
@@ -437,17 +557,117 @@ class SwitchViewIn(BaseModel):
 
 @router.post("/auth/switch-view")
 async def switch_view(data: SwitchViewIn, user: dict = Depends(get_current_user)):
-    """Verified specialists can toggle between specialist and client view."""
-    if user.get("role") != "specialist":
-        raise HTTPException(403, "Doar specialiștii pot comuta între profile.")
-    if not user.get("verified"):
-        raise HTTPException(403, "Doar specialiștii verificați pot accesa modul Client.")
+    """Toggle active view for users who have BOTH client + specialist profiles.
+
+    Eligibility: `dual_role_enabled=True` (set when client onboarded to specialist
+    via /auth/become-specialist) OR existing verified specialist (legacy path).
+    """
+    dual_enabled = bool(user.get("dual_role_enabled"))
+    is_legacy_verified_spec = user.get("role") == "specialist" and user.get("verified")
+    if not (dual_enabled or is_legacy_verified_spec):
+        raise HTTPException(
+            403,
+            "Profilul dublu nu este activ. Adaugă întâi profilul de Specialist din Setări → 'Devino Specialist'.",
+        )
     await db.users.update_one(
         {"_id": ObjectId(user["id"])},
         {"$set": {"active_view": data.view}}
     )
     refreshed = await db.users.find_one({"_id": ObjectId(user["id"])})
     return serialize_doc(refreshed)
+
+
+# ============= BECOME SPECIALIST (Client → dual-role upgrade) =============
+class BecomeSpecialistIn(BaseModel):
+    phone: str = Field(min_length=8, max_length=30)
+    service_categories: list[str] = Field(min_length=1, max_length=10)
+    coverage_zones: list[str] = Field(min_length=1, max_length=20)
+    bio: Optional[str] = Field(default=None, max_length=1000)
+
+
+@router.post("/auth/become-specialist")
+async def become_specialist(
+    data: BecomeSpecialistIn,
+    user: dict = Depends(get_current_user),
+):
+    """Promote a client account to ALSO be a specialist (dual-role).
+
+    - Keeps `role='client'` and `dual_role_enabled=True` so the user can switch
+      between views. The specialist features rely on `dual_role_enabled` OR role.
+    - Adds specialist fields: service_categories, coverage_zones, phone, bio.
+    - Does NOT auto-verify. Specialist must upload KYC docs to get `verified=True`.
+    - Enqueues 3-email onboarding drip (same as native specialist signup).
+    """
+    if user.get("role") not in ("client", "specialist"):
+        raise HTTPException(403, "Doar utilizatorii Client pot deveni Specialiști.")
+    if user.get("dual_role_enabled"):
+        raise HTTPException(400, "Ai deja un profil dual de Specialist activ.")
+    # Reject native specialists who haven't opted into dual-mode — their account is
+    # already a specialist account. Dual-mode is for clients who additionally want
+    # to offer services.
+    if user.get("role") == "specialist":
+        raise HTTPException(400, "Contul tău este deja un cont de Specialist. Profilul dual este pentru clienții care vor să devină și specialiști.")
+
+    uid = ObjectId(user["id"])
+    now_iso = datetime.now(timezone.utc).isoformat()
+    patch = {
+        "dual_role_enabled": True,
+        "active_view": "specialist",  # New specialists start in specialist view
+        "service_categories": data.service_categories,
+        "coverage_zones": data.coverage_zones,
+        "phone": data.phone,
+        "bio": data.bio or "",
+        # Reset verification — KYC must be completed in specialist dashboard
+        "verified": False,
+        "tier": None,
+        "rating": user.get("rating"),
+        "reviews_count": user.get("reviews_count", 0),
+        # Wallet stays the same — no welcome bonus, since this is an upgrade
+        "specialist_onboarded_at": now_iso,
+    }
+    # Also set role='specialist' so existing require_role("specialist") guards work
+    # while keeping `dual_role_enabled` to allow swapping back to client view.
+    patch["role"] = "specialist"
+
+    await db.users.update_one({"_id": uid}, {"$set": patch})
+
+    # Enqueue specialist onboarding emails (best-effort)
+    try:
+        from onboarding_emails import enqueue_specialist_onboarding
+        await enqueue_specialist_onboarding(str(uid), user["email"], user.get("name", ""))
+    except Exception as _e:  # noqa: BLE001
+        logger.warning(f"[BecomeSpecialist] onboarding enqueue failed: {_e}")
+
+    refreshed = await db.users.find_one({"_id": uid})
+    return serialize_doc(refreshed)
+
+
+# ============= AVATAR FROM GOOGLE =============
+@router.post("/auth/refresh-google-avatar")
+async def refresh_google_avatar(user: dict = Depends(get_current_user)):
+    """Re-apply the stored Google profile picture as the user's avatar.
+
+    Only works for users who linked their Google account (`google_auth=True`)
+    AND haven't manually uploaded an avatar (`avatar_source != 'uploaded'`).
+    The picture URL is the one captured at the latest Google sign-in.
+    """
+    doc = await db.users.find_one({"_id": ObjectId(user["id"])})
+    if not doc:
+        raise HTTPException(404, "Utilizator inexistent.")
+    if not doc.get("google_auth"):
+        raise HTTPException(400, "Contul tău nu este conectat cu Google. Re-loghează-te cu Google ca să sincronizezi fotografia.")
+    picture = doc.get("picture") or ""
+    if not picture:
+        raise HTTPException(400, "Google nu a furnizat o fotografie la ultima autentificare.")
+    await db.users.update_one(
+        {"_id": doc["_id"]},
+        {"$set": {"avatar": picture, "avatar_source": "google"}},
+    )
+    refreshed = await db.users.find_one({"_id": doc["_id"]})
+    return serialize_doc(refreshed)
+
+
+# ============= DUAL-ROLE SWITCHER (legacy alias removed) =============
 
 
 # ============= PROFILE / PASSWORD =============
@@ -465,11 +685,16 @@ class ProfileUpdateIn(BaseModel):
 async def update_profile(data: ProfileUpdateIn, user: dict = Depends(get_current_user)):
     update = {k: v for k, v in data.model_dump().items() if v is not None}
     # Specialist-scope guard: refuse to set categories/zones on a non-specialist account
+    # (dual-role users with role=specialist already passes this check)
     if user.get("role") != "specialist":
         update.pop("service_categories", None)
         update.pop("coverage_zones", None)
     if not update:
         raise HTTPException(400, "Niciun câmp de actualizat.")
+    # Track avatar source: if user uploads an avatar, mark it as 'uploaded' so
+    # Google re-sync (or auto-refresh) doesn't override their choice.
+    if "avatar" in update:
+        update["avatar_source"] = "uploaded" if update["avatar"] else None
     await db.users.update_one({"_id": ObjectId(user["id"])}, {"$set": update})
     refreshed = await db.users.find_one({"_id": ObjectId(user["id"])})
     return serialize_doc(refreshed)
@@ -568,26 +793,124 @@ class ContactIn(BaseModel):
 
 @router.post("/support/contact")
 async def support_contact(data: ContactIn, user: dict = Depends(get_current_user)):
-    admin_email = os.environ.get("SUPPORT_EMAIL", "admin@propmanage.io")
+    """Save contact message to DB + email all admin/operator users so they can respond.
+
+    Persisted in `support_messages` collection for the admin/operator inbox.
+    Configure recipients via env `SUPPORT_EMAIL` (fallback) — but ALL admin + operator
+    accounts are notified by default so no message is missed.
+    """
     safe_subject = data.subject.strip()
-    safe_message = data.message.strip().replace("\n", "<br/>")
+    safe_message_html = data.message.strip().replace("\n", "<br/>")
+    msg_id = uuid.uuid4().hex
+    now_iso = datetime.now(timezone.utc).isoformat()
+    # 1) Persist in DB so admin/operator inbox UI can list it
+    doc = {
+        "id": msg_id,
+        "user_id": user.get("id") or str(user.get("_id")),
+        "user_name": user.get("name") or "—",
+        "user_email": user.get("email") or "—",
+        "user_role": user.get("role") or "client",
+        "subject": safe_subject[:200],
+        "message": data.message.strip()[:5000],
+        "status": "new",  # new | in_progress | resolved
+        "assigned_to": None,
+        "resolved_at": None,
+        "resolved_by": None,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+    await db.support_messages.insert_one(doc)
+    # 2) Collect all admin + operator emails so they all see the inbox notification
+    recipients: List[str] = []
+    async for u in db.users.find({"role": {"$in": ["admin", "operator"]}}, {"email": 1}):
+        if u.get("email"):
+            recipients.append(u["email"])
+    fallback = os.environ.get("SUPPORT_EMAIL", "admin@propmanage.io")
+    if not recipients:
+        recipients = [fallback]
+    # 3) Send notifications (fire-and-forget)
     body_admin = (
-        f"<h2>Mesaj nou contact</h2>"
-        f"<p><b>De la:</b> {user.get('name','—')} ({user.get('email','—')})</p>"
-        f"<p><b>Rol:</b> {user.get('role','—')}</p>"
+        f"<h2>Mesaj nou de contact · #{msg_id[:8]}</h2>"
+        f"<p><b>De la:</b> {doc['user_name']} ({doc['user_email']})</p>"
+        f"<p><b>Rol:</b> {doc['user_role']}</p>"
         f"<p><b>Subiect:</b> {safe_subject}</p>"
-        f"<hr/><div>{safe_message}</div>"
+        f"<hr/><div>{safe_message_html}</div>"
+        f"<hr/><p style='font-size:11px;color:#666'>Răspunde direct pe email la <b>{doc['user_email']}</b> sau gestionează din "
+        f"<a href='https://propmanage.ro/admin/support-inbox'>Admin Inbox</a>.</p>"
     )
+    for em in recipients:
+        asyncio.create_task(send_email(em, f"[PropManage Contact] {safe_subject}", body_admin))
+    # 4) Confirmation to sender
     body_user = (
         f"<h2>Mesajul tău a fost primit</h2>"
         f"<p>Salut {user.get('name','')},</p>"
         f"<p>Confirmăm primirea mesajului tău cu subiectul: <b>{safe_subject}</b>.</p>"
-        f"<p>Echipa PropManage îți va răspunde în maximum 24h pe adresa <b>{user.get('email','')}</b>.</p>"
+        f"<p>Echipa PropManage îți va răspunde în maximum 24h pe adresa <b>{doc['user_email']}</b>.</p>"
+        f"<p style='font-size:11px;color:#666'>ID ticket: <code>#{msg_id[:8]}</code></p>"
     )
-    asyncio.create_task(send_email(admin_email, f"[PropManage Contact] {safe_subject}", body_admin))
     if user.get("email"):
         asyncio.create_task(send_email(user["email"], "Am primit mesajul tău - PropManage", body_user))
+    return {"ok": True, "id": msg_id}
+
+
+# ============= ADMIN / OPERATOR SUPPORT INBOX =============
+@router.get("/support/inbox")
+async def support_inbox_list(
+    status: Optional[str] = None,
+    limit: int = 100,
+    user: dict = Depends(require_role("admin", "operator")),
+):
+    """List contact messages. Filter by status (new / in_progress / resolved)."""
+    q: Dict[str, Any] = {}
+    if status in ("new", "in_progress", "resolved"):
+        q["status"] = status
+    cursor = db.support_messages.find(q).sort("created_at", -1).limit(min(max(int(limit), 1), 500))
+    items = []
+    async for m in cursor:
+        m["_id"] = str(m.get("_id"))
+        items.append(m)
+    # Counters
+    counts = {"new": 0, "in_progress": 0, "resolved": 0}
+    async for c in db.support_messages.aggregate([{"$group": {"_id": "$status", "n": {"$sum": 1}}}]):
+        if c.get("_id") in counts:
+            counts[c["_id"]] = c.get("n", 0)
+    return {"items": items, "counts": counts, "total": len(items)}
+
+
+class SupportStatusUpdate(BaseModel):
+    status: str = Field(..., description="new | in_progress | resolved")
+
+
+@router.patch("/support/inbox/{msg_id}")
+async def support_inbox_update(
+    msg_id: str,
+    payload: SupportStatusUpdate,
+    user: dict = Depends(require_role("admin", "operator")),
+):
+    if payload.status not in ("new", "in_progress", "resolved"):
+        raise HTTPException(400, "Status invalid.")
+    update = {
+        "status": payload.status,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if payload.status == "resolved":
+        update["resolved_at"] = update["updated_at"]
+        update["resolved_by"] = user.get("email") or user.get("id")
+    if payload.status == "in_progress":
+        update["assigned_to"] = user.get("email") or user.get("id")
+    r = await db.support_messages.update_one({"id": msg_id}, {"$set": update})
+    if r.matched_count == 0:
+        raise HTTPException(404, "Mesaj inexistent.")
     return {"ok": True}
+
+
+@router.get("/support/contact-info")
+async def support_contact_info():
+    """Public: returns the support email shown in the Contact modal so users can
+    also write directly without using the in-app form. Configured via env
+    SUPPORT_CONTACT_EMAIL (preferred) or SUPPORT_EMAIL (fallback)."""
+    email = os.environ.get("SUPPORT_CONTACT_EMAIL") or os.environ.get("SUPPORT_EMAIL") or "contact@propmanage.ro"
+    return {"email": email, "response_time": "24h"}
 
 
 # ============= WEB PUSH SUBSCRIPTIONS =============
@@ -690,40 +1013,89 @@ async def status_2fa(user: dict = Depends(get_current_user)):
 # ============= GOOGLE OAUTH (Emergent-managed) =============
 @router.post("/auth/google/session")
 async def google_session_exchange(request: Request, response: Response):
-    """Exchange Emergent session_id for our JWT cookie + user record."""
+    """Exchange Emergent session_id for our JWT cookie + user record.
+
+    Calls upstream `demobackend.emergentagent.com` to verify the session and
+    retrieve the Google profile. Retries up to 3× with exponential backoff so
+    transient upstream slowness (often 5-15s on cold start) doesn't yield a
+    520/origin-empty response that users see as "Autentificare Google eșuată".
+    Every attempt is recorded in `oauth_health` collection for the
+    /admin/auth-health dashboard.
+    """
+    started_at = datetime.now(timezone.utc)
+    health_event = {
+        "event_type": "google_oauth_exchange",
+        "started_at": started_at.isoformat(),
+        "attempts": 0,
+        "outcome": None,  # "success" | "user_error" | "upstream_5xx" | "network" | "exhausted"
+        "final_status": None,
+        "upstream_status": None,
+        "duration_ms": None,
+        "ip": request.client.host if request.client else None,
+    }
     session_id = request.headers.get("X-Session-ID")
     if not session_id:
+        health_event["outcome"] = "user_error"
+        health_event["final_status"] = 400
+        await _record_oauth_health(health_event, started_at)
         raise HTTPException(400, "Lipsește header-ul X-Session-ID")
     upstream_status = None
     upstream_body = None
-    async with httpx.AsyncClient(timeout=10) as http_client:
+    last_err = None
+    data = None
+    # Retry loop: 2 attempts, 15s timeout each + 2s backoff between → max ~32s total.
+    # MUST stay under the Kubernetes ingress proxy timeout (typically 60s) or the
+    # browser sees a generic 502 Bad Gateway from the ingress instead of our 503.
+    for attempt in range(2):
+        health_event["attempts"] = attempt + 1
         try:
-            r = await http_client.get(
-                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-                headers={"X-Session-ID": session_id}
-            )
-            upstream_status = r.status_code
-            try:
-                upstream_body = r.text[:300]
-            except Exception:
-                upstream_body = "(no body)"
-            if r.status_code != 200:
-                # Surface the EXACT upstream error so we can diagnose redirect-URL whitelist /
-                # session expiry / wrong client_id from the user's side.
-                logger.warning(f"Emergent OAuth exchange failed: status={upstream_status} body={upstream_body[:200]}")
-                raise HTTPException(
-                    401,
-                    f"Emergent OAuth a refuzat sesiunea (upstream HTTP {upstream_status}). "
-                    f"Detaliu: {upstream_body[:200]}. Cauze posibile: (1) session_id expirat — încearcă din nou rapid, "
-                    f"(2) propmanage.ro/auth/callback nu este whitelisted în panoul OAuth Emergent — "
-                    f"contactează support@emergent.sh."
+            async with httpx.AsyncClient(timeout=15) as http_client:
+                r = await http_client.get(
+                    "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
+                    headers={"X-Session-ID": session_id}
                 )
-            data = r.json()
+                upstream_status = r.status_code
+                upstream_body = (r.text or "")[:300]
+                health_event["upstream_status"] = upstream_status
+                if r.status_code == 200:
+                    data = r.json()
+                    break
+                # 4xx → user-fixable (session expired, redirect URL not whitelisted) — no retry
+                if 400 <= r.status_code < 500:
+                    logger.warning(f"Emergent OAuth user error: status={upstream_status} body={upstream_body[:200]}")
+                    health_event["outcome"] = "user_error"
+                    health_event["final_status"] = 401
+                    await _record_oauth_health(health_event, started_at)
+                    raise HTTPException(
+                        401,
+                        f"Emergent OAuth a refuzat sesiunea (upstream HTTP {upstream_status}). "
+                        f"Detaliu: {upstream_body[:200]}. Cauze posibile: (1) session_id expirat — încearcă din nou rapid, "
+                        f"(2) propmanage.ro/auth/callback nu este whitelisted în panoul OAuth Emergent — "
+                        f"contactează support@emergent.sh."
+                    )
+                # 5xx upstream → transient, will retry
+                last_err = f"upstream HTTP {r.status_code}"
+                logger.warning(f"Emergent OAuth transient {r.status_code} (attempt {attempt+1}/2): {upstream_body[:120]}")
         except HTTPException:
             raise
-        except httpx.HTTPError as e:
-            logger.error(f"Emergent OAuth network failure: {e!r}")
-            raise HTTPException(502, f"Nu pot contacta serverul OAuth Emergent: {e}")
+        except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPError) as e:
+            last_err = f"network: {type(e).__name__}: {e}"
+            logger.warning(f"Emergent OAuth network error (attempt {attempt+1}/2): {last_err}")
+        if attempt < 1:
+            await asyncio.sleep(2)  # short backoff to stay under ingress timeout
+    if data is None:
+        # Both attempts failed — return a SAFE 503 with JSON body so the browser
+        # gets an actionable detail instead of a generic ingress 502/520.
+        logger.error(f"Emergent OAuth exhausted retries: {last_err}")
+        health_event["outcome"] = "exhausted"
+        health_event["final_status"] = 503
+        health_event["last_error"] = last_err
+        await _record_oauth_health(health_event, started_at)
+        raise HTTPException(
+            503,
+            f"Serverul Emergent OAuth nu răspunde (2 încercări, ultima: {last_err}). "
+            "Încearcă din nou peste 1-2 minute sau folosește email + parolă."
+        )
 
     email = data.get("email", "").lower()
     name = data.get("name", "")
@@ -731,10 +1103,14 @@ async def google_session_exchange(request: Request, response: Response):
 
     existing = await db.users.find_one({"email": email})
     if existing:
-        await db.users.update_one(
-            {"_id": existing["_id"]},
-            {"$set": {"picture": picture, "name": name, "google_auth": True}}
-        )
+        # Always refresh stored Google picture so the user can "Refresh from Google"
+        # later, but ONLY apply it as the active avatar if they haven't uploaded
+        # a custom one.
+        patch = {"picture": picture, "name": name, "google_auth": True}
+        if existing.get("avatar_source") != "uploaded":
+            patch["avatar"] = picture
+            patch["avatar_source"] = "google" if picture else None
+        await db.users.update_one({"_id": existing["_id"]}, {"$set": patch})
         user = await db.users.find_one({"_id": existing["_id"]})
         uid = str(user["_id"])
     else:
@@ -742,6 +1118,8 @@ async def google_session_exchange(request: Request, response: Response):
             "email": email,
             "name": name,
             "picture": picture,
+            "avatar": picture or None,
+            "avatar_source": "google" if picture else None,
             "role": "client",
             "google_auth": True,
             "password_hash": "",
@@ -768,7 +1146,306 @@ async def google_session_exchange(request: Request, response: Response):
     access = create_access_token(uid, email, user.get("role", "client"))
     refresh = create_refresh_token(uid)
     set_auth_cookies(response, access, refresh)
+    # Mark success in oauth_health (best-effort, never block response on this)
+    try:
+        await db.oauth_health.insert_one({
+            "event_type": "google_oauth_exchange",
+            "started_at": started_at.isoformat(),
+            "outcome": "success",
+            "final_status": 200,
+            "upstream_status": 200,
+            "attempts": health_event["attempts"],
+            "duration_ms": int((datetime.now(timezone.utc) - started_at).total_seconds() * 1000),
+            "email": email,
+        })
+    except Exception:  # noqa: BLE001
+        pass
     return serialize_doc(user)
+
+
+async def _record_oauth_health(event: dict, started_at: datetime) -> None:
+    """Best-effort write to oauth_health collection — never raises."""
+    try:
+        event["duration_ms"] = int((datetime.now(timezone.utc) - started_at).total_seconds() * 1000)
+        await db.oauth_health.insert_one(event)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[oauth_health] write failed: {e}")
+
+
+class GatewayBeaconIn(BaseModel):
+    """Posted by the frontend AuthCallback when it catches a gateway error
+    (502 / 504 / 520-524) so we can track ingress-level failures that never
+    reached our backend retry loop."""
+    status_code: int = Field(..., ge=400, le=599)
+    where: Optional[str] = Field(None, max_length=128)  # "auth_callback" etc.
+    note: Optional[str] = Field(None, max_length=512)
+
+
+@router.post("/auth/health-beacon")
+async def post_health_beacon(payload: GatewayBeaconIn, request: Request):
+    """Public endpoint. Browser pings this when it sees a 5xx that didn't carry
+    a JSON body (i.e. ingress-level failure, NOT our backend response). This
+    fills the gap in oauth_health where we have no server-side event because
+    the request was killed at the proxy.
+    """
+    now = datetime.now(timezone.utc)
+    await db.oauth_health.insert_one({
+        "event_type": "gateway_error_observed",
+        "started_at": now.isoformat(),
+        "outcome": "gateway_error",
+        "final_status": payload.status_code,
+        "upstream_status": None,
+        "attempts": 0,
+        "duration_ms": 0,
+        "ip": request.client.host if request.client else None,
+        "where": payload.where or "unknown",
+        "note": payload.note or "",
+    })
+    return {"ok": True}
+
+
+def _aggregate_auth_health(events: List[dict], hours: int, raw_limit: int) -> dict:
+    total = len(events)
+    by_outcome: Dict[str, int] = {}
+    durations: List[int] = []
+    upstream_5xx: List[dict] = []
+    gateway_errors: List[dict] = []  # 502/504/520-524 observed by browser
+    for ev in events:
+        outcome = ev.get("outcome", "unknown")
+        by_outcome[outcome] = by_outcome.get(outcome, 0) + 1
+        d = ev.get("duration_ms")
+        if isinstance(d, (int, float)) and d > 0:
+            durations.append(int(d))
+        us = ev.get("upstream_status")
+        if isinstance(us, int) and 500 <= us < 600:
+            upstream_5xx.append({
+                "started_at": ev.get("started_at"),
+                "upstream_status": us,
+                "attempts": ev.get("attempts"),
+                "last_error": ev.get("last_error"),
+                "outcome": outcome,
+            })
+        # Gateway errors come from frontend beacon (502/504/520-524) — these
+        # never reached the backend retry loop, so they signal ingress / Cloudflare /
+        # K8s proxy issues, NOT upstream Emergent issues.
+        fs = ev.get("final_status")
+        if outcome == "gateway_error" and isinstance(fs, int) and fs in (502, 504) or (isinstance(fs, int) and 520 <= fs <= 524 and outcome == "gateway_error"):
+            gateway_errors.append({
+                "started_at": ev.get("started_at"),
+                "status": fs,
+                "where": ev.get("where"),
+            })
+    success = by_outcome.get("success", 0)
+    success_rate = round((success / total) * 100, 1) if total else None
+    durations_sorted = sorted(durations)
+    p50 = durations_sorted[len(durations_sorted) // 2] if durations_sorted else None
+    p95 = durations_sorted[int(len(durations_sorted) * 0.95)] if durations_sorted else None
+    p99 = durations_sorted[int(len(durations_sorted) * 0.99)] if durations_sorted else None
+    # 1h gateway error count — for prominent dashboard alert
+    now = datetime.now(timezone.utc)
+    one_hr_ago = (now - timedelta(hours=1)).isoformat()
+    gateway_errors_1h = sum(1 for g in gateway_errors if g["started_at"] >= one_hr_ago)
+    upstream_5xx_1h = sum(1 for u in upstream_5xx if u["started_at"] >= one_hr_ago)
+    return {
+        "window_hours": hours,
+        "total_attempts": total,
+        "success_rate_pct": success_rate,
+        "outcomes": by_outcome,
+        "latency_ms": {"p50": p50, "p95": p95, "p99": p99, "samples": len(durations)},
+        "upstream_5xx_count": len(upstream_5xx),
+        "upstream_5xx_count_1h": upstream_5xx_1h,
+        "recent_upstream_5xx": upstream_5xx[:10],
+        "gateway_errors_count": len(gateway_errors),
+        "gateway_errors_count_1h": gateway_errors_1h,
+        "recent_gateway_errors": gateway_errors[:10],
+        "recent_events": events[:raw_limit],
+    }
+
+
+async def _build_auth_health_payload(hours: int = 24, raw_limit: int = 20) -> dict:
+    now = datetime.now(timezone.utc)
+    since = (now - timedelta(hours=hours)).isoformat()
+    cursor = db.oauth_health.find({"started_at": {"$gte": since}}).sort("started_at", -1)
+    events: List[dict] = []
+    async for ev in cursor:
+        ev["_id"] = str(ev.get("_id"))
+        events.append(ev)
+    payload = _aggregate_auth_health(events, hours, raw_limit)
+    # Build hourly buckets for sparkline (oldest → newest, exactly `hours` entries)
+    payload["hourly_buckets"] = _build_hourly_buckets(events, now, hours)
+    return payload
+
+
+def _build_hourly_buckets(events: List[dict], now: datetime, hours: int) -> List[dict]:
+    """Group events into 1h buckets, oldest first.
+
+    Returns list of {hour_iso, hour_label, total, success, success_rate_pct}.
+    """
+    buckets = []
+    for i in range(hours - 1, -1, -1):  # oldest first
+        bucket_start = now - timedelta(hours=i + 1)
+        bucket_end = now - timedelta(hours=i)
+        bs_iso = bucket_start.isoformat()
+        be_iso = bucket_end.isoformat()
+        total = 0
+        success = 0
+        for ev in events:
+            ts = ev.get("started_at") or ""
+            if bs_iso <= ts < be_iso:
+                total += 1
+                if ev.get("outcome") == "success":
+                    success += 1
+        rate = round((success / total) * 100, 1) if total else None
+        buckets.append({
+            "hour_iso": bs_iso,
+            "hour_label": bucket_start.strftime("%H:00"),
+            "total": total,
+            "success": success,
+            "success_rate_pct": rate,
+        })
+    return buckets
+
+
+@router.get("/admin/auth-health")
+async def admin_auth_health(user: dict = Depends(require_role("admin"))):
+    """Real-time Google OAuth health dashboard data (last 24h)."""
+    return await _build_auth_health_payload(hours=24, raw_limit=20)
+
+
+@router.get("/admin/auth-health/export.csv")
+async def admin_auth_health_export_csv(user: dict = Depends(require_role("admin"))):
+    """Download last-24h OAuth events as CSV — useful for support@emergent.sh tickets."""
+    from fastapi.responses import StreamingResponse
+    now = datetime.now(timezone.utc)
+    since = (now - timedelta(hours=24)).isoformat()
+    cursor = db.oauth_health.find({"started_at": {"$gte": since}}).sort("started_at", -1)
+    buf = io.StringIO()
+    buf.write("started_at,outcome,final_status,upstream_status,attempts,duration_ms,email,ip,last_error\n")
+    async for ev in cursor:
+        row = [
+            (ev.get("started_at") or "").replace(",", " "),
+            (ev.get("outcome") or "").replace(",", " "),
+            str(ev.get("final_status") or ""),
+            str(ev.get("upstream_status") or ""),
+            str(ev.get("attempts") or ""),
+            str(ev.get("duration_ms") or ""),
+            (ev.get("email") or "").replace(",", " "),
+            (ev.get("ip") or "").replace(",", " "),
+            (ev.get("last_error") or "").replace(",", " ").replace("\n", " ")[:200],
+        ]
+        buf.write(",".join(row) + "\n")
+    buf.seek(0)
+    filename = f"oauth-health-{now.strftime('%Y%m%d-%H%M')}.csv"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ===== Early-warning email alert =====
+_AUTH_ALERT_COOLDOWN_MIN = 60
+_AUTH_ALERT_MIN_SAMPLES = 5
+_AUTH_ALERT_THRESHOLD_PCT = 80.0
+
+
+async def run_auth_health_alert_check() -> dict:
+    """Scheduled task: if Google OAuth success rate drops below 80% in last hour
+    AND we have ≥5 attempts AND no alert sent in last 60min → email all admins."""
+    now = datetime.now(timezone.utc)
+    since = (now - timedelta(hours=1)).isoformat()
+    cursor = db.oauth_health.find({"started_at": {"$gte": since}})
+    events = []
+    async for ev in cursor:
+        events.append(ev)
+    summary = _aggregate_auth_health(events, hours=1, raw_limit=0)
+    total = summary["total_attempts"]
+    rate = summary["success_rate_pct"]
+    if total < _AUTH_ALERT_MIN_SAMPLES:
+        return {"ok": True, "skipped": True, "reason": f"only {total} samples (<{_AUTH_ALERT_MIN_SAMPLES})"}
+    if rate is None or rate >= _AUTH_ALERT_THRESHOLD_PCT:
+        return {"ok": True, "skipped": True, "reason": f"healthy: {rate}%"}
+    last_alert = await db.system_alerts.find_one({"alert_key": "auth_health_low"})
+    if last_alert:
+        last_sent = last_alert.get("last_sent_at")
+        if last_sent:
+            try:
+                last_dt = datetime.fromisoformat(last_sent)
+                age_min = (now - last_dt).total_seconds() / 60
+                if age_min < _AUTH_ALERT_COOLDOWN_MIN:
+                    return {"ok": True, "skipped": True, "reason": f"cooldown {round(age_min)}min/{_AUTH_ALERT_COOLDOWN_MIN}min"}
+            except (ValueError, TypeError):
+                pass
+    admin_emails = []
+    async for adm in db.users.find({"role": "admin"}, {"email": 1}):
+        if adm.get("email"):
+            admin_emails.append(adm["email"])
+    if not admin_emails:
+        return {"ok": False, "reason": "no admin emails"}
+    lat = summary["latency_ms"]
+    outcomes_html = "".join(
+        f"<li><strong>{k}</strong>: {v}</li>" for k, v in (summary["outcomes"] or {}).items()
+    )
+    subject = f"⚠️ PropManage: Google OAuth degradat ({rate}% success rate)"
+    html = f"""
+    <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #fee2e2; border-left: 4px solid #dc2626; padding: 16px; border-radius: 8px;">
+        <h2 style="color: #dc2626; margin: 0 0 8px;">Alertă auth-health · {now.strftime('%Y-%m-%d %H:%M UTC')}</h2>
+        <p style="margin: 0; color: #7f1d1d;">Rata de succes Google OAuth a scăzut sub pragul de <strong>{_AUTH_ALERT_THRESHOLD_PCT}%</strong> în ultima oră.</p>
+      </div>
+      <h3>Sumar ultima oră:</h3>
+      <ul>
+        <li>Total atempturi: <strong>{total}</strong></li>
+        <li>Rata succes: <strong style="color: #dc2626;">{rate}%</strong></li>
+        <li>5xx upstream: {summary['upstream_5xx_count']}</li>
+        <li>P95 latency: {lat['p95']}ms</li>
+      </ul>
+      <h3>Distribuție rezultate:</h3>
+      <ul>{outcomes_html}</ul>
+      <p style="margin-top: 24px;">
+        <a href="https://propmanage.ro/admin/auth-health" style="display: inline-block; background: #d4ff3a; color: black; padding: 12px 24px; border-radius: 999px; text-decoration: none; font-weight: bold;">Deschide Dashboard</a>
+      </p>
+      <p style="font-size: 12px; color: #6b7280; margin-top: 24px;">
+        Cooldown: vei primi următoarea alertă cel mai devreme peste {_AUTH_ALERT_COOLDOWN_MIN} minute.<br/>
+        Dacă upstream Emergent OAuth e degradat, contactează <a href="mailto:support@emergent.sh">support@emergent.sh</a>.
+      </p>
+    </div>
+    """
+    from email_service import send_email as _send_email
+    try:
+        for em in admin_emails:
+            await _send_email(em, subject, html)
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[auth_health_alert] email send failed: {e}")
+        return {"ok": False, "error": str(e)}
+    await db.system_alerts.update_one(
+        {"alert_key": "auth_health_low"},
+        {"$set": {
+            "alert_key": "auth_health_low",
+            "last_sent_at": now.isoformat(),
+            "last_success_rate": rate,
+            "last_total": total,
+            "recipients": admin_emails,
+        }},
+        upsert=True,
+    )
+    logger.warning(f"[auth_health_alert] EMAIL SENT to {len(admin_emails)} admins: rate={rate}% total={total}")
+    return {"ok": True, "sent": True, "recipients": len(admin_emails), "rate": rate}
+
+
+@router.post("/admin/auth-health/test-alert")
+async def admin_auth_health_test_alert(user: dict = Depends(require_role("admin"))):
+    """Force-trigger the alert email (skips threshold, cooldown, min-samples). For testing email delivery."""
+    global _AUTH_ALERT_THRESHOLD_PCT, _AUTH_ALERT_COOLDOWN_MIN, _AUTH_ALERT_MIN_SAMPLES
+    orig_t, orig_c, orig_m = _AUTH_ALERT_THRESHOLD_PCT, _AUTH_ALERT_COOLDOWN_MIN, _AUTH_ALERT_MIN_SAMPLES
+    _AUTH_ALERT_THRESHOLD_PCT = 999.0
+    _AUTH_ALERT_COOLDOWN_MIN = 0
+    _AUTH_ALERT_MIN_SAMPLES = 0
+    try:
+        result = await run_auth_health_alert_check()
+    finally:
+        _AUTH_ALERT_THRESHOLD_PCT, _AUTH_ALERT_COOLDOWN_MIN, _AUTH_ALERT_MIN_SAMPLES = orig_t, orig_c, orig_m
+    return result
 
 
 # ============= DIGEST PREFERENCE & PREVIEW =============
@@ -799,3 +1476,105 @@ async def preview_my_digest(user: dict = Depends(get_current_user)):
         raise HTTPException(400, "Rol fără digest configurat.")
     digest = await builder(user)
     return digest or {"summary": "Niciun conținut relevant astăzi.", "cards": "", "empty": True}
+
+
+# ============================================================================
+# CONSENT MANAGEMENT (GDPR — terms, privacy, marketing, cookies)
+# ============================================================================
+@router.patch("/me/consent")
+async def update_my_consent(data: ConsentUpdateIn, request: Request, user: dict = Depends(get_current_user)):
+    """Update user's consent preferences. Records every change in consent_audit_log."""
+    payload = data.model_dump(exclude_none=True)
+    if not payload:
+        raise HTTPException(400, "Nothing to update")
+    ip = (request.client.host if request and request.client else "") or ""
+    ua = request.headers.get("user-agent", "") if request else ""
+    updates = {"consent_updated_at": datetime.now(timezone.utc).isoformat()}
+    for key, val in payload.items():
+        updates[key] = bool(val)
+        # Map field to consent_type for audit log
+        ctype = key.replace("_accepted", "").replace("_consent", "")
+        await _record_consent(user["id"], user["email"], ctype, bool(val), ip, ua, source="settings")
+    await db.users.update_one({"_id": ObjectId(user["id"])}, {"$set": updates})
+    return {"ok": True, "updated": list(payload.keys())}
+
+
+@router.post("/cookies/consent")
+async def record_cookie_consent(data: ConsentUpdateIn, request: Request):
+    """Public endpoint — anonymous users can record cookie preferences (banner)."""
+    payload = data.model_dump(exclude_none=True)
+    ip = (request.client.host if request and request.client else "") or ""
+    ua = request.headers.get("user-agent", "") if request else ""
+    # If user is logged in, also persist on their profile
+    try:
+        user = await get_current_user(request)
+    except Exception:
+        user = None
+    for key, val in payload.items():
+        if "cookies" not in key:
+            continue
+        ctype = key.replace("_accepted", "")
+        if user:
+            await db.users.update_one(
+                {"_id": ObjectId(user["id"])},
+                {"$set": {key: bool(val), "consent_updated_at": datetime.now(timezone.utc).isoformat()}},
+            )
+            await _record_consent(user["id"], user["email"], ctype, bool(val), ip, ua, source="cookie_banner")
+        else:
+            await _record_consent("anonymous", "", ctype, bool(val), ip, ua, source="cookie_banner")
+    return {"ok": True}
+
+
+# ============================================================================
+# EMAIL VERIFICATION
+# ============================================================================
+@router.get("/auth/verify-email")
+async def verify_email(token: str = Query(...)):
+    """Verify email via token from link. Idempotent."""
+    if not token or len(token) < 16:
+        raise HTTPException(400, "Invalid token")
+    doc = await db.users.find_one({"email_verification_token": token})
+    if not doc:
+        raise HTTPException(404, "Token invalid sau expirat")
+    expires = doc.get("email_verification_expires_at")
+    if expires and isinstance(expires, str):
+        try:
+            if datetime.fromisoformat(expires.replace("Z", "+00:00")) < datetime.now(timezone.utc):
+                raise HTTPException(410, "Token expirat. Cere unul nou.")
+        except ValueError:
+            pass
+    if doc.get("email_verified"):
+        return {"ok": True, "already_verified": True}
+    await db.users.update_one(
+        {"_id": doc["_id"]},
+        {"$set": {"email_verified": True, "email_verified_at": datetime.now(timezone.utc).isoformat()},
+         "$unset": {"email_verification_token": "", "email_verification_expires_at": ""}},
+    )
+    return {"ok": True, "verified": True}
+
+
+_resend_attempts: Dict[str, datetime] = {}
+
+@router.post("/auth/resend-verification")
+async def resend_verification(user: dict = Depends(get_current_user)):
+    """Re-send verification email. Rate-limited: 1 every 5 minutes per user."""
+    if user.get("email_verified"):
+        return {"ok": True, "already_verified": True}
+    last = _resend_attempts.get(user["id"])
+    if last and (datetime.now(timezone.utc) - last).total_seconds() < 300:
+        wait_sec = 300 - int((datetime.now(timezone.utc) - last).total_seconds())
+        raise HTTPException(429, f"Așteaptă {wait_sec}s înainte de retrimitere")
+    token = _gen_email_verification_token()
+    expires = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+    await db.users.update_one(
+        {"_id": ObjectId(user["id"])},
+        {"$set": {"email_verification_token": token, "email_verification_expires_at": expires}},
+    )
+    try:
+        from email_service import tpl_email_verification
+        await send_template(tpl_email_verification, user.get("name", ""), token, to=user["email"])
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[ResendVerify] failed: {e}")
+        raise HTTPException(500, "Trimiterea emailului a eșuat")
+    _resend_attempts[user["id"]] = datetime.now(timezone.utc)
+    return {"ok": True, "sent": True}

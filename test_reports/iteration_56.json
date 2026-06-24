@@ -1,0 +1,35 @@
+{
+  "summary": "Phase 76 — Auto-Match SCHEDULE + cron tick fully verified end-to-end. Backend: 14/14 pytest pass — AuthZ (GET+PUT both 403 for client), GET schedule shape ({enabled, interval_hours, min_rating, limit} + last_run + last_cron_run), PUT persists + validates interval bounds (0→400, 25→400), run_auto_match_cron_tick() in-process: disabled→{skipped:'disabled'}, enabled→executes execute_auto_match with triggered_by.kind='cron', second call within interval→{skipped:'not_due', next_due_in_sec:N}, schedule.last_cron_run populated post-tick with triggered_by.kind='cron', manual /run still uses triggered_by.kind='admin_manual', regression on /admin/autonomy/score + /admin/healthcheck/run (GET) + login. Frontend at /admin: AutoMatchPanel schedule section renders, toggle flips status badge Dezactivat↔Activ·la Nh, interval select change persists to backend (verified via /api/admin/auto-match/schedule fetch — interval_hours:12), last_cron_run line visible. State restored to {enabled:false, interval_hours:6} at the end.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase76_auto_match_schedule.py",
+    "/app/test_reports/pytest/phase76_auto_match_schedule.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "admin.py run_auto_match_cron_tick() catches all exceptions and returns {error:str} but APScheduler will then consider the job 'successful'. Logging via logger.exception is good, but consider emitting a structured AI finding or healthcheck entry when cron failures repeat — currently a silent backend.log line is the only signal.",
+    "admin.py update_auto_match_schedule: min_rating and limit have no bounds validation. interval_hours is guarded (1..24) but min_rating could be negative or >5, and limit could be 0/huge. Low risk for admin-only endpoint but add Pydantic model for hygiene.",
+    "admin.py _load_auto_match_schedule defensively returns DEFAULT copy when no doc exists — good. However GET /admin/auto-match/schedule does not also surface auto_match_schedule.updated_at / updated_by, which the PUT handler does write. Surfacing them in the response would help auditability ('who last toggled the cron').",
+    "Frontend AutoMatchPanel.jsx: updateSchedule on toggle/interval-change merges via setSchedule(s => ({...s, schedule: data})) — this preserves last_run/last_cron_run blocks in state, good. But there is no toast/visual confirmation after a successful PUT — the badge change is the only feedback. Consider a transient toast for parity with other admin actions.",
+    "Frontend: interval select disables on savingSchedule but the toggle button is also bound to the same flag — clicking toggle during a select-save in flight could race. updateSchedule is sequential so practical risk is low. Consider an AbortController or queueing the calls.",
+    "Cron registration in server.py is at minute=23 every hour with misfire_grace_time=600s. Combined with debouncing inside the tick this is safe, but the cron will spin up motor + db.find_one even when disabled — negligible cost but mention if scaling matters."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase76_auto_match_schedule.py"
+  ],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100% (all schedule UI flows verified)"},
+  "test_credentials": "admin@propmanage.io/Admin123! (admin), client@propmanage.io/Client123! (403 check)",
+  "seed_data_creation": "No seed data inserted. Test wipes auto_match_runs where triggered_by.kind='cron' before exercising the cron-tick path so the first call actually executes (rather than being debounced by a previous cron run).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 76 cron schedule endpoints stable. Pytest at /app/backend/tests/test_phase76_auto_match_schedule.py (~3s, 14 tests). KEY GOTCHA: motor's `db` singleton in routes/admin.py binds to the first event loop that touches it — tests that call run_auto_match_cron_tick() directly MUST share ONE asyncio loop (module-scoped fixture `shared_loop` using loop.run_until_complete). Multiple asyncio.run() calls cause 'Event loop is closed'. ALSO: /api/admin/healthcheck/run is registered as GET (not POST) in admin_healthcheck.py — easy gotcha for regression tests. Test resets schedule to {enabled:false, interval_hours:6} on teardown. data-testids on AutoMatchPanel schedule section: auto-match-schedule, auto-match-schedule-status, auto-match-schedule-toggle, auto-match-interval-select, auto-match-last-cron.",
+  "rca of the issue": "N/A — no bug found. Two transient test infra issues self-fixed during this run: (1) Motor event-loop reuse — solved with shared_loop module-fixture. (2) Initial regression test assumed POST /admin/healthcheck/run but real route is GET — corrected."
+}

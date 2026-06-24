@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 46 — Verified Estate incremental additions (auto-draft from paid order, email notifications, Leaflet map view). All 6 new backend tests PASS + 21/21 regression tests PASS. Frontend view-toggle (Grid ↔ Hartă), Leaflet map, lime markers, popups with Vezi detalii links, all functional end-to-end. Email notification hooks confirmed via backend log lines (admin notify on inquiry/external/order + buyer confirmation on demo checkout).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_verified_estate_iter46.py",
+    "/app/backend/tests/test_verified_estate.py",
+    "/app/test_reports/pytest/iter46_results.xml",
+    "/app/test_reports/pytest/verified_estate_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "verified_estate.py L50-56 _notify_admin uses asyncio.create_task without awaiting/logging the task result — failures are silently swallowed beyond a warning. Acceptable for fire-and-forget but consider tracking task handle for observability.",
+    "verified_estate.py L59-103 _create_draft_listing_from_order: city derived as `addr.split(',')[-1].strip()` — if address contains no comma, city ends up being the full address. Minor data-quality issue for admin Kanban filtering.",
+    "verified_estate.py L100 gates_status is built from a hardcoded dict {audit_report_id: None, ...} instead of `payload` — fine because the values are deterministic for fresh drafts, but feels duplicate with the listing_doc above; could pass the actual `listing_doc` for clarity.",
+    "EstateMapView.jsx — Leaflet CSS is imported per-component; if the Browse page is ever pre-rendered server-side this can cause SSR issues. Currently fine for CRA.",
+    "EstateMapView.jsx popup color: inline style `color: #0a0a0b` on price keeps it black against the default white Leaflet popup background, but the rest of popup text inherits a dark text from the dark theme container — readability is OK but inconsistent.",
+    "verified_estate.py file now 774 lines — past the 700-line soft threshold; consider splitting checkout/orders/notify helpers into a `verified_estate_payments.py` sub-module."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_verified_estate_iter46.py (new — 6 tests)"
+  ],
+  "success_rate": {"backend": "100% (27/27 — 6 new + 21 regression)", "frontend": "100% (view-toggle, map render, markers x2, popup, popup link, back-to-grid all verified)"},
+  "test_credentials": "Admin admin@propmanage.io / Admin123! (cookie auth, verified via /api/auth/me)",
+  "seed_data_creation": "Iter46 test run created: 3 TEST_Iter46 paid demo orders (bundle, audit, twin) → 3 auto-draft listings (visible in Admin Kanban draft column). 1 TEST_Iter46_Buyer inquiry. 1 TEST_Iter46_ExtBuyer external audit request. All flagged with TEST_Iter46 prefix for easy cleanup.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All three iter46 additions verified working: (1) demo checkout auto-creates draft listing with source_order_id, owner_email/name/phone, pending_services flags ({audit, twin} for bundle), gates_status all failing, title format 'Imobil în pregătire · <address>'. (2) Email hooks fire via console email service — log lines confirm admin notify on inquiry/external/order + buyer confirmation on checkout. (3) Leaflet map view renders 2 lime markers (.ve-marker) at correct Bucharest coords (Aviatorilor 44.4632/26.0894, Pipera 44.5215/26.1278), popups show title/city/price + 'Vezi detalii →' link (data-testid='map-popup-link-<id>'). Grid<->Map toggle clean (map unmounts on switch back). Regression suite test_verified_estate.py still 21/21. ENV: set REACT_APP_BACKEND_URL when running pytest manually — module reads from env without dotenv loader.",
+  "rca of the issue": "No issues to report."
+}

@@ -20,22 +20,28 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Body
 
 from db import db
 from deps import require_role
+from sub_admin_deps import require_admin_scope
 
 logger = logging.getLogger("propmanage.admin_smoketest")
 router = APIRouter(prefix="/api/admin/smoke-test", tags=["admin-smoketest"])
 
-# Demo credentials used for the smoke test. These must always exist (seed) and
-# are reset nightly by demo_reset.py, so a smoke test never corrupts real data.
-SMOKE_EMAIL = "client@propmanage.io"
-SMOKE_PASSWORD = "Client123!"
+# Demo credentials for smoke tests. These accounts are seeded in seed.py and
+# reset nightly by demo_reset.py, so a smoke test never corrupts real data.
+# Default values match the seeded fixtures — override via env vars if you
+# rotate the demo passwords (the seed must be updated too).
+SMOKE_EMAIL = os.environ.get("SMOKE_TEST_EMAIL", "client@propmanage.io")
+SMOKE_PASSWORD = os.environ.get("SMOKE_TEST_PASSWORD", "Client123!")
 
 # Role-specific demo credentials for multi-role smoke tests.
-# All accounts are seeded and reset nightly by demo_reset.py.
 ROLE_CREDENTIALS = {
-    "client":     {"email": "client@propmanage.io",     "password": "Client123!"},
-    "specialist": {"email": "specialist@propmanage.io", "password": "Spec123!"},
-    "admin":      {"email": "admin@propmanage.io",      "password": "Admin123!"},
-    "operator":   {"email": "operator@propmanage.io",   "password": "Op123!"},
+    "client":     {"email": os.environ.get("SMOKE_CLIENT_EMAIL", "client@propmanage.io"),
+                   "password": os.environ.get("SMOKE_CLIENT_PASSWORD", "Client123!")},
+    "specialist": {"email": os.environ.get("SMOKE_SPECIALIST_EMAIL", "specialist@propmanage.io"),
+                   "password": os.environ.get("SMOKE_SPECIALIST_PASSWORD", "Spec123!")},
+    "admin":      {"email": os.environ.get("SMOKE_ADMIN_EMAIL", "admin@propmanage.io"),
+                   "password": os.environ.get("SMOKE_ADMIN_PASSWORD", "Admin123!")},
+    "operator":   {"email": os.environ.get("SMOKE_OPERATOR_EMAIL", "operator@propmanage.io"),
+                   "password": os.environ.get("SMOKE_OPERATOR_PASSWORD", "Op123!")},
 }
 
 # Default base URL preference:
@@ -234,7 +240,7 @@ def _finalize(run_id: str, started_at: str, steps: list, overall_ok: bool, base_
 @router.post("/run")
 async def run_smoke_test(
     base_url: Optional[str] = Query(None, description="Override base URL (default: APP_PUBLIC_URL)"),
-    user: dict = Depends(require_role("admin")),
+    user: dict = Depends(require_admin_scope("testing")),
 ):
     """Run the smoke test sequence and persist the result."""
     target = (base_url or DEFAULT_BASE).rstrip("/")
@@ -252,7 +258,7 @@ async def run_smoke_test(
 @router.get("/history")
 async def list_smoke_test_runs(
     limit: int = Query(20, le=100),
-    user: dict = Depends(require_role("admin")),
+    user: dict = Depends(require_admin_scope("testing")),
 ):
     """Return last N smoke test runs (newest first)."""
     cursor = db.smoke_test_runs.find({}, {"_id": 0}).sort("started_at", -1).limit(limit)
@@ -402,7 +408,7 @@ def _finalize_role(run_id: str, started_at: str, steps: list, overall_ok: bool,
 @router.post("/run-all-roles")
 async def run_all_roles(
     base_url: Optional[str] = Query(None),
-    user: dict = Depends(require_role("admin")),
+    user: dict = Depends(require_admin_scope("testing")),
 ):
     """Run smoke tests for ALL 4 roles (client, specialist, operator, admin)
     in parallel. Returns one aggregated report.
@@ -602,7 +608,7 @@ async def run_smoke_test_monitor_tick() -> Optional[dict]:
 
 
 @router.get("/monitor/config")
-async def get_monitor_config(user: dict = Depends(require_role("admin"))):
+async def get_monitor_config(user: dict = Depends(require_admin_scope("testing"))):
     """Return current monitor config (enabled, interval, last status)."""
     cfg = await _get_monitor_config()
     cfg.pop("_id", None)
@@ -612,7 +618,7 @@ async def get_monitor_config(user: dict = Depends(require_role("admin"))):
 @router.post("/monitor/config")
 async def update_monitor_config(
     payload: dict = Body(...),
-    user: dict = Depends(require_role("admin")),
+    user: dict = Depends(require_admin_scope("testing")),
 ):
     """Enable/disable the auto monitor or change its interval / target URL."""
     updates: dict = {}

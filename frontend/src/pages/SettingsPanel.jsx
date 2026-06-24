@@ -2,17 +2,38 @@
 // Includes: Profile edit, Change password, Dual-role switcher, Referrals, Support,
 // Contact, Data & Privacy (GDPR).
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import axios from "axios";
 import {
   User as UserIcon, Settings as SettingsIcon, RefreshCw, Share2, Heart,
   LifeBuoy, MessageCircle, Lock, ChevronRight, X, Mail, Phone, MapPin as MapPinIcon,
   Download, Trash2, AlertTriangle, CheckCircle2, Shield, BellRing, BellOff,
-  Sun, Eye, Globe, Clock, KeyRound,
+  Sun, Eye, Globe, Clock, KeyRound, Box, Loader2, Sparkles, Trophy,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { API } from "./DashShared";
+import { ClientTwinViewerModal } from "./ClientTwinViewer";
+import DigitalTwinViewer from "../components/DigitalTwinViewer";
 import { pushSupported, getPushStatus, subscribeToPush, unsubscribeFromPush, ensureServiceWorker } from "../push";
+
+// ============= ROW (hoisted out of SettingsPanel to avoid no-unstable-nested-components) =============
+const Row = ({ icon: Icon, title, subtitle, onClick, danger, accent, tid }) => (
+  <button
+    onClick={onClick}
+    className={`w-full flex items-center gap-4 py-4 border-b border-white/5 hover:bg-white/[0.02] transition-colors group ${
+      danger ? "text-red-400" : ""
+    } ${accent ? "bg-[#d4ff3a]/[0.04]" : ""}`}
+    data-testid={tid}
+  >
+    <Icon className={`w-5 h-5 shrink-0 ${danger ? "text-red-400" : accent ? "text-[#d4ff3a]" : "text-stone-400"}`} />
+    <div className="flex-1 text-left">
+      <div className="text-sm font-medium">{title}</div>
+      {subtitle && <div className="text-xs text-stone-500 mt-0.5">{subtitle}</div>}
+    </div>
+    <ChevronRight className="w-4 h-4 text-stone-600 group-hover:text-stone-400 transition-colors" />
+  </button>
+);
 
 // ============= MAIN PANEL =============
 export const SettingsPanel = () => {
@@ -20,6 +41,10 @@ export const SettingsPanel = () => {
   const [modal, setModal] = useState(null);
   const [pushStatus, setPushStatus] = useState("unsupported");
   const [digestEnabled, setDigestEnabled] = useState(true);
+  const [tierMilestoneEnabled, setTierMilestoneEnabled] = useState(true);
+  // Digital Twin summary (loaded only for client view)
+  const [twinSummary, setTwinSummary] = useState(null);
+  const [twinViewerProp, setTwinViewerProp] = useState(null);
 
   useEffect(() => {
     if (!pushSupported()) return;
@@ -28,6 +53,25 @@ export const SettingsPanel = () => {
 
   useEffect(() => {
     if (user) setDigestEnabled(!user.digest_disabled);
+  }, [user]);
+
+  // Tier milestone preference
+  useEffect(() => {
+    axios.get(`${API}/tier-milestones/preferences`)
+      .then(r => setTierMilestoneEnabled(r.data?.notify_tier_milestones !== false))
+      .catch(() => {});
+  }, []);
+
+  // Load DT summary only when user is in Client view (avoids noise for specialists/admins)
+  useEffect(() => {
+    if (!user) return;
+    const inClient = user.active_view === "client" || user.role === "client";
+    if (!inClient) return;
+    let cancelled = false;
+    axios.get(`${API}/me/digital-twins`)
+      .then(r => { if (!cancelled) setTwinSummary(r.data); })
+      .catch(() => { if (!cancelled) setTwinSummary({ has_any: false, twins: [], primary: null }); });
+    return () => { cancelled = true; };
   }, [user]);
 
   if (!user) return null;
@@ -46,8 +90,22 @@ export const SettingsPanel = () => {
     }
   };
 
-  const showDualRole = user.role === "specialist" && user.dual_role_enabled;
+  const refreshGoogleAvatar = async () => {
+    try {
+      await axios.post(`${API}/auth/refresh-google-avatar`);
+      await refreshUser();
+      alert("Fotografia de profil a fost actualizată din Google.");
+    } catch (e) {
+      alert(formatApiError(e));
+    }
+  };
+
+  // Dual-role visibility:
+  // - showDualRole = user already has both profiles (client+specialist active)
+  // - canBecomeSpecialist = user is currently a Client and doesn't have dual yet
+  const showDualRole = user.dual_role_enabled === true;
   const inClientView = user.active_view === "client";
+  const canBecomeSpecialist = user.role === "client" && !user.dual_role_enabled;
 
   const togglePush = async () => {
     try {
@@ -76,6 +134,16 @@ export const SettingsPanel = () => {
     }
   };
 
+  const toggleTierMilestones = async () => {
+    const next = !tierMilestoneEnabled;
+    try {
+      await axios.patch(`${API}/tier-milestones/preferences`, { notify_tier_milestones: next });
+      setTierMilestoneEnabled(next);
+    } catch (e) {
+      alert(formatApiError(e));
+    }
+  };
+
   const previewDigest = async () => {
     try {
       const { data } = await axios.post(`${API}/auth/digest/preview`);
@@ -85,30 +153,22 @@ export const SettingsPanel = () => {
     }
   };
 
-  const Row = ({ icon: Icon, title, subtitle, onClick, danger, accent, tid }) => (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-4 py-4 border-b border-white/5 hover:bg-white/[0.02] transition-colors group ${
-        danger ? "text-red-400" : ""
-      } ${accent ? "bg-[#d4ff3a]/[0.04]" : ""}`}
-      data-testid={tid}
-    >
-      <Icon className={`w-5 h-5 shrink-0 ${danger ? "text-red-400" : accent ? "text-[#d4ff3a]" : "text-stone-400"}`} />
-      <div className="flex-1 text-left">
-        <div className="text-sm font-medium">{title}</div>
-        {subtitle && <div className="text-xs text-stone-500 mt-0.5">{subtitle}</div>}
-      </div>
-      <ChevronRight className="w-4 h-4 text-stone-600 group-hover:text-stone-400 transition-colors" />
-    </button>
-  );
+  // Row component is hoisted at module scope (above) — fixes react/no-unstable-nested-components
 
   return (
     <div className="max-w-2xl mx-auto" data-testid="settings-panel">
       {/* Profile header */}
       <div className="flex items-center gap-4 mb-8 pb-6 border-b border-white/5">
         <div className="relative">
-          {user.avatar ? (
-            <img src={user.avatar} alt={user.name} className="w-20 h-20 rounded-full object-cover" />
+          {(user.avatar || user.picture) ? (
+            <img
+              src={user.avatar || user.picture}
+              alt={user.name}
+              className="w-20 h-20 rounded-full object-cover"
+              referrerPolicy="no-referrer"
+              onError={(e) => { e.currentTarget.style.display = "none"; }}
+              data-testid="settings-avatar-img"
+            />
           ) : (
             <div className="w-20 h-20 rounded-full bg-gradient-to-br from-stone-600 to-stone-800 flex items-center justify-center font-serif text-2xl">
               {initials}
@@ -130,6 +190,14 @@ export const SettingsPanel = () => {
           </div>
         </div>
       </div>
+
+      {/* Digital Twin 3D — visible only for client view */}
+      {(user.active_view === "client" || user.role === "client") && twinSummary !== null && (
+        <DigitalTwinCard
+          summary={twinSummary}
+          onView={(prop) => setTwinViewerProp(prop)}
+        />
+      )}
 
       <div className="space-y-0">
         <Row
@@ -165,17 +233,37 @@ export const SettingsPanel = () => {
             tid="row-coverage"
           />
         )}
+        {canBecomeSpecialist && (
+          <Row
+            icon={RefreshCw}
+            title="Devino Specialist"
+            subtitle="Creează un profil de Specialist pe același cont. Vei putea primi lead-uri din marketplace și comuta între cele 2 profile oricând, fără logout."
+            onClick={() => setModal("become-specialist")}
+            tid="row-become-specialist"
+            accent
+          />
+        )}
         {showDualRole && (
           <Row
             icon={RefreshCw}
-            title={inClientView ? "Treci la profilul de profesionist" : "Treci la profilul de client"}
+            title={inClientView ? "Comută la profilul de Specialist" : "Comută la profilul de Client"}
             subtitle={
               inClientView
-                ? "Revino la dashboard-ul tău de specialist pentru a primi lead-uri."
-                : "Schimbă pe profilul de client pentru a solicita servicii pentru imobilul tău."
+                ? `Profil activ: CLIENT. Apasă pentru a trece la dashboard-ul de Specialist.`
+                : `Profil activ: SPECIALIST. Apasă pentru a trece la dashboard-ul de Client.`
             }
             onClick={switchView}
             tid="row-switch-view"
+            accent
+          />
+        )}
+        {user.google_auth && (user.avatar_source !== "uploaded" || !user.avatar) && (
+          <Row
+            icon={UserIcon}
+            title="Actualizează fotografia din Google"
+            subtitle="Re-sincronizează poza de profil din contul tău Google. Util când ai schimbat avatarul în Google."
+            onClick={refreshGoogleAvatar}
+            tid="row-refresh-google-avatar"
           />
         )}
         <Row
@@ -210,6 +298,17 @@ export const SettingsPanel = () => {
           }
           onClick={toggleDigest}
           tid="row-digest"
+        />
+        <Row
+          icon={Trophy}
+          title={tierMilestoneEnabled ? "Notificări progres tier: ACTIVE" : "Activează notificări progres tier"}
+          subtitle={
+            tierMilestoneEnabled
+              ? "Primești notificare când atingi 50%, 75% sau 100% pe drumul către următorul tier. Apasă pentru a dezactiva."
+              : "Activează ca să fii anunțat când ești aproape de promovare (Junior → Verified → Premium)."
+          }
+          onClick={toggleTierMilestones}
+          tid="row-tier-milestones"
         />
         {digestEnabled && (
           <Row
@@ -279,6 +378,25 @@ export const SettingsPanel = () => {
       {modal === "password" && <PasswordModal onClose={() => setModal(null)} />}
       {modal === "backup-password" && <BackupPasswordModal onClose={() => setModal(null)} />}
       {modal === "coverage" && <CoverageModal user={user} refreshUser={refreshUser} onClose={() => setModal(null)} />}
+      {modal === "become-specialist" && <BecomeSpecialistModal onClose={() => setModal(null)} refreshUser={refreshUser} />}
+      {twinViewerProp && (
+        twinViewerProp.dt_project_id && twinViewerProp.model_url ? (
+          // Real 3D viewer with Three.js — supports rotation 360°, X-Ray, wireframe, sections, pins
+          <DigitalTwinViewer
+            projectId={twinViewerProp.dt_project_id}
+            modelUrl={twinViewerProp.model_url}
+            projectName={twinViewerProp.property_name || twinViewerProp.dt_project_name}
+            onClose={() => setTwinViewerProp(null)}
+          />
+        ) : (
+          // Fallback: 2D top-down room layout from twins collection
+          <ClientTwinViewerModal
+            propertyId={twinViewerProp.property_id}
+            propertyName={twinViewerProp.property_name}
+            onClose={() => setTwinViewerProp(null)}
+          />
+        )
+      )}
       {modal === "privacy" && <PrivacyModal onClose={() => setModal(null)} />}
       {modal === "referral" && <ReferralModal onClose={() => setModal(null)} />}
       {modal === "review-app" && <SimpleInfoModal title="Evaluează PropManage" onClose={() => setModal(null)}>
@@ -301,6 +419,143 @@ export const SettingsPanel = () => {
     </div>
   );
 };
+
+// ============= DIGITAL TWIN 3D CARD =============
+// Compact, prominent surface in Settings showing the user's Digital Twin status
+// across all owned properties. Click opens the existing ClientTwinViewerModal.
+const TWIN_STATUS_TONE = {
+  approved:           { bg: "bg-emerald-500/10",  border: "border-emerald-500/30", text: "text-emerald-300", dot: "bg-emerald-400" },
+  draft:              { bg: "bg-indigo-500/10",   border: "border-indigo-500/30",  text: "text-indigo-300",  dot: "bg-indigo-400" },
+  pending_validation: { bg: "bg-amber-500/10",    border: "border-amber-500/30",   text: "text-amber-300",   dot: "bg-amber-400" },
+  needs_revision:     { bg: "bg-red-500/10",      border: "border-red-500/30",     text: "text-red-300",     dot: "bg-red-400" },
+  not_requested:      { bg: "bg-stone-500/10",    border: "border-stone-500/30",   text: "text-stone-300",   dot: "bg-stone-400" },
+};
+
+const DigitalTwinCard = ({ summary, onView }) => {
+  const navigate = useNavigate();
+  // No property at all → CTA to create one
+  if (!summary?.has_any) {
+    return (
+      <div className="mb-6 rounded-2xl bg-gradient-to-br from-[#d4ff3a]/5 to-emerald-500/5 border border-[#d4ff3a]/20 p-5" data-testid="dt-card-empty">
+        <div className="flex items-start gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl bg-[#d4ff3a]/15 border border-[#d4ff3a]/30 flex items-center justify-center shrink-0">
+            <Box className="w-5 h-5 text-[#d4ff3a]" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-serif text-lg text-stone-100">Digital Twin 3D</h3>
+            <p className="text-xs text-stone-400 mt-1">Adaugă prima ta proprietate ca să poți genera modelul Digital Twin.</p>
+          </div>
+        </div>
+        <button
+          onClick={() => navigate("/client?tab=properties")}
+          className="w-full bg-[#d4ff3a] text-stone-900 font-medium py-2.5 rounded-xl text-sm hover:bg-[#c8f520] transition flex items-center justify-center gap-2"
+          data-testid="dt-create-btn"
+        >
+          <Sparkles className="w-4 h-4" /> Adaugă o proprietate
+        </button>
+      </div>
+    );
+  }
+
+  const primary = summary.primary;
+  const tone = TWIN_STATUS_TONE[primary?.status] || TWIN_STATUS_TONE.not_requested;
+  const otherCount = (summary.twins?.length || 0) - 1;
+  const isApproved = primary?.status === "approved";
+  const canView = isApproved; // The existing viewer reads rooms/assets — only meaningful when approved
+
+  return (
+    <div className="mb-6 rounded-2xl bg-gradient-to-br from-[#d4ff3a]/5 to-emerald-500/5 border border-[#d4ff3a]/20 p-5" data-testid="dt-card">
+      <div className="flex items-start gap-3 mb-3">
+        <div className="w-10 h-10 rounded-xl bg-[#d4ff3a]/15 border border-[#d4ff3a]/30 flex items-center justify-center shrink-0">
+          <Box className="w-5 h-5 text-[#d4ff3a]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-serif text-lg text-stone-100">Digital Twin 3D</h3>
+          <p className="text-xs text-stone-400 mt-1">Vizualizează și gestionează modelul tău Digital Twin.</p>
+        </div>
+      </div>
+
+      {/* Primary twin status */}
+      <div className={`rounded-xl ${tone.bg} ${tone.border} border p-3 mb-3`} data-testid="dt-primary-status">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="text-xs uppercase tracking-wider text-stone-500">Imobil principal</div>
+          <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${tone.bg} ${tone.text} ${tone.border} border inline-flex items-center gap-1`} data-testid="dt-status-badge">
+            <span className={`w-1.5 h-1.5 rounded-full ${tone.dot}`} />
+            Status: {primary?.status_label || "Inexistent"}
+          </span>
+        </div>
+        <div className="text-sm text-stone-200 truncate" title={primary?.property_name}>{primary?.property_name}</div>
+        {/* Progress bar — show when in flight (draft / pending) */}
+        {primary && primary.progress > 0 && primary.progress < 100 && (
+          <div className="mt-2">
+            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div className={`h-full ${tone.dot} transition-all`} style={{ width: `${primary.progress}%` }} />
+            </div>
+            <div className="text-[10px] text-stone-500 mt-1">{primary.progress}% finalizat</div>
+          </div>
+        )}
+      </div>
+
+      {/* Primary action */}
+      {canView ? (
+        <button
+          onClick={() => onView(primary)}
+          className="w-full bg-[#d4ff3a] text-stone-900 font-medium py-2.5 rounded-xl text-sm hover:bg-[#c8f520] transition flex items-center justify-center gap-2"
+          data-testid="dt-view-btn"
+        >
+          <Box className="w-4 h-4" /> Vezi Digital Twin 3D
+        </button>
+      ) : primary?.status === "pending_validation" || primary?.status === "draft" ? (
+        <button
+          disabled
+          className="w-full bg-white/5 text-stone-400 font-medium py-2.5 rounded-xl text-sm cursor-not-allowed inline-flex items-center justify-center gap-2"
+          data-testid="dt-pending-btn"
+        >
+          <Loader2 className="w-4 h-4 animate-spin" /> În generare — revino în curând
+        </button>
+      ) : (
+        <button
+          onClick={() => navigate("/client?tab=properties")}
+          className="w-full bg-[#d4ff3a] text-stone-900 font-medium py-2.5 rounded-xl text-sm hover:bg-[#c8f520] transition inline-flex items-center justify-center gap-2"
+          data-testid="dt-create-btn"
+        >
+          <Sparkles className="w-4 h-4" /> Creează Digital Twin
+        </button>
+      )}
+
+      {/* Secondary twins list (if user has >1 property) */}
+      {otherCount > 0 && (
+        <details className="mt-3">
+          <summary className="text-[11px] text-stone-500 cursor-pointer hover:text-stone-300" data-testid="dt-others-toggle">
+            Vezi celelalte {otherCount} imobil{otherCount > 1 ? "e" : ""}
+          </summary>
+          <div className="mt-2 space-y-1.5">
+            {summary.twins.slice(1).map((t) => {
+              const otone = TWIN_STATUS_TONE[t.status] || TWIN_STATUS_TONE.not_requested;
+              const otherApproved = t.status === "approved";
+              return (
+                <button
+                  key={t.property_id}
+                  onClick={() => otherApproved && onView(t)}
+                  disabled={!otherApproved}
+                  className={`w-full text-left flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg ${otone.bg} ${otone.border} border ${otherApproved ? "hover:bg-white/[0.06]" : "opacity-70 cursor-not-allowed"}`}
+                  data-testid={`dt-other-${t.property_id}`}
+                >
+                  <span className="text-xs text-stone-200 truncate flex-1">{t.property_name}</span>
+                  <span className={`text-[10px] ${otone.text} inline-flex items-center gap-1`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${otone.dot}`} />
+                    {t.status_label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+};
+
 
 // ============= PROFILE EDIT MODAL =============
 const ProfileModal = ({ onClose }) => {
@@ -880,6 +1135,11 @@ const ContactModal = ({ onClose }) => {
   const [form, setForm] = useState({ subject: "", message: "" });
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [contactInfo, setContactInfo] = useState({ email: "contact@propmanage.ro", response_time: "24h" });
+
+  useEffect(() => {
+    axios.get(`${API}/support/contact-info`).then(r => setContactInfo(r.data)).catch(() => {});
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -901,31 +1161,40 @@ const ContactModal = ({ onClose }) => {
         <div className="text-center py-8" data-testid="contact-sent">
           <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
           <div className="font-serif text-xl">Mesaj trimis</div>
-          <p className="text-sm text-stone-400 mt-2">Vei primi un răspuns în maxim 24h pe email-ul tău.</p>
+          <p className="text-sm text-stone-400 mt-2">Vei primi un răspuns în maxim {contactInfo.response_time} pe email-ul tău.</p>
         </div>
       ) : (
-        <form onSubmit={submit} className="space-y-4">
-          <Field label="Subiect">
-            <input
-              required
-              value={form.subject}
-              onChange={(e) => setForm({ ...form, subject: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm"
-              data-testid="contact-subject"
-            />
-          </Field>
-          <Field label="Mesaj">
-            <textarea
-              required
-              rows={5}
-              value={form.message}
-              onChange={(e) => setForm({ ...form, message: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm resize-none"
-              data-testid="contact-message"
-            />
-          </Field>
-          <button type="submit" disabled={loading} className="w-full btn-accent py-3 rounded-xl text-sm font-medium" data-testid="contact-send">{loading ? "Se trimite..." : "Trimite mesaj"}</button>
-        </form>
+        <>
+          <div className="mb-4 p-3 rounded-xl bg-[#d4ff3a]/5 border border-[#d4ff3a]/20" data-testid="contact-email-info">
+            <div className="text-[10px] uppercase tracking-wider text-[#d4ff3a] mb-1">Sau scrie-ne direct la</div>
+            <a href={`mailto:${contactInfo.email}`} className="text-sm text-white font-medium hover:underline break-all" data-testid="contact-email-link">
+              {contactInfo.email}
+            </a>
+            <div className="text-[10px] text-stone-500 mt-1">Răspuns garantat în {contactInfo.response_time}</div>
+          </div>
+          <form onSubmit={submit} className="space-y-4">
+            <Field label="Subiect">
+              <input
+                required
+                value={form.subject}
+                onChange={(e) => setForm({ ...form, subject: e.target.value })}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm"
+                data-testid="contact-subject"
+              />
+            </Field>
+            <Field label="Mesaj">
+              <textarea
+                required
+                rows={5}
+                value={form.message}
+                onChange={(e) => setForm({ ...form, message: e.target.value })}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm resize-none"
+                data-testid="contact-message"
+              />
+            </Field>
+            <button type="submit" disabled={loading} className="w-full btn-accent py-3 rounded-xl text-sm font-medium" data-testid="contact-send">{loading ? "Se trimite..." : "Trimite mesaj"}</button>
+          </form>
+        </>
       )}
     </ModalShell>
   );
@@ -1007,6 +1276,165 @@ const FAQItem = ({ q, a }) => {
 
 
 // ============= COVERAGE MODAL (specialist's work scope + zones + response time) =============
+// ============= BECOME SPECIALIST MODAL =============
+// Lets a Client user create a Specialist profile on the same account.
+// On success the user gains `dual_role_enabled=true` and is redirected to /specialist.
+const BecomeSpecialistModal = ({ onClose, refreshUser }) => {
+  const [phone, setPhone] = useState("");
+  const [categories, setCategories] = useState([]);
+  const [zones, setZones] = useState([]);
+  const [bio, setBio] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [groupedZones, setGroupedZones] = useState([]);
+  const [zoneSearch, setZoneSearch] = useState("");
+
+  // 9 main service categories used across the platform
+  const SERVICE_OPTIONS = [
+    { id: "electric", label: "Electrician" },
+    { id: "plumbing", label: "Instalator" },
+    { id: "hvac", label: "Termo/HVAC" },
+    { id: "appliance", label: "Reparații electrocasnice" },
+    { id: "painter", label: "Zugrav / finisaje" },
+    { id: "carpenter", label: "Tâmplar" },
+    { id: "interior_design", label: "Designer interior" },
+    { id: "cleaning", label: "Curățenie" },
+    { id: "general", label: "Constructor general" },
+  ];
+
+  useEffect(() => {
+    axios.get(`${API}/regions/grouped`).then(r => setGroupedZones(r.data || [])).catch(() => setGroupedZones([]));
+  }, []);
+
+  const toggleCat = (id) => setCategories(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  const toggleZone = (z) => setZones(p => p.includes(z) ? p.filter(x => x !== z) : [...p, z]);
+
+  const submit = async () => {
+    if (!phone || phone.length < 8) { alert("Adaugă un număr de telefon valid (minim 8 cifre)."); return; }
+    if (categories.length === 0) { alert("Alege cel puțin o categorie de servicii."); return; }
+    if (zones.length === 0) { alert("Alege cel puțin o zonă de acoperire."); return; }
+    setBusy(true);
+    try {
+      await axios.post(`${API}/auth/become-specialist`, {
+        phone, service_categories: categories, coverage_zones: zones, bio,
+      });
+      await refreshUser();
+      // Redirect to specialist dashboard so the user lands directly in their new profile
+      window.location.href = "/specialist";
+    } catch (e) {
+      alert(formatApiError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const filteredZones = zoneSearch
+    ? groupedZones.map(g => ({
+        ...g,
+        zones: g.zones.filter(z => z.zone.toLowerCase().includes(zoneSearch.toLowerCase()) || g.city.toLowerCase().includes(zoneSearch.toLowerCase())),
+      })).filter(g => g.zones.length > 0)
+    : groupedZones;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-3" onClick={onClose}>
+      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={e => e.stopPropagation()}
+        className="bg-stone-950 border border-white/10 rounded-3xl p-5 w-full max-w-lg max-h-[90vh] overflow-y-auto" data-testid="become-specialist-modal">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-serif text-xl">Devino Specialist</h3>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center" data-testid="become-specialist-close"><X className="w-4 h-4" /></button>
+        </div>
+        <p className="text-xs text-stone-400 mb-4">
+          Creezi un profil de Specialist pe același cont. După salvare poți comuta între Client și Specialist
+          oricând din Setări. Pentru badge-ul "Verified" va trebui să încarci documente de identitate ulterior.
+        </p>
+
+        {/* Phone */}
+        <label className="block text-xs uppercase tracking-wider text-stone-500 mb-1">Telefon contact</label>
+        <input
+          type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+          placeholder="07XX XXX XXX"
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm mb-4 focus:border-[#d4ff3a]/40 outline-none"
+          data-testid="become-spec-phone"
+        />
+
+        {/* Categories */}
+        <label className="block text-xs uppercase tracking-wider text-stone-500 mb-2">Categorii servicii (1+ obligatoriu)</label>
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {SERVICE_OPTIONS.map(opt => {
+            const active = categories.includes(opt.id);
+            return (
+              <button
+                key={opt.id}
+                onClick={() => toggleCat(opt.id)}
+                className={`text-left text-xs px-3 py-2 rounded-lg border transition ${active ? "border-[#d4ff3a] bg-[#d4ff3a]/10 text-[#d4ff3a]" : "border-white/10 text-stone-300 hover:border-white/20"}`}
+                data-testid={`become-spec-cat-${opt.id}`}
+              >
+                {active ? "✓ " : ""}{opt.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Bio */}
+        <label className="block text-xs uppercase tracking-wider text-stone-500 mb-1">Descriere scurtă (opțional)</label>
+        <textarea
+          value={bio} onChange={e => setBio(e.target.value.slice(0, 1000))}
+          placeholder="Spune clienților în 2-3 propoziții cu ce te ocupi și de ce ești de încredere."
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm mb-4 focus:border-[#d4ff3a]/40 outline-none min-h-[70px]"
+          data-testid="become-spec-bio"
+        />
+
+        {/* Zones */}
+        <label className="block text-xs uppercase tracking-wider text-stone-500 mb-2">Zone de acoperire (1+ obligatoriu)</label>
+        <input
+          type="text" value={zoneSearch} onChange={e => setZoneSearch(e.target.value)}
+          placeholder="Caută oraș sau cartier..."
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm mb-2 outline-none"
+          data-testid="become-spec-zone-search"
+        />
+        <div className="max-h-[180px] overflow-y-auto border border-white/5 rounded-xl p-2 mb-4 space-y-1">
+          {filteredZones.length === 0 && <div className="text-xs text-stone-500 italic px-2 py-1">Nicio zonă disponibilă.</div>}
+          {filteredZones.map(g => (
+            <div key={g.city}>
+              <div className="text-[10px] uppercase tracking-wider text-stone-500 px-2 pt-1">{g.city}</div>
+              <div className="flex flex-wrap gap-1">
+                {g.zones.map(z => {
+                  const active = zones.includes(z.zone);
+                  return (
+                    <button
+                      key={z.zone} onClick={() => toggleZone(z.zone)}
+                      className={`text-[11px] px-2 py-1 rounded-full border transition ${active ? "border-[#d4ff3a] bg-[#d4ff3a]/10 text-[#d4ff3a]" : "border-white/10 text-stone-300 hover:border-white/20"}`}
+                      data-testid={`become-spec-zone-${z.zone}`}
+                    >
+                      {z.zone}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Summary + submit */}
+        <div className="text-[11px] text-stone-500 mb-3">
+          Selectate: <span className="text-stone-300">{categories.length}</span> categorii · <span className="text-stone-300">{zones.length}</span> zone
+        </div>
+        <button
+          onClick={submit} disabled={busy}
+          className="w-full bg-[#d4ff3a] text-stone-900 font-medium py-3 rounded-xl text-sm hover:bg-[#c8f520] transition disabled:opacity-50"
+          data-testid="become-spec-submit"
+        >
+          {busy ? "Se creează profilul..." : "Creează profil de Specialist"}
+        </button>
+        <p className="text-[10px] text-stone-600 mt-3 text-center">
+          După salvare vei fi redirecționat la dashboard-ul de Specialist. Poți reveni la profilul Client din Setări → Comută la profil Client.
+        </p>
+      </motion.div>
+    </div>
+  );
+};
+
+
+// ============= COVERAGE MODAL =============
 const CoverageModal = ({ user, refreshUser, onClose }) => {
   const isDesigner = (user.service_categories || []).includes("interior_design");
   const [scope, setScope] = useState(user.coverage_scope || "local");

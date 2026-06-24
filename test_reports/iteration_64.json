@@ -1,0 +1,30 @@
+{
+  "summary": "Iter64 - Tier-based progressive disclosure end-to-end testing PASSED. Backend tier_demo_seed: 9/9 demo accounts (3 client + 6 specialist) idempotently seeded with correct tier/verified/reviews_count/jobs_completed and accept Demo123!. Admin tier-switcher dropdown shows all 12 ROLE_PROFILES entries (3 base + 3 client tiers + 6 spec tiers) with all expected data-testids and 3 section headers visible. Specialist ENTRY (spec.entry) sees minimal UI: only 3 bottom tabs (opportunities, jobs, settings — NO notifications), spec-newcomer-intro + newcomer-upload-docs visible, verify-banner visible, and ALL of spec-stat-* + manage-portfolio-btn + link-premium-profile + premium-hint hidden. Specialist PREMIUM (spec.premium) shows ALL 4 tabs, ALL 4 stats, link-premium-profile, AND Quest panel rendered. Client JUNIOR (client.junior) shows welcome 'Bună, Andrei', Ghid de pornire bar, 4 stat tiles, 'Începe cu prima ta proprietate' empty state, and 4 client tabs. Regression OK: specialist@propmanage.io still shows full 4 tabs/4 stats/Quest, client@propmanage.io still shows normal dashboard.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "SpecialistDashboard (spec.premium)", "issues": ["Quest panel still reads 'Nivel actual: Junior · 0 deblocate · 9 blocate' for a user whose backend tier=PREMIUM. The unlock gating itself is correct (Quest section IS visible per ADVANCED+ rule); only the displayed level text inside the Quest/Unelte avansate header appears to be computed from jobs_completed/its own ladder rather than user.tier. Cosmetic only — does not affect feature gating.", "The header chip next to Daniel PREMIUM also shows 'JUNIOR' badge instead of PREMIUM in the global header area near profile name. Likely the same secondary tier-derivation pipeline."]},
+      {"screen": "Multiple specialist pages", "issues": ["React console warning: 'Encountered two children with the same key, interior_design' — service_categories list in tier_demo_seed inserts the specialty + 'interior_design'; when specialty itself is 'interior_design' (spec.premium, spec.top), the list becomes duplicate. Fix: dedupe service_categories in tier_demo_seed.py line ~169/195 with list(dict.fromkeys([...]))."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter64_tier_seed.py", "/app/test_reports/pytest/iter64.xml"],
+  "action_items": [
+    "OPTIONAL/COSMETIC: Align the Quest/Unelte avansate panel 'Nivel actual: ...' label and the user-header tier badge with user.tier (currently shows JUNIOR for a PREMIUM user). Unlock booleans are correct; only the displayed text is off.",
+    "MINOR: Dedupe service_categories in tier_demo_seed.py to silence React duplicate-key warning for interior_design specialists (spec.premium, spec.top). e.g. list(dict.fromkeys([u.get('specialty'), 'interior_design']))."
+  ],
+  "critical_code_review_comments": [
+    "tier_demo_seed.py: service_categories construction can produce duplicate values when specialty=='interior_design' (spec.premium, spec.top) causing React duplicate-key console warnings in Specialist dashboards. Use a dedupe pattern.",
+    "AdminLayoutMetronic.jsx ROLE_PROFILES: clean structure with explicit 'group' discriminator; dropdown testid pattern quick-profile-{tier-lowercase}-{role} works as documented and 12/12 testids resolved.",
+    "useTier.js: Tier normalization defaults unknown values to ENTRY (rank 0). Good failsafe for specialists, but for clients an undefined tier also lands on ENTRY which has rank 0 — fine because the lowest client tier rank is JUNIOR=1 so all gates kick in correctly. Consider adding role-aware default ('JUNIOR' for client) if a client without explicit tier should still see notifications tab."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter64_tier_seed.py"],
+  "success_rate": {"backend": "100% (19/19 pytest)", "frontend": "100% (6/6 user-flow scenarios)"},
+  "test_credentials": "admin@propmanage.io/Admin123!, spec.entry@propmanage.io/Demo123!, spec.premium@propmanage.io/Demo123!, client.junior@propmanage.io/Demo123!, specialist@propmanage.io/Spec123!, client@propmanage.io/Client123! — all confirmed working.",
+  "seed_data_creation": "No new ephemeral users created. 9 tier-demo accounts are idempotently seeded by backend startup (tier_demo_seed.py). Logs confirm: created=9 on first run, updated=9 on subsequent boots.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Tier seed is idempotent (key=email). useTier() reads user.tier from /auth/me response. AdminLayout dropdown's onClick path: GET /api/admin/users?q=<demoEmail> -> POST /api/admin/impersonate -> redirect. Two cosmetic-only items remain (tier label mismatch in Quest panel header + interior_design duplicate-key React warning). All gating booleans work correctly. Hard logout pattern in Playwright requires page.request.post('/api/auth/logout') + ctx.clear_cookies() to invalidate httpOnly cookie — otherwise /login redirects back to /admin and the form fields target unrelated inputs (verified during this iteration's first run).",
+  "rca_of_the_issue": "No defects blocking acceptance. Two cosmetic notes recorded under design_issues: (a) Quest panel header displays jobs-based ladder text instead of user.tier label; (b) tier_demo_seed.py emits duplicate 'interior_design' in service_categories for spec.premium and spec.top causing a React key warning. Both are minor and do not affect unlock behavior. Confirmed by Playwright screenshots: spec.entry sees minimal UI (3 tabs + newcomer card + verify banner), spec.premium sees 4 tabs + 4 stats + link-premium-profile + Quest, client.junior sees welcome+ghid+empty state+4 tabs."
+}

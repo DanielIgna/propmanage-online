@@ -5,6 +5,13 @@ module.exports = {
     "./src/**/*.{js,jsx,ts,tsx}",
     "./public/index.html"
   ],
+  safelist: [
+    // QA Copilot + AI Control Center dynamic category colors
+    ...['cyan', 'amber', 'red', 'violet', 'blue', 'orange', 'rose', 'lime', 'emerald', 'stone'].flatMap(c => [
+      `bg-${c}-500/15`, `bg-${c}-500/10`, `bg-${c}-500/20`, `border-${c}-500/30`, `border-${c}-500/40`,
+      `text-${c}-400`, `text-${c}-300`, `text-${c}-100`, `text-${c}-200`,
+    ]),
+  ],
   theme: {
   	extend: {
   		borderRadius: {

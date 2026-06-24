@@ -11,6 +11,7 @@ import { API, DashLayout, Stat } from "./DashShared";
 import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
 import { RequestTimelineModal } from "./ActivityTimeline";
+import { AutopilotWidget } from "./AutopilotWidget";
 
 export const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
@@ -68,6 +69,7 @@ export const AdminDashboard = () => {
             <Stat icon={AlertTriangle} label="Dispute" value={openDisputes.length} sub="Deschise" color="red" tid="admin-disputes-stat" />
           </div>
           <AdminAnalytics />
+          <AutopilotWidget />
           {/* Live Activity Stream */}
           <div className="glass-strong rounded-3xl p-6 mt-6" data-testid="activity-stream">
             <div className="flex items-center justify-between mb-4">

@@ -184,3 +184,71 @@ export const ResetCamera = ({ resetTrigger }) => {
   }, [resetTrigger, camera, controls]);
   return null;
 };
+
+
+// ============= MULTI-LAYER SCENE =============
+// Loads multiple GLB models simultaneously, each treated as an independent
+// building system (structure / electric / plumbing / hvac / ...). The
+// LayerPanel toggles visibility + opacity per layer — this is the "glass
+// walls X-Ray" experience requested by the user.
+//
+// Props:
+//   layers: [
+//     { id, url, label, color (hex 0x..), opacity (0-1), visible (bool) }
+//   ]
+//   clippingPlanes: THREE.Plane[] | null
+//
+// Each layer keeps its raw geometry but its material is rebuilt with the
+// layer's colour + opacity + transparency. Setting opacity=1 + transparent=false
+// renders fully opaque (structure default). Setting opacity=0.25 renders glass.
+const _LayerModel = ({ layer, clippingPlanes }) => {
+  const { scene } = useGLTF(layer.url);
+  // Clone so multiple instances of the same URL keep independent materials.
+  const cloned = useMemo(() => scene.clone(true), [scene]);
+
+  useEffect(() => {
+    cloned.traverse((obj) => {
+      if (!obj.isMesh) return;
+      const isTransparent = layer.opacity < 1.0;
+      const mat = new THREE.MeshStandardMaterial({
+        color: layer.color,
+        roughness: 0.55,
+        metalness: 0.05,
+        transparent: isTransparent,
+        opacity: layer.opacity,
+        depthWrite: !isTransparent, // transparent layers shouldn't occlude what's behind
+        side: THREE.DoubleSide,
+      });
+      mat.clippingPlanes = clippingPlanes && clippingPlanes.length ? clippingPlanes : null;
+      mat.clipShadows = true;
+      mat.needsUpdate = true;
+      obj.material = mat;
+      obj.castShadow = !isTransparent;
+      obj.receiveShadow = !isTransparent;
+    });
+  }, [cloned, layer.color, layer.opacity, clippingPlanes]);
+
+  if (!layer.visible) return null;
+  return <primitive object={cloned} />;
+};
+
+
+export const MultiLayerScene = ({ layers, clippingPlanes, onMeshClick }) => {
+  // Render order: opaque first (structure, walls), then transparent overlays
+  // (electric, plumbing, hvac). Three.js sorts by depth but ordering helps.
+  const sorted = useMemo(() => {
+    return [...layers].sort((a, b) => (b.opacity || 0) - (a.opacity || 0));
+  }, [layers]);
+  return (
+    <group
+      onClick={(e) => {
+        e.stopPropagation();
+        onMeshClick?.(e);
+      }}
+    >
+      {sorted.map((layer) => (
+        <_LayerModel key={layer.id} layer={layer} clippingPlanes={clippingPlanes} />
+      ))}
+    </group>
+  );
+};

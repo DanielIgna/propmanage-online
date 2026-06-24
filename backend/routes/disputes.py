@@ -13,7 +13,7 @@ from db import db
 from core_utils import serialize_doc, effective_role
 from deps import get_current_user, require_role
 from services import send_email, notify, send_web_push, log_event
-from models import *
+from models import DisputeOpenIn, DisputeResolveIn
 from email_service import (
     send_template, tpl_welcome, tpl_dispute_opened, tpl_dispute_resolved,
     tpl_design_phase_quote, tpl_specialist_verified, tpl_escrow_funded,

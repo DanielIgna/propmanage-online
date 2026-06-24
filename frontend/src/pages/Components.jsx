@@ -2,7 +2,7 @@
 import React, { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import axios from "axios";
-import { Star, Upload, X, Plus, Trash2, Edit2, Building2 } from "lucide-react";
+import { Star, Upload, X, Plus, Trash2, Edit2, Building2, Box } from "lucide-react";
 import { formatApiError } from "../auth";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -117,10 +117,32 @@ export const ReviewModal = ({ requestId, specialistName, onClose, onSubmitted })
 };
 
 // ============= PROPERTY MANAGER =============
-export const PropertyManagerModal = ({ properties, onClose, onChange }) => {
+export const PropertyManagerModal = ({ properties, onClose, onChange, onOpenTwin }) => {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ name: "", address: "", type: "apartment", surface: 50, rooms: 2 });
   const [showAdd, setShowAdd] = useState(false);
+  const [twinIndex, setTwinIndex] = useState({}); // { property_id: { status, dt_project_id, model_url } }
+
+  // Batch-load DT status across all owned properties so each row can show a colored
+  // 3D button. One call, refreshed when the list changes.
+  React.useEffect(() => {
+    let cancelled = false;
+    axios.get(`${API}/me/digital-twins`).then(r => {
+      if (cancelled) return;
+      const idx = {};
+      (r.data?.twins || []).forEach(t => {
+        idx[t.property_id] = {
+          status: t.status,
+          dt_project_id: t.dt_project_id,
+          dt_project_name: t.dt_project_name,
+          model_url: t.model_url,
+          property_name: t.property_name,
+        };
+      });
+      setTwinIndex(idx);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [properties.length]);
   
   const refresh = async () => {
     const { data } = await axios.get(`${API}/properties`);
@@ -195,23 +217,59 @@ export const PropertyManagerModal = ({ properties, onClose, onChange }) => {
         )}
         
         <div className="space-y-2">
-          {properties.map(p => (
-            <div key={p.id} className="bg-white/5 rounded-xl p-4 flex items-center gap-3" data-testid={`prop-item-${p.id}`}>
-              <div className="w-10 h-10 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-                <Building2 className="w-4 h-4 text-emerald-400" />
+          {properties.map(p => {
+            const tw = twinIndex[p.id] || {};
+            const twinStatus = tw.status;
+            const twinAvailable = twinStatus === "approved";
+            const twinInFlight = twinStatus === "pending_validation" || twinStatus === "draft";
+            const has3D = twinAvailable && !!tw.model_url;
+            const twinTone = twinAvailable
+              ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25"
+              : twinInFlight
+                ? "bg-amber-500/10 border-amber-500/30 text-amber-300/70 cursor-not-allowed"
+                : "bg-white/5 border-white/10 text-stone-400 hover:bg-white/10";
+            const twinTitle = has3D
+              ? "Vezi modelul 3D (rotație 360° · X-Ray · Wireframe)"
+              : twinAvailable
+                ? "Vezi planul 2D al proprietății"
+                : twinInFlight
+                  ? "Digital Twin în generare — revino în curând"
+                  : "Digital Twin indisponibil";
+            return (
+              <div key={p.id} className="bg-white/5 rounded-xl p-4 flex items-center gap-3" data-testid={`prop-item-${p.id}`}>
+                <div className="w-10 h-10 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+                  <Building2 className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm">{p.name}</div>
+                  <div className="text-[10px] text-stone-500">{p.type} · {p.surface}m² · {p.rooms} camere · Health: {p.health_score}/100</div>
+                </div>
+                {onOpenTwin && (
+                  <button
+                    onClick={() => twinAvailable && onOpenTwin({
+                      property_id: p.id,
+                      property_name: p.name,
+                      dt_project_id: tw.dt_project_id,
+                      dt_project_name: tw.dt_project_name,
+                      model_url: tw.model_url,
+                    })}
+                    disabled={!twinAvailable}
+                    title={twinTitle}
+                    className={`px-2 py-1.5 rounded-lg border text-[10px] uppercase tracking-wider inline-flex items-center gap-1 transition ${twinTone}`}
+                    data-testid={`prop-twin-${p.id}`}
+                  >
+                    <Box className="w-3.5 h-3.5" />{has3D ? "3D" : "2D"}
+                  </button>
+                )}
+                <button onClick={() => startEdit(p)} className="p-2 hover:bg-white/10 rounded-lg" data-testid={`prop-edit-${p.id}`}>
+                  <Edit2 className="w-3.5 h-3.5 text-stone-400" />
+                </button>
+                <button onClick={() => del(p.id)} className="p-2 hover:bg-red-500/10 rounded-lg" data-testid={`prop-del-${p.id}`}>
+                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                </button>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-medium text-sm">{p.name}</div>
-                <div className="text-[10px] text-stone-500">{p.type} · {p.surface}m² · {p.rooms} camere · Health: {p.health_score}/100</div>
-              </div>
-              <button onClick={() => startEdit(p)} className="p-2 hover:bg-white/10 rounded-lg" data-testid={`prop-edit-${p.id}`}>
-                <Edit2 className="w-3.5 h-3.5 text-stone-400" />
-              </button>
-              <button onClick={() => del(p.id)} className="p-2 hover:bg-red-500/10 rounded-lg" data-testid={`prop-del-${p.id}`}>
-                <Trash2 className="w-3.5 h-3.5 text-red-400" />
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </motion.div>
     </div>

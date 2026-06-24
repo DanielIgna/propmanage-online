@@ -23,11 +23,17 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, Body, Query, UploadFile, File
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
+import logging
+
+logger = logging.getLogger("propmanage.digital_twin")
 
 from db import db
 from deps import get_current_user, require_role
 from core_utils import JWT_SECRET, JWT_ALGORITHM
 import jwt as _jwt
+import asyncio
+import cloudconvert_client as _ccv
+import blender_service as _blender
 from email_service import (
     send_template,
     tpl_dt_pin_created,
@@ -48,10 +54,12 @@ router = APIRouter(prefix="/api/digital-twin", tags=["digital-twin"])
 UPLOAD_ROOT = Path(os.environ.get("DT_UPLOAD_DIR") or "/app/backend/uploads/digital_twin")
 UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
 
-ALLOWED_EXTS = {".glb", ".gltf", ".skp"}
+ALLOWED_EXTS = {".glb", ".gltf", ".skp", ".dae", ".obj", ".fbx", ".stl", ".ply"}
 ALLOWED_PLAN_EXTS = {".pdf"}
 # Extensions that can't be rendered in-browser; we store them as downloadable archives only.
 DOWNLOAD_ONLY_EXTS = {".skp"}
+# Extensions Blender can auto-convert to .glb headless on Linux
+BLENDER_CONVERT_EXTS = {".dae", ".obj", ".fbx", ".stl", ".ply"}
 MAX_UPLOAD_BYTES = 200 * 1024 * 1024  # 200 MB hard cap
 MAX_PLAN_BYTES = 50 * 1024 * 1024  # 50 MB cap for PDFs
 
@@ -152,12 +160,14 @@ class ProjectCreate(BaseModel):
     property_id: Optional[str] = None
     description: Optional[str] = Field(None, max_length=2000)
     model_url: Optional[str] = Field(None, max_length=2000)  # Phase B: external .glb URL
+    trimble_embed_url: Optional[str] = Field(None, max_length=2000)  # Trimble Connect 3D viewer share URL
 
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=200)
     description: Optional[str] = Field(None, max_length=2000)
     model_url: Optional[str] = Field(None, max_length=2000)
+    trimble_embed_url: Optional[str] = Field(None, max_length=2000)
 
 
 @router.post("/projects")
@@ -171,6 +181,7 @@ async def create_project(payload: ProjectCreate, user: dict = Depends(get_curren
         "property_id": payload.property_id,
         "description": (payload.description or "").strip(),
         "model_url": (payload.model_url or "").strip() or None,
+        "trimble_embed_url": (payload.trimble_embed_url or "").strip() or None,
         "owner_id": user["id"],
         "owner_name": user.get("name") or user.get("email"),
         "members": [],
@@ -294,9 +305,15 @@ async def delete_project(project_id: str, user: dict = Depends(get_current_user)
 async def upload_model(
     project_id: str,
     file: UploadFile = File(...),
+    layer_type: Optional[str] = Query(None, description="structure | electric | plumbing | hvac | decor | other"),
     user: dict = Depends(get_current_user),
 ):
-    """Upload a .glb/.gltf model for the project. Stored locally and served via /files/."""
+    """Upload a .glb/.gltf model for the project. Stored locally and served via /files/.
+
+    Each uploaded model is treated as an independent BUILDING LAYER (structure,
+    electric, plumbing, hvac, ...). Multiple layers per project let the viewer
+    render the X-Ray "glass walls" overlay business case.
+    """
     await _ensure_dt_access(user)
     p = await _ensure_project_access(project_id, user)
     if user.get("role") not in ("admin", "operator") and p.get("owner_id") != user["id"]:
@@ -306,7 +323,10 @@ async def upload_model(
     raw_name = file.filename or "model.glb"
     ext = Path(raw_name).suffix.lower()
     if ext not in ALLOWED_EXTS:
-        raise HTTPException(400, "Format permis: .glb, .gltf sau .skp (SketchUp, descărcabil — pentru randare în browser folosește .glb/.gltf).")
+        raise HTTPException(
+            400,
+            "Format permis: .glb / .gltf (vizualizabil 3D) · .dae / .obj / .fbx / .stl / .ply (auto-conversie via Blender) · .skp (SketchUp, descărcabil — exportă .dae din SketchUp pentru randare browser).",
+        )
 
     # Persist to disk with streaming (chunks of 1 MB) to avoid loading 200MB in RAM
     project_dir = UPLOAD_ROOT / project_id
@@ -337,8 +357,38 @@ async def upload_model(
     # Build the public URL. Use APP_PUBLIC_URL when set, else relative path the frontend will resolve.
     public_path = f"/api/digital-twin/files/{project_id}/{safe_name}"
 
+    # Layer metadata — color & default opacity per building system. This mirrors
+    # frontend's MultiLayerScene defaults so the viewer can apply consistent
+    # "glass walls" visuals.
+    LAYER_DEFAULTS = {
+        "structure":  {"label": "Structură",   "color": "#c8b89a", "opacity": 1.00},
+        "electric":   {"label": "Electricitate", "color": "#fbbf24", "opacity": 0.45},
+        "plumbing":   {"label": "Apă/Canal",    "color": "#3b82f6", "opacity": 0.45},
+        "hvac":       {"label": "Climatizare",  "color": "#10b981", "opacity": 0.45},
+        "decor":      {"label": "Decor",        "color": "#a78bfa", "opacity": 0.85},
+        "other":      {"label": "Alt strat",    "color": "#94a3b8", "opacity": 0.70},
+    }
+    norm_layer = (layer_type or "").strip().lower()
+    if norm_layer not in LAYER_DEFAULTS:
+        # Auto-detect from filename for backwards-compat (e.g. "electric_layer.glb")
+        n = raw_name.lower()
+        if any(k in n for k in ("electric", "elect", "el_")):
+            norm_layer = "electric"
+        elif any(k in n for k in ("plumb", "apa", "sanitar", "water")):
+            norm_layer = "plumbing"
+        elif any(k in n for k in ("hvac", "clima", "ventil")):
+            norm_layer = "hvac"
+        elif any(k in n for k in ("decor", "interior", "design", "mobil")):
+            norm_layer = "decor"
+        elif any(k in n for k in ("struct", "rezist", "arhitectur", "ar_")):
+            norm_layer = "structure"
+        else:
+            norm_layer = "structure"  # first upload default
+    layer_meta = LAYER_DEFAULTS[norm_layer]
+
     # Save model metadata + set as current model on project
     is_archive = ext in DOWNLOAD_ONLY_EXTS
+    needs_blender = ext in BLENDER_CONVERT_EXTS  # DAE/OBJ/FBX/STL/PLY → GLB
     model_doc = {
         "id": _new_id(),
         "project_id": project_id,
@@ -346,22 +396,48 @@ async def upload_model(
         "stored_as": safe_name,
         "size_bytes": total,
         "url": public_path,
-        "kind": "archive" if is_archive else "model",  # "archive" = .skp (download only), "model" = .glb/.gltf
+        "kind": "archive" if is_archive else ("source" if needs_blender else "model"),
         "ext": ext,
+        "layer_type": norm_layer,
+        "layer_label": layer_meta["label"],
+        "layer_color": layer_meta["color"],
+        "layer_opacity": layer_meta["opacity"],
+        "layer_visible": True,
         "uploaded_by": user["id"],
         "uploaded_by_name": user.get("name") or user.get("email"),
         "uploaded_by_role": user.get("role"),
         "uploaded_at": _now_iso(),
     }
+    # Auto-conversion path:
+    #   .skp → CloudConvert (off — SKP not supported)
+    #   .dae / .obj / .fbx / .stl / .ply → Blender headless
+    if needs_blender and _blender.is_enabled():
+        model_doc["conversion_status"] = "pending"
+        model_doc["conversion_percent"] = 0
+        model_doc["conversion_started_at"] = _now_iso()
+        model_doc["conversion_engine"] = "blender"
+    elif is_archive and ext == ".skp" and _ccv.is_enabled():
+        model_doc["conversion_status"] = "pending"
+        model_doc["conversion_percent"] = 0
+        model_doc["conversion_started_at"] = _now_iso()
+        model_doc["conversion_engine"] = "cloudconvert"
     await db.digital_twin_models.insert_one(model_doc)
     # Only set as the active model_url if it's actually viewable (.glb/.gltf)
+    is_viewable = not is_archive and not needs_blender
     update_set = {"updated_at": _now_iso()}
-    if not is_archive:
+    if is_viewable:
         update_set["model_url"] = public_path
     await db.digital_twin_projects.update_one(
         {"id": project_id},
         {"$set": update_set, "$inc": {"model_count": 1}},
     )
+    # Fire-and-forget conversion: doesn't block the upload response.
+    if model_doc.get("conversion_status") == "pending":
+        engine = model_doc.get("conversion_engine")
+        if engine == "blender":
+            asyncio.create_task(_run_blender_conversion(model_doc["id"]))
+        elif engine == "cloudconvert":
+            asyncio.create_task(_run_skp_to_glb_conversion(model_doc["id"]))
     # Phase G: notify stakeholders the architect updated the model
     actor_name = user.get("name") or user.get("email") or "Utilizator"
     project_name = p.get("name", "Proiect")
@@ -381,6 +457,349 @@ async def upload_model(
             to=s["email"],
         )
     return _clean(model_doc)
+
+
+# ============= CLOUDCONVERT SKP → GLB PIPELINE =============
+
+LAYER_DEFAULTS_FOR_CONVERT = {
+    "structure":  {"label": "Structură",   "color": "#c8b89a", "opacity": 1.00},
+    "electric":   {"label": "Electricitate", "color": "#fbbf24", "opacity": 0.45},
+    "plumbing":   {"label": "Apă/Canal",    "color": "#3b82f6", "opacity": 0.45},
+    "hvac":       {"label": "Climatizare",  "color": "#10b981", "opacity": 0.45},
+    "decor":      {"label": "Decor",        "color": "#a78bfa", "opacity": 0.85},
+    "other":      {"label": "Alt strat",    "color": "#94a3b8", "opacity": 0.70},
+}
+
+
+async def _update_conversion(model_id: str, **fields) -> None:
+    fields["updated_at"] = _now_iso()
+    await db.digital_twin_models.update_one({"id": model_id}, {"$set": fields})
+
+
+async def _run_blender_conversion(model_id: str) -> None:
+    """Background task: convert .dae/.obj/.fbx/.stl/.ply → .glb via headless Blender.
+
+    Inserts a new sibling `digital_twin_models` row marked as the converted
+    `.glb` so MultiLayerScene picks it up automatically.
+    """
+    src = await db.digital_twin_models.find_one({"id": model_id})
+    if not src:
+        return
+    project_id = src["project_id"]
+    src_path = UPLOAD_ROOT / project_id / src["stored_as"]
+    if not src_path.exists():
+        await _update_conversion(model_id, conversion_status="failed", conversion_error="Source file missing on disk.")
+        return
+    await _update_conversion(model_id, conversion_status="converting", conversion_percent=10)
+    glb_safe = f"{uuid.uuid4().hex[:12]}.glb"
+    glb_path = UPLOAD_ROOT / project_id / glb_safe
+    try:
+        result = await _blender.convert_to_glb(str(src_path), str(glb_path), timeout_sec=600)
+    except Exception as e:  # noqa: BLE001
+        logger.exception(f"[Blender] conversion failed for {model_id}")
+        await _update_conversion(model_id, conversion_status="failed", conversion_error=str(e))
+        return
+    bytes_written = int(result.get("bytes_written") or 0)
+    await _update_conversion(model_id, conversion_status="downloading", conversion_percent=90)
+
+    norm_layer = src.get("layer_type") or "structure"
+    meta = LAYER_DEFAULTS_FOR_CONVERT.get(norm_layer, LAYER_DEFAULTS_FOR_CONVERT["structure"])
+    glb_public_path = f"/api/digital-twin/files/{project_id}/{glb_safe}"
+    converted_doc = {
+        "id": _new_id(),
+        "project_id": project_id,
+        "filename": Path(src["filename"]).stem + ".glb",
+        "stored_as": glb_safe,
+        "size_bytes": bytes_written,
+        "url": glb_public_path,
+        "kind": "model",
+        "ext": ".glb",
+        "layer_type": norm_layer,
+        "layer_label": meta["label"],
+        "layer_color": meta["color"],
+        "layer_opacity": meta["opacity"],
+        "layer_visible": True,
+        "uploaded_by": src.get("uploaded_by"),
+        "uploaded_by_name": src.get("uploaded_by_name"),
+        "uploaded_by_role": src.get("uploaded_by_role"),
+        "uploaded_at": _now_iso(),
+        "converted_from_id": model_id,
+        "converted_from_filename": src.get("filename"),
+        "conversion_engine": "blender",
+    }
+    await db.digital_twin_models.insert_one(converted_doc)
+    await db.digital_twin_projects.update_one(
+        {"id": project_id},
+        {"$set": {"model_url": glb_public_path, "updated_at": _now_iso()},
+         "$inc": {"model_count": 1}},
+    )
+    await _update_conversion(
+        model_id,
+        conversion_status="completed",
+        conversion_percent=100,
+        conversion_completed_at=_now_iso(),
+        converted_model_id=converted_doc["id"],
+    )
+    logger.info(f"[Blender] {src.get('ext')}→GLB done: {model_id} → {converted_doc['id']} ({bytes_written} bytes)")
+
+
+async def _run_skp_to_glb_conversion(model_id: str) -> None:
+    archive = await db.digital_twin_models.find_one({"id": model_id})
+    if not archive:
+        return
+    project_id = archive["project_id"]
+    src_path = UPLOAD_ROOT / project_id / archive["stored_as"]
+    if not src_path.exists():
+        await _update_conversion(model_id, conversion_status="failed", conversion_error="Source .skp file missing on disk.")
+        return
+
+    # 1) Create CC job
+    try:
+        await _update_conversion(model_id, conversion_status="uploading", conversion_percent=5)
+        cc_job = await _ccv.create_skp_to_glb_job()
+        cc_job_id = cc_job["id"]
+        await _update_conversion(model_id, cloudconvert_job_id=cc_job_id)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("[CloudConvert] create job failed")
+        await _update_conversion(model_id, conversion_status="failed", conversion_error=f"Create job: {e}")
+        return
+
+    # 2) Upload the .skp file (uses the import/upload task's signed form)
+    try:
+        await _ccv.upload_file_for_import_task(cc_job, str(src_path), archive["filename"])
+        await _update_conversion(model_id, conversion_status="converting", conversion_percent=20)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("[CloudConvert] upload failed")
+        await _update_conversion(model_id, conversion_status="failed", conversion_error=f"Upload: {e}")
+        return
+
+    # 3) Poll until job is finished or errored (max ~30 min)
+    max_polls = 360  # 360 * 5s = 30 min
+    finished_job = None
+    for i in range(max_polls):
+        await asyncio.sleep(5)
+        try:
+            job_state = await _ccv.get_job(cc_job_id)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[CloudConvert] poll error (attempt {i}): {e}")
+            continue
+        summary = _ccv.aggregate_job_status(job_state)
+        # Map CloudConvert progress to our 20-85 range.
+        pct = 20
+        if summary["convert_percent"] is not None:
+            pct = 20 + int(summary["convert_percent"] * 0.65)
+        await _update_conversion(model_id, conversion_percent=pct)
+        if summary["cc_status"] == "finished":
+            finished_job = job_state
+            break
+        if summary["cc_status"] == "error":
+            await _update_conversion(
+                model_id,
+                conversion_status="failed",
+                conversion_error=summary.get("error_message") or "CloudConvert reported error.",
+            )
+            return
+    if finished_job is None:
+        await _update_conversion(model_id, conversion_status="failed", conversion_error="Conversion timeout (30 min).")
+        return
+
+    # 4) Pull export URL + stream the .glb to local disk
+    try:
+        export_url, export_filename = _ccv.extract_export_file_url(finished_job)
+    except Exception as e:  # noqa: BLE001
+        await _update_conversion(model_id, conversion_status="failed", conversion_error=f"Export URL: {e}")
+        return
+
+    await _update_conversion(model_id, conversion_status="downloading", conversion_percent=90)
+    glb_safe = f"{uuid.uuid4().hex[:12]}.glb"
+    glb_path = UPLOAD_ROOT / project_id / glb_safe
+    try:
+        bytes_written = await _ccv.download_file(export_url, str(glb_path))
+    except Exception as e:  # noqa: BLE001
+        logger.exception("[CloudConvert] download failed")
+        await _update_conversion(model_id, conversion_status="failed", conversion_error=f"Download: {e}")
+        return
+
+    # 5) Insert the converted .glb as a sibling layer linked to the same project.
+    norm_layer = archive.get("layer_type") or "structure"
+    meta = LAYER_DEFAULTS_FOR_CONVERT.get(norm_layer, LAYER_DEFAULTS_FOR_CONVERT["structure"])
+    glb_public_path = f"/api/digital-twin/files/{project_id}/{glb_safe}"
+    converted_doc = {
+        "id": _new_id(),
+        "project_id": project_id,
+        "filename": export_filename or (Path(archive["filename"]).stem + ".glb"),
+        "stored_as": glb_safe,
+        "size_bytes": bytes_written,
+        "url": glb_public_path,
+        "kind": "model",
+        "ext": ".glb",
+        "layer_type": norm_layer,
+        "layer_label": meta["label"],
+        "layer_color": meta["color"],
+        "layer_opacity": meta["opacity"],
+        "layer_visible": True,
+        "uploaded_by": archive.get("uploaded_by"),
+        "uploaded_by_name": archive.get("uploaded_by_name"),
+        "uploaded_by_role": archive.get("uploaded_by_role"),
+        "uploaded_at": _now_iso(),
+        "converted_from_id": model_id,
+        "converted_from_filename": archive.get("filename"),
+    }
+    await db.digital_twin_models.insert_one(converted_doc)
+    await db.digital_twin_projects.update_one(
+        {"id": project_id},
+        {"$set": {"model_url": glb_public_path, "updated_at": _now_iso()},
+         "$inc": {"model_count": 1}},
+    )
+    await _update_conversion(
+        model_id,
+        conversion_status="completed",
+        conversion_percent=100,
+        conversion_completed_at=_now_iso(),
+        converted_model_id=converted_doc["id"],
+    )
+    logger.info(f"[CloudConvert] SKP→GLB done: {model_id} → {converted_doc['id']} ({bytes_written} bytes)")
+
+
+@router.get("/conversions/{model_id}/status")
+async def get_conversion_status(model_id: str, user: dict = Depends(get_current_user)):
+    """Polling endpoint — frontend hits this every 5s while a .skp is converting.
+
+    Returns:
+      { status, percent, error, converted_model_id, converted_url }
+    """
+    await _ensure_dt_access(user)
+    doc = await db.digital_twin_models.find_one({"id": model_id})
+    if not doc:
+        raise HTTPException(404, "Model not found.")
+    await _ensure_project_access(doc["project_id"], user)
+    converted_url = None
+    if doc.get("converted_model_id"):
+        sibling = await db.digital_twin_models.find_one({"id": doc["converted_model_id"]})
+        if sibling:
+            converted_url = sibling.get("url")
+    return {
+        "model_id": model_id,
+        "status": doc.get("conversion_status", "n/a"),
+        "percent": doc.get("conversion_percent", 0),
+        "error": doc.get("conversion_error"),
+        "converted_model_id": doc.get("converted_model_id"),
+        "converted_url": converted_url,
+        "cc_job_id": doc.get("cloudconvert_job_id"),
+        "started_at": doc.get("conversion_started_at"),
+        "completed_at": doc.get("conversion_completed_at"),
+    }
+
+
+@router.post("/conversions/{model_id}/retry")
+async def retry_conversion(model_id: str, user: dict = Depends(get_current_user)):
+    """Re-trigger conversion (owner / admin / operator only). Auto-selects engine."""
+    await _ensure_dt_access(user)
+    doc = await db.digital_twin_models.find_one({"id": model_id})
+    if not doc:
+        raise HTTPException(404, "Model not found.")
+    proj = await _ensure_project_access(doc["project_id"], user)
+    if user.get("role") not in ("admin", "operator") and proj.get("owner_id") != user["id"]:
+        raise HTTPException(403, "Only the project owner can retry conversion.")
+    ext = doc.get("ext")
+    if ext == ".skp":
+        if not _ccv.is_enabled():
+            raise HTTPException(503, "CloudConvert is not configured.")
+        engine = "cloudconvert"
+        runner = _run_skp_to_glb_conversion
+    elif ext in BLENDER_CONVERT_EXTS:
+        if not _blender.is_enabled():
+            raise HTTPException(503, "Blender is not available on this server.")
+        engine = "blender"
+        runner = _run_blender_conversion
+    else:
+        raise HTTPException(400, f"Format {ext} nu necesită conversie.")
+    await _update_conversion(
+        model_id,
+        conversion_status="pending",
+        conversion_percent=0,
+        conversion_error=None,
+        conversion_started_at=_now_iso(),
+        conversion_engine=engine,
+    )
+    asyncio.create_task(runner(model_id))
+    return {"ok": True, "model_id": model_id, "status": "pending", "engine": engine}
+
+
+# ============= MULTI-LAYER VIEWER ENDPOINTS =============
+@router.get("/projects/{project_id}/models")
+async def list_project_models(project_id: str, user: dict = Depends(get_current_user)):
+    """List all uploaded models (layers) for a project — used by the multi-layer
+    viewer to render multiple `.glb` files simultaneously as glass-wall overlays."""
+    await _ensure_dt_access(user)
+    await _ensure_project_access(project_id, user)
+    docs = await db.digital_twin_models.find({"project_id": project_id}).to_list(50)
+    # Only return viewable models (.glb/.gltf) — archives (.skp) listed separately
+    items = []
+    archives = []
+    for d in docs:
+        clean = _clean(d)
+        if d.get("kind") == "archive":
+            archives.append(clean)
+        else:
+            items.append(clean)
+    return {"models": items, "archives": archives, "total": len(items) + len(archives)}
+
+
+class _LayerUpdateIn(BaseModel):
+    layer_type: Optional[str] = Field(None, max_length=20)
+    layer_label: Optional[str] = Field(None, max_length=80)
+    layer_color: Optional[str] = Field(None, max_length=20)
+    layer_opacity: Optional[float] = Field(None, ge=0.0, le=1.0)
+    layer_visible: Optional[bool] = None
+
+
+@router.patch("/models/{model_id}")
+async def update_model_layer(
+    model_id: str,
+    payload: _LayerUpdateIn,
+    user: dict = Depends(get_current_user),
+):
+    """Update a model's layer metadata (color / opacity / label / visibility)."""
+    await _ensure_dt_access(user)
+    doc = await db.digital_twin_models.find_one({"id": model_id})
+    if not doc:
+        raise HTTPException(404, "Model not found.")
+    # Only project members + admin/operator can edit
+    await _ensure_project_access(doc["project_id"], user)
+    update = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if not update:
+        raise HTTPException(400, "Nothing to update.")
+    update["updated_at"] = _now_iso()
+    await db.digital_twin_models.update_one({"id": model_id}, {"$set": update})
+    refreshed = await db.digital_twin_models.find_one({"id": model_id})
+    return _clean(refreshed)
+
+
+@router.delete("/models/{model_id}")
+async def delete_model_layer(model_id: str, user: dict = Depends(get_current_user)):
+    """Remove a model file from a project (owner / admin / operator only)."""
+    await _ensure_dt_access(user)
+    doc = await db.digital_twin_models.find_one({"id": model_id})
+    if not doc:
+        raise HTTPException(404, "Model not found.")
+    proj = await _ensure_project_access(doc["project_id"], user)
+    if user.get("role") not in ("admin", "operator") and proj.get("owner_id") != user["id"]:
+        raise HTTPException(403, "Only the project owner can delete models.")
+    # Best-effort filesystem cleanup — never block the DB delete on filesystem errors
+    try:
+        path = UPLOAD_ROOT / doc["project_id"] / doc["stored_as"]
+        if path.exists():
+            path.unlink()
+    except Exception as _e:  # noqa: BLE001
+        logger.warning(f"[dt] failed to remove file {doc.get('stored_as')}: {_e}")
+    await db.digital_twin_models.delete_one({"id": model_id})
+    # Decrement project counter
+    await db.digital_twin_projects.update_one(
+        {"id": doc["project_id"]},
+        {"$inc": {"model_count": -1}, "$set": {"updated_at": _now_iso()}},
+    )
+    return {"ok": True, "id": model_id}
 
 
 @router.get("/files/{project_id}/{filename}")
@@ -1772,6 +2191,39 @@ class OperatorProjectCreate(BaseModel):
     client_id: str
     name: str = Field(..., min_length=2, max_length=200)
     description: Optional[str] = Field(None, max_length=2000)
+    trimble_embed_url: Optional[str] = Field(None, max_length=2000)
+
+
+class OperatorTrimbleEmbedUpdate(BaseModel):
+    trimble_embed_url: Optional[str] = Field(None, max_length=2000)
+
+
+@operator_router.patch("/projects/{project_id}/trimble")
+async def operator_set_trimble_embed(
+    project_id: str,
+    payload: OperatorTrimbleEmbedUpdate,
+    user: dict = Depends(require_role("operator", "admin")),
+):
+    """Set / clear the Trimble Connect 3D Viewer iframe URL for a project.
+
+    Pass an empty string or null to remove. The URL must be a Trimble Connect
+    share / embed link (e.g. https://web.connect.trimble.com/projects/.../viewer/...).
+    """
+    project = await db.digital_twin_projects.find_one({"id": project_id})
+    if not project:
+        raise HTTPException(404, "Project not found.")
+    raw_url = (payload.trimble_embed_url or "").strip()
+    if raw_url:
+        if not (raw_url.startswith("https://") and ("trimble.com" in raw_url or "sketchup.com" in raw_url)):
+            raise HTTPException(400, "URL invalid — folosește un link Trimble Connect / SketchUp (https://*.trimble.com/...).")
+        new_value = raw_url
+    else:
+        new_value = None
+    await db.digital_twin_projects.update_one(
+        {"id": project_id},
+        {"$set": {"trimble_embed_url": new_value, "updated_at": _now_iso()}},
+    )
+    return {"ok": True, "trimble_embed_url": new_value}
 
 
 @operator_router.post("/clients/{client_id}/projects")
@@ -1798,6 +2250,7 @@ async def operator_create_project_for_client(
         "name": payload.name.strip(),
         "description": (payload.description or "").strip(),
         "model_url": None,
+        "trimble_embed_url": (payload.trimble_embed_url or "").strip() or None,
         "owner_id": client_id,
         "owner_name": client.get("name") or client.get("email"),
         "members": [],

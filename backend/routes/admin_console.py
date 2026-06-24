@@ -459,6 +459,9 @@ async def list_users(
     q: Optional[str] = None,
     verified: Optional[bool] = None,
     banned: Optional[bool] = None,
+    email_verified: Optional[bool] = None,
+    phone_verified: Optional[bool] = None,
+    marketing_consent: Optional[bool] = None,
     skip: int = 0,
     limit: int = Query(50, le=200),
 ):
@@ -469,6 +472,12 @@ async def list_users(
         filt["verified"] = verified
     if banned is not None:
         filt["banned"] = banned
+    if email_verified is not None:
+        filt["email_verified"] = email_verified
+    if phone_verified is not None:
+        filt["phone_verified"] = phone_verified
+    if marketing_consent is not None:
+        filt["marketing_consent"] = marketing_consent
     if q:
         filt["$or"] = [
             {"name": {"$regex": q, "$options": "i"}},

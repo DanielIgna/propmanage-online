@@ -1,0 +1,119 @@
+"""Seed 4 sub-admin demo accounts (idempotent, called from server startup).
+
+Accounts created:
+  - testing.admin@propmanage.io   / TestAdmin123!  — scope: testing
+  - frontend.admin@propmanage.io  / FrontAdmin123! — scope: frontend
+  - backend.admin@propmanage.io   / BackAdmin123!  — scope: backend
+  - security.admin@propmanage.io  / SecAdmin123!   — scope: security
+
+All start as ``admin_seniority="senior"`` so they can be used as reference
+implementations for approval workflows. Super admin (admin@propmanage.io)
+remains the only one with scope="general".
+"""
+import logging
+from datetime import datetime, timezone
+
+import bcrypt
+
+from db import db
+
+logger = logging.getLogger("propmanage.sub_admin_seed")
+
+SUB_ADMINS = [
+    {
+        "email": "testing.admin@propmanage.io",
+        "password": "TestAdmin123!",
+        "name": "Testing Admin",
+        "admin_scope": "testing",
+        "admin_seniority": "senior",
+    },
+    {
+        "email": "frontend.admin@propmanage.io",
+        "password": "FrontAdmin123!",
+        "name": "Frontend Admin",
+        "admin_scope": "frontend",
+        "admin_seniority": "senior",
+    },
+    {
+        "email": "backend.admin@propmanage.io",
+        "password": "BackAdmin123!",
+        "name": "Backend Admin",
+        "admin_scope": "backend",
+        "admin_seniority": "senior",
+    },
+    {
+        "email": "security.admin@propmanage.io",
+        "password": "SecAdmin123!",
+        "name": "Security Admin",
+        "admin_scope": "security",
+        "admin_seniority": "senior",
+    },
+]
+
+
+async def seed_sub_admins() -> dict:
+    created, updated, skipped = 0, 0, 0
+    for spec in SUB_ADMINS:
+        try:
+            existing = await db.users.find_one({"email": spec["email"]})
+            now_iso = datetime.now(timezone.utc).isoformat()
+            if existing is None:
+                pw_hash = bcrypt.hashpw(spec["password"].encode(), bcrypt.gensalt()).decode()
+                doc = {
+                    "email": spec["email"],
+                    "name": spec["name"],
+                    "role": "admin",
+                    "admin_scope": spec["admin_scope"],
+                    "admin_seniority": spec["admin_seniority"],
+                    "password_hash": pw_hash,
+                    "verified": True,
+                    "email_verified": True,
+                    "phone_verified": False,
+                    "wallet_balance": 0,
+                    "tokens": 0,
+                    "tier": "",
+                    "is_active": True,
+                    "created_at": now_iso,
+                    "updated_at": now_iso,
+                    "is_demo_sub_admin": True,
+                    "consent_grandfathered": True,
+                    "terms_accepted": True,
+                    "privacy_policy_accepted": True,
+                }
+                await db.users.insert_one(doc)
+                created += 1
+            else:
+                # Idempotent update: only patch scope/seniority/role; leave password alone
+                patch = {}
+                if existing.get("role") != "admin":
+                    patch["role"] = "admin"
+                if existing.get("admin_scope") != spec["admin_scope"]:
+                    patch["admin_scope"] = spec["admin_scope"]
+                if existing.get("admin_seniority") != spec["admin_seniority"]:
+                    patch["admin_seniority"] = spec["admin_seniority"]
+                if not existing.get("is_demo_sub_admin"):
+                    patch["is_demo_sub_admin"] = True
+                if existing.get("is_active") is False:
+                    patch["is_active"] = True  # demo accounts always reactivated
+                if patch:
+                    patch["updated_at"] = datetime.now(timezone.utc).isoformat()
+                    await db.users.update_one({"_id": existing["_id"]}, {"$set": patch})
+                    updated += 1
+                else:
+                    skipped += 1
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[sub_admin_seed] failed for {spec['email']}: {e}")
+
+    # Backfill: existing admin@propmanage.io gets admin_scope="general"
+    try:
+        super_admin = await db.users.find_one({"email": "admin@propmanage.io"})
+        if super_admin and not super_admin.get("admin_scope"):
+            await db.users.update_one(
+                {"_id": super_admin["_id"]},
+                {"$set": {"admin_scope": "general", "admin_seniority": "senior"}},
+            )
+    except Exception:  # noqa: BLE001
+        pass
+
+    logger.info(f"[sub_admin_seed] created={created} updated={updated} skipped={skipped}")
+    return {"created": created, "updated": updated, "skipped": skipped}

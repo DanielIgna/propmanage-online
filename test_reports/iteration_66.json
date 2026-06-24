@@ -1,0 +1,43 @@
+{
+  "summary": "Full frontend regression of House Health F4 (Plans CRUD + Scoring + Recommendations + Marketplace publish). All 14 specified test cases pass. Backend was already 39/39 passing (not re-tested).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      { "screen": "House Health · Documentație tehnică", "issues": ["Date input uses native browser picker (mm/dd/yyyy) instead of localized shadcn calendar — minor UX inconsistency since rest of app is Romanian"] },
+      { "screen": "Cookie consent banner", "issues": ["Overlaps bottom ~80px of viewport but does not block clicks (acknowledged in test brief)"] }
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "HouseHealthPage.jsx is 617 lines — borderline; consider splitting RecommendationsSection and EvaluationSection into separate files for maintainability (>700 line threshold).",
+    "AdminHouseHealthPage.jsx PlanForm uses uncontrolled features split by newline ('text.split(\\n)') which can create empty string entries — already mitigated by .filter(Boolean) at save. Acceptable.",
+    "Recommendation list `li` className interpolation `m.cls.replace('text-','border-').split(' ').filter(...).join(' ')` works but is brittle if Tailwind class names change — consider a small color->border map.",
+    "Client-side publish() condition combines 4 checks (role+marketplace_request_id+priority+status) — duplicated implicitly with backend; if backend rule changes, update UI."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "not-tested (39/39 per main agent)", "frontend": "14/14 = 100%" },
+  "test_credentials": "admin@propmanage.io / 1!nasov01ADMIN (override; default Admin123! does NOT work for admin), client@propmanage.io / Client123!, specialist@propmanage.io / Spec123!. /app/memory/test_credentials.md lists Admin123! but actual seeded admin uses 1!nasov01ADMIN — flag for credential file update.",
+  "seed_data_creation": "Created admin plan qa_temp_basic (then archived as instructed). Created specialist recommendation 'TEST_QA Spec Rec' on twin 2d0a899...c012 which client subsequently published to marketplace. Test data left as-is (not hard-deleted) per instructions.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "F4 (F4.1+F4.2+F4.4) fully validated frontend. The PRE-EXISTING DATA on twin 2d0a899...c012 already had several urgent/recommended recs published in marketplace from prior iterations. The QA-created spec rec was used to validate client publish flow. Tutorial overlay can be bypassed by setting localStorage keys ['tutorial_dismissed_v2','tutorial_dismissed','tour_completed','hh_tutorial_done']='true' before navigation. Important: when checking plan slug in list inner_text, use case-insensitive match (CSS uppercase transform affects inner_text).",
+  "verified_flows": [
+    "Admin login + /admin/house-health route with both tabs (Planuri, Formula scor)",
+    "PlansTab: create qa_temp_basic with slug/name/desc/price/billing/trial/commission/features — appears in list with badges",
+    "PlansTab: edit qa_temp_basic price 9.99→19.99 — reflected in list",
+    "PlansTab: archive qa_temp_basic — shows 'arhivat' badge and opacity reduced",
+    "PlansTab: duplicate slug returns 409 from backend; UI displays error in form",
+    "ScoringTab: 7 weight sliders + numeric inputs, live total display = 100.0/100",
+    "ScoringTab: setting air=0 makes Save button disabled (isValid=false guard)",
+    "ScoringTab: restoring valid sum 100 enables Save; click → 'Salvat cu succes!' toast",
+    "Client (client@propmanage.io) recommendations tab: badges (URGENT rose / RECOMANDAT amber / MONITORIZARE sky) + category labels rendered",
+    "Client does NOT see 'Recomandare nouă' button (data-testid hh-rec-new absent)",
+    "Specialist (specialist@propmanage.io) sees 'Recomandare nouă' button; form opens with 4 approved evaluations available in dropdown; creating TEST_QA Spec Rec appears in list immediately",
+    "Client sees '📢 Publică în marketplace' button only on urgent/recommended unpublished recs; clicking confirms dialog, calls publish endpoint, alert shows request_id+commission, '✓ Publicat în marketplace' label replaces button",
+    "Monitor-priority recommendation has NO publish button (UI filter verified by scanning all hh-rec-* entries)",
+    "Score tab and Documentație tabs still render properly (regression — no break)"
+  ]
+}

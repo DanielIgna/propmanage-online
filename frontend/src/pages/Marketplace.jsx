@@ -3,10 +3,11 @@ import React, { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { Building2, Star, CheckCircle2, Search, Filter, ArrowLeft, Shield, QrCode, Copy, Check, Calendar, Wrench, AlertTriangle, CreditCard } from "lucide-react";
+import { Building2, Star, CheckCircle2, Search, Filter, ArrowLeft, Shield, QrCode, Copy, Check, Calendar, Wrench, AlertTriangle, CreditCard, MapPin } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { HealthScoreBadge } from "../components/HealthScoreBadge";
 import { useSEO } from "../hooks/useSEO";
+import { PMCard, PMPillButton, PMChip, PMSectionHeader, PMEmptyState } from "../components/pm";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -55,42 +56,46 @@ export const PublicMarketplace = () => {
   }, [filters]);
 
   return (
-    <div className="min-h-screen bg-[#0a0a0b] text-stone-100">
-      <header className="border-b border-white/5 sticky top-0 z-30 bg-[#0a0a0b]/80 backdrop-blur-xl">
+    <div className="pm-page-bg">
+      <header className="pm-topbar">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#d4ff3a] to-[#a8e028] flex items-center justify-center">
-              <Building2 className="w-3.5 h-3.5 text-black" strokeWidth={2.5} />
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#d4ff3a] to-[#a8e028] flex items-center justify-center">
+              <Building2 className="w-4 h-4 text-black" strokeWidth={2.5} />
             </div>
             <span className="font-serif text-lg font-semibold">PropManage</span>
           </Link>
-          <div className="flex items-center gap-4">
-            <Link to="/ghiduri" className="text-xs text-stone-400 hover:text-white hidden sm:inline">Ghiduri</Link>
-            <Link to="/login" className="text-xs text-stone-400 hover:text-white">Conectare</Link>
+          <div className="flex items-center gap-2">
+            <Link to="/ghiduri" className="hidden sm:inline"><PMPillButton variant="ghost" size="sm">Ghiduri</PMPillButton></Link>
+            <Link to="/login"><PMPillButton variant="primary" size="sm">Conectare</PMPillButton></Link>
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        <h1 className="font-serif text-4xl sm:text-6xl tracking-tight mb-3" data-testid="mkt-title">Marketplace specialiști</h1>
-        <p className="text-stone-400 mb-8">Descoperă cei mai buni profesioniști verificați pentru proprietatea ta.</p>
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+        <div className="pm-fade-in">
+          <PMChip variant="primary" className="mb-3">MARKETPLACE PROPMANAGE</PMChip>
+          <h1 className="font-serif text-4xl sm:text-6xl tracking-tight mb-3" data-testid="mkt-title">Specialiști verificați</h1>
+          <p className="text-stone-400 mb-8 max-w-xl">Descoperă cei mai buni profesioniști pentru proprietatea ta. Recenzii reale, plăți escrow, garanție lucrare.</p>
+        </div>
 
         {/* Filters */}
-        <div className="glass-strong rounded-2xl p-4 sm:p-5 mb-6 flex flex-wrap gap-3 items-center">
-          <select value={filters.category} onChange={e => setFilters({...filters, category: e.target.value})} 
-            className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm" data-testid="mkt-cat">
+        <div className="pm-card-glass !p-4 mb-6 flex flex-wrap gap-3 items-center pm-fade-in-delay-1">
+          <select value={filters.category} onChange={e => setFilters({...filters, category: e.target.value})}
+            className="bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[var(--pm-primary)]/50" data-testid="mkt-cat">
             <option value="">Toate categoriile</option>
             <option value="hvac">HVAC</option>
             <option value="electric">Electric</option>
             <option value="plumbing">Sanitar</option>
             <option value="other">Altele</option>
           </select>
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" checked={filters.verified_only} onChange={e => setFilters({...filters, verified_only: e.target.checked})} className="rounded" data-testid="mkt-verified" />
+          <label className="flex items-center gap-2 text-sm cursor-pointer px-4 py-2 bg-white/5 border border-white/10 rounded-full hover:bg-white/10 transition-colors">
+            <input type="checkbox" checked={filters.verified_only} onChange={e => setFilters({...filters, verified_only: e.target.checked})} className="rounded accent-[var(--pm-primary)]" data-testid="mkt-verified" />
+            <CheckCircle2 className="w-4 h-4 text-[var(--pm-primary)]" />
             <span>Doar verificați</span>
           </label>
           <select value={filters.sort} onChange={e => setFilters({...filters, sort: e.target.value})}
-            className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm ml-auto" data-testid="mkt-sort">
+            className="bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm ml-auto focus:outline-none focus:border-[var(--pm-primary)]/50" data-testid="mkt-sort">
             <option value="rating">Cele mai bune ratinguri</option>
             <option value="reviews">Cele mai multe recenzii</option>
             <option value="recent">Cei mai noi</option>
@@ -99,40 +104,51 @@ export const PublicMarketplace = () => {
 
         <div className="text-xs text-stone-500 mb-4">{loading ? "Se încarcă..." : `${specialists.length} specialiști`}</div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 pm-fade-in-delay-2">
           {specialists.map((s, i) => (
-            <motion.div key={s.id} 
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-              className="glass-strong rounded-2xl p-5 hover:bg-white/[0.06] transition" data-testid={`mkt-card-${s.id}`}>
-              <div className="flex items-start gap-3 mb-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-stone-600 to-stone-800 flex items-center justify-center font-medium shrink-0">
-                  {s.name?.[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <div className="font-medium truncate">{s.name}</div>
-                    {s.verified && <CheckCircle2 className="w-3.5 h-3.5 text-[#d4ff3a] shrink-0" />}
+            <motion.div key={s.id}
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+              <PMCard className="hover:!border-[var(--pm-primary)]/30 transition-all group h-full flex flex-col" testid={`mkt-card-${s.id}`}>
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--pm-primary)] to-[var(--pm-primary-dim)] flex items-center justify-center font-bold text-black shrink-0 text-lg">
+                    {s.name?.[0]}
                   </div>
-                  <div className="text-[11px] text-stone-400 capitalize">{s.specialty || "Specialist"}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <div className="font-semibold truncate">{s.name}</div>
+                      {s.verified && <CheckCircle2 className="w-4 h-4 text-[var(--pm-primary)] shrink-0 fill-[var(--pm-primary)]/20" />}
+                    </div>
+                    <div className="text-xs text-stone-400 capitalize">{s.specialty || "Specialist"}</div>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-3 text-xs mb-2">
-                <div className="flex items-center gap-1">
-                  <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                  <span>{s.rating || "—"}</span>
-                  <span className="text-stone-500">({s.reviews_count})</span>
+                <div className="flex items-center gap-2 text-xs mb-3 flex-wrap">
+                  <div className="flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 text-amber-300 px-2.5 py-1 rounded-full">
+                    <Star className="w-3 h-3 fill-current" />
+                    <span className="font-semibold">{s.rating || "—"}</span>
+                    <span className="opacity-70">({s.reviews_count})</span>
+                  </div>
+                  {s.tier && <PMChip variant="primary">{s.tier}</PMChip>}
                 </div>
-                {s.tier && <span className="text-[9px] bg-[#d4ff3a]/15 text-[#d4ff3a] px-2 py-0.5 rounded-full uppercase tracking-wider">{s.tier}</span>}
-              </div>
-              <div className="mb-4">
-                <HealthScoreBadge health={s.health} size="sm" />
-              </div>
-              <Link to={`/specialists/${s.id}`} className="w-full text-center bg-white/5 hover:bg-white/10 py-2 rounded-xl text-xs font-medium block" data-testid={`mkt-view-${s.id}`}>
-                Vezi profil
-              </Link>
+                <div className="mb-4 flex-1">
+                  <HealthScoreBadge health={s.health} size="sm" />
+                </div>
+                <Link to={`/specialists/${s.id}`} className="block" data-testid={`mkt-view-${s.id}`}>
+                  <PMPillButton variant="ghost" className="w-full">
+                    Vezi profil
+                  </PMPillButton>
+                </Link>
+              </PMCard>
             </motion.div>
           ))}
         </div>
+
+        {specialists.length === 0 && !loading && (
+          <PMEmptyState
+            icon={Search}
+            title="Niciun specialist găsit"
+            description="Încearcă să ajustezi filtrele sau revino mai târziu."
+          />
+        )}
 
         {/* SEO internal-link block — surfaces all category/city landing pages */}
         <section className="mt-16 pt-10 border-t border-white/5" data-testid="mkt-seo-links">

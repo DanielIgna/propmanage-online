@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { X, Building, Star, CheckCircle2, Palette, Sparkles, MapPin, Users, SlidersHorizontal } from "lucide-react";
 import { API } from "./DashShared";
+import TwinAIQA from "../components/TwinAIQA";
 
 const ROOM_COLORS = {
   living: "bg-emerald-500/20 border-emerald-500/40 text-emerald-300",
@@ -79,6 +80,7 @@ export const ClientTwinViewerModal = ({ propertyId, propertyName, onClose }) => 
         </div>
 
         <div className="p-5 space-y-5">
+          {twin?.project_id && <TwinAIQA projectId={twin.project_id} />}
           {loading ? (
             <div className="text-center py-10 text-stone-500">Se încarcă modelul 3D...</div>
           ) : rooms.length === 0 ? (

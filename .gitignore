@@ -92,9 +92,6 @@ frontend/node_modules/.cache/default-development/40.pack
 frontend/node_modules/.cache/default-development/6.pack
 frontend/node_modules/.cache/default-development/42.pack
 frontend/node_modules/.cache/default-development/45.pack
-.env
-.env.*
-*.env
 credentials.json
 *.key
 .credentials
@@ -152,3 +149,12 @@ frontend/node_modules/.cache/default-development/13.pack
 frontend/node_modules/.cache/default-development/18.pack
 frontend/node_modules/.cache/default-development/19.pack
 frontend/node_modules/.cache/default-development/28.pack
+backend/uploads/digital_twin/711de1c5f245490793c90e6f48deab99/296233ff7320.skp
+.env
+.env.*
+*.env
+frontend/node_modules/.cache/default-development/32.pack
+frontend/node_modules/.cache/default-development/25.pack_
+frontend/node_modules/.cache/default-development/35.pack
+frontend/node_modules/.cache/default-development/39.pack
+frontend/node_modules/.cache/default-development/43.pack

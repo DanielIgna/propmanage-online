@@ -1,0 +1,38 @@
+{
+  "summary": "Phase 73 RE-TEST after fix — Service Contracts module is now FULLY GREEN. Iteration 52 critical bug (POST /api/contracts/generate 404 for all valid request_ids) has been correctly fixed in /app/backend/routes/service_contracts.py with a dual ObjectId/string lookup (lines 126-134) and a normalized string request_id storage (line 189). The same dual fallback was correctly added in /by-request/{request_id} (lines 283-289). Re-ran TestContracts class (10/10 PASS) and end-to-end ContractPage frontend flow as client — contract title, status pill (DRAFT), body_html (3490 chars, white background, all placeholders substituted: client name, specialist, price, etc.), sig-client/sig-specialist Nesemnat, sign-modal opens, name input accepted, sign-confirm posts to /sign and updates UI to show 'Andrei Popescu 04.06.2026 ...' while status correctly stays DRAFT until both sign. Validated via curl that signing as specialist flips status to 'active' (both signed_by_* true). Snapshots module already validated in iter 52 and skipped per main agent instructions. Backend success rate: 100% on contracts (10/10) + previously 100% on snapshots (8/8) = 18/18 total. Frontend ContractPage: 100% on tested flows.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/requests/my", "issue": "Returns 500 for client (pre-existing, NOT phase 73). Workaround in test_phase73.py uses /api/requests instead. Should be investigated separately."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ContractPage", "issues": ["Onboarding tour overlay ('TUR GHIDAT pasul 1/5') auto-launches on first visit and can occlude the sign modal — for a first-time client navigating directly to /contracts/{cid}, the modal would still be clickable but the tour shows on top of the page. Minor UX nit; the tour can be dismissed with 'Sari peste'."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase73.py",
+    "/app/test_reports/pytest/phase73_contracts_retest.xml"
+  ],
+  "action_items": [
+    "(Optional) Pre-existing /api/requests/my 500 error still present — unrelated to Phase 73 but worth investigating in next sprint.",
+    "(Optional, low-priority) The onboarding tour might want to be suppressed on deep-linked legal pages like /contracts/{cid} to avoid overlay collision."
+  ],
+  "critical_code_review_comments": [
+    "FIX VERIFIED: routes/service_contracts.py:126-137 now uses correct dual lookup pattern (ObjectId then string id fallback). Same pattern correctly applied at /by-request line 283-289.",
+    "routes/service_contracts.py:189 — Good: request_id is now stored as str(req._id or req.id or payload.request_id) so /by-request lookups are stable regardless of which form the caller used.",
+    "routes/service_contracts.py:143 — `existing = await db.service_contracts.find_one({'request_id': payload.request_id})` — if user posts an ObjectId hex but stored value is also ObjectId hex (str of _id) the match works; but if user previously generated via string 'id' and now posts ObjectId, idempotency could break. Recommend a dual lookup here too: try both payload.request_id and str(ObjectId(payload.request_id)). NOT blocking — current tests pass because new code normalizes storage.",
+    "ContractPage.jsx:103 — Still uses dangerouslySetInnerHTML for body_html. As noted in iter 52, this is safe today (server-rendered) but if /admin/settings-control ever exposes contract_template editing, sanitize via DOMPurify."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (10/10 contract tests PASS + 8/8 snapshot tests from iter 52 = 18/18)", "frontend": "100% on ContractPage tested flows (title, status pill DRAFT, body_html render with substituted placeholders, sig-client/specialist Nesemnat → Semnat after sign, modal open/close, sign-confirm POST → /sign returns updated contract)"},
+  "test_credentials": "admin@propmanage.io / Admin123! · client@propmanage.io / Client123! · specialist@propmanage.io / Spec123! · operator@propmanage.io / Op123!",
+  "seed_data_creation": "Two contracts created during testing: id=3fcaa6acd13f497c8b1a87480fba41cf (request 6a1787b434ac1dcb3f3b4ee0, now status=mediated from operator-resolve test) and id=12daf15557ae4d5c9cf6fa6a08fdd85e (request 6a1787b234ac1dcb3f3b4ea4, status=active after both client+specialist signed during frontend test).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Phase 73 is COMPLETE. Both Snapshots (iter 52) and Service Contracts (iter 53) modules are GREEN end-to-end. Two test contracts persist in db.service_contracts (see seed_data_creation). The /api/requests/my pre-existing 500 was observed in two iterations now and should be triaged as a separate bug.",
+  "rca of the issue": "FIX VERIFIED. Root cause was single-mode string-id lookup on requests collection that stores Mongo ObjectId _id only. Fix in service_contracts.py:126-137 now tries ObjectId(payload.request_id) first then falls back to string id. Storage at line 189 normalizes request_id to string form so the /by-request endpoint can find it. Curl reproduction confirms: POST /api/contracts/generate with request_id=6a1787b234ac1dcb3f3b4ea4 (ObjectId hex) now returns 200 with id=12daf15557ae4d5c9cf6fa6a08fdd85e, status=draft, body_html present with substituted placeholders. Pytest TestContracts 10/10 PASS in 2.88s."
+}

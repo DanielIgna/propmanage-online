@@ -26,7 +26,7 @@ Structure per doc:
 from __future__ import annotations
 from datetime import datetime, timezone
 
-UPDATED = "2026-02-29"
+UPDATED = "2026-06-23"
 
 # Re-usable callouts
 _CB_ESCROW = {
@@ -519,28 +519,128 @@ ADMIN_DOC = {
     "slug": "admin",
     "role": "admin",
     "title": "Ghid Complet pentru Administratori",
-    "subtitle": "Console admin, AI Investigator, Smoke Tests, Healthcheck, Data Integrity, Backup, GDPR, monitoring, dispute complexe.",
-    "version": "1.0",
+    "subtitle": "Autonomy Engine, Twin Orchestrator, Auto-Tune, Sub-Admin RBAC, KYC AI, Cost & ROI, Smoke Tests, Backup, GDPR.",
+    "version": "2.0",
     "updated_at": UPDATED,
-    "email_intro": "Bine ai venit ca administrator PropManage. Acest ghid acoperă toate uneltele tale și fluxurile zilnice/săptămânale/lunare.",
+    "email_intro": "Bine ai venit ca administrator PropManage. Acest ghid acoperă toate uneltele tale și fluxurile zilnice/săptămânale/lunare — inclusiv noul sistem self-driving (Autonomy Engine + Twin Orchestrator).",
     "sections": [
         {
             "heading": "1. Ce poți face ca admin",
             "body": [
-                "Admin-ul PropManage are acces TOTAL la platformă. Responsabilitățile principale:",
+                "Admin-ul PropManage are acces TOTAL la platformă. Pe lângă super-admin, există acum și **sub-admini cu scope** (testing, frontend, backend, security, ai, ops) care văd doar feature-urile relevante și au nevoie de aprobare pentru acțiuni distructive.",
                 {"type": "list", "items": [
-                    "**Monitoring** — verifici Morning Briefing zilnic, intervii la alerte",
-                    "**Mediere complexă** — dispute > 1.000 RON, cazuri cu acuzații serioase, intervenții juridice",
-                    "**KYC final** — apel final pe respingerile/acceptările dubioase ale operatorilor",
-                    "**GDPR** — gestionezi cererile DSAR (export/delete), aprobi impersonările",
+                    "**Self-Healing & Autonomy** — verifici tier-ul (self-driving / autonomous / assisted / manual), apeși Auto-Tune când scorul scade, monitorizezi cron-uri (vezi §2)",
+                    "**Twin Orchestrator** — chat AI super-admin pentru întrebări live + executare acțiuni cu confirmare (§3)",
+                    "**Monitoring** — verifici Morning Briefing zilnic, Cost & ROI Tracker, Autopilot Activity",
+                    "**Sub-Admin RBAC** — adaugi/promovezi sub-admini, aprobi acțiuni junior",
+                    "**Mediere complexă** — dispute > 1.000 RON, cazuri cu acuzații serioase",
+                    "**KYC AI** — review queue (auto-aprobări AI Vision Claude Sonnet 4.5 cu threshold configurabil)",
+                    "**GDPR** — gestionezi DSAR (export/delete), aprobi impersonările",
                     "**Securitate** — review AI Findings, suspendări conturi, blocare IP",
                     "**Configurare platformă** — feature flags, pricing changes, schedules",
-                    "**Comunicare** — newsletter, anunțuri publice, gestionare incidents",
                 ]},
             ],
         },
         {
-            "heading": "2. Morning Briefing — primul lucru dimineața",
+            "heading": "2. Autonomy Engine & Self-Healing Platform (NEW v2.0)",
+            "body": [
+                "PropManage rulează acum în mod **self-driving** — un set de cron-uri + AI keep automatically scor-ul ≥ 90/100 fără intervenție.",
+                {"type": "h3", "text": "Autonomy Score (0-100) cu 5 sub-dimensiuni"},
+                {"type": "list", "items": [
+                    "**Operational** (țintă 95) — auto-matching, lifecycle requests, scheduler health",
+                    "**Technical** (țintă 85) — smoke tests, snapshots, release gates",
+                    "**Security** (țintă 90) — OAuth, findings critice, GDPR",
+                    "**DEV** (țintă 75) — quality gates, QA findings, stabilitate",
+                    "**AI** (țintă 80) — findings închise, memorie, knowledge base",
+                ]},
+                "Tier-uri: ≥90 self-driving · ≥75 autonomous · ≥60 assisted · <60 manual. Vezi `/admin/autonomy`.",
+                {"type": "h3", "text": "Butoane în pagina Autonomy"},
+                {"type": "list", "items": [
+                    "**✨ Auto-Tune to Self-Driving** (recomandat) — orchestrator one-click: seed AI knowledge + repair + concierge + dismiss findings + snapshot. ~5s",
+                    "**Boost DEV** (violet) — Release Gate background + dismiss findings stale",
+                    "**Boost AI** (cyan) — Seed knowledge base + memorii sintetice",
+                    "**Snapshot acum** — forțează un snapshot nou",
+                    "**Refresh** — invalidează cache",
+                ]},
+                {"type": "h3", "text": "Cron-uri self-healing (toate Europe/Bucharest)"},
+                {"type": "list", "items": [
+                    "Zilnic 03:15 — autonomy snapshot",
+                    "Zilnic 03:30 — MongoDB backup (email admin)",
+                    "Zilnic 04:15 — autopilot sweep (dismiss findings vechi)",
+                    "**Lun 04:00 — Auto-Tune adaptiv** (escalare automată dacă tier ≠ self-driving + email confirmare)",
+                    "**Lun 09:30 — Founders' Digest** (email cu KPI-uri 7 zile)",
+                    "La 15 min — health ping · La 30 min — smoke test E2E",
+                    "Real-time — tier downgrade alerts (push + email super-admini)",
+                ]},
+                {"type": "callout", "variant": "success", "title": "Tier Downgrade Alerts",
+                 "body": "Când tier-ul scade (ex: self-driving → autonomous), super-admini primesc instant push + email. Alertele de test sunt marcate cu badge 🧪 TEST (amber) și ascunse din UI default; bifează \"Arată test\" în panou pentru a le vedea."},
+            ],
+        },
+        {
+            "heading": "3. Twin Orchestrator (NEW v2.0) — creierul platformei",
+            "body": [
+                "Chat AI super-admin la `/admin/twin`. Răspunde la întrebări în română citind live din `autonomy_snapshots`, `autopilot_runs`, `admin_actions_log`, `autonomy_alerts`, AI Health, counts platformă. Powered by Claude Sonnet 4.5.",
+                {"type": "h3", "text": "Exemple întrebări (read-only)"},
+                {"type": "list", "items": [
+                    "„Care e tier-ul curent și de ce?\"",
+                    "„Câți admini au făcut acțiuni denied astăzi?\"",
+                    "„Ce ar trebui să fac ca scorul DEV să crească?\"",
+                    "„A scăzut scorul săptămâna asta?\"",
+                ]},
+                {"type": "h3", "text": "Twin Action Mode — execută acțiuni cu confirmare"},
+                "Când scrii o comandă imperativă (verb + acțiune), Twin propune un buton de confirmare cu token TTL 5min single-use. Acțiuni allowed: `auto_tune`, `send_founder_digest`, `boost_dev`, `take_snapshot`.",
+                {"type": "code", "text": "Twin, rulează Auto-Tune acum\nTwin, trimite digest către admin\nTwin, ia un snapshot"},
+                {"type": "h3", "text": "Twin Scheduled Actions — natural-language cron"},
+                "Twin acceptă programări (recurente sau one-shot). Persistate în `twin_scheduled_actions` + APScheduler dynamic jobs. Max 20 active/user.",
+                {"type": "code", "text": "Twin, rulează Auto-Tune în fiecare luni la 06:00\nTwin, trimite digest în fiecare 1 a lunii la 09:00\nTwin, ia un snapshot mâine la 09:00"},
+                {"type": "callout", "variant": "info", "title": "Programări active",
+                 "body": "Vezi lista jos pe pagina `/admin/twin` cu badge \"recurent\"/\"o dată\" + buton Anulează. Schedules sunt re-hydrated automat după restart backend."},
+            ],
+        },
+        {
+            "heading": "4. Cost & ROI Tracker (NEW v2.0)",
+            "body": [
+                "Card pe `/admin` care arată cât timp & bani salvează Autopilot vs ce ar fi făcut admin-i manual. Default rata 150 RON/h (Romanian admin median, configurabilă prin `?hourly_rate=`).",
+                {"type": "h3", "text": "Surse contorizate (per event)"},
+                {"type": "list", "items": [
+                    "Auto-Tune run × 30 min",
+                    "Daily sweep × 10 min",
+                    "Cerere auto-asignată AI × 5 min",
+                    "QA finding auto-rezolvat × 5 min",
+                    "KYC auto-aprobat (AI Vision) × 15 min",
+                    "AI top-match notification × 3 min",
+                ]},
+                "Selector window: 7 / 30 / 90 / 365 zile. Hero KPI-uri: bani salvați, ore salvate, evenimente automate.",
+            ],
+        },
+        {
+            "heading": "5. Sub-Admin RBAC (NEW v2.0)",
+            "body": [
+                "Sub-admini scoped pe un departament: testing, frontend, backend, security, ai, ops. Middleware `middleware_scope.py` enforce SCOPE_MAP pe routes.",
+                {"type": "h3", "text": "Cum adaugi un sub-admin"},
+                {"type": "steps", "items": [
+                    {"title": "Mergi la `/admin/sub-admins`", "body": "Vezi lista existentă + buton \"Adaugă sub-admin\""},
+                    {"title": "Setează scope + seniority", "body": "Junior = necesită aprobare super-admin pentru destructive. Senior = poate executa direct"},
+                    {"title": "Sub-adminul primește email cu parolă temporară", "body": "Pattern: `{scope}.admin@propmanage.io` / `SubAdmin123!`"},
+                ]},
+                {"type": "h3", "text": "Aprobări (Junior admin)"},
+                "Acțiuni destructive (DELETE, force) ale junior-ilor creează entries în `admin_approvals`. Super-admin aprobă/respinge din `/admin/approvals`.",
+                {"type": "h3", "text": "Preview As — vezi platforma ca alt scope"},
+                "Super-admin → header X-Preview-Scope=`testing` (ex) → UI ascunde ce nu se vede pentru testing scope. Folosit pentru validare RBAC.",
+            ],
+        },
+        {
+            "heading": "6. KYC AI Verification (NEW v2.0)",
+            "body": [
+                "Specialiștii încarcă ID + selfie. Sistemul rulează automat **Claude Sonnet 4.5 Vision** care returnează JSON cu `match_score` + flag-uri (poor, blur_high, mismatch, suspicious, fake, etc.).",
+                {"type": "h3", "text": "Auto-Approve Threshold"},
+                "Configurat în `/admin/kyc-queue` cu slider min_score (50-100, default 92) + toggle \"blochează pe flag-uri negative\". Când scor ≥ threshold AND zero flag-uri → user.verified=true automat + push notification.",
+                {"type": "h3", "text": "Manual review queue"},
+                "`/admin/kyc-queue` → cazurile borderline (scor < threshold sau cu flag-uri). Apeși Approve/Reject + comentariu.",
+            ],
+        },
+        {
+            "heading": "7. Morning Briefing — primul lucru dimineața",
             "body": [
                 "Te loghezi la propmanage.ro/admin → primul card vizibil este **Morning Briefing** cu 6 tile-uri:",
                 {"type": "list", "items": [
@@ -556,7 +656,7 @@ ADMIN_DOC = {
             ],
         },
         {
-            "heading": "3. AI Investigator — auditorul tău automat",
+            "heading": "8. AI Investigator — auditorul tău automat",
             "body": [
                 "AI Investigator scanează zilnic codul + logs + DB pentru a detecta probleme. Findings categorizate pe severitate: **high** (acțiune imediată), **warning** (cod review), **low** (improvement suggestion).",
                 {"type": "h3", "text": "Cum acționezi pe findings"},
@@ -566,10 +666,12 @@ ADMIN_DOC = {
                     {"title": "Acționezi", "body": "Variante: (a) **Resolve** (problemă rezolvată sau nu e problemă reală), (b) **Snooze** (revii peste 30 zile), (c) **Escalate to Dev** (trimiți pe email developer-ului tău)."},
                     {"title": "Documentezi în comentariu", "body": "Scrii ce ai făcut. Aud trail păstrat pentru viitor."},
                 ]},
+                {"type": "callout", "variant": "success", "title": "Self-Healing acoperă acest pas",
+                 "body": "Auto-Tune săptămânal + autopilot daily sweep dismissează findings low/medium vechi automat. Tu intervii doar pe HIGH/CRITICAL."},
             ],
         },
         {
-            "heading": "4. Console tehnice — când să le folosești",
+            "heading": "9. Console tehnice — când să le folosești",
             "body": [
                 {"type": "h3", "text": "Smoke Test (`/admin/smoke-test`)"},
                 "Verifică automat la 30 min că flow-ul E2E funcționează. Dacă pică, primești email instant. Acțiune: vezi în Logs cauza, redirect către dev sau resolve dacă a fost flaky.",
@@ -588,7 +690,7 @@ ADMIN_DOC = {
             ],
         },
         {
-            "heading": "5. GDPR Compliance Pack",
+            "heading": "10. GDPR Compliance Pack",
             "body": [
                 {"type": "list", "items": [
                     "**DSAR Export** — un user cere copia datelor sale. Tu apeși \"Generate Export\" → primește PDF + JSON în 30 zile. Tracking în `dsar_requests`.",
@@ -602,7 +704,7 @@ ADMIN_DOC = {
             ],
         },
         {
-            "heading": "6. Dispute complexe — cum mediezi",
+            "heading": "11. Dispute complexe — cum mediezi",
             "body": [
                 "Pentru orice dispută > 1.000 RON sau escaladare de la operator:",
                 {"type": "steps", "items": [
@@ -615,7 +717,7 @@ ADMIN_DOC = {
             ],
         },
         {
-            "heading": "7. Suspendări conturi & escaladări de securitate",
+            "heading": "12. Suspendări conturi & escaladări de securitate",
             "body": [
                 "Când e ok să suspenzi un cont:",
                 {"type": "list", "items": [
@@ -630,7 +732,7 @@ ADMIN_DOC = {
             ],
         },
         {
-            "heading": "8. Configurare platformă",
+            "heading": "13. Configurare platformă",
             "body": [
                 {"type": "list", "items": [
                     "**Feature flags** (`/admin/feature-flags`) — activezi/dezactivezi feature-uri pentru % din useri (A/B testing)",
@@ -642,7 +744,7 @@ ADMIN_DOC = {
             ],
         },
         {
-            "heading": "9. Comunicare publică (incidents + newsletter)",
+            "heading": "14. Comunicare publică (incidents + newsletter)",
             "body": [
                 {"type": "h3", "text": "Incident management"},
                 "Când ceva pică (Stripe down, Mongo replication, etc.), creezi un incident: `/admin/incidents` → \"Create new\". Apare instant pe `/status` public. Updates regulare la fiecare 30 min până e \"resolved\".",
@@ -652,9 +754,9 @@ ADMIN_DOC = {
             ],
         },
         {
-            "heading": "10. Comenzi rapide & shortcut-uri",
+            "heading": "15. Comenzi rapide & shortcut-uri",
             "body": [
-                {"type": "code", "text": "# Login admin\ncurl -c /tmp/cookies.txt -X POST $API_URL/api/auth/login -d '{\"email\":\"admin@propmanage.io\",\"password\":\"Admin123!\"}'\n\n# Status global\ncurl -b /tmp/cookies.txt $API_URL/api/admin/healthcheck/run\n\n# Force backup\ncurl -b /tmp/cookies.txt -X POST $API_URL/api/admin/backups/run\n\n# Force weekly dev report\ncurl -b /tmp/cookies.txt -X POST $API_URL/api/admin/dev-velocity/send-now\n\n# Search docs\ncurl -b /tmp/cookies.txt \"$API_URL/api/admin/docs/admin/search?q=escrow\""},
+                {"type": "code", "text": "# Login admin\ncurl -c /tmp/cookies.txt -X POST $API_URL/api/auth/login -d '{\"email\":\"admin@propmanage.io\",\"password\":\"1!nasov01ADMIN\"}'\n\n# Status global\ncurl -b /tmp/cookies.txt $API_URL/api/admin/healthcheck/run\n\n# Force backup\ncurl -b /tmp/cookies.txt -X POST $API_URL/api/admin/backups/run\n\n# Auto-Tune one-click (urcă tier-ul la self-driving)\ncurl -b /tmp/cookies.txt -X POST $API_URL/api/admin/autonomy/auto-tune\n\n# Trimite Founders' Digest acum\ncurl -b /tmp/cookies.txt -X POST $API_URL/api/admin/autonomy/founder-digest/send-now\n\n# Snapshot Autonomy\ncurl -b /tmp/cookies.txt -X POST $API_URL/api/admin/autonomy/snapshot\n\n# Twin ask\ncurl -b /tmp/cookies.txt -X POST $API_URL/api/admin/twin/ask -d '{\"question\":\"care e tier-ul?\"}'\n\n# Search docs\ncurl -b /tmp/cookies.txt \"$API_URL/api/admin/docs/admin/search?q=autonomy\""},
                 {"type": "h3", "text": "Hotkeys UI"},
                 {"type": "list", "items": [
                     "**⌘K / Ctrl+K** în Admin → Docs — search instant",
@@ -664,7 +766,7 @@ ADMIN_DOC = {
             ],
         },
         {
-            "heading": "11. Cum adaugi un alt admin",
+            "heading": "16. Cum adaugi un alt admin",
             "body": [
                 {"type": "steps", "items": [
                     {"title": "Adaugă email în whitelist", "body": "Editezi `backend/.env` → `ADMIN_WHITELIST=existing@propmanage.io,nou-admin@example.com` → restart backend."},
@@ -677,13 +779,19 @@ ADMIN_DOC = {
         },
     ],
     "faq": [
+        {"q": "Ce e Autonomy Engine și de ce-mi pasă?", "a": "Un sistem care monitorizează 5 sub-scoruri (operational, technical, security, dev, ai) și calculează tier-ul platformei (self-driving / autonomous / assisted / manual). Țintă: ≥90 self-driving. Vezi `/admin/autonomy`."},
+        {"q": "Ce face Auto-Tune to Self-Driving?", "a": "În ~5s: seed-ează AI knowledge base, repair decisions, concierge traffic + dismiss QA findings stale + snapshot nou. Idempotent. Rulează automat în fiecare luni 04:00 (cron) și manual din pagină."},
+        {"q": "Cum vorbesc cu Twin?", "a": "Mergi la `/admin/twin`. Întrebări READ-ONLY răspunde direct. Pentru comenzi (\"Twin, rulează Auto-Tune\") apare buton de confirmare cu token 5min. Pentru programări (\"...în fiecare luni la 06:00\") se adaugă la `twin_scheduled_actions`."},
+        {"q": "Cum schimb threshold KYC auto-approve?", "a": "`/admin/kyc-queue` → buton settings → slider min_score (50-100). Recomand 92. Combinat cu toggle „blochează pe flag-uri negative\"."},
         {"q": "Cum verific dacă un admin nou primește emailurile automate?", "a": "Verifică `ADMIN_EMAILS` în `backend/.env`. Apoi în admin panel apasă \"Test email\" pe Morning Briefing → toți admins primesc email. Dacă unul nu primește, verifică spam folder + că emailul e corect scris (case-insensitive)."},
-        {"q": "Ce fac dacă uit parola admin?", "a": "Reset normal prin email (la fel ca user). Dacă pierzi accesul la emailul admin (catastrofă), poți folosi SSH pe server → rulezi script direct pe DB: `python3 -c \"...\"` pentru a seta o parolă nouă bcrypt. Detalii în `backend/scripts/admin_password_reset.py`."},
+        {"q": "Ce fac dacă uit parola admin?", "a": "Reset normal prin email (la fel ca user). Dacă pierzi accesul la emailul admin (catastrofă), poți folosi SSH pe server → rulezi script direct pe DB: `python3 -c \"...\"` pentru a seta o parolă nouă bcrypt. Detalii în `backend/scripts/admin_password_reset.py`. Parolele admin curente sunt în `/app/memory/test_credentials.md`."},
         {"q": "Pot avea 2 admini conectați simultan?", "a": "Da, nelimitat. Toate acțiunile sunt logate cu user_id în audit_log. Singurul caz în care apar conflicte: dacă ambii editează același user simultan — al doilea primește eroare \"Resource modified, please refresh\"."},
         {"q": "Cum fac rollback la o versiune anterioară a platformei?", "a": "Folosește butonul **Rollback** din Emergent UI (este GRATIS, nu costă credite). NU rula `git reset` manual. Rollback restaurează cod + DB la un checkpoint anterior."},
-        {"q": "Care e SLA-ul meu ca admin?", "a": "Pentru alerte HIGH severity (smoke test fail, Stripe down): răspuns în 30 min. Pentru WARNING: răspuns în 4h. Pentru INFO: răspuns în 48h. Pentru cereri de la useri: răspuns în 24h."},
-        {"q": "Cum monitorizez sănătatea platformei când sunt în vacanță?", "a": "1) Activează \"On-call backup\" în profilul tău (alt admin primește alertele tale). 2) Verifică Morning Briefing zilnic din telefon (5 min). 3) Setează auto-replier în email pentru cereri non-urgente. Pentru urgențe, sistemul oricum te sună automat dacă e configurat numărul în profil."},
-        {"q": "Pot oprii rapoartele automate pe email?", "a": "Da, dezactivezi temporar din `/admin/schedules`. Toggle pe \"morning_briefing_digest\", \"daily_mongodb_backup\", \"weekly_dev_velocity\". NU recomandăm să le ții oprite > 7 zile."},
+        {"q": "Care e SLA-ul meu ca admin?", "a": "Pentru alerte HIGH severity (smoke test fail, Stripe down): răspuns în 30 min. Pentru WARNING: răspuns în 4h. Pentru INFO: răspuns în 48h. Pentru cereri de la useri: răspuns în 24h. Self-Healing acoperă LOW automat."},
+        {"q": "Cum monitorizez sănătatea platformei când sunt în vacanță?", "a": "1) Founders' Digest săptămânal îl primești pe email (Luni 09:30). 2) Tier downgrade alerts vin instant push + email. 3) Auto-Tune adaptiv (Luni 04:00) repară automat dacă tier-ul scade. Practic, platforma se autorepară fără tine — verifici emailul la întoarcere."},
+        {"q": "Ce sunt alertele cu badge 🧪 TEST?", "a": "Alerte sintetice generate când cineva apasă „Trimite test alert\" pentru a verifica că push + email funcționează. Sunt ascunse din UI default; bifează „Arată test\" în panou pentru a le vedea. NU înseamnă că platforma chiar a căzut."},
+        {"q": "Cum anulez o programare Twin?", "a": "`/admin/twin` → panou „Programări active\" jos → buton „Anulează\" pe row. Status devine `cancelled` în DB + jobul e removed din APScheduler."},
+        {"q": "Pot oprii rapoartele automate pe email?", "a": "Da, dezactivezi temporar din `/admin/schedules`. Toggle pe \"morning_briefing_digest\", \"daily_mongodb_backup\", \"weekly_dev_velocity\", \"founder_digest_weekly\". NU recomandăm să le ții oprite > 7 zile."},
     ],
 }
 

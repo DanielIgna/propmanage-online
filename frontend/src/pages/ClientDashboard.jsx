@@ -17,15 +17,24 @@ import { TwoFASetupModal, PropertyTimelineModal } from "./Marketplace";
 import { OpenDisputeModal } from "./AdminModals";
 import { InteriorDesignCard, InteriorDesignModal, DesignPhasesPanel } from "./InteriorDesign";
 import { ClientTwinViewerModal, DesignersBrowse } from "./ClientTwinViewer";
+import DigitalTwinViewer from "../components/DigitalTwinViewer";
 import { ProjectListSection } from "./ProjectWorkspace";
 import { API, DashLayout, Stat, StatusBadge, NavigateButtons } from "./DashShared";
 import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
 import { RequestTimelineModal, LastActionBanner } from "./ActivityTimeline";
+import { TierCelebrationBanner } from "../lib/TierCelebrationBanner";
+import { TierToolsPanel } from "../lib/TierToolsPanel";
+import { QuestPanel } from "../lib/QuestPanel";
+import { useTier } from "../lib/useTier";
+import { PMCard, PMCardPrimary, PMPillButton, PMChip, PMSectionHeader, PMEmptyState } from "../components/pm";
+import { TierProgressWidget } from "../components/TierProgressWidget";
+import HouseHealthCard from "./HouseHealthCard";
 
 export const ClientDashboard = () => {
   const { user, refreshUser } = useAuth();
   const { t } = useI18n();
+  const tierInfo = useTier();
   const [properties, setProperties] = useState([]);
   const [requests, setRequests] = useState([]);
   const [notifs, setNotifs] = useState([]);
@@ -42,6 +51,9 @@ export const ClientDashboard = () => {
   const [filterStatus, setFilterStatus] = useState("");
   const [showDesign, setShowDesign] = useState(false);
   const [showTwinViewer, setShowTwinViewer] = useState(false);
+  // When opening a twin from anywhere other than the currently-selected property,
+  // we override the property used by the viewer. null = use currently selected `prop`.
+  const [twinPropOverride, setTwinPropOverride] = useState(null);
   const [newReqCategory, setNewReqCategory] = useState(null);
   const [designPhasesFor, setDesignPhasesFor] = useState(null);
   const [timelineRequestId, setTimelineRequestId] = useState(null);
@@ -125,12 +137,13 @@ export const ClientDashboard = () => {
     } catch (e) { alert(formatApiError(e)); }
   };
 
-  const tabs = [
-    { id: "request", label: "Solicită", icon: SearchIcon, badge: 0 },
-    { id: "jobs", label: "Lucrările mele", icon: ClipboardList, badge: activeJobs.length },
-    { id: "notifications", label: "Notificări", icon: Bell, badge: unreadNotifs },
-    { id: "settings", label: "Setări", icon: SettingsIcon, badge: 0 },
+  const allTabs = [
+    { id: "request", label: "Solicită", icon: SearchIcon, badge: 0, minTier: "JUNIOR" },
+    { id: "jobs", label: "Lucrările mele", icon: ClipboardList, badge: activeJobs.length, minTier: "JUNIOR" },
+    { id: "notifications", label: "Notificări", icon: Bell, badge: unreadNotifs, minTier: "JUNIOR" },
+    { id: "settings", label: "Setări", icon: SettingsIcon, badge: 0, minTier: "JUNIOR" },
   ];
+  const tabs = allTabs.filter(tb => tierInfo.isAtLeast(tb.minTier));
 
   const title = {
     request: `${t("client.welcome")}, ${user?.name?.split(" ")[0] || ""}`,
@@ -141,6 +154,10 @@ export const ClientDashboard = () => {
 
   return (
     <DashLayout role="client" title={title} bottomNav={<BottomNav tabs={tabs} active={tab} onChange={setTab} dataPrefix="client-tab" />}>
+      {tierInfo.canSeeTierCelebration && <TierCelebrationBanner />}
+      {tab === "request" && tierInfo.canSeeQuests && <QuestPanel />}
+      {tab === "request" && tierInfo.canSeeStats && <TierToolsPanel role="client" />}
+      {tab === "request" && <TierProgressWidget className="mb-4" />}
       {tab === "request" && (
         <RequestZone
           user={user} prop={prop} properties={properties} requests={requests}
@@ -168,11 +185,43 @@ export const ClientDashboard = () => {
 
       {showNewReq && <NewRequestModal onClose={() => { setShowNewReq(false); setNewReqCategory(null); }} property={prop} initialCategory={newReqCategory} onCreated={r => setRequests([r, ...requests])} />}
       {chatRequest && <ChatPanel requestId={chatRequest} onClose={() => setChatRequest(null)} />}
-      {showPropManager && <PropertyManagerModal properties={properties} onClose={() => setShowPropManager(false)} onChange={setProperties} />}
+      {showPropManager && <PropertyManagerModal
+        properties={properties}
+        onClose={() => setShowPropManager(false)}
+        onChange={setProperties}
+        onOpenTwin={(twinInfo) => {
+          // twinInfo: { property_id, property_name, dt_project_id, model_url }
+          setTwinPropOverride(twinInfo);
+          setShowPropManager(false);
+          setShowTwinViewer(true);
+        }}
+      />}
       {timelineFor && <PropertyTimelineModal propertyId={timelineFor} onClose={() => setTimelineFor(null)} />}
       {disputeFor && <OpenDisputeModal requestId={disputeFor.id} requestTitle={disputeFor.title} onClose={() => setDisputeFor(null)} onOpened={() => loadRequests()} />}
       {showDesign && <InteriorDesignModal onClose={() => setShowDesign(false)} onCreated={() => loadRequests()} />}
-      {showTwinViewer && prop && <ClientTwinViewerModal propertyId={prop.id} propertyName={prop.name} onClose={() => setShowTwinViewer(false)} />}
+      {showTwinViewer && (twinPropOverride || prop) && (() => {
+        const t = twinPropOverride || { property_id: prop.id, property_name: prop.name };
+        // If we have a real 3D project with model uploaded, open the Three.js viewer
+        // (rotation 360° · X-Ray · wireframe · sections · pins · screenshots)
+        if (t.dt_project_id && t.model_url) {
+          return (
+            <DigitalTwinViewer
+              projectId={t.dt_project_id}
+              modelUrl={t.model_url}
+              projectName={t.property_name || t.dt_project_name}
+              onClose={() => { setShowTwinViewer(false); setTwinPropOverride(null); }}
+            />
+          );
+        }
+        // Fallback: 2D top-down room layout from the legacy twins collection
+        return (
+          <ClientTwinViewerModal
+            propertyId={t.property_id}
+            propertyName={t.property_name}
+            onClose={() => { setShowTwinViewer(false); setTwinPropOverride(null); }}
+          />
+        );
+      })()}
       {designPhasesFor && <DesignPhasesViewer request={designPhasesFor} onClose={() => setDesignPhasesFor(null)} onUpdate={() => { loadRequests(); refreshUser(); }} />}
       {timelineRequestId && <RequestTimelineModal requestId={timelineRequestId} onClose={() => setTimelineRequestId(null)} />}
       {show2FA && <TwoFASetupModal onClose={() => setShow2FA(false)} currentlyEnabled={false} />}
@@ -321,7 +370,7 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setP
             </p>
             <button
               onClick={() => setShowPropManager(true)}
-              className="btn-accent px-8 py-4 rounded-full text-base font-medium inline-flex items-center gap-2"
+              className="pm-btn pm-btn-primary pm-btn-lg"
               data-testid="onboarding-add-prop"
             >
               <Plus className="w-5 h-5" />Adaugă proprietate
@@ -350,23 +399,26 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setP
       <CyclePreview activeStep={twinUnlocked ? 3 : (twinStatus === "pending_validation" ? 2.5 : 2)} />
 
       {/* Quick action CTA */}
-      <div className="glass-strong rounded-3xl p-6 sm:p-8 mb-6 mt-6 relative overflow-hidden">
-        <div className="absolute -top-20 -right-20 w-60 h-60 rounded-full bg-[#d4ff3a] blur-[100px] opacity-15" />
-        <div className="relative flex items-center justify-between flex-wrap gap-4">
+      <PMCardPrimary className="mb-6 mt-6 pm-fade-in">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h2 className="font-serif text-2xl sm:text-3xl mb-2">Ai nevoie de un specialist?</h2>
-            <p className="text-sm text-stone-400 max-w-md">Postează cererea ta — primești oferte de la profesioniști verificați în câteva minute.</p>
+            <PMChip variant="primary" className="!bg-[var(--pm-on-primary-container)] !text-[var(--pm-primary-container)] !border-transparent mb-2">
+              ACȚIUNE RAPIDĂ
+            </PMChip>
+            <h2 className="font-serif text-2xl sm:text-3xl text-[var(--pm-on-primary-container)] mb-1">Ai nevoie de un specialist?</h2>
+            <p className="text-sm text-[var(--pm-on-primary-container)] opacity-80 max-w-md">Postează cererea ta — primești oferte de la profesioniști verificați în câteva minute.</p>
           </div>
-          <button
+          <PMPillButton
+            variant="on-container"
+            icon={Plus}
             onClick={() => setShowNewReq(true)}
-            className="btn-accent px-6 py-3 rounded-full text-sm font-medium flex items-center gap-2"
-            data-testid="new-request-cta"
+            testid="new-request-cta"
             data-tour="client-new-request"
           >
-            <Plus className="w-4 h-4" />Solicită serviciu
-          </button>
+            Solicită serviciu
+          </PMPillButton>
         </div>
-      </div>
+      </PMCardPrimary>
 
       {/* Quick Services Grid — visible category shortcuts with twin gating */}
       <QuickServicesGrid
@@ -442,7 +494,7 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setP
                 <>
                   <div className="font-medium text-amber-300">Activează Digital Twin gratuit</div>
                   <p className="text-xs text-stone-400 mt-1 mb-3 leading-relaxed">Cerere către operator pentru a construi modelul 3D al proprietății tale (camere, sisteme, asset-uri). Necesar pentru serviciul de Design Interior.</p>
-                  <button onClick={requestTwin} className="btn-accent px-4 py-2 rounded-full text-xs font-medium flex items-center gap-1.5" data-testid="request-twin-btn">
+                  <button onClick={requestTwin} className="pm-btn pm-btn-primary pm-btn-sm" data-testid="request-twin-btn">
                     <Sparkles className="w-3 h-3" />Solicită activare
                   </button>
                 </>
@@ -523,6 +575,7 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setP
 
       {/* Projects where this client is a member (read-only view) */}
       <ProjectListSection title="Proiectele tale de amenajare" />
+      <HouseHealthCard />
     </>
   );
 };
@@ -565,27 +618,27 @@ const CyclePreview = ({ activeStep }) => {
 
 // ============= TAB 2: Jobs Zone (all requests with filters) =============
 const JobsZone = ({ requests, searchQ, setSearchQ, filterCat, setFilterCat, filterStatus, setFilterStatus, loadRequests, payEscrow, confirmRequest, setChatRequest, setReviewFor, setDisputeFor, setDesignPhasesFor, setTimelineRequestId }) => {
-  useEffect(() => { loadRequests(); /* eslint-disable-next-line */ }, [searchQ, filterCat, filterStatus]);
+  useEffect(() => { loadRequests(); }, [searchQ, filterCat, filterStatus]);
 
   return (
     <div className="space-y-4 max-w-3xl mx-auto" data-testid="jobs-zone">
-      <div className="glass rounded-2xl p-3 sm:p-4 sticky top-[72px] z-10 bg-[#0a0a0b]/80 backdrop-blur">
+      <div className="pm-card-glass !p-3 sm:!p-4 sticky top-[72px] z-10">
         <div className="relative mb-2">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
           <input
             type="text" placeholder="Caută în lucrările tale..." value={searchQ} onChange={e => setSearchQ(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-3 py-2.5 text-sm focus:outline-none focus:border-[#d4ff3a]/50"
+            className="w-full bg-white/5 border border-white/10 rounded-full pl-10 pr-3 py-2.5 text-sm focus:outline-none focus:border-[var(--pm-primary)]/50 transition-colors"
             data-testid="req-search"
           />
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <select value={filterCat} onChange={e => setFilterCat(e.target.value)} className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs" data-testid="req-filter-cat">
+          <select value={filterCat} onChange={e => setFilterCat(e.target.value)} className="bg-white/5 border border-white/10 rounded-full px-3 py-2 text-xs" data-testid="req-filter-cat">
             <option value="">Toate categoriile</option>
             <option value="hvac">HVAC</option><option value="electric">Electric</option>
             <option value="plumbing">Sanitar</option><option value="interior_design">Design Interior</option>
             <option value="other">Altele</option>
           </select>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs" data-testid="req-filter-status">
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="bg-white/5 border border-white/10 rounded-full px-3 py-2 text-xs" data-testid="req-filter-status">
             <option value="">Toate statusurile</option>
             <option value="open">Deschis</option><option value="assigned">Asignat</option>
             <option value="in_progress">În lucru</option><option value="completed">Finalizat</option>
@@ -593,75 +646,82 @@ const JobsZone = ({ requests, searchQ, setSearchQ, filterCat, setFilterCat, filt
           </select>
         </div>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {requests.length === 0 && (
-          <div className="text-center py-16">
-            <ClipboardList className="w-12 h-12 text-stone-700 mx-auto mb-3" />
-            <div className="text-sm text-stone-400">Nicio solicitare încă</div>
-            <div className="text-xs text-stone-600 mt-1">Plasează prima ta cerere din tab-ul "Solicită".</div>
-          </div>
+          <PMEmptyState
+            icon={ClipboardList}
+            title="Nicio solicitare încă"
+            description='Plasează prima ta cerere din tab-ul "Solicită".'
+          />
         )}
         {requests.map(r => (
-          <div key={r.id} className="bg-white/5 rounded-2xl p-4" data-testid={`req-${r.id}`}>
+          <PMCard
+            key={r.id}
+            accent={r.disputed ? "warning" : r.status === "in_progress" ? "primary" : "default"}
+            testid={`req-${r.id}`}
+          >
             <div className="flex justify-between items-start mb-2 gap-3">
-              <div className="font-medium text-sm flex-1 min-w-0">{r.title}</div>
+              <div className="font-semibold text-sm md:text-base flex-1 min-w-0">{r.title}</div>
               <StatusBadge status={r.status} />
             </div>
-            <div className="text-xs text-stone-400 mb-2 line-clamp-2">{r.description}</div>
-            <div className="flex items-center justify-between text-[10px] text-stone-500">
+            <div className="text-xs md:text-sm text-stone-400 mb-2 line-clamp-2">{r.description}</div>
+            <div className="flex items-center justify-between text-[11px] text-stone-500 flex-wrap gap-2">
               <span>{r.category} · {r.priority}</span>
-              {r.specialist_name && <span className="text-[#d4ff3a]">{r.specialist_name}</span>}
+              {r.specialist_name && (
+                <span className="text-[var(--pm-primary)] flex items-center gap-1" title={`${r.specialist_specialty || ""}${r.specialist_city ? " · " + r.specialist_city : ""}`}>
+                  {r.specialist_name}
+                  {r.specialist_specialty && <span className="text-stone-400 normal-case">· {r.specialist_specialty}</span>}
+                  {r.specialist_city && <span className="text-stone-500">· {r.specialist_city}</span>}
+                  {r.specialist_verified && <span className="ml-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full px-1.5 py-0.5 text-[8px] uppercase tracking-wider font-semibold">✓ VERIF</span>}
+                </span>
+              )}
             </div>
             <LastActionBanner event={r.last_event} onClick={() => setTimelineRequestId(r.id)} />
-            <div className="flex gap-2 mt-3">
-              <button onClick={() => setTimelineRequestId(r.id)} className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 py-2 px-3 rounded-lg text-xs flex items-center gap-1" data-testid={`client-timeline-${r.id}`} title="Vezi timeline complet">
+            <div className="flex gap-2 mt-3 flex-wrap">
+              <button onClick={() => setTimelineRequestId(r.id)} className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 py-2 px-3 rounded-full text-xs flex items-center gap-1" data-testid={`client-timeline-${r.id}`} title="Vezi timeline complet">
                 <Clock className="w-3 h-3" />Timeline
               </button>
               {r.specialist_id && ["assigned","in_progress","completed"].includes(r.status) && (
-                <button onClick={() => setChatRequest(r.id)} className="flex-1 bg-white/10 hover:bg-white/15 py-2 rounded-lg text-xs flex items-center justify-center gap-1" data-testid={`chat-${r.id}`}>
-                  <MessageSquare className="w-3 h-3" />Chat
-                </button>
+                <PMPillButton variant="ghost" size="sm" icon={MessageSquare} onClick={() => setChatRequest(r.id)} testid={`chat-${r.id}`} className="flex-1 !min-w-[100px]">
+                  Chat
+                </PMPillButton>
               )}
               {r.status === "assigned" && !r.escrow_amount && (
-                <button onClick={() => payEscrow(r.id)} className="flex-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 py-2 rounded-lg text-xs flex items-center justify-center gap-1" data-testid={`pay-${r.id}`}>
-                  <CreditCard className="w-3 h-3" />Plătește
+                <button onClick={() => payEscrow(r.id)} className="flex-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 py-2 rounded-full text-xs flex items-center justify-center gap-1 font-semibold" data-testid={`pay-${r.id}`}>
+                  <CreditCard className="w-3 h-3" />Plătește escrow
                 </button>
               )}
             </div>
             {r.status === "completed" && (
-              <button onClick={() => confirmRequest(r.id, r)}
-                className="mt-2 w-full bg-[#d4ff3a] text-black py-2 rounded-lg text-xs font-medium"
-                data-testid={`confirm-${r.id}`}>
+              <PMPillButton variant="primary" size="sm" onClick={() => confirmRequest(r.id, r)} testid={`confirm-${r.id}`} className="mt-3 w-full">
                 Confirmă & Eliberează plata
-              </button>
+              </PMPillButton>
             )}
             {r.status === "confirmed" && r.specialist_id && (
-              <button onClick={() => setReviewFor(r)}
-                className="mt-2 w-full bg-white/10 hover:bg-white/15 py-2 rounded-lg text-xs flex items-center justify-center gap-1"
-                data-testid={`review-${r.id}`}>
-                <Star className="w-3 h-3" />Evaluează specialist
-              </button>
+              <PMPillButton variant="ghost" size="sm" icon={Star} onClick={() => setReviewFor(r)} testid={`review-${r.id}`} className="mt-3 w-full">
+                Evaluează specialist
+              </PMPillButton>
             )}
             {r.specialist_id && ["assigned","in_progress","completed"].includes(r.status) && !r.disputed && (
               <button onClick={() => setDisputeFor(r)}
-                className="mt-2 w-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 py-2 rounded-lg text-xs flex items-center justify-center gap-1"
+                className="mt-2 w-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 py-2 rounded-full text-xs flex items-center justify-center gap-1"
                 data-testid={`dispute-${r.id}`}>
                 <AlertTriangle className="w-3 h-3" />Deschide dispută
               </button>
             )}
             {r.disputed && (
-              <div className="mt-2 w-full bg-amber-500/15 border border-amber-500/40 text-amber-300 py-2 rounded-lg text-xs text-center" data-testid={`disputed-badge-${r.id}`}>
+              <div className="mt-3 w-full bg-amber-500/15 border border-amber-500/40 text-amber-300 py-2 rounded-xl text-xs text-center font-medium" data-testid={`disputed-badge-${r.id}`}>
                 ⚠ Dispută în analiză
               </div>
             )}
             {r.category === "interior_design" && (
               <button onClick={() => setDesignPhasesFor(r)}
-                className="mt-2 w-full bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 py-2 rounded-lg text-xs flex items-center justify-center gap-1"
+                className="mt-2 w-full bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 py-2 rounded-full text-xs flex items-center justify-center gap-1"
                 data-testid={`phases-${r.id}`}>
                 <Palette className="w-3 h-3" />Faze design ({(r.phases || []).length})
               </button>
             )}
-          </div>
+          </PMCard>
         ))}
       </div>
     </div>
@@ -677,22 +737,23 @@ const NotifsZone = ({ notifs, reload }) => {
   return (
     <div className="space-y-2 max-w-2xl mx-auto" data-testid="notifications-zone">
       {notifs.length === 0 && (
-        <div className="text-center py-16">
-          <Bell className="w-12 h-12 text-stone-700 mx-auto mb-3" />
-          <div className="text-sm text-stone-400">Nicio notificare</div>
-        </div>
+        <PMEmptyState
+          icon={Bell}
+          title="Nicio notificare"
+          description="Aici vor apărea actualizările pentru lucrările tale."
+        />
       )}
       {notifs.map(n => (
         <button
           key={n.id}
           onClick={() => markRead(n.id)}
-          className={`w-full text-left bg-white/5 rounded-2xl p-4 hover:bg-white/[0.08] transition-colors ${!n.read ? "border border-[#d4ff3a]/30" : ""}`}
+          className={`w-full text-left bg-white/5 hover:bg-white/[0.08] transition-colors rounded-2xl p-4 ${!n.read ? "border border-[var(--pm-primary)]/40" : "border border-white/5"}`}
           data-testid={`notif-${n.id}`}
         >
           <div className="flex items-start gap-3">
-            {!n.read && <div className="w-1.5 h-1.5 rounded-full bg-[#d4ff3a] mt-2 shrink-0" />}
+            {!n.read && <div className="w-2 h-2 rounded-full bg-[var(--pm-primary)] mt-2 shrink-0" />}
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium">{n.title}</div>
+              <div className="text-sm font-semibold">{n.title}</div>
               <div className="text-xs text-stone-400 mt-1">{n.message}</div>
               <div className="text-[10px] text-stone-600 mt-2">{new Date(n.created_at).toLocaleString("ro-RO")}</div>
             </div>
@@ -746,8 +807,14 @@ const NewRequestModal = ({ onClose, property, onCreated, initialCategory }) => {
           </select>
           <div className="grid grid-cols-2 gap-2">
             <button type="button" onClick={() => setForm({...form, priority: "normal"})} className={`py-3 rounded-xl text-sm ${form.priority === "normal" ? "bg-white text-black" : "bg-white/5 text-stone-400"}`}>Normal</button>
-            <button type="button" onClick={() => setForm({...form, priority: "urgent"})} className={`py-3 rounded-xl text-sm ${form.priority === "urgent" ? "bg-red-500 text-white" : "bg-white/5 text-stone-400"}`}>Urgent</button>
+            <button type="button" onClick={() => setForm({...form, priority: "urgent"})} className={`py-3 rounded-xl text-sm ${form.priority === "urgent" ? "bg-red-500 text-white" : "bg-white/5 text-stone-400"}`}>🔥 Urgent</button>
           </div>
+          {form.priority === "urgent" && (
+            <div className="text-[11px] text-red-300/80 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 flex items-start gap-2">
+              <span>⚡</span>
+              <span>Joburile urgente apar primele în lista specialiștilor și declanșează notificare instant cu prefix [URGENT].</span>
+            </div>
+          )}
           <input type="number" placeholder="Buget estimat (RON)" value={form.budget_estimate} onChange={e => setForm({...form, budget_estimate: parseFloat(e.target.value)})}
             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" data-testid="newreq-budget" />
           <div>
@@ -757,8 +824,8 @@ const NewRequestModal = ({ onClose, property, onCreated, initialCategory }) => {
             <PhotoUploader photos={photos} onChange={setPhotos} max={5} />
           </div>
           <div className="flex gap-2 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 py-3 bg-white/5 rounded-xl text-sm">Anulează</button>
-            <button type="submit" disabled={loading} className="flex-1 btn-accent py-3 rounded-xl text-sm font-medium" data-testid="newreq-submit">
+            <button type="button" onClick={onClose} className="pm-btn pm-btn-secondary flex-1">Anulează</button>
+            <button type="submit" disabled={loading} className="pm-btn pm-btn-primary flex-1" data-testid="newreq-submit">
               {loading ? "..." : "Creează"}
             </button>
           </div>
@@ -808,24 +875,24 @@ const WalletTopupBar = ({ onSuccess }) => {
   const [busy, setBusy] = useState(false);
   const presets = [100, 250, 500, 1000];
 
-  const topup = async (val) => {
+  const topup = (val) => {
     const amt = parseFloat(val || amount);
     if (!amt || amt <= 0 || amt > 50000) {
       alert("Sumă invalidă (1-50,000 RON)");
       return;
     }
     setBusy(true);
-    try {
-      const { data } = await axios.post(`${API}/wallet/topup-checkout-session`, {
-        amount: amt,
-        origin: window.location.origin,
+    axios.post(`${API}/wallet/topup-checkout-session`, {
+      amount: amt,
+      origin: window.location.origin,
+    })
+      .then(({ data }) => {
+        window.location.href = data.checkout_url;
+      })
+      .catch((e) => {
+        alert(formatApiError(e));
+        setBusy(false);
       });
-      // Redirect to Stripe Checkout (or demo success page)
-      window.location.href = data.checkout_url;
-    } catch (e) {
-      alert(formatApiError(e));
-      setBusy(false);
-    }
   };
 
   return (

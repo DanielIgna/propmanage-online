@@ -1,0 +1,59 @@
+name: Dashboard Smoke Test
+
+# Runs a fast (~90s) end-to-end check against the live preview to catch
+# broken imports, undefined references, ErrorBoundary triggers, and missing
+# data-testids BEFORE they reach production.
+#
+# Triggers:
+#   - Every pull request to main/master
+#   - Every push to main/master
+#   - Manual dispatch (Actions tab → "Run workflow")
+#
+# Configure in repo settings → Variables:
+#   - SMOKE_BASE_URL (e.g. https://phased-document.preview.emergentagent.com)
+#   - SMOKE_ADMIN_EMAIL (default: admin@propmanage.io)
+#   - SMOKE_ADMIN_PASSWORD (secret, required for impersonation)
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    name: 🔥 Pre-Deploy Dashboard Health Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Playwright + deps
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Run dashboard smoke test
+        env:
+          SMOKE_BASE_URL: ${{ vars.SMOKE_BASE_URL || 'https://phased-document.preview.emergentagent.com' }}
+          SMOKE_ADMIN_EMAIL: ${{ vars.SMOKE_ADMIN_EMAIL || 'admin@propmanage.io' }}
+          SMOKE_ADMIN_PASSWORD: ${{ secrets.SMOKE_ADMIN_PASSWORD || 'Admin123!' }}
+        run: python backend/tests/test_dashboards_smoke.py
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-logs
+          path: |
+            /tmp/smoke*.log
+          retention-days: 7

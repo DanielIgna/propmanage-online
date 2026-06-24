@@ -27,6 +27,20 @@ class RegisterIn(BaseModel):
     coverage_zones: Optional[List[str]] = None
     zone: Optional[str] = None
     referrer_id: Optional[str] = None
+    # GDPR consent — terms + privacy MUST be True for register to succeed
+    terms_accepted: Optional[bool] = False
+    privacy_policy_accepted: Optional[bool] = False
+    marketing_consent: Optional[bool] = False
+
+
+class ConsentUpdateIn(BaseModel):
+    marketing_consent: Optional[bool] = None
+    functional_cookies_accepted: Optional[bool] = None
+    analytics_cookies_accepted: Optional[bool] = None
+    marketing_cookies_accepted: Optional[bool] = None
+    # User can re-accept terms/privacy (e.g., after policy update)
+    terms_accepted: Optional[bool] = None
+    privacy_policy_accepted: Optional[bool] = None
 
 
 class LoginIn(BaseModel):

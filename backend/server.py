@@ -24,7 +24,7 @@ from routes.requests import router as requests_router
 from routes.operator import router as operator_nonconformity_router
 from routes.operator_twins import router as operator_twins_router
 from routes.wallet import router as wallet_router
-from routes.admin import router as admin_router
+from routes.admin import router as admin_router, run_auto_match_cron_tick
 from routes.specialist_docs import router as specialist_docs_router
 from routes.disputes import router as disputes_router
 from routes.design import router as design_router
@@ -45,6 +45,7 @@ from routes.root import router as root_router
 from routes.admin_console import router as admin_console_router, public_router as cms_public_router, run_due_preset_schedules, run_incident_spike_alert_check
 from routes.digital_twin import run_dt_auto_reminders
 from routes.admin_ai import router as admin_ai_router, run_daily_ai_digest, send_daily_ai_digest_email, run_ai_effectiveness_alert_check
+from routes.auth import run_auth_health_alert_check
 from routes.security_guard import router as security_guard_router
 from routes.concierge import router as concierge_router, admin_router as concierge_admin_router
 from routes.public import router as public_router, admin_router as public_admin_router, record_health_ping
@@ -67,6 +68,60 @@ from routes.admin_onboarding import router as admin_onboarding_router
 from routes.admin_qa_playbook import router as admin_qa_playbook_router
 from routes.admin_content_audit import router as admin_content_audit_router
 from routes.admin_term_audit import router as admin_term_audit_router
+from routes.verified_estate import router as verified_estate_router, seed_demo_listings as seed_verified_estate_demo
+from routes.app_settings import router as app_settings_router, public_router as app_settings_public_router
+from routes.qa_copilot import router as qa_copilot_router
+from routes.ai_control import router as ai_control_router
+from routes.digital_twin_qa import router as dt_qa_router
+from routes.docs_ai import router as docs_ai_router
+from routes.ai_dev_team import router as ai_dev_team_router
+from routes.ai_security import router as ai_security_router
+from routes.settings_snapshots import router as settings_snapshots_router, take_auto_snapshot
+from routes.service_contracts import router as service_contracts_router
+from routes.autonomy import router as autonomy_router, take_autonomy_snapshot, weekly_auto_tune_job
+from routes.twin import router as twin_router
+from routes.house_health import router as house_health_router, admin_router as house_health_admin_router
+from routes.house_health_plans import public_router as hh_plans_public_router, admin_router as hh_plans_admin_router
+from routes.house_health_recommendations import router as hh_recommendations_router
+from routes.house_health_billing import router as hh_billing_router, webhook_router as hh_webhook_router, seed_default_plans as hh_seed_default_plans
+from routes.admin_tour import router as admin_tour_router
+from autonomy.founder_digest import weekly_founder_digest
+from autonomy.autopilot import bootstrap_autonomy_defaults, daily_autopilot_sweep
+from routes.ai_activity import router as ai_activity_router
+from routes.ai_weekly_briefing import router as ai_weekly_briefing_router, run_weekly_briefing_job
+from routes.admin_todos import router as admin_todos_router
+from routes.experience_spaces_bootstrap import router as es_bootstrap_router
+from routes.future_ideas import router as future_ideas_router
+from routes.future_ideas_digest import router as future_ideas_digest_router, run_future_ideas_digest_job
+from routes.founder_gate_admin import router as founder_gate_admin_router
+from routes.ai_governance import router as ai_governance_router
+from routes.bug_memory_aggregator import router as bug_memory_router
+from routes.deprecation_pulse import router as deprecation_pulse_router, run_deprecation_pulse_job
+from routes.architecture_board import router as architecture_board_router
+from routes.ai_pm import router as ai_pm_router
+from routes.operating_manual import router as operating_manual_router
+from routes.experience_tiers import (
+    router as experience_tiers_router,
+    self_router as experience_tiers_self_router,
+    run_promotion_job as run_experience_tier_promotion_job,
+)
+from routes.feature_configurator import (
+    router as feature_configurator_router,
+    self_router as feature_configurator_self_router,
+    evaluate_quests_job,
+)
+from routes.twin_orchestrator import router as twin_orchestrator_router
+from routes.specialist_progression import router_admin as sp_admin_router, router_public as sp_public_router, run_auto_promotion
+from routes.reviews_v2 import router as reviews_v2_router
+from routes.marketplace_offers import router as marketplace_offers_router
+from routes.premium_marketplace import router as premium_marketplace_router
+from routes.bi_moe import router as bi_moe_router
+from routes.community import router as community_router, seed_community_demo
+from routes.tier_milestones import router as tier_milestones_router, cron_check_all_users
+from routes.sub_admins import router as sub_admins_router
+from routes.admin_approvals import router as admin_approvals_router
+from routes.kyc import router as kyc_router
+from middleware_scope import admin_scope_middleware
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
 from dev_velocity_service import run_weekly_velocity_job
@@ -101,6 +156,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Admin-scope HTTP middleware (Milestone 2): URL-pattern → required-scope map
+app.middleware("http")(admin_scope_middleware)
 logger = logging.getLogger(__name__)
 logger.info(f"CORS configured: origins={_origins} regex={_origin_regex} credentials={_allow_credentials}")
 
@@ -139,6 +196,56 @@ for r in (
     admin_qa_playbook_router,
     admin_content_audit_router,
     admin_term_audit_router,
+    verified_estate_router,
+    app_settings_router,
+    app_settings_public_router,
+    qa_copilot_router,
+    ai_control_router,
+    dt_qa_router,
+    docs_ai_router,
+    ai_dev_team_router,
+    ai_security_router,
+    settings_snapshots_router,
+    service_contracts_router,
+    autonomy_router,
+    twin_router,
+    house_health_router,
+    house_health_admin_router,
+    hh_plans_public_router,
+    hh_plans_admin_router,
+    hh_recommendations_router,
+    hh_billing_router,
+    hh_webhook_router,
+    admin_tour_router,
+    ai_activity_router,
+    ai_weekly_briefing_router,
+    admin_todos_router,
+    es_bootstrap_router,
+    future_ideas_router,
+    future_ideas_digest_router,
+    founder_gate_admin_router,
+    ai_governance_router,
+    bug_memory_router,
+    deprecation_pulse_router,
+    architecture_board_router,
+    ai_pm_router,
+    operating_manual_router,
+    experience_tiers_router,
+    experience_tiers_self_router,
+    feature_configurator_router,
+    feature_configurator_self_router,
+    twin_orchestrator_router,
+    sp_admin_router,
+    sp_public_router,
+    reviews_v2_router,
+    marketplace_offers_router,
+    premium_marketplace_router,
+    bi_moe_router,
+    community_router,
+    tier_milestones_router,
+    sub_admins_router,
+    admin_approvals_router,
+    kyc_router,
 ):
     app.include_router(r)
 
@@ -149,6 +256,40 @@ scheduler = AsyncIOScheduler(timezone=pytz.timezone(BUCHAREST_TZ_NAME))
 @app.on_event("startup")
 async def startup():
     await seed()
+    try:
+        await hh_seed_default_plans()
+    except Exception as e:
+        logger.warning(f"House Health plans seed failed: {e}")
+    try:
+        await seed_verified_estate_demo()
+    except Exception as e:
+        logger.warning(f"Verified Estate demo seed failed: {e}")
+    try:
+        await seed_community_demo()
+    except Exception as e:
+        logger.warning(f"Community demo seed failed: {e}")
+    try:
+        from tier_demo_seed import seed_tier_demo_users
+        await seed_tier_demo_users()
+    except Exception as e:
+        logger.warning(f"Tier demo seed failed: {e}")
+    # GDPR Phase 1 — backfill existing users with consent + verification fields (idempotent)
+    try:
+        from consent_backfill import run_consent_backfill
+        await run_consent_backfill()
+    except Exception as e:
+        logger.warning(f"Consent backfill failed: {e}")
+    # Autonomy autopilot — enable smoke-monitor, auto-match schedule, fresh snapshot (idempotent)
+    try:
+        await bootstrap_autonomy_defaults()
+    except Exception as e:
+        logger.warning(f"Autonomy autopilot bootstrap failed: {e}")
+    # Sub-admin RBAC — seed demo scoped admins (testing/frontend/backend/security)
+    try:
+        from sub_admin_seed import seed_sub_admins
+        await seed_sub_admins()
+    except Exception as e:
+        logger.warning(f"Sub-admin seed failed: {e}")
     if not scheduler.running:
         scheduler.add_job(
             run_daily_digests,
@@ -156,6 +297,111 @@ async def startup():
             id="daily_digest",
             replace_existing=True,
             misfire_grace_time=3600,
+        )
+        scheduler.add_job(
+            take_auto_snapshot,
+            CronTrigger(hour=4, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="settings_snapshot_daily",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        scheduler.add_job(
+            take_autonomy_snapshot,
+            CronTrigger(hour=3, minute=15, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="autonomy_snapshot_daily",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        # Auto-Tune weekly orchestrator — every Monday 04:00 Europe/Bucharest.
+        # Self-healing: keeps platform in self-driving tier without manual action.
+        scheduler.add_job(
+            weekly_auto_tune_job,
+            CronTrigger(day_of_week="mon", hour=4, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="autonomy_auto_tune_weekly",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        # Weekly Founders' Digest — Monday 09:30 (after Auto-Tune 04:00, after
+        # AI Briefing 09:00). Sends a 1-email-per-week summary to super-admins.
+        scheduler.add_job(
+            weekly_founder_digest,
+            CronTrigger(day_of_week="mon", hour=9, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="founder_digest_weekly",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        # Sprint A — Auto-promotion engine: daily 03:30 (after autonomy snapshot)
+        scheduler.add_job(
+            run_auto_promotion,
+            CronTrigger(hour=3, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="specialist_auto_promotion_daily",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        # Auto-match cron tick — runs hourly, executes only when due
+        # per `auto_match_schedule` config (enabled + interval_hours).
+        scheduler.add_job(
+            run_auto_match_cron_tick,
+            CronTrigger(minute=23, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="auto_match_cron_tick",
+            replace_existing=True,
+            misfire_grace_time=600,
+        )
+        # Weekly AI Briefing email — Mondays 09:00 Europe/Bucharest
+        scheduler.add_job(
+            run_weekly_briefing_job,
+            CronTrigger(day_of_week="mon", hour=9, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="weekly_ai_briefing",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        # Future Ideas Vault — weekly digest, Mondays 09:15 (after AI briefing)
+        scheduler.add_job(
+            run_future_ideas_digest_job,
+            CronTrigger(day_of_week="mon", hour=9, minute=15, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="future_ideas_digest",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        # AI Governance — Deprecation Pulse, Thursdays 09:30 Europe/Bucharest
+        scheduler.add_job(
+            run_deprecation_pulse_job,
+            CronTrigger(day_of_week="thu", hour=9, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="deprecation_pulse_weekly",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        # Experience Tiers — daily auto-promotion, 03:30 Europe/Bucharest
+        scheduler.add_job(
+            run_experience_tier_promotion_job,
+            CronTrigger(hour=3, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="experience_tier_daily_promotion",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        # Quests — daily evaluation + voucher issuance, 03:45 Europe/Bucharest
+        scheduler.add_job(
+            evaluate_quests_job,
+            CronTrigger(hour=3, minute=45, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="quests_daily_evaluation",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        # Tier milestones — daily sweep for missed 50/75/100% notifications, 04:00 Europe/Bucharest
+        scheduler.add_job(
+            cron_check_all_users,
+            CronTrigger(hour=4, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="tier_milestone_daily_sweep",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        # Autonomy autopilot daily sweep — 04:15 Europe/Bucharest (after tier milestones)
+        scheduler.add_job(
+            daily_autopilot_sweep,
+            CronTrigger(hour=4, minute=15, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="autonomy_autopilot_daily",
+            replace_existing=True,
+            misfire_grace_time=7200,
         )
         scheduler.add_job(
             auto_release_warranty_holds,
@@ -199,6 +445,14 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=3600,
         )
+        # Google OAuth early-warning: check every 15 min, alert if success rate < 80% in last hour
+        scheduler.add_job(
+            run_auth_health_alert_check,
+            CronTrigger(minute="*/15", timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="auth_health_alert",
+            replace_existing=True,
+            misfire_grace_time=900,
+        )
         scheduler.add_job(
             reset_demo_accounts,
             CronTrigger(hour=2, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
@@ -220,6 +474,12 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=3600,
         )
+        # Email lifecycle sequences: drip reminders + weekly newsletter (Phase 67)
+        try:
+            from email_sequences import register_email_sequence_jobs
+            register_email_sequence_jobs(scheduler)
+        except Exception as e:
+            logger.warning(f"Failed to register email sequence jobs: {e}")
         # Smoke Test auto-monitor — runs every 30 min, alerts admins on failure
         scheduler.add_job(
             run_smoke_test_monitor_tick,
@@ -296,6 +556,18 @@ async def startup():
         logger.info("Morning Briefing digest scheduler started (daily 09:00 Europe/Bucharest).")
         logger.info("Daily MongoDB backup scheduler started (03:30 Europe/Bucharest, emails admin).")
         logger.info("Weekly Dev Velocity scheduler started (Mondays 09:30 Europe/Bucharest).")
+        logger.info("Autonomy snapshot scheduler started (daily 03:15 Europe/Bucharest).")
+        logger.info("Autonomy Auto-Tune scheduler started (Mondays 04:00 Europe/Bucharest, self-healing + adaptive escalation).")
+        logger.info("Founders' Digest scheduler started (Mondays 09:30 Europe/Bucharest, 1 email/week to super-admins).")
+        # Hydrate Twin scheduled actions from DB (re-register all active ones)
+        try:
+            from twin_schedule import hydrate_schedules_on_startup
+            n = await hydrate_schedules_on_startup(scheduler)
+            logger.info(f"Twin Scheduled Actions: hydrated {n} active schedules from DB.")
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Twin schedule hydration failed: {e}")
+        logger.info("Weekly AI Briefing scheduler started (Mondays 09:00 Europe/Bucharest).")
+        logger.info("Future Ideas digest scheduler started (Mondays 09:15 Europe/Bucharest).")
 
 
 @app.on_event("shutdown")

@@ -1,0 +1,35 @@
+{
+  "summary": "Phase 75 Admin Bulk Auto-Match tool fully verified end-to-end. Backend: 9/9 pytest pass — AuthZ (403 for client on both /preview and /run), preview shape & invariant total=with+without, dry_run does NOT mutate db, min_rating=9.9 forces all candidates into 'skipped' with reason 'no_eligible_specialist', real run assigns specialists + reduces total_unmatched + autonomy operational.signals.auto_matched_requests_pct does not decrease, regression on /admin/autonomy/snapshot, /admin/autonomy/score, /admin/smoke-test/run, /admin/ai/findings/{id}/resolve all 200. Frontend at /admin: AutoMatchPanel renders with 3 KPI tiles (auto-match-total/with/without), Simulează → green result block (Simulare Asignate N cereri), toggle details expands assignment list, Asignează → window.confirm auto-accepted → real run executes & KPIs refresh to 0. window.confirm dialog handled correctly by playwright dialog listener.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase75_auto_match.py",
+    "/app/test_reports/pytest/phase75_auto_match.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "admin.py auto_match_run: best-match selection iterates matches and picks first one with rating >= min_rating, but find_matching_specialists already orders by best fit — this is correct. However if best_match in preview is computed without min_rating but /run filters by min_rating, the preview KPI 'with_match_available' can overstate reality. Consider passing min_rating into preview too, or surfacing it in the UI so admins see consistent counts.",
+    "admin.py auto_match_run line 619: spec.get('name') is used as specialist_name; if find_matching_specialists already returned best['name'], a redundant find_one happens for each assignment (extra round-trip in the bulk loop). Could batch-fetch specialists in one query for performance once N grows.",
+    "AutoMatchPanel.jsx: limit hard-coded to 100, min_rating hard-coded to 0 on the frontend; user has no control. Acceptable for an admin one-click tool but a future iteration could add small inputs.",
+    "AutoMatchPanel.jsx: uses window.confirm() — accessible but not stylistically aligned with the rest of admin (shadcn AlertDialog would be more consistent). Note: testing agent must auto-accept via page.on('dialog', d.accept).",
+    "Preview uses cutoff = now - 1h based on created_at as ISO string comparison ($lt). Same caveat as Phase 74: only safe if all created_at values are ISO strings — which they are in this codebase. No issue today.",
+    "No idempotency / lock — if two admins click Asignează simultaneously, both runs could try to assign the same request. Last-write-wins on the doc, but notifications would double-fire. Low-risk for an admin tool; consider an optimistic update_one({_id, specialist_id:None}) guard if scale matters."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase75_auto_match.py"
+  ],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% (all flows verified incl. dialog confirm)"},
+  "test_credentials": "admin@propmanage.io/Admin123! and client@propmanage.io/Client123! (used for 403 check)",
+  "seed_data_creation": "Inserted 5 TEST_ prefixed open+unassigned request docs (created_at = now-3h) directly via motor to exercise the matching path because the preview env had 0 unmatched requests after the prior phase-74 admin run. After tests, cleaned up via db.requests.delete_many({title:/^TEST_/}) which also removed 200+ historic TEST_* debris from prior phases.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 75 auto-match endpoints live and stable. Backend regression test at /app/backend/tests/test_phase75_auto_match.py (run time ~4s). Note: TestRealRun will SKIP if there are no open+unassigned+>1h-old requests in the env; seed via db.requests with status='open', specialist_id=None, created_at=(now-3h).isoformat() to exercise it. Important data-testids on AutoMatchPanel: auto-match-panel, auto-match-total, auto-match-with, auto-match-without, auto-match-dry-run, auto-match-run, auto-match-result, auto-match-toggle-details. window.confirm() is used for the real-run confirmation — playwright must register page.on('dialog', lambda d: asyncio.create_task(d.accept())) BEFORE clicking auto-match-run.",
+  "rca of the issue": "N/A — no bug found."
+}

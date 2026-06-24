@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="8" skipped="0" tests="16" time="3.150" timestamp="2026-06-04T00:26:54.422122+00:00" hostname="agent-env-5fea00b5-37f3-49c5-9521-8e803208718f"><testcase classname="backend.tests.test_phase73.TestSnapshots" name="test_create_manual_snapshot" time="0.874" /><testcase classname="backend.tests.test_phase73.TestSnapshots" name="test_list_snapshots_excludes_settings" time="0.058" /><testcase classname="backend.tests.test_phase73.TestSnapshots" name="test_get_single_snapshot_has_settings" time="0.064" /><testcase classname="backend.tests.test_phase73.TestSnapshots" name="test_restore_creates_pre_restore" time="0.698" /><testcase classname="backend.tests.test_phase73.TestSnapshots" name="test_non_admin_forbidden" time="0.456" /><testcase classname="backend.tests.test_phase73.TestSnapshots" name="test_snapshot_404_on_unknown" time="0.074" /><testcase classname="backend.tests.test_phase73.TestContracts" name="test_generate_404_unknown_request" time="0.058" /><testcase classname="backend.tests.test_phase73.TestContracts" name="test_generate_contract" time="0.222"><failure message="AssertionError: {&quot;detail&quot;:&quot;Solicitarea nu a fost găsită&quot;}&#10;assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code">backend/tests/test_phase73.py:144: in test_generate_contract
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Solicitarea nu a fost găsită"}
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_phase73.TestContracts" name="test_generate_idempotent" time="0.060"><failure message="assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code">backend/tests/test_phase73.py:156: in test_generate_idempotent
+    assert r.status_code == 200
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_phase73.TestContracts" name="test_get_contract_as_admin" time="0.000"><failure message="AttributeError: module 'pytest' has no attribute 'contract_id'">backend/tests/test_phase73.py:160: in test_get_contract_as_admin
+    r = admin_session.get(f"{BASE_URL}/api/contracts/{pytest.contract_id}", timeout=10)
+                                                      ^^^^^^^^^^^^^^^^^^
+E   AttributeError: module 'pytest' has no attribute 'contract_id'</failure></testcase><testcase classname="backend.tests.test_phase73.TestContracts" name="test_by_request_returns_contract" time="0.062"><failure message="AssertionError: assert None is not None&#10; +  where None = &lt;built-in method get of dict object at 0xf81c296707c0&gt;('contract')&#10; +    where &lt;built-in method get of dict object at 0xf81c296707c0&gt; = {'contract': None}.get&#10; +      where {'contract': None} = json()&#10; +        where json = &lt;Response [200]&gt;.json">backend/tests/test_phase73.py:167: in test_by_request_returns_contract
+    assert r.json().get("contract") is not None
+E   AssertionError: assert None is not None
+E    +  where None = &lt;built-in method get of dict object at 0xf81c296707c0&gt;('contract')
+E    +    where &lt;built-in method get of dict object at 0xf81c296707c0&gt; = {'contract': None}.get
+E    +      where {'contract': None} = json()
+E    +        where json = &lt;Response [200]&gt;.json</failure></testcase><testcase classname="backend.tests.test_phase73.TestContracts" name="test_by_request_null_when_missing" time="0.067" /><testcase classname="backend.tests.test_phase73.TestContracts" name="test_non_party_cannot_read" time="0.366"><failure message="AttributeError: module 'pytest' has no attribute 'contract_doc'">backend/tests/test_phase73.py:177: in test_non_party_cannot_read
+    c = pytest.contract_doc
+        ^^^^^^^^^^^^^^^^^^^
+E   AttributeError: module 'pytest' has no attribute 'contract_doc'</failure></testcase><testcase classname="backend.tests.test_phase73.TestContracts" name="test_sign_as_client" time="0.000"><failure message="AttributeError: module 'pytest' has no attribute 'contract_doc'">backend/tests/test_phase73.py:191: in test_sign_as_client
+    c = pytest.contract_doc
+        ^^^^^^^^^^^^^^^^^^^
+E   AttributeError: module 'pytest' has no attribute 'contract_doc'</failure></testcase><testcase classname="backend.tests.test_phase73.TestContracts" name="test_sign_as_specialist_and_active" time="0.000"><failure message="AttributeError: module 'pytest' has no attribute 'contract_doc'">backend/tests/test_phase73.py:201: in test_sign_as_specialist_and_active
+    c = pytest.contract_doc
+        ^^^^^^^^^^^^^^^^^^^
+E   AttributeError: module 'pytest' has no attribute 'contract_doc'</failure></testcase><testcase classname="backend.tests.test_phase73.TestContracts" name="test_operator_resolve_as_admin" time="0.001"><failure message="AttributeError: module 'pytest' has no attribute 'contract_id'">backend/tests/test_phase73.py:214: in test_operator_resolve_as_admin
+    r = admin_session.post(f"{BASE_URL}/api/contracts/{pytest.contract_id}/operator-resolve",
+                                                       ^^^^^^^^^^^^^^^^^^
+E   AttributeError: module 'pytest' has no attribute 'contract_id'</failure></testcase></testsuite></testsuites>

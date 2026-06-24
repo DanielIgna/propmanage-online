@@ -19,6 +19,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends, Body, Query
 
 from db import db
 from deps import require_role, get_current_user
+from sub_admin_deps import require_admin_scope
 
 logger = logging.getLogger("propmanage.security_guard")
 router = APIRouter(prefix="/api/admin/security", tags=["admin-security"])
@@ -269,12 +270,12 @@ async def security_guard(request: Request, user: dict = Depends(get_current_user
 # ============= ADMIN ENDPOINTS =============
 
 @router.get("/config")
-async def get_config(user: dict = Depends(require_role("admin"))):
+async def get_config(user: dict = Depends(require_admin_scope("security"))):
     return await _get_config()
 
 
 @router.put("/config")
-async def update_config(payload: dict = Body(...), user: dict = Depends(require_role("admin"))):
+async def update_config(payload: dict = Body(...), user: dict = Depends(require_admin_scope("security"))):
     allowed_fields = {
         "geo_block_enabled", "geo_allowed_countries",
         "vpn_block_enabled", "bot_block_enabled",
@@ -299,7 +300,7 @@ async def update_config(payload: dict = Body(...), user: dict = Depends(require_
 async def list_events(
     limit: int = Query(100, le=500),
     kind: Optional[str] = None,
-    user: dict = Depends(require_role("admin")),
+    user: dict = Depends(require_admin_scope("security")),
 ):
     filt = {}
     if kind:

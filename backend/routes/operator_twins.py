@@ -13,7 +13,7 @@ from db import db
 from core_utils import serialize_doc, effective_role
 from deps import get_current_user, require_role
 from services import send_email, notify, send_web_push, log_event
-from models import *
+from models import TwinUpsertIn, TwinValidateIn
 from email_service import (
     send_template, tpl_welcome, tpl_dispute_opened, tpl_dispute_resolved,
     tpl_design_phase_quote, tpl_specialist_verified, tpl_escrow_funded,
@@ -101,6 +101,130 @@ async def get_my_property_twin(prop_id: str, user: dict = Depends(get_current_us
         "notes": twin.get("notes"),
         "requested_at": twin.get("requested_at"),
         "validated_at": twin.get("validated_at"),
+    }
+
+
+# ---------------------------------------------------------------------------
+# CLIENT — Digital Twin summary across all owned properties
+# Used by Settings → Digital Twin 3D section.
+# ---------------------------------------------------------------------------
+_TWIN_STATUS_RANK = {
+    # Higher rank = more "available" to the user. Used to pick a primary twin.
+    "approved": 5,
+    "draft": 4,
+    "needs_revision": 3,
+    "pending_validation": 2,
+    "not_requested": 1,
+}
+
+_TWIN_STATUS_LABEL = {
+    "approved": "Disponibil",
+    "draft": "În generare",
+    "needs_revision": "Eșuat",
+    "pending_validation": "În procesare",
+    "not_requested": "Inexistent",
+}
+
+
+@router.get("/me/digital-twins")
+async def my_digital_twins(user: dict = Depends(get_current_user)):
+    """Return Digital Twin summary for the authenticated user's properties.
+
+    Output shape:
+        {
+            "has_any": bool,              # User owns at least one property
+            "has_available": bool,        # At least one twin in 'approved' state
+            "primary": { ... } | None,    # Best twin to show first (highest rank)
+            "twins": [
+                {
+                    "property_id": str,
+                    "property_name": str,
+                    "twin_id": str | None,
+                    "status": str,         # raw status code
+                    "status_label": str,   # localized Romanian label
+                    "progress": int,       # 0-100 (rough estimate)
+                    "model_url": None,     # placeholder for future GLB upload
+                    "requested_at": iso,
+                    "validated_at": iso,
+                }
+            ]
+        }
+    """
+    props = await db.properties.find(
+        {"owner_id": user["id"], "deleted": {"$ne": True}},
+        {"_id": 1, "name": 1},
+    ).to_list(50)
+    if not props:
+        return {"has_any": False, "has_available": False, "primary": None, "twins": []}
+
+    prop_ids = [str(p["_id"]) for p in props]
+    # Batch-fetch all twins for owned properties in one query
+    twin_docs = await db.twins.find({"property_id": {"$in": prop_ids}}).to_list(len(prop_ids))
+    twin_by_pid = {t["property_id"]: t for t in twin_docs}
+    # Batch-fetch DT projects (Phase G) so the frontend can deep-link directly into
+    # the 3D viewer when the architect has uploaded a GLB/GLTF model.
+    dt_projects = await db.digital_twin_projects.find(
+        {"property_id": {"$in": prop_ids}}
+    ).to_list(len(prop_ids))
+    dt_by_pid = {}
+    for proj in dt_projects:
+        pid = proj.get("property_id")
+        if not pid:
+            continue
+        # Prefer the most recent project per property
+        existing = dt_by_pid.get(pid)
+        if not existing or (proj.get("updated_at") or "") > (existing.get("updated_at") or ""):
+            dt_by_pid[pid] = proj
+
+    items: list[dict] = []
+    for p in props:
+        pid = str(p["_id"])
+        t = twin_by_pid.get(pid)
+        proj = dt_by_pid.get(pid)
+        status_code = (t or {}).get("status") or "not_requested"
+        # If a DT project has a model_url, treat it as approved even if the legacy
+        # twins doc isn't there — the architect has shipped a viewable model.
+        if proj and proj.get("model_url"):
+            status_code = "approved"
+        # Rough progress estimate based on status (frontend can render bar)
+        progress = {
+            "approved": 100,
+            "draft": 70,
+            "needs_revision": 50,
+            "pending_validation": 30,
+            "not_requested": 0,
+        }.get(status_code, 0)
+        items.append({
+            "property_id": pid,
+            "property_name": p.get("name") or "Imobil",
+            "twin_id": str(t["_id"]) if t else None,
+            "status": status_code,
+            "status_label": _TWIN_STATUS_LABEL.get(status_code, status_code),
+            "progress": progress,
+            # DT project info — frontend opens the real 3D viewer when these are set
+            "dt_project_id": proj.get("id") if proj else None,
+            "dt_project_name": proj.get("name") if proj else None,
+            "model_url": (proj or {}).get("model_url"),
+            "requested_at": (t or {}).get("requested_at"),
+            "validated_at": (t or {}).get("validated_at"),
+        })
+    # Pick a primary twin: highest rank, ties broken by validated_at desc, then requested_at desc
+    items_sorted = sorted(
+        items,
+        key=lambda x: (
+            _TWIN_STATUS_RANK.get(x["status"], 0),
+            x.get("validated_at") or "",
+            x.get("requested_at") or "",
+        ),
+        reverse=True,
+    )
+    primary = items_sorted[0] if items_sorted else None
+    has_available = any(x["status"] == "approved" for x in items)
+    return {
+        "has_any": True,
+        "has_available": has_available,
+        "primary": primary,
+        "twins": items_sorted,
     }
 
 

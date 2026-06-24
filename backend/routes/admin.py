@@ -6,14 +6,14 @@ import logging
 from typing import Optional, List, Literal, Dict
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Body
 from pydantic import BaseModel, Field
 
 from db import db
 from core_utils import serialize_doc, effective_role
 from deps import get_current_user, require_role
 from services import send_email, notify, send_web_push, log_event
-from models import *
+from models import DocumentReviewIn, SpecialistRejectIn
 from email_service import (
     send_template, tpl_welcome, tpl_dispute_opened, tpl_dispute_resolved,
     tpl_design_phase_quote, tpl_specialist_verified, tpl_escrow_funded,
@@ -221,7 +221,7 @@ async def admin_cleanup_test_users(
         "action": "admin.cleanup_test_users",
         "target_emails": target_emails,
         "counts": counts,
-        "created_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     })
 
     return {"deleted_users": counts.get("users", 0), "counts": counts, "emails": target_emails}
@@ -368,6 +368,12 @@ async def verify_specialist(spec_id: str, user: dict = Depends(require_role("adm
         await send_template(tpl_trust_badge_invite, spec.get("name"), to=spec.get("email"))
     except Exception:  # noqa: BLE001
         pass
+    # Tier milestone check after KYC approval (verified field changed)
+    try:
+        from routes.tier_milestones import check_tier_milestones
+        await check_tier_milestones(spec_id)
+    except Exception:
+        pass
     return {"ok": True}
 
 
@@ -483,4 +489,324 @@ async def review_specialist_document(spec_id: str, doc_id: str, data: DocumentRe
         msg += f" Motiv: {data.reason}"
     await notify(spec_id, title, msg, type_="verification", link="/specialist")
     return {"ok": True}
+
+
+
+# ============================================================================
+# BULK AUTO-MATCH — Admin tool to assign pending open requests
+# ============================================================================
+@router.post("/admin/auto-match/preview")
+async def auto_match_preview(user: dict = Depends(require_role("admin"))):
+    """Preview unmatched open requests + best specialist suggestion per each.
+
+    Read-only. Returns the list with proposed assignments so admin can review
+    before executing the bulk operation.
+    """
+    from routes.matching import find_matching_specialists
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+    cursor = db.requests.find({
+        "status": "open",
+        "specialist_id": {"$in": [None, ""]},
+        "created_at": {"$lt": cutoff.isoformat()},
+    }).sort("created_at", 1).limit(100)
+
+    items = []
+    async for req in cursor:
+        category = req.get("category") or ""
+        # Best-effort zone resolve
+        zone = req.get("property_zone") or req.get("zone") or ""
+        if not zone and req.get("property_id"):
+            prop = await db.properties.find_one({"_id": ObjectId(req["property_id"])})
+            if prop:
+                zone = prop.get("zone") or prop.get("city") or "default"
+        zone = zone or "default"
+
+        matches = await find_matching_specialists(category, zone, max_results=3)
+        best = matches[0] if matches else None
+        items.append({
+            "request_id": str(req["_id"]),
+            "title": req.get("title"),
+            "category": category,
+            "client_name": req.get("client_name"),
+            "property_address": req.get("property_address"),
+            "created_at": req.get("created_at"),
+            "best_match": {
+                "id": best["id"],
+                "name": best["name"],
+                "rating": best.get("rating"),
+                "in_zone": best.get("is_in_zone"),
+                "reasons": best.get("match_reasons", []),
+            } if best else None,
+            "alternatives_count": max(0, len(matches) - 1),
+        })
+
+    return {
+        "items": items,
+        "total_unmatched": len(items),
+        "with_match_available": sum(1 for i in items if i["best_match"]),
+        "no_match_available": sum(1 for i in items if not i["best_match"]),
+    }
+
+
+@router.post("/admin/auto-match/run")
+async def auto_match_run(
+    payload: dict = Body(default={}),
+    user: dict = Depends(require_role("admin")),
+):
+    """Bulk-assign unmatched open requests to their best-fit specialist.
+
+    Admin-driven matching — bypasses the 45 RON lead fee (admin tool).
+    Each assignment is logged + the specialist + client receive notification.
+
+    Body:
+      {
+        "limit": 50,            # cap on how many to assign in one run
+        "min_rating": 4.0,      # skip specialists below this rating
+        "dry_run": false        # if true, returns plan without writing
+      }
+    """
+    limit = int(payload.get("limit") or 50)
+    min_rating = float(payload.get("min_rating") or 0.0)
+    dry_run = bool(payload.get("dry_run") or False)
+    return await execute_auto_match(
+        limit=limit, min_rating=min_rating, dry_run=dry_run,
+        triggered_by={"id": user["id"], "kind": "admin_manual", "label": user.get("email")},
+    )
+
+
+async def execute_auto_match(
+    limit: int = 50,
+    min_rating: float = 0.0,
+    dry_run: bool = False,
+    triggered_by: Optional[dict] = None,
+) -> dict:
+    """Core auto-match logic — usable from HTTP handler or scheduler.
+
+    triggered_by: {"id": "...", "kind": "admin_manual"|"cron", "label": "..."}
+    """
+    from routes.matching import find_matching_specialists
+
+    triggered_by = triggered_by or {"id": "system", "kind": "cron", "label": "cron"}
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+    cursor = db.requests.find({
+        "status": "open",
+        "specialist_id": {"$in": [None, ""]},
+        "created_at": {"$lt": cutoff.isoformat()},
+    }).sort("created_at", 1).limit(limit)
+
+    assigned = []
+    skipped = []
+    async for req in cursor:
+        category = req.get("category") or ""
+        zone = req.get("property_zone") or req.get("zone") or ""
+        if not zone and req.get("property_id"):
+            try:
+                prop = await db.properties.find_one({"_id": ObjectId(req["property_id"])})
+                if prop:
+                    zone = prop.get("zone") or prop.get("city") or "default"
+            except Exception:
+                zone = "default"
+        zone = zone or "default"
+
+        matches = await find_matching_specialists(category, zone, max_results=5)
+        best = None
+        for m in matches:
+            if (m.get("rating") or 0) >= min_rating:
+                best = m
+                break
+
+        if not best:
+            skipped.append({
+                "request_id": str(req["_id"]),
+                "reason": "no_eligible_specialist",
+                "category": category,
+            })
+            continue
+
+        if dry_run:
+            assigned.append({
+                "request_id": str(req["_id"]),
+                "specialist_id": best["id"],
+                "specialist_name": best["name"],
+                "dry_run": True,
+            })
+            continue
+
+        try:
+            spec = await db.users.find_one({"_id": ObjectId(best["id"])})
+            update = {
+                "status": "assigned",
+                "specialist_id": best["id"],
+                "specialist_name": spec.get("name"),
+                "specialist_specialty": spec.get("specialty") or spec.get("category") or "",
+                "specialist_city": spec.get("city") or spec.get("location") or "",
+                "specialist_verified": bool(spec.get("verified")),
+                "assigned_at": datetime.now(timezone.utc).isoformat(),
+                "auto_assigned_by_admin": triggered_by.get("id"),
+                "auto_assigned_at": datetime.now(timezone.utc).isoformat(),
+                "auto_assigned_via": triggered_by.get("kind"),
+            }
+            await db.requests.update_one({"_id": req["_id"]}, {"$set": update})
+
+            try:
+                await notify(
+                    req["client_id"],
+                    f"Specialist alocat automat: {spec.get('name')}",
+                    f"{'Cron' if triggered_by.get('kind') == 'cron' else 'Admin'} a alocat un specialist potrivit pentru '{req.get('title','')}'. Verifică detaliile.",
+                    type_="assignment", link="/client",
+                )
+                await notify(
+                    best["id"],
+                    "Cerere alocată automat",
+                    f"Ai primit o cerere via auto-match: {req.get('title','')}. Lead fee gratuit (admin-driven).",
+                    type_="assignment", link="/specialist",
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[auto-match] notify failed for {req['_id']}: {e}")
+
+            actor = {"id": triggered_by.get("id"), "name": triggered_by.get("label") or triggered_by.get("kind")}
+            try:
+                await log_event(str(req["_id"]), "request.auto_assigned", actor=actor,
+                                payload={"specialist_id": best["id"], "via": triggered_by.get("kind")})
+            except Exception:
+                pass
+
+            assigned.append({
+                "request_id": str(req["_id"]),
+                "specialist_id": best["id"],
+                "specialist_name": spec.get("name"),
+            })
+        except Exception as e:  # noqa: BLE001
+            logger.exception(f"[auto-match] failed for request {req['_id']}: {e}")
+            skipped.append({
+                "request_id": str(req["_id"]),
+                "reason": f"error: {str(e)[:120]}",
+            })
+
+    result = {
+        "ok": True,
+        "dry_run": dry_run,
+        "assigned_count": len(assigned),
+        "skipped_count": len(skipped),
+        "assigned": assigned,
+        "skipped": skipped,
+        "triggered_by": triggered_by,
+        "executed_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    # Persist run history (skip dry-runs to avoid noise)
+    if not dry_run:
+        try:
+            await db.auto_match_runs.insert_one({
+                "executed_at": result["executed_at"],
+                "triggered_by": triggered_by,
+                "assigned_count": result["assigned_count"],
+                "skipped_count": result["skipped_count"],
+                "limit": limit,
+                "min_rating": min_rating,
+            })
+            # Keep only last 200 runs
+            cur = db.auto_match_runs.find({}, {"_id": 1}).sort("executed_at", -1).skip(200)
+            old_ids = [d["_id"] async for d in cur]
+            if old_ids:
+                await db.auto_match_runs.delete_many({"_id": {"$in": old_ids}})
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[auto-match] failed to persist run history: {e}")
+
+    return result
+
+
+# ============================================================================
+# AUTO-MATCH SCHEDULE (config + cron tick)
+# ============================================================================
+DEFAULT_AUTO_MATCH_SCHEDULE = {
+    "enabled": False,
+    "interval_hours": 6,
+    "min_rating": 0.0,
+    "limit": 100,
+}
+
+
+async def _load_auto_match_schedule() -> dict:
+    doc = await db.auto_match_schedule.find_one({"_id": "config"})
+    if not doc:
+        return DEFAULT_AUTO_MATCH_SCHEDULE.copy()
+    return {
+        "enabled": bool(doc.get("enabled", False)),
+        "interval_hours": int(doc.get("interval_hours") or 6),
+        "min_rating": float(doc.get("min_rating") or 0.0),
+        "limit": int(doc.get("limit") or 100),
+    }
+
+
+@router.get("/admin/auto-match/schedule")
+async def get_auto_match_schedule(user: dict = Depends(require_role("admin"))):
+    cfg = await _load_auto_match_schedule()
+    last_run = await db.auto_match_runs.find_one({}, sort=[("executed_at", -1)])
+    last_cron = await db.auto_match_runs.find_one({"triggered_by.kind": "cron"}, sort=[("executed_at", -1)])
+    if last_run:
+        last_run.pop("_id", None)
+    if last_cron:
+        last_cron.pop("_id", None)
+    return {
+        "schedule": cfg,
+        "last_run": last_run,
+        "last_cron_run": last_cron,
+    }
+
+
+@router.put("/admin/auto-match/schedule")
+async def update_auto_match_schedule(
+    payload: dict = Body(...),
+    user: dict = Depends(require_role("admin")),
+):
+    cfg = await _load_auto_match_schedule()
+    if "enabled" in payload:
+        cfg["enabled"] = bool(payload["enabled"])
+    if "interval_hours" in payload:
+        h = int(payload["interval_hours"])
+        if h < 1 or h > 24:
+            raise HTTPException(400, "interval_hours must be between 1 and 24")
+        cfg["interval_hours"] = h
+    if "min_rating" in payload:
+        cfg["min_rating"] = float(payload["min_rating"])
+    if "limit" in payload:
+        cfg["limit"] = int(payload["limit"])
+    cfg["updated_at"] = datetime.now(timezone.utc).isoformat()
+    cfg["updated_by"] = user["id"]
+    await db.auto_match_schedule.update_one({"_id": "config"}, {"$set": cfg}, upsert=True)
+    return await _load_auto_match_schedule()
+
+
+async def run_auto_match_cron_tick() -> dict:
+    """APScheduler callback — runs every hour, executes auto-match only when due.
+
+    Reads `auto_match_schedule.enabled` and `interval_hours` from MongoDB and
+    skips if disabled or if the last cron run was within interval_hours.
+    """
+    try:
+        cfg = await _load_auto_match_schedule()
+        if not cfg["enabled"]:
+            return {"skipped": "disabled"}
+        last = await db.auto_match_runs.find_one(
+            {"triggered_by.kind": "cron"}, sort=[("executed_at", -1)],
+        )
+        now = datetime.now(timezone.utc)
+        if last and last.get("executed_at"):
+            try:
+                last_ts = datetime.fromisoformat(last["executed_at"].replace("Z", "+00:00"))
+                if (now - last_ts) < timedelta(hours=cfg["interval_hours"]):
+                    return {"skipped": "not_due", "next_due_in_sec": int((timedelta(hours=cfg["interval_hours"]) - (now - last_ts)).total_seconds())}
+            except Exception:
+                pass
+        result = await execute_auto_match(
+            limit=cfg["limit"], min_rating=cfg["min_rating"], dry_run=False,
+            triggered_by={"id": "system", "kind": "cron", "label": f"cron@{cfg['interval_hours']}h"},
+        )
+        logger.info(f"[auto-match-cron] assigned={result['assigned_count']} skipped={result['skipped_count']}")
+        return result
+    except Exception as e:  # noqa: BLE001
+        logger.exception(f"[auto-match-cron] failed: {e}")
+        return {"error": str(e)}
 

@@ -3487,7 +3487,7 @@ async def execute_tests(test_codes: list[str], run_id: Optional[str] = None) -> 
                     )
                 else:
                     new_check = {
-                        "id": __import__("uuid").uuid4().hex,
+                        "id": uuid.uuid4().hex,
                         "code": r["code"],
                         "category": r["category"],
                         "subcategory": "auto · " + r["kind"],

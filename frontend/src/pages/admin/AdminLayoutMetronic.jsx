@@ -6,12 +6,73 @@ import {
   LayoutDashboard, Users, ShieldCheck, Scale, Wallet, FolderKanban,
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
   LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, Sparkles, Bot, Zap, Inbox,
-  UserCheck, Home, Wrench, Briefcase
+  UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb, Bug, Compass, Layers, BookOpenCheck, GraduationCap, Gamepad2, Trophy, BarChart3, Eye, Heart
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { API } from "../DashShared";
 import { HealthScoreBadge } from "./HealthScoreBadge";
+import { AutonomyTierBadge } from "./AutonomyTierBadge";
 import { AIAdminTour, ReplayAIAdminTourButton } from "./AIAdminTour";
+import { AdminTourV2Wrapper } from "./AdminTourV2";
+import { useAdminScope, filterNavSections, setPreviewScope, getPreviewScope } from "../../lib/useAdminScope";
+import { PreviewAuditButton } from "./PreviewAuditButton";
+
+// Scope-color tones for the topbar badge
+const SCOPE_TONES = {
+  general:  { bg: "bg-violet-100  dark:bg-violet-500/15",  text: "text-violet-700  dark:text-violet-300",  label: "Super Admin" },
+  testing:  { bg: "bg-cyan-100    dark:bg-cyan-500/15",    text: "text-cyan-700    dark:text-cyan-300",    label: "Testing" },
+  frontend: { bg: "bg-pink-100    dark:bg-pink-500/15",    text: "text-pink-700    dark:text-pink-300",    label: "Frontend" },
+  backend:  { bg: "bg-blue-100    dark:bg-blue-500/15",    text: "text-blue-700    dark:text-blue-300",    label: "Backend" },
+  security: { bg: "bg-red-100     dark:bg-red-500/15",     text: "text-red-700     dark:text-red-300",     label: "Security" },
+  ai:       { bg: "bg-amber-100   dark:bg-amber-500/15",   text: "text-amber-700   dark:text-amber-300",   label: "AI" },
+  ops:      { bg: "bg-emerald-100 dark:bg-emerald-500/15", text: "text-emerald-700 dark:text-emerald-300", label: "Ops" },
+};
+
+const ScopeBadgeTop = ({ scope }) => {
+  if (!scope) return null;
+  const s = (scope.admin_scope || "general").toLowerCase();
+  const tone = SCOPE_TONES[s] || SCOPE_TONES.general;
+  const seniority = scope.admin_seniority || "senior";
+  const isPreview = !!scope._preview_active;
+
+  const exitPreview = (e) => {
+    e.stopPropagation();
+    setPreviewScope(null);
+    setTimeout(() => window.location.reload(), 100);
+  };
+
+  if (isPreview) {
+    return (
+      <div
+        className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-200 border-2 border-amber-400 dark:border-amber-500/50 animate-pulse"
+        title={`Preview as: ${s} (real scope: ${scope._real_scope})`}
+        data-testid="admin-scope-badge"
+      >
+        <Eye className="w-3 h-3" />
+        <span className="font-bold uppercase">PREVIEW · {tone.label}</span>
+        <button
+          onClick={exitPreview}
+          className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-200 dark:bg-amber-600/40 hover:bg-amber-300 dark:hover:bg-amber-600/70"
+          data-testid="exit-preview"
+        >
+          ✕ Ieși
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium ${tone.bg} ${tone.text}`}
+      title={`Scope: ${s} · Seniority: ${seniority}`}
+      data-testid="admin-scope-badge"
+    >
+      <ShieldCheck className="w-3 h-3" />
+      <span>{tone.label}</span>
+      <span className="text-[9px] font-bold uppercase opacity-70">· {seniority}</span>
+    </div>
+  );
+};
 
 const NAV_SECTIONS = [
   {
@@ -56,6 +117,19 @@ const NAV_SECTIONS = [
       { id: "trust", label: "Trust Score Weights", icon: Award },
       { id: "audit", label: "Audit Log", icon: FileText },
       { id: "settings", label: "Setări Platformă", icon: Settings },
+      { id: "settings_control", label: "Control Administrare", icon: Settings, badge: "NEW", href: "/admin/settings-control" },
+      { id: "ve_admin", label: "Imobile Verificate", icon: Award, badge: "NEW", href: "/admin/imobile-verificate" },
+      { id: "docs_train", label: "Documentație & Training", icon: FileText, badge: "NEW", href: "/admin/documentation" },
+      { id: "qa_copilot", label: "QA Copilot · AI Testing", icon: Sparkles, badge: "NEW", href: "/admin/qa-copilot" },
+      { id: "ai_control", label: "AI Control Center", icon: Sparkles, badge: "NEW", href: "/admin/ai-control" },
+      { id: "ai_docs", label: "Document Intelligence", icon: FileText, badge: "NEW", href: "/ai-docs" },
+      { id: "ai_dev_team", label: "AI Development Team", icon: Code2, badge: "NEW", href: "/admin/ai-dev-team" },
+      { id: "ai_security", label: "AI Security Center", icon: Shield, badge: "NEW", href: "/admin/ai-security" },
+      { id: "autonomy", label: "Autonomy Engine", icon: Sparkles, badge: "NEW", href: "/admin/autonomy" },
+      { id: "twin", label: "Twin Orchestrator", icon: Bot, badge: "AI", href: "/admin/twin" },
+      { id: "house_health", label: "House Health", icon: Heart, badge: "NEW", href: "/admin/house-health" },
+      { id: "todo_board", label: "ToDo Board", icon: FileText, badge: "NEW", href: "/admin/todo" },
+      { id: "experience_spaces", label: "Experience Spaces", icon: Sparkles, badge: "BETA", href: "/admin/experience-spaces" },
     ],
   },
   {
@@ -63,6 +137,30 @@ const NAV_SECTIONS = [
     items: [
       { id: "gdpr", label: "GDPR Pack", icon: ShieldCheck, badge: "NEW" },
       { id: "impersonation", label: "Impersonări", icon: ShieldCheck, badge: "NEW" },
+      { id: "kyc", label: "KYC Identitate", icon: ShieldCheck, badge: "NEW" },
+    ],
+  },
+  {
+    title: "RBAC & APROBĂRI",
+    items: [
+      { id: "sub_admins", label: "Sub-Admini", icon: Users, badge: "NEW" },
+      { id: "approvals", label: "Aprobări Admin", icon: ShieldCheck, badge: "NEW" },
+    ],
+  },
+  {
+    title: "STRATEGIE & R&D",
+    items: [
+      { id: "operating_manual", label: "Manual de Operare", icon: BookOpenCheck, badge: "START AICI", href: "/admin/operating-manual" },
+      { id: "ai_governance", label: "AI Governance Center", icon: Shield, badge: "NEW", href: "/admin/ai-governance" },
+      { id: "architecture_board", label: "Architecture Review Board", icon: Compass, badge: "NEW", href: "/admin/architecture-board" },
+      { id: "ai_pm", label: "AI Product Manager", icon: Layers, badge: "NEW", href: "/admin/ai-pm" },
+      { id: "experience_tiers", label: "Experience Tiers", icon: GraduationCap, badge: "NEW", href: "/admin/experience-tiers" },
+      { id: "feature_configurator", label: "Feature Configurator", icon: Gamepad2, badge: "GAMIFY", href: "/admin/feature-configurator" },
+      { id: "specialist_progression", label: "Progresie Specialiști", icon: Trophy, badge: "SPRINT A", href: "/admin/specialist-progression" },
+      { id: "bi_moe", label: "Business Intelligence", icon: BarChart3, badge: "SPRINT F", href: "/admin/bi-moe" },
+      { id: "founder_gate", label: "Founder Approval Gate", icon: ShieldCheck, badge: "FG-0", href: "/admin/founder-gate" },
+      { id: "bug_memory", label: "Bug Memory Aggregator", icon: Bug, badge: "NEW", href: "/admin/bug-memory" },
+      { id: "future_ideas", label: "Idei Dezvoltare Viitoare", icon: Lightbulb, badge: "REVIEW", href: "/admin/future-ideas" },
     ],
   },
   {
@@ -195,9 +293,21 @@ const LiveActivityRail = ({ theme }) => {
 };
 
 const ROLE_PROFILES = [
-  { role: "client", label: "Client", icon: Home, color: "blue", demoEmail: "client@propmanage.io" },
-  { role: "specialist", label: "Specialist", icon: Wrench, color: "emerald", demoEmail: "specialist@propmanage.io" },
-  { role: "operator", label: "Operator", icon: Briefcase, color: "amber", demoEmail: "operator@propmanage.io" },
+  // Base demo accounts (existing)
+  { role: "client", label: "Client (demo)", icon: Home, color: "blue", demoEmail: "client@propmanage.io", tier: "VERIFIED", group: "base" },
+  { role: "specialist", label: "Specialist (demo)", icon: Wrench, color: "emerald", demoEmail: "specialist@propmanage.io", tier: "VERIFIED", group: "base" },
+  { role: "operator", label: "Operator", icon: Briefcase, color: "amber", demoEmail: "operator@propmanage.io", tier: null, group: "base" },
+  // Client tiers
+  { role: "client", label: "Client JUNIOR", icon: Home, color: "slate", demoEmail: "client.junior@propmanage.io", tier: "JUNIOR", group: "client_tiers" },
+  { role: "client", label: "Client VERIFIED", icon: Home, color: "blue", demoEmail: "client.verified@propmanage.io", tier: "VERIFIED", group: "client_tiers" },
+  { role: "client", label: "Client PREMIUM", icon: Home, color: "fuchsia", demoEmail: "client.premium@propmanage.io", tier: "PREMIUM", group: "client_tiers" },
+  // Specialist tiers
+  { role: "specialist", label: "Specialist ENTRY", icon: Wrench, color: "slate", demoEmail: "spec.entry@propmanage.io", tier: "ENTRY", group: "spec_tiers" },
+  { role: "specialist", label: "Specialist JUNIOR", icon: Wrench, color: "cyan", demoEmail: "spec.junior@propmanage.io", tier: "JUNIOR", group: "spec_tiers" },
+  { role: "specialist", label: "Specialist VERIFIED", icon: Wrench, color: "emerald", demoEmail: "spec.verified@propmanage.io", tier: "VERIFIED", group: "spec_tiers" },
+  { role: "specialist", label: "Specialist ADVANCED", icon: Wrench, color: "lime", demoEmail: "spec.advanced@propmanage.io", tier: "ADVANCED", group: "spec_tiers" },
+  { role: "specialist", label: "Specialist PREMIUM", icon: Wrench, color: "fuchsia", demoEmail: "spec.premium@propmanage.io", tier: "PREMIUM", group: "spec_tiers" },
+  { role: "specialist", label: "Specialist TOP", icon: Wrench, color: "yellow", demoEmail: "spec.top@propmanage.io", tier: "TOP", group: "spec_tiers" },
 ];
 
 const QuickProfileSwitch = ({ dark }) => {
@@ -205,7 +315,7 @@ const QuickProfileSwitch = ({ dark }) => {
   const [busy, setBusy] = useState(null);
 
   const enterRole = async (profile) => {
-    setBusy(profile.role);
+    setBusy(profile.demoEmail || profile.role);
     try {
       // Try demo account first (fast path, predictable)
       let target = null;
@@ -226,7 +336,7 @@ const QuickProfileSwitch = ({ dark }) => {
 
       const { data } = await axios.post(`${API}/admin/impersonate`, {
         user_id: target.id,
-        reason: `QA admin — verificare funcționalități rol ${profile.label} (${target.email})`,
+        reason: `QA admin — verificare funcționalități ${profile.label} (${target.email})`,
       });
       window.location.href = data?.redirect_to || `/${profile.role}`;
     } catch (e) {
@@ -258,12 +368,12 @@ const QuickProfileSwitch = ({ dark }) => {
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div
-            className={`absolute right-0 top-full mt-2 w-64 rounded-xl border shadow-2xl z-40 overflow-hidden ${
+            className={`absolute right-0 top-full mt-2 w-80 max-h-[80vh] overflow-y-auto rounded-xl border shadow-2xl z-40 ${
               dark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
             }`}
             data-testid="quick-profile-menu"
           >
-            <div className={`px-3 py-2.5 border-b ${dark ? "border-slate-700" : "border-slate-200"}`}>
+            <div className={`sticky top-0 z-10 px-3 py-2.5 border-b ${dark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"}`}>
               <div className={`text-[10px] uppercase tracking-wider font-bold ${dark ? "text-slate-400" : "text-slate-500"}`}>
                 Intră rapid ca
               </div>
@@ -271,12 +381,17 @@ const QuickProfileSwitch = ({ dark }) => {
                 Sesiune impersonare jurnalizată GDPR · 2h
               </div>
             </div>
-            {ROLE_PROFILES.map(p => (
+
+            {/* Base demo accounts */}
+            <div className={`px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider font-bold ${dark ? "text-slate-500" : "text-slate-400"}`}>
+              Conturi demo principale
+            </div>
+            {ROLE_PROFILES.filter(p => p.group === "base").map(p => (
               <button
-                key={p.role}
+                key={p.demoEmail}
                 onClick={() => { setOpen(false); enterRole(p); }}
-                disabled={busy === p.role}
-                className={`w-full text-left px-3 py-2.5 flex items-center gap-3 text-sm transition-colors ${
+                disabled={busy === p.demoEmail}
+                className={`w-full text-left px-3 py-2 flex items-center gap-3 text-sm transition-colors ${
                   dark ? "hover:bg-slate-800 text-slate-200" : "hover:bg-slate-50 text-slate-700"
                 } disabled:opacity-60`}
                 data-testid={`quick-profile-${p.role}`}
@@ -287,11 +402,70 @@ const QuickProfileSwitch = ({ dark }) => {
                 <div className="flex-1 min-w-0">
                   <div className="font-medium">{p.label}</div>
                   <div className={`text-[11px] truncate ${dark ? "text-slate-500" : "text-slate-400"}`}>
-                    {busy === p.role ? "Se inițializează..." : p.demoEmail}
+                    {busy === p.demoEmail ? "Se inițializează..." : p.demoEmail}
                   </div>
                 </div>
               </button>
             ))}
+
+            {/* Client tier profiles */}
+            <div className={`px-3 pt-3 pb-1 text-[10px] uppercase tracking-wider font-bold border-t ${dark ? "text-blue-400 border-slate-800" : "text-blue-600 border-slate-100"}`}>
+              Client · Tier-uri de progresie
+            </div>
+            {ROLE_PROFILES.filter(p => p.group === "client_tiers").map(p => (
+              <button
+                key={p.demoEmail}
+                onClick={() => { setOpen(false); enterRole(p); }}
+                disabled={busy === p.demoEmail}
+                className={`w-full text-left px-3 py-2 flex items-center gap-3 text-sm transition-colors ${
+                  dark ? "hover:bg-slate-800 text-slate-200" : "hover:bg-slate-50 text-slate-700"
+                } disabled:opacity-60`}
+                data-testid={`quick-profile-${p.tier?.toLowerCase()}-client`}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-${p.color}-500/15`}>
+                  <p.icon className={`w-4 h-4 text-${p.color}-500`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium flex items-center gap-1.5">
+                    {p.label}
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-${p.color}-500/15 text-${p.color}-500 uppercase`}>{p.tier}</span>
+                  </div>
+                  <div className={`text-[11px] truncate ${dark ? "text-slate-500" : "text-slate-400"}`}>
+                    {busy === p.demoEmail ? "Se inițializează..." : p.demoEmail}
+                  </div>
+                </div>
+              </button>
+            ))}
+
+            {/* Specialist tier profiles */}
+            <div className={`px-3 pt-3 pb-1 text-[10px] uppercase tracking-wider font-bold border-t ${dark ? "text-emerald-400 border-slate-800" : "text-emerald-600 border-slate-100"}`}>
+              Specialist · Tier-uri de progresie
+            </div>
+            {ROLE_PROFILES.filter(p => p.group === "spec_tiers").map(p => (
+              <button
+                key={p.demoEmail}
+                onClick={() => { setOpen(false); enterRole(p); }}
+                disabled={busy === p.demoEmail}
+                className={`w-full text-left px-3 py-2 flex items-center gap-3 text-sm transition-colors ${
+                  dark ? "hover:bg-slate-800 text-slate-200" : "hover:bg-slate-50 text-slate-700"
+                } disabled:opacity-60`}
+                data-testid={`quick-profile-${p.tier?.toLowerCase()}-specialist`}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-${p.color}-500/15`}>
+                  <p.icon className={`w-4 h-4 text-${p.color}-500`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium flex items-center gap-1.5">
+                    {p.label}
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-${p.color}-500/15 text-${p.color}-500 uppercase`}>{p.tier}</span>
+                  </div>
+                  <div className={`text-[11px] truncate ${dark ? "text-slate-500" : "text-slate-400"}`}>
+                    {busy === p.demoEmail ? "Se inițializează..." : p.demoEmail}
+                  </div>
+                </div>
+              </button>
+            ))}
+
             <div className={`px-3 py-2 border-t text-[10px] ${dark ? "border-slate-800 text-slate-500" : "border-slate-100 text-slate-400"}`}>
               Pentru utilizatori reali → tab <strong>Toți userii</strong>.
             </div>
@@ -307,9 +481,13 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
   const navigate = useNavigate();
   const [theme, toggleTheme] = useAdminTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { scope: adminScope } = useAdminScope();
 
   const handleLogout = async () => { await logout(); navigate("/login"); };
   const dark = theme === "dark";
+
+  // Filter nav sections based on current admin's scope (general sees all)
+  const visibleSections = filterNavSections(NAV_SECTIONS, adminScope);
 
   const sidebar = (
     <aside
@@ -328,7 +506,7 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
         </button>
       </div>
       <nav className="flex-1 overflow-y-auto py-4 px-3">
-        {NAV_SECTIONS.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.title} className="mb-6">
             <div className={`px-3 mb-2 text-[10px] font-bold uppercase tracking-wider ${dark ? "text-slate-500" : "text-slate-400"}`}>{section.title}</div>
             <div className="space-y-0.5">
@@ -338,7 +516,10 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
                 return (
                   <button
                     key={it.id}
-                    onClick={() => { onChange(it.id); setSidebarOpen(false); }}
+                    onClick={() => {
+                      if (it.href) { navigate(it.href); setSidebarOpen(false); return; }
+                      onChange(it.id); setSidebarOpen(false);
+                    }}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
                       isActive
                         ? "bg-blue-50 text-blue-600 font-medium dark:bg-blue-500/10 dark:text-blue-400"
@@ -395,6 +576,8 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
           </button>
           <GlobalSearch theme={theme} />
           <HealthScoreBadge dark={dark} />
+          <AutonomyTierBadge dark={dark} />
+          <ScopeBadgeTop scope={adminScope} />
           <QuickProfileSwitch dark={dark} />
           <ReplayAIAdminTourButton />
           <button onClick={toggleTheme} className={`p-2 rounded-lg ${dark ? "hover:bg-slate-800 text-slate-300" : "hover:bg-slate-100 text-slate-600"}`} data-testid="admin-theme-toggle">
@@ -416,6 +599,8 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
         </main>
       </div>
       <AIAdminTour />
+      <AdminTourV2Wrapper />
+      <PreviewAuditButton scope={getPreviewScope()} />
     </div>
   );
 };

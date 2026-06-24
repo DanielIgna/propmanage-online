@@ -58,53 +58,33 @@ def _categorize(path: str) -> str:
     return "other"
 
 
-def collect_velocity(days: int = 7) -> dict:
-    """Parse git log for the last N days, return categorized stats + commits list."""
-    since = f'{days} days ago'
+def _parse_commit_header(line: str) -> dict:
+    """Parse a 'COMMIT|sha|date|author|subject' git log line into a dict."""
+    parts = line.split("|", 4)
+    return {
+        "sha": parts[1][:8] if len(parts) > 1 else "",
+        "date": parts[2] if len(parts) > 2 else "",
+        "author": parts[3] if len(parts) > 3 else "",
+        "subject": parts[4] if len(parts) > 4 else "",
+        "files": [],
+        "added": 0,
+        "deleted": 0,
+    }
 
-    # Numstat: per-commit per-file additions/deletions
-    raw = _git(["log", f"--since={since}", "--pretty=format:COMMIT|%H|%ai|%an|%s", "--numstat"])
-    if not raw:
-        return {"days": days, "commits": [], "totals": {}, "categories": {}, "files_changed": []}
 
-    commits = []
-    current = None
-    files_touched: dict[str, dict] = {}
+def _parse_numstat_line(line: str) -> Optional[tuple[int, int, str]]:
+    """Parse a 'added<tab>deleted<tab>path' numstat line; returns (added, deleted, path) or None."""
+    m = re.match(r"^(\S+)\s+(\S+)\s+(.+)$", line.strip())
+    if not m:
+        return None
+    added, deleted, path = m.groups()
+    added_n = int(added) if added.isdigit() else 0
+    deleted_n = int(deleted) if deleted.isdigit() else 0
+    return (added_n, deleted_n, path)
 
-    for line in raw.split("\n"):
-        if line.startswith("COMMIT|"):
-            if current:
-                commits.append(current)
-            parts = line.split("|", 4)
-            current = {
-                "sha": parts[1][:8] if len(parts) > 1 else "",
-                "date": parts[2] if len(parts) > 2 else "",
-                "author": parts[3] if len(parts) > 3 else "",
-                "subject": parts[4] if len(parts) > 4 else "",
-                "files": [],
-                "added": 0, "deleted": 0,
-            }
-        elif line.strip() and current:
-            m = re.match(r"^(\S+)\s+(\S+)\s+(.+)$", line.strip())
-            if m:
-                added, deleted, path = m.groups()
-                try:
-                    added_n = int(added) if added.isdigit() else 0
-                    deleted_n = int(deleted) if deleted.isdigit() else 0
-                except ValueError:
-                    added_n = deleted_n = 0
-                current["files"].append(path)
-                current["added"] += added_n
-                current["deleted"] += deleted_n
-                # Aggregate per-file
-                f = files_touched.setdefault(path, {"category": _categorize(path), "added": 0, "deleted": 0, "touches": 0})
-                f["added"] += added_n
-                f["deleted"] += deleted_n
-                f["touches"] += 1
-    if current:
-        commits.append(current)
 
-    # Category aggregation
+def _aggregate_categories(files_touched: dict) -> dict:
+    """Aggregate per-file stats into category buckets (JSON-friendly output)."""
     categories: dict[str, dict] = {}
     for path, info in files_touched.items():
         cat = info["category"]
@@ -113,10 +93,44 @@ def collect_velocity(days: int = 7) -> dict:
         c["added"] += info["added"]
         c["deleted"] += info["deleted"]
         c["touches"] += info["touches"]
-    # Make JSON-friendly
     for cat in categories:
         categories[cat]["files"] = sorted(categories[cat]["files"])
         categories[cat]["file_count"] = len(categories[cat]["files"])
+    return categories
+
+
+def collect_velocity(days: int = 7) -> dict:
+    """Parse git log for the last N days, return categorized stats + commits list."""
+    since = f"{days} days ago"
+    raw = _git(["log", f"--since={since}", "--pretty=format:COMMIT|%H|%ai|%an|%s", "--numstat"])
+    if not raw:
+        return {"days": days, "commits": [], "totals": {}, "categories": {}, "files_changed": []}
+
+    commits: list[dict] = []
+    current: Optional[dict] = None
+    files_touched: dict[str, dict] = {}
+
+    for line in raw.split("\n"):
+        if line.startswith("COMMIT|"):
+            if current:
+                commits.append(current)
+            current = _parse_commit_header(line)
+            continue
+        if not (line.strip() and current):
+            continue
+        parsed = _parse_numstat_line(line)
+        if not parsed:
+            continue
+        added_n, deleted_n, path = parsed
+        current["files"].append(path)
+        current["added"] += added_n
+        current["deleted"] += deleted_n
+        f = files_touched.setdefault(path, {"category": _categorize(path), "added": 0, "deleted": 0, "touches": 0})
+        f["added"] += added_n
+        f["deleted"] += deleted_n
+        f["touches"] += 1
+    if current:
+        commits.append(current)
 
     totals = {
         "commits": len(commits),
@@ -125,8 +139,6 @@ def collect_velocity(days: int = 7) -> dict:
         "lines_deleted": sum(c["deleted"] for c in commits),
         "authors": len({c["author"] for c in commits if c["author"]}),
     }
-
-    # Top files (most touched)
     files_changed = sorted(
         [{"path": p, **i} for p, i in files_touched.items()],
         key=lambda x: -x["touches"],
@@ -137,7 +149,7 @@ def collect_velocity(days: int = 7) -> dict:
         "since": (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d"),
         "until": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "totals": totals,
-        "categories": categories,
+        "categories": _aggregate_categories(files_touched),
         "files_changed": files_changed,
         "commits": commits[:30],  # cap for transport
     }

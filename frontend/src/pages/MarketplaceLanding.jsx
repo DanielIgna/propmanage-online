@@ -11,6 +11,7 @@ import { Link, useParams } from "react-router-dom";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { Building2, Star, CheckCircle2, MapPin, Shield, Award, Sparkles, ArrowRight } from "lucide-react";
+import { RatingBadge } from "../components/RatingBadge";
 import { useSEO } from "../hooks/useSEO";
 import {
   parseLandingSlug, SEO_CITY_MAP, SEO_CATEGORY_MAP, TOP_CITIES_FOR_LINKING,
@@ -257,11 +258,7 @@ export const MarketplaceLanding = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 text-xs mb-2">
-                  <div className="flex items-center gap-1">
-                    <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                    <span>{s.rating || "—"}</span>
-                    <span className="text-stone-500">({s.reviews_count || 0})</span>
-                  </div>
+                  <RatingBadge rating={s.rating} reviewsCount={s.reviews_count} size="sm" />
                   {s.tier && <span className="text-[9px] bg-[#d4ff3a]/15 text-[#d4ff3a] px-2 py-0.5 rounded-full uppercase tracking-wider">{s.tier}</span>}
                 </div>
                 <div className="mb-4">

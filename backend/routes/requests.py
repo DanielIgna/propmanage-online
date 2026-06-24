@@ -6,7 +6,7 @@ import logging
 from typing import Optional, List, Literal, Dict
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
 from db import db
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api", tags=["requests"])
 
 # ============= REQUESTS =============
 @router.post("/requests")
-async def create_request(data: RequestIn, user: dict = Depends(require_role("client"))):
+async def create_request(data: RequestIn, background_tasks: BackgroundTasks, user: dict = Depends(require_role("client"))):
     prop = await db.properties.find_one({"_id": ObjectId(data.property_id), "owner_id": user["id"]})
     if not prop: raise HTTPException(404, "Property not found")
     doc = {
@@ -50,14 +50,32 @@ async def create_request(data: RequestIn, user: dict = Depends(require_role("cli
         # Notify specialists with matching specialty OR no specialty set
         spec_query = {"role": "specialist", "$or": [{"specialty": data.category}, {"specialty": None}]}
     specs = await db.users.find(spec_query).to_list(50)
+    is_urgent = (data.priority or "").lower() == "urgent"
+    title_prefix = "[URGENT] " if is_urgent else ""
     for s in specs:
         await notify(
             str(s["_id"]),
-            f"Lead nou: {data.title}",
+            f"{title_prefix}Lead nou: {data.title}",
             f"Solicitare {data.priority} în categoria {data.category}. Buget estimat: {data.budget_estimate or '—'} RON",
-            type_="lead",
+            type_="lead_urgent" if is_urgent else "lead",
             link=f"/specialist"
         )
+    # Real-time AI auto-match: notify top 3 specialists with a high-priority push.
+    # Runs in background so the API responds immediately (<5s).
+    try:
+        from autonomy.autopilot import enqueue_ai_match_notifications
+        zone = prop.get("zone") or prop.get("city") or "default"
+        background_tasks.add_task(
+            enqueue_ai_match_notifications,
+            doc["id"],
+            data.category or "",
+            zone,
+            data.title,
+            data.priority or "",
+            data.budget_estimate,
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[requests] failed to enqueue AI match notifications: {e}")
     return doc
 
 @router.get("/requests")
@@ -171,6 +189,9 @@ async def accept_request(req_id: str, data: Optional[AcceptRequestIn] = None, us
         "status": "assigned",
         "specialist_id": user["id"],
         "specialist_name": user["name"],
+        "specialist_specialty": specialist.get("specialty") or specialist.get("category") or "",
+        "specialist_city": specialist.get("city") or specialist.get("location") or "",
+        "specialist_verified": bool(specialist.get("verified")),
         "assigned_at": datetime.now(timezone.utc).isoformat(),
     }
     # Schedule proposal
@@ -329,6 +350,19 @@ async def confirm_complete(req_id: str, user: dict = Depends(require_role("clien
             type_="payment",
             link="/specialist"
         )
+        # Increment jobs_completed for both parties (used by tier progression)
+        try:
+            await db.users.update_one({"_id": ObjectId(req["specialist_id"])}, {"$inc": {"jobs_completed": 1}})
+            await db.users.update_one({"_id": ObjectId(req["client_id"])}, {"$inc": {"jobs_completed": 1}})
+        except Exception:
+            pass
+        # Tier milestone check (50%/75%/100% notifications)
+        try:
+            from routes.tier_milestones import check_tier_milestones
+            await check_tier_milestones(req["specialist_id"])
+            await check_tier_milestones(req["client_id"])
+        except Exception:
+            pass
     return {"ok": True, "tokens_earned": 100}
 
 @router.post("/requests/{req_id}/review")
@@ -362,9 +396,15 @@ async def review_specialist(req_id: str, data: ReviewIn, user: dict = Depends(re
         update["tier"] = "VERIFIED"
     
     await db.users.update_one({"_id": ObjectId(req["specialist_id"])}, {"$set": update})
-    
+
     # Award client +20 tokens for review
     await db.users.update_one({"_id": ObjectId(user["id"])}, {"$inc": {"tokens": 20}})
+    # Tier milestone check after rating change
+    try:
+        from routes.tier_milestones import check_tier_milestones
+        await check_tier_milestones(req["specialist_id"])
+    except Exception:
+        pass
     return {"ok": True, "new_rating": new_rating}
 
 # ============= ACTIVITY EVENTS API =============

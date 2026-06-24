@@ -1,8 +1,15 @@
 # PropManage — Property Operating System
 
+[![Dashboard Smoke Test](https://github.com/USER/REPO/actions/workflows/smoke-test.yml/badge.svg)](https://github.com/USER/REPO/actions/workflows/smoke-test.yml)
+[![Backend](https://img.shields.io/badge/backend-FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Frontend](https://img.shields.io/badge/frontend-React%2018-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![Database](https://img.shields.io/badge/database-MongoDB-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+
 Full-stack platform (React + FastAPI + MongoDB) cu 4 zone (Client / Specialist / Operator / Admin), Digital Twin, plăți escrow, AI Concierge + AI Investigator, sistem complet de monitorizare AI Health Score.
 
 > **Status**: Beta · pregătită pentru demo-uri live.
+
+> ⚠️ **Înlocuiește `USER/REPO`** din badge-uri cu calea reală a repo-ului GitHub (ex: `vlad/propmanage`) după ce conectezi repo-ul prin Save to GitHub.
 
 ---
 
@@ -112,6 +119,23 @@ Conturile demo se resetează automat în fiecare noapte → starea e mereu clean
 └── frontend/                 # React + Tailwind + Shadcn UI
     └── src/pages/admin/      # Metronic-style admin panel
 ```
+
+---
+
+## 🛡️ Pre-Deploy Quality Gate
+
+Înainte de fiecare deploy în producție, rulează **smoke test-ul automat** care verifică toate cele 12 dashboards demo (3 base + 3 client tiers + 6 specialist tiers):
+
+```bash
+./scripts/smoke-test.sh                                        # against preview
+SMOKE_BASE_URL=https://propmanage.ro ./scripts/smoke-test.sh   # against production
+```
+
+**Runtime**: ~90 secunde. **Detectează**: ErrorBoundary, ReferenceError, TypeError, missing data-testids.
+
+Workflow-ul GitHub Actions (`.github/workflows/smoke-test.yml`) rulează automat acest test pe fiecare PR + push în main.
+
+📖 [Documentația completă a smoke test-ului](backend/tests/SMOKE_TEST_README.md)
 
 ---
 

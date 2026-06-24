@@ -1,0 +1,38 @@
+{
+  "summary": "Phase 57 backend testing — Google OAuth resilience (HTTP 520 fix) + admin_access_token cleanup on login. 10/11 tests PASSED, 1 SKIPPED. Verified: (1) /api/auth/google/session without X-Session-ID returns 400 with Romanian 'Lipsește header-ul X-Session-ID', (2) bogus session_id returns 401 (NOT 520/502/503) with Romanian 'Emergent OAuth a refuzat sesiunea' + 'session_id expirat' + 'propmanage.ro/auth/callback nu este whitelisted' hints, (3) source inspection of /app/backend/routes/auth.py confirms 3-attempt retry loop, httpx timeout=30s (old 10s removed), HTTPException(503) JSON fallback after retries exhausted (not 520), 4xx upstream short-circuits without retry, (4) /api/auth/login sets access_token + refresh_token cookies AND explicitly deletes admin_access_token (Max-Age=0) for impersonation stash cleanup, (5) admin login returns role=admin, (6) /api/health 200 OK, (7) digital-twin trimble PATCH route still exists (smoke).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/refresh", "issue": "Endpoint does NOT exist in /app/backend/routes/auth.py (only /auth/refresh-google-avatar). refresh_token cookie is set on login but no endpoint consumes it. The review_request asks to regression-test this but the route is absent — either intentionally removed or never implemented. Frontend cannot rotate access_token without it."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase57_auth_oauth_resilience.py",
+    "/app/test_reports/pytest/phase57_results.xml"
+  ],
+  "action_items": [
+    "Decide if /api/auth/refresh endpoint is needed. refresh_token cookie is set on login (604800s TTL) but no route consumes it, so access_token expiry forces a full re-login. If by design, document; otherwise implement to consume refresh_token and issue new access_token.",
+    "(Optional, pre-existing from iteration_43) Trimble URL validator uses substring match for 'trimble.com' — vulnerable to 'malicious-trimble.com.evil.io'. Recommend host-suffix check."
+  ],
+  "critical_code_review_comments": [
+    "auth.py google_session_exchange (lines 816-924): retry/timeout/fallback structure is correct (3 attempts, 30s timeout, 503 JSON fallback, 4xx short-circuit). Good defensive coding for HTTP 520 root cause.",
+    "Login response correctly calls response.delete_cookie('admin_access_token', path='/') after set_auth_cookies (line 193) — proper impersonation hygiene.",
+    "Missing /api/auth/refresh endpoint despite refresh_token cookie being set on login. Either implement consumption or remove the refresh cookie to avoid confusion.",
+    "auth.py is now 955 lines — exceeds 700-line guideline; consider splitting into auth_core.py + auth_oauth.py + auth_2fa.py + auth_profile.py."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase57_auth_oauth_resilience.py"
+  ],
+  "success_rate": {"backend": "100% (10/10 executed, 1 skipped for non-existent endpoint)", "frontend": "n/a (frontend not in scope)"},
+  "test_credentials": "admin@propmanage.io / Admin123! — works, returns role=admin, sets access_token + refresh_token + clears admin_access_token cookie.",
+  "seed_data_creation": "None — tests use existing pre-seeded admin account only.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 57 OAuth resilience fully verified. Bogus session_id against real Emergent upstream returns 401 fast (upstream responds 404 quickly). For real upstream-slow simulation (would test the 3-retry / 503 fallback path), you'd need to mock httpx.AsyncClient — current tests verify via source inspection instead. /api/auth/refresh endpoint is MISSING — refresh_token cookie is set but no consumer route exists. Login response uses raw Set-Cookie headers via response.delete_cookie for admin_access_token cleanup (Max-Age=0 marker). All Romanian error messages match expected strings exactly.",
+  "rca of the issue": "Original bug (HTTP 520 on /auth/callback): httpx.AsyncClient(timeout=10) caused slow Emergent OAuth responses to either hang or surface as origin-empty 520 at Cloudflare. Fix in lines 816-880: (a) timeout raised to 30s, (b) wrapped in for-loop with 3 attempts and 1.5s/3s backoff on transient 5xx + network errors, (c) 4xx upstream short-circuits to 401 with explicit Romanian error mentioning whitelist requirement, (d) final exhaustion path raises HTTPException(503) with JSON body so Cloudflare never sees an empty origin response. All verified by source regex matching + live bogus-session test returning 401 (not 520/502/503)."
+}
