@@ -10,6 +10,8 @@ import {
   CheckCircle2, ShieldCheck, ChevronRight, Inbox, TrendingUp,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
+import { WelcomeChecklist } from "../components/WelcomeChecklist";
+import { MaturityCard } from "../components/MaturityCard";
 import { ChatPanel } from "./ChatPanel";
 import { OpenDisputeModal, SpecialistDocumentsModal } from "./AdminModals";
 import { ProposePhaseModal } from "./InteriorDesign";
@@ -95,6 +97,8 @@ export const SpecialistDashboard = () => {
 
   return (
     <DashLayout role="specialist" title={title} bottomNav={<BottomNav tabs={tabs} active={tab} onChange={setTab} dataPrefix="spec-tab" />}>
+      <WelcomeChecklist />
+      <MaturityCard />
       <TierCelebrationBanner />
       {!user?.verified && (
         <PMCard accent="warning" className="mb-6 !bg-amber-500/5 !border-amber-500/30 pm-fade-in" testid="verify-banner">

@@ -2,8 +2,9 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
 const THEMES = [
-  { id: "default", label: "Dark (default)", emoji: "🌙" },
+  { id: "default", label: "Dark Pro", emoji: "🌙" },
   { id: "warm-linen", label: "Warm Linen 2026", emoji: "🌾" },
+  { id: "tech-build", label: "Tech Build 2026", emoji: "🏗" },
 ];
 
 const ThemeContext = createContext(null);

@@ -30,6 +30,7 @@ import { useTier } from "../lib/useTier";
 import { PMCard, PMCardPrimary, PMPillButton, PMChip, PMSectionHeader, PMEmptyState } from "../components/pm";
 import { TierProgressWidget } from "../components/TierProgressWidget";
 import HouseHealthCard from "./HouseHealthCard";
+import { WelcomeChecklist } from "../components/WelcomeChecklist";
 
 export const ClientDashboard = () => {
   const { user, refreshUser } = useAuth();
@@ -386,6 +387,7 @@ const RequestZone = ({ user, prop, properties, requests, setSelectedPropId, setP
 
   return (
     <>
+      <WelcomeChecklist />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <Stat icon={Activity} label={t("client.health")} value={`${prop?.health_score || 0}/100`} sub="Proprietate" tid="stat-health" />
         <Stat icon={Wallet} label={t("client.wallet")} value={`${user?.wallet_balance?.toFixed(0) || 0} RON`} sub="Portofel" color="emerald" tid="stat-wallet" />

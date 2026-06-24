@@ -4,6 +4,32 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 
+## 🎯 Adaptive UX 2026 — Sprint A+B+C + Tech Build theme (Feb 24 2026)
+
+**Sprint A — Adaptive Shell (feature gating)**:
+- `/app/frontend/src/lib/featureMatrix.js` — pure rules engine `canUse(user, key) → "available" | "locked" | "hidden"`. Mapează ~20 feature keys (spec.*, client.*, admin.*) la cerințe (role, verified, maturity, hh_subscription, admin_scope).
+- `/app/frontend/src/components/GatedItem.jsx` — wrapper care randează children normal/estompat-cu-lock/hidden. Reutilizabil oriunde.
+- Funcție utility `lockedReason(user, key)` întoarce text RO pentru tooltip ("Finalizează verificarea contului pentru activare." etc.).
+
+**Sprint B — Maturity Levels** (specialist progressive disclosure):
+- Backend `/app/backend/routes/adaptive_ux.py` — `GET /api/ux/me/maturity` (auto-compute beginner/intermediate/advanced bazat pe verified + leads accepted + leads completed).
+- Admin override: `POST /api/admin/ux/maturity-override` pentru flexibilitate.
+- Component `MaturityCard.jsx` afișat în SpecialistDashboard cu counters + next unlock criteria.
+
+**Sprint C — Welcome Checklist** (client + specialist onboarding):
+- Backend `GET/POST /api/ux/checklist*` cu template hardcodat per rol (client = 6 pași, specialist = 6 pași).
+- Persistat în `user.onboarding_checklist[]` + `user.onboarding_dismissed`.
+- Component `WelcomeChecklist.jsx` cu progress bar gradient, butoane "Mergi → / ✓ marchează manual", dismiss button. Afișat în ClientDashboard + SpecialistDashboard.
+
+**Tema "Tech Build 2026"** (industrial premium):
+- Adăugată ca a 3-a opțiune în ThemeSwitcher.
+- Paletă: alb `#f4f6f8`, gri tehnic `#cad6e0`, albastru tehnic `#0c5d8e/#1d8ec8`, verde energetic `#0a8a5f/#16b97e` — inspirată din BIM / Digital Twin / smart-building.
+- ~50 CSS overrides în `themes.css` pentru consistență pe toate paginile.
+
+**Tests**: 51/51 backend tests verzi (zero regresie).
+
+
+
 ## 🌾 Tema "Warm Linen 2026" (Feb 24 2026)
 
 **Concept**: light theme inspirat din paleta Pantone 2025-2026 (Mocha Mousse + earth tones), aliniat trend-ului "warm minimalism" 2026.
