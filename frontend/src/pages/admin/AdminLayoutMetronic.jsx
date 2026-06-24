@@ -13,6 +13,7 @@ import { API } from "../DashShared";
 import { HealthScoreBadge } from "./HealthScoreBadge";
 import { AutonomyTierBadge } from "./AutonomyTierBadge";
 import { AIAdminTour, ReplayAIAdminTourButton } from "./AIAdminTour";
+import { ThemeSwitcher } from "../../components/ThemeSwitcher";
 import { AdminTourV2Wrapper } from "./AdminTourV2";
 import { useAdminScope, filterNavSections, setPreviewScope, getPreviewScope } from "../../lib/useAdminScope";
 import { PreviewAuditButton } from "./PreviewAuditButton";
@@ -581,7 +582,8 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
           <ScopeBadgeTop scope={adminScope} />
           <QuickProfileSwitch dark={dark} />
           <ReplayAIAdminTourButton />
-          <button onClick={toggleTheme} className={`p-2 rounded-lg ${dark ? "hover:bg-slate-800 text-slate-300" : "hover:bg-slate-100 text-slate-600"}`} data-testid="admin-theme-toggle">
+          <ThemeSwitcher />
+          <button onClick={toggleTheme} className={`p-2 rounded-lg ${dark ? "hover:bg-slate-800 text-slate-300" : "hover:bg-slate-100 text-slate-600"}`} data-testid="admin-theme-toggle" title="Schimbă tema Metronic admin (dark/light intern)">
             {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
           <Link to="/" className={`hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg ${dark ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"}`}>

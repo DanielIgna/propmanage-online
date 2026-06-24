@@ -8,6 +8,7 @@ import {
   Loader2, AlertCircle, Plus, Bot, RotateCcw, TrendingUp, TrendingDown, Minus, Activity,
 } from "lucide-react";
 import { API } from "../DashShared";
+import { ThemeSwitcher } from "../../components/ThemeSwitcher";
 
 const STATUS_META = {
   pass: { label: "PASS", cls: "bg-emerald-500 text-stone-950 border-emerald-500" },
@@ -150,6 +151,7 @@ const ManualTesterPage = () => {
             <p className="text-xs text-stone-400">QA driven by humans · {suites.length} suite-uri · {suites.reduce((s, x) => s + x.cases.length, 0)} cazuri</p>
           </div>
           <div className="flex items-center gap-3">
+            <ThemeSwitcher />
             <div className="flex gap-1 p-1 bg-stone-900/60 border border-stone-800 rounded-lg">
               <button
                 onClick={() => setView("runner")}
