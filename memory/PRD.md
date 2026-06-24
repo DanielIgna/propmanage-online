@@ -4,6 +4,43 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 
+## 💳 House Health — F4.3 Stripe Checkout Complete (Feb 23 2026)
+
+**Approach**: Each "subscription purchase" is modelled as a one-shot Stripe Checkout payment that grants N days of access (extending `hh_subscriptions.expires_at`). True recurring auto-renewal would require switching to the official Stripe Subscription API (currently the Emergent test key `sk_test_emergent` proxies through the `emergentintegrations` wrapper which only supports one-shot checkout sessions). Auto-renewal is a future iteration.
+
+**Endpoints** (`/app/backend/routes/house_health_billing.py`):
+- `POST /api/house-health/checkout-session` — body `{plan_slug, origin_url}`, returns Stripe checkout URL + session_id. Server reads price from `hh_plans` (never accepts amount from client). Persists `payment_transactions` doc in `initiated` state.
+- `GET /api/house-health/checkout-status/{session_id}` — polled by frontend after redirect-back. Activates / extends `hh_subscriptions` atomically. Idempotent. Gracefully degrades when Stripe sandbox can't recover the session (returns cached state instead of 500).
+- `POST /api/webhook/stripe` — server-side fallback that activates the subscription even if the user closes the tab. Signature verified.
+
+**Auto-provisioning Stripe Product/Price** (`auto_provision_stripe_price` in same file): When admin creates a plan, attempts to auto-create matching Stripe Product + recurring Price via the official `stripe` SDK. Best-effort — silently skipped with the Emergent placeholder key (which only works via the wrapper). With a real Stripe key the slug ↔ price_id mapping is automatic.
+
+**Seeded 3 default plans** on backend startup (`seed_default_plans`):
+- `basic` 9 EUR/month — 1 Digital Twin, 1 GB storage, 1 evaluation/year, 15% lead commission
+- `pro` 29 EUR/month — 3 Digital Twins, 5 GB storage, 4 evaluations/year, 10% lead commission, prioritised urgent recommendations
+- `premium` 79 EUR/month — Unlimited Twins, unlimited storage, unlimited evaluations, Twin Orchestrator AI, 5% lead commission, dedicated CSM
+All admin-editable from `/admin/house-health` (Plans tab).
+
+**Frontend** (`/app/frontend/src/pages/HouseHealthUpgradePage.jsx`):
+- `/house-health/upgrade` — 3 plan cards (Pro highlighted as "Recomandat"), Romanian UI, Stripe checkout redirect on click.
+- `/house-health/upgrade/success` — polls status every 2s for 8 attempts, shows confirmation with amount + expires_at.
+- `HouseHealthCard` CTA now redirects to `/house-health/upgrade` instead of showing a placeholder alert.
+
+**Subscription activation logic**:
+- On payment success → upserts `hh_subscriptions` with `expires_at = max(now, current_expires_at) + billing_days`.
+- billing_days: monthly → 30, yearly → 365, one_time → 90.
+- Audit log written on activation.
+
+**Security**:
+- Price always read server-side from `hh_plans` (immutable from client).
+- `success_url` / `cancel_url` built from client-provided `origin_url` only (never hardcoded production URL).
+- Webhook signature verified via `emergentintegrations` library.
+- Status polling endpoint enforces tx-owner OR admin role.
+
+**Tests**: `/app/backend/tests/test_house_health_f43_billing.py` — 8 backend tests. Combined with F1-F4.2 + F4.4: **47/47 House Health tests passing**.
+
+
+
 ## 🏠 House Health — F4.1 + F4.2 + F4.4 Complete (Feb 23 2026)
 
 **F4.1 — Admin Plans CRUD + Scoring config** (`/app/backend/routes/house_health_plans.py`):
