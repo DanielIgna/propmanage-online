@@ -4,6 +4,26 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 
+## 📊 Compounding QA — Trends dashboard (Feb 24 2026)
+
+`/admin/manual-tester` are acum 2 view-uri: **Runner** și **Trends 30d**.
+
+**Backend** (`/app/backend/routes/manual_tester.py`):
+- `GET /api/admin/manual-tester/trends?days=N` (N ∈ 7/14/30/90)
+- Returnează: `overall` KPIs, `by_suite` (pass-rate latest, avg, trend, sparkline history), `alerts` (suite-uri unde latest dropped >=20pts sub avg, severity high/medium), `timeline` per zi.
+
+**Frontend** (TrendsPanel în `/app/frontend/src/pages/admin/ManualTesterPage.jsx`):
+- 4 KPI cards (Run-uri, Cazuri, Avg pass-rate, Failures)
+- Alerte regression cu severity badges (Critical/Warning)
+- Per-suite cards: pass-rate %, sparkline SVG (puncte colorate per rate), progress bar, delta % cu icon trending up/down
+- Timeline zilnic stacked bars verde/roșu/gri
+
+**Seed**: 64 run-uri sintetice peste 25 zile pentru demo (`tester_email=seed@propmanage.io`). Pot fi șterse oricând cu `db.manual_test_runs.delete_many({"tester_email": "seed@propmanage.io"})`.
+
+**Screenshots tour**: 9 capturi salvate în `/app/screenshots/` + `README.md` cu legenda.
+
+
+
 ## 🧹 House Health refactor (Feb 24 2026)
 
 `HouseHealthPage.jsx` was reduced from **618 lines → 88 lines** (orchestrator only). Section implementations moved to `/app/frontend/src/pages/house_health/`:

@@ -5,7 +5,7 @@ import axios from "axios";
 import { Link } from "react-router-dom";
 import {
   Check, X, MinusCircle, Save, Sparkles, ChevronLeft, Download,
-  Loader2, AlertCircle, Plus, Bot, RotateCcw,
+  Loader2, AlertCircle, Plus, Bot, RotateCcw, TrendingUp, TrendingDown, Minus, Activity,
 } from "lucide-react";
 import { API } from "../DashShared";
 
@@ -16,6 +16,7 @@ const STATUS_META = {
 };
 
 const ManualTesterPage = () => {
+  const [view, setView] = useState("runner"); // runner | trends
   const [suites, setSuites] = useState([]);
   const [activeSuite, setActiveSuite] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -148,9 +149,28 @@ const ManualTesterPage = () => {
             <h1 className="text-2xl font-bold">🧪 Tester Manual</h1>
             <p className="text-xs text-stone-400">QA driven by humans · {suites.length} suite-uri · {suites.reduce((s, x) => s + x.cases.length, 0)} cazuri</p>
           </div>
-          <SummaryBadge summary={summary} />
+          <div className="flex items-center gap-3">
+            <div className="flex gap-1 p-1 bg-stone-900/60 border border-stone-800 rounded-lg">
+              <button
+                onClick={() => setView("runner")}
+                data-testid="mt-view-runner"
+                className={`px-3 py-1.5 rounded text-xs font-semibold inline-flex items-center gap-1.5 ${view === "runner" ? "bg-emerald-500 text-stone-950" : "text-stone-400"}`}
+              >
+                <Check className="w-3.5 h-3.5" /> Runner
+              </button>
+              <button
+                onClick={() => setView("trends")}
+                data-testid="mt-view-trends"
+                className={`px-3 py-1.5 rounded text-xs font-semibold inline-flex items-center gap-1.5 ${view === "trends" ? "bg-violet-500 text-white" : "text-stone-400"}`}
+              >
+                <Activity className="w-3.5 h-3.5" /> Trends 30d
+              </button>
+            </div>
+            {view === "runner" && <SummaryBadge summary={summary} />}
+          </div>
         </div>
 
+        {view === "trends" ? <TrendsPanel /> : (
         <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
           {/* Sidebar suites */}
           <aside className="bg-stone-900/40 border border-stone-800 rounded-2xl p-3 h-fit" data-testid="mt-sidebar">
@@ -255,6 +275,7 @@ const ManualTesterPage = () => {
             )}
           </section>
         </div>
+        )}
       </div>
     </div>
   );
@@ -361,5 +382,185 @@ const PreviousRuns = ({ runs }) => (
     </ul>
   </div>
 );
+
+// ============================================================================
+// COMPOUNDING QA — Trends panel
+// ============================================================================
+const TrendsPanel = () => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [days, setDays] = useState(30);
+
+  useEffect(() => {
+    setLoading(true);
+    axios.get(`${API}/admin/manual-tester/trends`, { params: { days } })
+      .then((r) => setData(r.data))
+      .finally(() => setLoading(false));
+  }, [days]);
+
+  if (loading) return <div className="text-stone-400 text-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Se încarcă tendințele...</div>;
+  if (!data || data.overall.total_runs === 0) {
+    return (
+      <div className="bg-stone-900/40 border border-stone-800 rounded-2xl p-6 text-center" data-testid="mt-trends-empty">
+        <Activity className="w-10 h-10 mx-auto text-stone-600 mb-2" />
+        <div className="text-stone-300 font-bold">Niciun run în ultimele {days} zile</div>
+        <p className="text-xs text-stone-500 mt-1">Rulează cel puțin un test manual ca să apară tendințele aici.</p>
+      </div>
+    );
+  }
+
+  const o = data.overall;
+
+  return (
+    <div className="space-y-4">
+      {/* Window selector + KPIs */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex gap-1 p-1 bg-stone-900/60 border border-stone-800 rounded-lg" data-testid="mt-trends-window">
+          {[7, 14, 30, 90].map((d) => (
+            <button key={d} onClick={() => setDays(d)}
+              className={`px-2.5 py-1 rounded text-[11px] font-semibold ${days === d ? "bg-violet-500 text-white" : "text-stone-400 hover:text-stone-200"}`}
+              data-testid={`mt-trends-window-${d}`}
+            >
+              {d}d
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3 text-xs">
+          <KPI label="Run-uri" value={o.total_runs} />
+          <KPI label="Cazuri executate" value={o.total_cases_executed} />
+          <KPI label="Avg pass-rate" value={`${o.avg_pass_rate}%`} accent={o.avg_pass_rate >= 80 ? "emerald" : o.avg_pass_rate >= 60 ? "amber" : "rose"} />
+          <KPI label="Total failures" value={o.total_failures} accent={o.total_failures > 0 ? "rose" : "stone"} />
+        </div>
+      </div>
+
+      {/* Alerts */}
+      {data.alerts.length > 0 && (
+        <div className="space-y-2" data-testid="mt-trends-alerts">
+          {data.alerts.map((a) => (
+            <div key={a.suite_id} className={`p-3 rounded-xl border ${a.severity === "high" ? "border-rose-500/50 bg-rose-500/10" : "border-amber-500/50 bg-amber-500/10"} flex items-start gap-3`}>
+              <AlertCircle className={`w-5 h-5 mt-0.5 ${a.severity === "high" ? "text-rose-400" : "text-amber-400"}`} />
+              <div className="flex-1">
+                <div className="font-bold text-stone-100">⚠ Regression detectat: <span className="underline">{a.suite_name}</span></div>
+                <div className="text-xs text-stone-300 mt-0.5">{a.message}</div>
+              </div>
+              <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded font-bold ${a.severity === "high" ? "bg-rose-500 text-white" : "bg-amber-500 text-stone-950"}`}>
+                {a.severity === "high" ? "Critical" : "Warning"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* By-suite cards */}
+      <div className="bg-stone-900/40 border border-stone-800 rounded-2xl p-4">
+        <h3 className="text-sm font-bold mb-3">Pass-rate per suite (ultimele {days} zile)</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3" data-testid="mt-trends-by-suite">
+          {data.by_suite.map((s) => <SuiteTrendCard key={s.suite_id} suite={s} />)}
+        </div>
+      </div>
+
+      {/* Timeline */}
+      {data.timeline.length > 0 && (
+        <div className="bg-stone-900/40 border border-stone-800 rounded-2xl p-4">
+          <h3 className="text-sm font-bold mb-3">Activitate zilnică</h3>
+          <TimelineChart timeline={data.timeline} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const KPI = ({ label, value, accent = "stone" }) => {
+  const colorCls = {
+    emerald: "text-emerald-400",
+    amber: "text-amber-400",
+    rose: "text-rose-400",
+    stone: "text-stone-200",
+  }[accent];
+  return (
+    <div className="bg-stone-900/40 border border-stone-800 rounded-lg px-3 py-1.5">
+      <div className="text-[10px] uppercase tracking-wider text-stone-500 font-bold">{label}</div>
+      <div className={`text-lg font-bold tabular-nums ${colorCls}`}>{value}</div>
+    </div>
+  );
+};
+
+const SuiteTrendCard = ({ suite }) => {
+  const TrendIcon = suite.trend === "up" ? TrendingUp : suite.trend === "down" ? TrendingDown : Minus;
+  const trendColor = suite.trend === "up" ? "text-emerald-400" : suite.trend === "down" ? "text-rose-400" : "text-stone-400";
+  const rateColor = suite.latest_pass_rate >= 80 ? "text-emerald-400" : suite.latest_pass_rate >= 60 ? "text-amber-400" : "text-rose-400";
+  return (
+    <div className="p-3 bg-stone-800/30 border border-stone-800 rounded-xl" data-testid={`mt-trends-card-${suite.suite_id}`}>
+      <div className="flex items-start gap-2 mb-2">
+        <span className="text-xl shrink-0">{suite.suite_icon}</span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-bold text-stone-100 truncate">{suite.suite_name}</div>
+          <div className="text-[11px] text-stone-500">{suite.total_runs} run-uri · {suite.total_cases} cazuri</div>
+        </div>
+        <div className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-bold inline-flex items-center gap-0.5 ${trendColor} bg-stone-800`}>
+          <TrendIcon className="w-3 h-3" /> {suite.delta_pct > 0 ? "+" : ""}{suite.delta_pct}%
+        </div>
+      </div>
+      <div className="flex items-end justify-between mb-1">
+        <div>
+          <div className={`text-2xl font-black tabular-nums ${rateColor}`}>{suite.latest_pass_rate}%</div>
+          <div className="text-[10px] text-stone-500">latest · avg {suite.avg_pass_rate}%</div>
+        </div>
+        <Sparkline history={suite.history} />
+      </div>
+      {/* Mini progress bar */}
+      <div className="h-1 bg-stone-800 rounded-full overflow-hidden">
+        <div className={`h-full ${suite.latest_pass_rate >= 80 ? "bg-emerald-500" : suite.latest_pass_rate >= 60 ? "bg-amber-500" : "bg-rose-500"}`}
+          style={{ width: `${suite.latest_pass_rate}%` }} />
+      </div>
+    </div>
+  );
+};
+
+const Sparkline = ({ history }) => {
+  if (!history || history.length === 0) return null;
+  const W = 100, H = 30;
+  const max = 100;
+  const points = history.map((p, i) => {
+    const x = (i / Math.max(1, history.length - 1)) * W;
+    const y = H - (p.pass_rate / max) * H;
+    return `${x},${y}`;
+  }).join(" ");
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="opacity-80">
+      <polyline points={points} fill="none" stroke="currentColor" strokeWidth="1.5" className="text-violet-400" />
+      {history.map((p, i) => {
+        const x = (i / Math.max(1, history.length - 1)) * W;
+        const y = H - (p.pass_rate / max) * H;
+        const c = p.pass_rate >= 80 ? "#10b981" : p.pass_rate >= 60 ? "#f59e0b" : "#ef4444";
+        return <circle key={i} cx={x} cy={y} r="1.5" fill={c} />;
+      })}
+    </svg>
+  );
+};
+
+const TimelineChart = ({ timeline }) => {
+  const maxTotal = Math.max(...timeline.map((t) => t.pass + t.fail + t.skip), 1);
+  return (
+    <div className="space-y-1.5" data-testid="mt-trends-timeline">
+      {timeline.map((t) => {
+        const tot = t.pass + t.fail + t.skip;
+        return (
+          <div key={t.date} className="flex items-center gap-2 text-xs">
+            <div className="w-20 text-stone-500 tabular-nums">{t.date}</div>
+            <div className="flex-1 h-5 bg-stone-800 rounded flex overflow-hidden">
+              <div className="bg-emerald-500" style={{ width: `${(t.pass / maxTotal) * 100}%` }} title={`${t.pass} pass`} />
+              <div className="bg-rose-500" style={{ width: `${(t.fail / maxTotal) * 100}%` }} title={`${t.fail} fail`} />
+              <div className="bg-stone-600" style={{ width: `${(t.skip / maxTotal) * 100}%` }} title={`${t.skip} skip`} />
+            </div>
+            <div className="w-20 text-right text-stone-400 tabular-nums">
+              <span className="text-emerald-400">{t.pass}</span>·<span className="text-rose-400">{t.fail}</span>·<span className="text-stone-500">{t.skip}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 export default ManualTesterPage;

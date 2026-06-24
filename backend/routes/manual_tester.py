@@ -452,6 +452,121 @@ async def list_runs(limit: int = 30, user=Depends(require_role("admin"))):
     return {"items": items, "count": len(items)}
 
 
+# ============================================================================
+# Compounding QA — trends over time
+# ============================================================================
+@router.get("/trends")
+async def trends(days: int = 30, user=Depends(require_role("admin"))):
+    """Aggregate per-suite pass-rate trend over the last N days.
+
+    Returns:
+      - by_suite: list of {suite_id, suite_name, total_runs, total_cases,
+        avg_pass_rate, latest_pass_rate, trend ("up"|"down"|"flat"),
+        last_run_at}
+      - alerts: list of suites where latest pass-rate dropped >=20 percentage
+        points below the 30d average — early warning signal.
+      - overall: {total_runs, avg_pass_rate, total_failures}
+      - timeline: per-day aggregate {date, pass, fail, skip}
+    """
+    from datetime import timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+    suite_meta = {s["id"]: s for s in SUITES}
+
+    # Pull runs once, aggregate in Python (cleaner than nested Mongo pipelines).
+    by_suite_runs: dict = {}  # suite_id -> [(pass_rate, created_at, summary)]
+    timeline: dict = {}  # date_str -> {"pass": x, "fail": y, "skip": z}
+    overall_total_cases = 0
+    overall_total_pass = 0
+    overall_total_runs = 0
+    overall_total_failures = 0
+
+    async for run in db.manual_test_runs.find({"created_at": {"$gte": cutoff}}, {"_id": 0}):
+        sid = run.get("suite_id") or "_mixed"
+        summary = run.get("summary") or {}
+        total = int(summary.get("total") or 0)
+        p = int(summary.get("pass") or 0)
+        f = int(summary.get("fail") or 0)
+        sk = int(summary.get("skip") or 0)
+        if total == 0:
+            continue
+        pass_rate = round(100.0 * p / total, 1)
+        by_suite_runs.setdefault(sid, []).append({
+            "pass_rate": pass_rate, "created_at": run.get("created_at"),
+            "summary": {"total": total, "pass": p, "fail": f, "skip": sk},
+            "tester": run.get("tester_email"),
+        })
+        # Daily timeline
+        date_str = (run.get("created_at") or "")[:10]
+        d = timeline.setdefault(date_str, {"pass": 0, "fail": 0, "skip": 0})
+        d["pass"] += p
+        d["fail"] += f
+        d["skip"] += sk
+        overall_total_cases += total
+        overall_total_pass += p
+        overall_total_failures += f
+        overall_total_runs += 1
+
+    by_suite = []
+    alerts = []
+    for sid, runs in by_suite_runs.items():
+        runs.sort(key=lambda r: r["created_at"] or "")
+        rates = [r["pass_rate"] for r in runs]
+        avg = round(sum(rates) / len(rates), 1) if rates else 0
+        latest = rates[-1] if rates else 0
+        first_half = rates[: max(1, len(rates) // 2)]
+        second_half = rates[max(1, len(rates) // 2):]
+        if second_half and first_half:
+            delta = round(sum(second_half) / len(second_half) - sum(first_half) / len(first_half), 1)
+        else:
+            delta = 0
+        trend = "up" if delta > 3 else ("down" if delta < -3 else "flat")
+        total_cases = sum(r["summary"]["total"] for r in runs)
+        entry = {
+            "suite_id": sid,
+            "suite_name": (suite_meta.get(sid) or {}).get("name", sid),
+            "suite_icon": (suite_meta.get(sid) or {}).get("icon", "🧪"),
+            "total_runs": len(runs),
+            "total_cases": total_cases,
+            "avg_pass_rate": avg,
+            "latest_pass_rate": latest,
+            "trend": trend,
+            "delta_pct": delta,
+            "last_run_at": runs[-1]["created_at"],
+            "last_tester": runs[-1].get("tester"),
+            "history": [{"pass_rate": r["pass_rate"], "at": r["created_at"], "total": r["summary"]["total"]} for r in runs[-20:]],
+        }
+        by_suite.append(entry)
+        # Alert: latest dropped 20+ pts below avg
+        if avg >= 50 and latest < avg - 20:
+            alerts.append({
+                "suite_id": sid,
+                "suite_name": entry["suite_name"],
+                "avg_pass_rate": avg,
+                "latest_pass_rate": latest,
+                "severity": "high" if latest < avg - 35 else "medium",
+                "message": f"Pass-rate scăzut de la avg {avg}% la {latest}% în ultimul run.",
+            })
+
+    by_suite.sort(key=lambda s: s["latest_pass_rate"])
+    timeline_list = [{"date": d, **vals} for d, vals in sorted(timeline.items())]
+
+    overall_avg = round(100.0 * overall_total_pass / overall_total_cases, 1) if overall_total_cases else 0
+
+    return {
+        "window_days": days,
+        "overall": {
+            "total_runs": overall_total_runs,
+            "total_cases_executed": overall_total_cases,
+            "avg_pass_rate": overall_avg,
+            "total_failures": overall_total_failures,
+        },
+        "by_suite": by_suite,
+        "alerts": alerts,
+        "timeline": timeline_list,
+    }
+
+
 class SuggestIn(BaseModel):
     topic: str
     context: Optional[str] = ""
