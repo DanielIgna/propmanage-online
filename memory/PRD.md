@@ -4,6 +4,20 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 
+## 🧹 House Health refactor (Feb 24 2026)
+
+`HouseHealthPage.jsx` was reduced from **618 lines → 88 lines** (orchestrator only). Section implementations moved to `/app/frontend/src/pages/house_health/`:
+- `constants.js` — SECTIONS, EVALUATION_KINDS, DOC_CATEGORIES, EXT_TYPES, EVAL_META, STATUS_COLORS, PRIORITY_META, CATEGORY_LABELS, fmtDate
+- `ScoreSection.jsx` (33 lines)
+- `DocumentsSection.jsx` (147 lines)
+- `HistorySection.jsx` (36 lines)
+- `EvaluationSection.jsx` (63 lines) — reused for air/thermal/humidity/electric/radon
+- `RecommendationsSection.jsx` (246 lines) — split internally into `RecommendationForm`, `RecommendationCard`, `PriorityLegend` sub-components
+
+No API contract changes. All 47/47 House Health backend tests still pass; smoke test confirms all 9 tabs render and switch correctly.
+
+
+
 ## 💳 House Health — F4.3 Stripe Checkout Complete (Feb 23 2026)
 
 **Approach**: Each "subscription purchase" is modelled as a one-shot Stripe Checkout payment that grants N days of access (extending `hh_subscriptions.expires_at`). True recurring auto-renewal would require switching to the official Stripe Subscription API (currently the Emergent test key `sk_test_emergent` proxies through the `emergentintegrations` wrapper which only supports one-shot checkout sessions). Auto-renewal is a future iteration.
