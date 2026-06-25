@@ -4,6 +4,41 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 
+## 🎯 Admin Reorganization 2026 + IT Collaborators Hub (Feb 25, 2026)
+
+**Sprint 1 — Sidebar Reorg (NON-DESTRUCTIVE)**:
+- Refactored `AdminLayoutMetronic.jsx` from 9 ad-hoc sections (~51 linear links) into **9 logical mega-menu sections**:
+  1. **Dashboard** (overview, activity, demo, leads)
+  2. **Operațiuni Zilnice** (projects, disputes, finance, todo_board, manual_tester)
+  3. **Utilizatori** (users, verification, beta_testers, sub_admins, approvals, specialist_progression, experience_tiers)
+  4. **Conținut** (cms, emails, zones, operating_manual, docs_train, docs, qa_playbook)
+  5. **Compliance** (gdpr, impersonation, kyc, trust, audit, settings, settings_control)
+  6. **Imobile** (ve_admin, house_health, experience_spaces)
+  7. **AI & Engineering Lab** *(superAdminOnly)* — 15 AI subitems
+  8. **Analytics** (bi_moe, abtests)
+  9. **IT Collaborators Hub** *(superAdminOnly, NEW)* — it_team, it_copilot, founder_gate
+- All 50+ original item IDs preserved (same `data-testid=admin-nav-{id}`). Routes unchanged. RBAC scope filtering preserved.
+- Sections are collapsible (chevron + localStorage `pm_admin_nav_collapsed_v2`).
+- `superAdminOnly` flag hides AI Lab + IT Hub from scoped sub-admins.
+
+**Sprint 2 — IT Collaborators Hub (Backend + Frontend)**:
+- Backend `/app/backend/routes/it_collaborators.py`:
+  - CRUD: `GET/POST /api/admin/it-collaborators`, `GET/PATCH/DELETE /{id}`, `POST /{id}/metrics`.
+  - AI Copilot: `POST /copilot/analyze` (Claude Sonnet 4.5 via Emergent LLM key) + `GET /copilot/history`.
+  - Schema: `it_collaborators` { name, email, role, seniority, tech_stack, status, hourly_rate, location, notes, metrics: {bugs_introduced, tasks_completed, review_score, last_sprint} }.
+- Frontend `/app/frontend/src/pages/admin/ITCollaboratorsHubPage.jsx` — full CRUD UI with role/status filters, tech_stack chips, metrics quick-edit modal, archive (soft-delete).
+- Frontend `/app/frontend/src/pages/admin/ITCopilotPage.jsx` — runs AI Performance Copilot, shows risk_level, top_performers, at_risk + recommended_action, team_recommendations, sprint_risk_score, plus report history (last 5).
+
+**Sprint 3 — Global UX power-user features**:
+- `/app/frontend/src/components/CommandPalette.jsx` — global Ctrl/Cmd+K palette with fuzzy filter, keyboard nav (↑↓ + Enter + Esc), favorites + recents grouping. Mounted at AdminLayout level.
+- Favorites: `pm_admin_fav_items_v1` localStorage. Star button reveals on row hover; favorites render in a pinned "Favorite" pseudo-section at the top of the sidebar AND at top of the palette.
+- Recents: `pm_admin_recent_items_v1` localStorage. Auto-updated on every nav click.
+- Topbar + sidebar each have a `⌘K` trigger button.
+
+**Tests**: 19/19 new pytest pass (`/app/backend/tests/test_it_collaborators.py`). All frontend selectors verified by `iteration_68.json`. RBAC confirmed (sub-admin sees neither AI Lab nor IT Hub).
+
+
+
 ## 🎯 Adaptive UX 2026 — Sprint A+B+C + Tech Build theme (Feb 24 2026)
 
 **Sprint A — Adaptive Shell (feature gating)**:
