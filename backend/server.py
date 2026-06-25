@@ -128,6 +128,7 @@ from routes.it_digest import router as it_digest_router, run_weekly_it_sprint_di
 from routes.legal import router as legal_router, admin_router as legal_admin_router, seed_default_legal_documents
 from routes.city_partners import admin_router as city_partners_admin_router, partner_router as city_partners_portal_router
 from routes.marketplace_partners import admin_router as marketplace_admin_router, partner_router as marketplace_portal_router
+from routes.strategic_partners import router as strategic_partners_router
 from middleware_scope import admin_scope_middleware
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
@@ -264,6 +265,7 @@ for r in (
     city_partners_portal_router,
     marketplace_admin_router,
     marketplace_portal_router,
+    strategic_partners_router,
 ):
     app.include_router(r)
 

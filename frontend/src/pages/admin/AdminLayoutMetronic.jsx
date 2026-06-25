@@ -7,7 +7,7 @@ import {
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
   LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, ChevronRight, Sparkles, Bot, Zap, Inbox,
   UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb, Bug, Compass, Layers, BookOpenCheck, GraduationCap, Gamepad2, Trophy, BarChart3, Eye, Heart,
-  Star, Clock, Command
+  Star, Clock, Command, Network
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { API } from "../DashShared";
@@ -198,6 +198,7 @@ const NAV_SECTIONS = [
     icon: Building2,
     superAdminOnly: true,
     items: [
+      { id: "strategic_partners_dashboard", label: "Strategic Dashboard", icon: Network, badge: "AI XREF", href: "/admin/strategic-partners" },
       { id: "city_partners_list", label: "City Partners", icon: Building2, badge: "NEW V1", href: "/admin/city-partners" },
       { id: "marketplace_partners_list", label: "Marketplace Partners", icon: Award, badge: "AI", href: "/admin/marketplace-partners" },
     ],
