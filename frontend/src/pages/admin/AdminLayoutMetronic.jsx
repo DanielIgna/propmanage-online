@@ -7,7 +7,7 @@ import {
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
   LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, ChevronRight, Sparkles, Bot, Zap, Inbox,
   UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb, Bug, Compass, Layers, BookOpenCheck, GraduationCap, Gamepad2, Trophy, BarChart3, Eye, Heart,
-  Star, Clock, Command, Network
+  Star, Clock, Command, Network, Megaphone, Brain, Rocket
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { API } from "../DashShared";
@@ -213,6 +213,18 @@ const NAV_SECTIONS = [
       { id: "it_copilot", label: "AI Performance Copilot", icon: Bot, badge: "AI", href: "/admin/it-collaborators/copilot" },
       { id: "it_legal", label: "Audit Juridic IT", icon: ShieldCheck, badge: "LEGAL", href: "/admin/legal-audit" },
       { id: "founder_gate", label: "Founder Approval Gate", icon: ShieldCheck, badge: "FG-0", href: "/admin/founder-gate" },
+    ],
+  },
+  {
+    id: "marketing_growth",
+    title: "Marketing & Growth",
+    icon: Megaphone,
+    superAdminOnly: true,
+    items: [
+      { id: "marketing_department", label: "AI Marketing Department", icon: Megaphone, badge: "NEW · AI", href: "/admin/marketing" },
+      { id: "marketing_insights", label: "Business Intelligence", icon: Brain, badge: "AI", href: "/admin/marketing?tab=insights" },
+      { id: "marketing_copilot", label: "Marketing Copilot", icon: Bot, badge: "CHAT", href: "/admin/marketing?tab=copilot" },
+      { id: "marketing_future", label: "Idei viitoare (Faza 2-3)", icon: Rocket, badge: "ROADMAP", href: "/admin/marketing?tab=future" },
     ],
   },
 ];

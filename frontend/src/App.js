@@ -86,6 +86,7 @@ import CityPartnersPage from "./pages/admin/CityPartnersPage";
 import CityPartnerDetailPage from "./pages/admin/CityPartnerDetailPage";
 import MarketplacePartnersPage from "./pages/admin/MarketplacePartnersPage";
 import StrategicPartnersDashboard from "./pages/admin/StrategicPartnersDashboard";
+import MarketingDepartmentPage from "./pages/admin/MarketingDepartmentPage";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import ContractPage from "./pages/ContractPage";
 import { trackPageView } from "@/lib/analytics";
@@ -1655,6 +1656,7 @@ function App() {
               <Route path="/admin/city-partners/:id" element={<CityPartnerDetailPage />} />
               <Route path="/admin/marketplace-partners" element={<MarketplacePartnersPage />} />
               <Route path="/admin/strategic-partners" element={<StrategicPartnersDashboard />} />
+              <Route path="/admin/marketing" element={<MarketingDepartmentPage />} />
               <Route path="/partner/dashboard" element={<PartnerDashboard />} />
               <Route path="/legal/sign" element={<LegalSignPage />} />
               <Route path="/contracts/:id" element={<ContractPage />} />
