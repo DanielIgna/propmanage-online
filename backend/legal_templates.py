@@ -1,0 +1,267 @@
+"""Default templates for the 6 mandatory legal contracts.
+
+Each template is plain markdown — admins can extend / override per version via
+`POST /api/admin/legal/documents`. The first time the app starts, these templates
+are seeded into the `legal_documents` collection (idempotent — by `type` + `version`).
+"""
+
+LEGAL_DOC_TYPES = [
+    "nda",
+    "collaboration",
+    "ip_cession",
+    "security_policy",
+    "infra_access",
+    "regulation",
+]
+
+DEFAULT_VERSION = "1.0"
+
+LEGAL_TEMPLATES = {
+    "nda": {
+        "title": "Acord de Confidențialitate (NDA)",
+        "summary": "Obligația de a păstra confidențiale toate informațiile, codul, datele și strategiile platformei PropManage.",
+        "body": """# Acord de Confidențialitate (NDA)
+
+**Între** PropManage (denumită în continuare „Platforma") și Colaboratorul semnatar.
+
+## 1. Definiția informațiilor confidențiale
+Toate informațiile, codul sursă, documentația, arhitectura, design-ul, datele utilizatorilor, prompturile AI, modelele, strategiile comerciale, financiare și operaționale ale Platformei sunt considerate confidențiale, indiferent de formatul lor.
+
+## 2. Obligații
+Colaboratorul se obligă:
+- să nu dezvăluie informațiile confidențiale către terți;
+- să nu utilizeze informațiile decât pentru îndeplinirea atribuțiilor în cadrul Platformei;
+- să protejeze fizic și digital documentele și accesele primite;
+- să returneze sau să distrugă toate materialele confidențiale la încetarea colaborării.
+
+## 3. Durata
+Obligația de confidențialitate continuă **5 ani** de la încetarea colaborării.
+
+## 4. Sancțiuni
+Încălcarea NDA poate atrage răspunderea civilă și penală conform legislației române și europene aplicabile.
+
+## 5. GDPR
+Datele personale ale Colaboratorului sunt procesate conform Politicii GDPR a Platformei, disponibilă în secțiunea Compliance.
+
+Prin acceptarea acestui document, Colaboratorul declară că a citit și înțeles obligațiile prevăzute.
+""",
+    },
+    "collaboration": {
+        "title": "Contract de Colaborare",
+        "summary": "Definește relația operațională, livrabilele, responsabilitățile și absența calității de asociat / acționar.",
+        "body": """# Contract de Colaborare
+
+**Între** PropManage și Colaboratorul semnatar.
+
+## 1. Natura colaborării
+Colaboratorul prestează servicii de dezvoltare software, QA, consultanță sau alte activități IT conform descrierii rolului din profilul său.
+
+## 2. ✋ Limitare expresă de proprietate
+**Colaboratorul NU devine asociat, acționar, coproprietar sau părtaș la profitul companiei.**
+Orice recompensă, bonus sau remunerație se realizează exclusiv în baza acestui contract și a documentelor anexate.
+
+## 3. Livrabile și termene
+Sunt definite per task / sprint în sistemul intern al Platformei (ToDo Board, IT Collaborators Hub).
+
+## 4. Remunerație
+Conform tarifului orar / proiect agreat și înregistrat în profilul Colaboratorului. Recompensele estimate prin scoring intern nu constituie obligații ferme de plată până la îndeplinirea condițiilor contractuale.
+
+## 5. Responsabilități
+- Respectarea politicilor de securitate și acces;
+- Livrare cod conform standardelor de calitate ale Platformei;
+- Acceptare NDA, Cesiune IP, Politică Securitate și Regulament Strategic Contributors.
+
+## 6. Încetare
+Oricare parte poate înceta colaborarea cu preaviz de **14 zile**.
+
+## 7. Legea aplicabilă
+Contractul este guvernat de legislația română și europeană aplicabilă.
+""",
+    },
+    "ip_cession": {
+        "title": "Cesiune Drepturi Patrimoniale de Autor Software",
+        "summary": "Toată producția (cod, docs, arhitectură, design, automatizări, AI, prompturi, teste) devine proprietatea exclusivă a Platformei.",
+        "body": """# Cesiune Drepturi Patrimoniale de Autor Software
+
+**Cedent:** Colaboratorul semnatar.
+**Cesionar:** PropManage.
+
+## 1. Obiectul cesiunii
+Cedentul cedează către Cesionar, **exclusiv, irevocabil și pentru întreaga durată legală de protecție**, toate drepturile patrimoniale de autor asupra:
+- codului sursă;
+- documentației;
+- arhitecturii software;
+- design-ului UI/UX;
+- automatizărilor;
+- scripturilor;
+- componentelor AI;
+- modelelor și prompturilor;
+- testelor automate sau manuale;
+- documentelor tehnice;
+- oricăror lucrări intelectuale produse în cadrul colaborării.
+
+## 2. Întinderea cesiunii
+Cesiunea include:
+- reproducerea;
+- distribuirea;
+- modificarea;
+- traducerea;
+- adaptarea;
+- comunicarea publică;
+- comercializarea sub orice formă, în orice teritoriu.
+
+## 3. Garanții ale Cedentului
+Cedentul declară pe propria răspundere că:
+- este autorul exclusiv al lucrărilor cedate;
+- lucrările nu încalcă drepturi de autor sau brevete ale unor terți;
+- nu există acorduri anterioare care să limiteze cesiunea.
+
+## 4. Remunerație
+Cesiunea este parte din remunerația globală convenită în Contractul de Colaborare. Cedentul nu pretinde plăți suplimentare pentru drepturile cedate.
+
+## 5. Drepturi morale
+Cedentul își păstrează dreptul moral la paternitatea operei, care va fi consemnat în istoricul intern al Platformei (autor + commit-uri).
+
+## 6. Durata
+Cesiunea operează pe durata maximă legală de protecție prevăzută de legislația aplicabilă.
+""",
+    },
+    "security_policy": {
+        "title": "Politica de Securitate IT",
+        "summary": "Reguli obligatorii de securitate: parole, 2FA, criptare disk, gestionare secrete, raportare incidente.",
+        "body": """# Politica de Securitate IT
+
+Această politică este parte integrantă a relației de colaborare.
+
+## 1. Stații de lucru
+- Disk criptat (FileVault / BitLocker / LUKS) este obligatoriu;
+- Sistem de operare actualizat la zi;
+- Antivirus / endpoint protection activ.
+
+## 2. Autentificare
+- Parole strong (min 14 caractere, gestor de parole obligatoriu);
+- **2FA obligatoriu** pe toate conturile platformei și serviciilor (GitHub, MongoDB, Stripe, Resend, etc.).
+
+## 3. Gestionarea secretelor
+- **NICIODATĂ** nu se commit-ează chei API, parole, certificate;
+- Secretele se stochează doar în `.env`, vault sau secret manager;
+- Rotirea cheilor compromise se face în max 24h.
+
+## 4. Cod și branch
+- PR obligatoriu pentru orice modificare în `main`;
+- Cod review minim 1 reviewer;
+- Nu se rulează cod neaprobat în producție.
+
+## 5. Acces date utilizatori
+- Accesul la date personale ale utilizatorilor finali este permis doar pentru investigații documentate;
+- Orice export trebuie logat în Audit Log.
+
+## 6. Raportare incidente
+- Suspiciune de breșă → notificare IMEDIATĂ (max 1h) către Founder / Security Lead;
+- Logging activ în jurnalul intern Bug Memory / Audit Log.
+
+## 7. Sancțiuni
+Încălcarea politicii poate duce la revocarea accesului, încetarea contractului și răspundere conform legislației.
+""",
+    },
+    "infra_access": {
+        "title": "Politica de Acces la Infrastructură",
+        "summary": "Reguli pentru acces la servere, baze de date, repository-uri, third-party services și producție.",
+        "body": """# Politica de Acces la Infrastructură
+
+## 1. Principiul „least privilege"
+Fiecare colaborator primește **doar accesele minim necesare** pentru rolul său. Accesele suplimentare se solicită explicit și se logează.
+
+## 2. Inventar accese
+Accesele active sunt înregistrate în panoul Admin → IT Collaborators Hub și revizuite trimestrial.
+
+## 3. Tipuri de acces
+- **Cod**: GitHub repository (read / write per branch);
+- **Producție**: doar Tech Lead / DevOps autorizat;
+- **Baza de date producție**: doar pentru migrări sau debugging documentat;
+- **Third-party** (Stripe, Resend, Twilio, etc.): roluri scoped.
+
+## 4. Revocare
+La încetarea colaborării, **toate accesele se revocă în max 24h**:
+- Token-uri GitHub;
+- Chei SSH;
+- Conturi MongoDB;
+- API keys third-party;
+- Acces VPN / bastion.
+
+## 5. Audit
+Toate accesările resurselor critice sunt logate. Reviewul logurilor este lunar.
+
+## 6. Producție
+- Nu se modifică direct date producție fără ticket aprobat;
+- Snapshot DB înainte de orice migrare;
+- Roll-back plan obligatoriu.
+""",
+    },
+    "regulation": {
+        "title": "Regulamentul Programului Strategic Contributors",
+        "summary": "Cadrul programului de colaboratori strategici: poziții cheie, recompense estimate (non-obligatorii), criterii de promovare.",
+        "body": """# Regulamentul Programului Strategic Contributors
+
+## 1. Scop
+Programul recunoaște contribuțiile excepționale ale colaboratorilor IT prin acordarea de **poziții operaționale** și **recompense estimate**, fără a conferi drepturi de proprietate.
+
+## 2. Poziții cheie disponibile
+Colaboratorii performanți pot primi una sau mai multe dintre următoarele poziții operaționale:
+- **Technical Lead** — responsabil arhitectură + cod review;
+- **QA Lead** — responsabil strategia de testare;
+- **Architecture Reviewer** — review pe schimbări de design;
+- **Security Reviewer** — review pe pull-requests cu impact de securitate;
+- **Product Advisor** — input strategic pe roadmap;
+- **AI Advisor** — input strategic pe componentele AI;
+- **Technical Mentor** — mentorat pentru juniori;
+- **Community Lead** — relația cu comunitatea de developeri externi.
+
+**Aceste poziții acordă responsabilități și acces operațional, dar NU oferă drepturi de proprietate asupra companiei, acțiuni sau părți sociale.**
+
+## 3. Tipuri de recompense
+Platforma poate acorda:
+- remunerare imediată (tarif orar / proiect);
+- remunerare etapizată (milestones);
+- bonusuri condiționate (KPI sprint / OKR);
+- recompense viitoare programate;
+- beneficii non-financiare (mentorat, certificări, training-uri, conferințe).
+
+## 4. ⚠️ Disclaimer obligatoriu
+Toate recompensele estimate sunt afișate cu următorul disclaimer:
+> *„Recompensele estimate nu reprezintă obligații ferme de plată până la îndeplinirea condițiilor contractuale."*
+
+## 5. Criterii de promovare
+Promovarea în poziții cheie se face în baza:
+- consistenței livrărilor (review_score ≥ 8);
+- ratei de bug-uri introduse (< 1 / sprint);
+- aprobării Founder-ului + 1 super-admin.
+
+## 6. Revocarea pozițiilor
+Pozițiile pot fi retrase oricând, cu preaviz de 14 zile, în baza:
+- nerespectării politicii de securitate;
+- scăderii constante a metricilor de performanță;
+- retragerii Colaboratorului din program.
+
+## 7. Conformitate
+Programul respectă legislația română și europeană, inclusiv GDPR.
+""",
+    },
+}
+
+
+def list_default_templates() -> list:
+    """Return list of (type, payload) for seeding."""
+    out = []
+    for t in LEGAL_DOC_TYPES:
+        tpl = LEGAL_TEMPLATES[t]
+        out.append({
+            "type": t,
+            "version": DEFAULT_VERSION,
+            "title": tpl["title"],
+            "summary": tpl["summary"],
+            "body": tpl["body"],
+            "mandatory": True,
+            "active": True,
+        })
+    return out

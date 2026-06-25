@@ -140,6 +140,7 @@ const NAV_SECTIONS = [
     title: "Compliance",
     icon: ShieldCheck,
     items: [
+      { id: "legal_audit", label: "Audit Juridic IT", icon: ShieldCheck, badge: "NEW", href: "/admin/legal-audit" },
       { id: "gdpr", label: "GDPR Pack", icon: ShieldCheck, badge: "NEW" },
       { id: "impersonation", label: "Impersonări", icon: ShieldCheck, badge: "NEW" },
       { id: "kyc", label: "KYC Identitate", icon: ShieldCheck, badge: "NEW" },
@@ -199,6 +200,7 @@ const NAV_SECTIONS = [
     items: [
       { id: "it_team", label: "Echipa IT", icon: Users, badge: "NEW", href: "/admin/it-collaborators" },
       { id: "it_copilot", label: "AI Performance Copilot", icon: Bot, badge: "AI", href: "/admin/it-collaborators/copilot" },
+      { id: "it_legal", label: "Audit Juridic IT", icon: ShieldCheck, badge: "LEGAL", href: "/admin/legal-audit" },
       { id: "founder_gate", label: "Founder Approval Gate", icon: ShieldCheck, badge: "FG-0", href: "/admin/founder-gate" },
     ],
   },

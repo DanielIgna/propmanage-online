@@ -25,6 +25,9 @@ const ITCopilotPage = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [history, setHistory] = useState([]);
+  const [digest, setDigest] = useState(null);
+  const [digestBusy, setDigestBusy] = useState(false);
+  const [digestMsg, setDigestMsg] = useState("");
 
   useEffect(() => {
     ax.get("/api/admin/it-collaborators?status=active")
@@ -34,7 +37,32 @@ const ITCopilotPage = () => {
     ax.get("/api/admin/it-collaborators/copilot/history?limit=5")
       .then(r => setHistory(r.data?.items || []))
       .catch(() => {});
+    ax.get("/api/admin/it-collaborators/digest/settings")
+      .then(r => setDigest(r.data))
+      .catch(() => {});
   }, []);
+
+  const saveDigest = async (patch) => {
+    try {
+      const { data } = await ax.post("/api/admin/it-collaborators/digest/settings", patch);
+      setDigest(data);
+      setDigestMsg("Setări salvate.");
+      setTimeout(() => setDigestMsg(""), 2500);
+    } catch (err) {
+      setDigestMsg(err.response?.data?.detail || err.message);
+    }
+  };
+
+  const sendDigestNow = async () => {
+    setDigestBusy(true); setDigestMsg("");
+    try {
+      const { data } = await ax.post("/api/admin/it-collaborators/digest/run");
+      setDigestMsg(`Trimis către ${data.sent_to} prin ${data.provider}. Risk: ${data.report?.risk_level}.`);
+      ax.get("/api/admin/it-collaborators/digest/settings").then(r => setDigest(r.data));
+    } catch (err) {
+      setDigestMsg(err.response?.data?.detail || err.message);
+    } finally { setDigestBusy(false); }
+  };
 
   const analyze = async () => {
     setBusy(true); setError(""); setReport(null);
@@ -123,6 +151,68 @@ const ITCopilotPage = () => {
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Sprint Health Digest configuration */}
+          {digest && (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800" data-testid="digest-card">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" /> Sprint Health Digest · Email săptămânal
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 mb-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!digest.enabled}
+                  onChange={(e) => saveDigest({ enabled: e.target.checked })}
+                  data-testid="digest-enabled"
+                  className="w-4 h-4"
+                />
+                Activează trimitere automată
+              </label>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div>
+                  <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Zi</label>
+                  <select value={digest.day_of_week} onChange={e => saveDigest({ day_of_week: e.target.value })} className="w-full px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs" data-testid="digest-day">
+                    <option value="mon">Luni</option>
+                    <option value="tue">Marți</option>
+                    <option value="wed">Miercuri</option>
+                    <option value="thu">Joi</option>
+                    <option value="fri">Vineri</option>
+                    <option value="sat">Sâmbătă</option>
+                    <option value="sun">Duminică</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Ora (24h)</label>
+                  <input type="number" min="0" max="23" value={digest.hour} onChange={e => saveDigest({ hour: parseInt(e.target.value || 0) })} className="w-full px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs" data-testid="digest-hour" />
+                </div>
+              </div>
+              <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Email destinatar</label>
+              <input
+                type="email"
+                value={digest.recipient_email}
+                onBlur={(e) => e.target.value !== digest.recipient_email && saveDigest({ recipient_email: e.target.value })}
+                onChange={(e) => setDigest({ ...digest, recipient_email: e.target.value })}
+                className="w-full px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs mb-3"
+                data-testid="digest-email"
+              />
+              <button
+                onClick={sendDigestNow}
+                disabled={digestBusy}
+                className="w-full px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium flex items-center justify-center gap-1.5 disabled:opacity-60"
+                data-testid="digest-send-now"
+              >
+                {digestBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                {digestBusy ? "Se trimite…" : "Trimite test acum"}
+              </button>
+              {digestMsg && <div className="mt-2 text-[11px] text-emerald-600 dark:text-emerald-400">{digestMsg}</div>}
+              {digest.last_sent_at && (
+                <div className="mt-2 text-[10px] text-slate-400">
+                  Ultim trimis: {new Date(digest.last_sent_at).toLocaleString("ro-RO")} · status: {digest.last_status}
+                  {digest.last_error && <div className="text-rose-500 mt-0.5">{digest.last_error}</div>}
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -79,6 +79,9 @@ import SpecialistProgressionPage from "./pages/admin/SpecialistProgressionPage";
 import BIMoePage from "./pages/admin/BIMoePage";
 import ITCollaboratorsHubPage from "./pages/admin/ITCollaboratorsHubPage";
 import ITCopilotPage from "./pages/admin/ITCopilotPage";
+import LegalAuditPage from "./pages/admin/LegalAuditPage";
+import LegalSignPage from "./pages/LegalSignPage";
+import LegalGate from "./components/LegalGate";
 import ContractPage from "./pages/ContractPage";
 import { trackPageView } from "@/lib/analytics";
 import { useDynamicSEO } from "@/lib/useDynamicSEO";
@@ -1642,6 +1645,8 @@ function App() {
               <Route path="/admin/bi-moe" element={<BIMoePage />} />
               <Route path="/admin/it-collaborators" element={<ITCollaboratorsHubPage />} />
               <Route path="/admin/it-collaborators/copilot" element={<ITCopilotPage />} />
+              <Route path="/admin/legal-audit" element={<LegalAuditPage />} />
+              <Route path="/legal/sign" element={<LegalSignPage />} />
               <Route path="/contracts/:id" element={<ContractPage />} />
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />
               <Route path="/ghiduri" element={<GhiduriIndex />} />
@@ -1662,6 +1667,7 @@ function App() {
             <RoleTour />
             <AIConciergeBubble />
             <CookieBanner />
+            <LegalGate />
             </ErrorBoundary>
           </BrowserRouter>
         </AuthProvider>

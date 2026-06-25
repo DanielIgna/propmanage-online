@@ -124,6 +124,8 @@ from routes.sub_admins import router as sub_admins_router
 from routes.admin_approvals import router as admin_approvals_router
 from routes.kyc import router as kyc_router
 from routes.it_collaborators import router as it_collaborators_router
+from routes.it_digest import router as it_digest_router, run_weekly_it_sprint_digest, _get_settings as _it_digest_get_settings
+from routes.legal import router as legal_router, admin_router as legal_admin_router, seed_default_legal_documents
 from middleware_scope import admin_scope_middleware
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
@@ -253,6 +255,9 @@ for r in (
     admin_approvals_router,
     kyc_router,
     it_collaborators_router,
+    it_digest_router,
+    legal_router,
+    legal_admin_router,
 ):
     app.include_router(r)
 
@@ -297,6 +302,10 @@ async def startup():
         await seed_sub_admins()
     except Exception as e:
         logger.warning(f"Sub-admin seed failed: {e}")
+    try:
+        await seed_default_legal_documents()
+    except Exception as e:
+        logger.warning(f"Legal docs seed failed: {e}")
     if not scheduler.running:
         scheduler.add_job(
             run_daily_digests,
@@ -467,6 +476,24 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=3600,
         )
+        # IT Sprint Health Digest — weekly AI-powered founder email (default Sun 18:00 Europe/Bucharest)
+        try:
+            _digest_settings = await _it_digest_get_settings()
+            scheduler.add_job(
+                run_weekly_it_sprint_digest,
+                CronTrigger(
+                    day_of_week=_digest_settings.get("day_of_week", "sun"),
+                    hour=int(_digest_settings.get("hour", 18)),
+                    minute=int(_digest_settings.get("minute", 0)),
+                    timezone=pytz.timezone(BUCHAREST_TZ_NAME),
+                ),
+                id="it_sprint_digest_weekly",
+                replace_existing=True,
+                misfire_grace_time=7200,
+            )
+            logger.info(f"IT Sprint Digest scheduled: {_digest_settings.get('day_of_week','sun')} {_digest_settings.get('hour',18):02d}:{_digest_settings.get('minute',0):02d} Europe/Bucharest")
+        except Exception as e:
+            logger.warning(f"IT Sprint Digest schedule failed: {e}")
         scheduler.add_job(
             record_health_ping,
             CronTrigger(minute="*/15", timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
