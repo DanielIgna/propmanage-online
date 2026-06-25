@@ -77,6 +77,8 @@ import ExperienceTiersPage from "./pages/admin/ExperienceTiersPage";
 import FeatureConfiguratorPage from "./pages/admin/FeatureConfiguratorPage";
 import SpecialistProgressionPage from "./pages/admin/SpecialistProgressionPage";
 import BIMoePage from "./pages/admin/BIMoePage";
+import ITCollaboratorsHubPage from "./pages/admin/ITCollaboratorsHubPage";
+import ITCopilotPage from "./pages/admin/ITCopilotPage";
 import ContractPage from "./pages/ContractPage";
 import { trackPageView } from "@/lib/analytics";
 import { useDynamicSEO } from "@/lib/useDynamicSEO";
@@ -1638,6 +1640,8 @@ function App() {
               <Route path="/admin/feature-configurator" element={<FeatureConfiguratorPage />} />
               <Route path="/admin/specialist-progression" element={<SpecialistProgressionPage />} />
               <Route path="/admin/bi-moe" element={<BIMoePage />} />
+              <Route path="/admin/it-collaborators" element={<ITCollaboratorsHubPage />} />
+              <Route path="/admin/it-collaborators/copilot" element={<ITCopilotPage />} />
               <Route path="/contracts/:id" element={<ContractPage />} />
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />
               <Route path="/ghiduri" element={<GhiduriIndex />} />

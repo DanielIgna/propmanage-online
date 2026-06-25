@@ -5,8 +5,9 @@ import axios from "axios";
 import {
   LayoutDashboard, Users, ShieldCheck, Scale, Wallet, FolderKanban,
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
-  LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, Sparkles, Bot, Zap, Inbox,
-  UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb, Bug, Compass, Layers, BookOpenCheck, GraduationCap, Gamepad2, Trophy, BarChart3, Eye, Heart
+  LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, ChevronRight, Sparkles, Bot, Zap, Inbox,
+  UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb, Bug, Compass, Layers, BookOpenCheck, GraduationCap, Gamepad2, Trophy, BarChart3, Eye, Heart,
+  Star, Clock, Command
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { API } from "../DashShared";
@@ -17,6 +18,7 @@ import { ThemeSwitcher } from "../../components/ThemeSwitcher";
 import { AdminTourV2Wrapper } from "./AdminTourV2";
 import { useAdminScope, filterNavSections, setPreviewScope, getPreviewScope } from "../../lib/useAdminScope";
 import { PreviewAuditButton } from "./PreviewAuditButton";
+import { CommandPalette } from "../../components/CommandPalette";
 
 // Scope-color tones for the topbar badge
 const SCOPE_TONES = {
@@ -75,101 +77,129 @@ const ScopeBadgeTop = ({ scope }) => {
   );
 };
 
+// ============================================================================
+// NAV_SECTIONS v2 (Feb 2026) — Mega-menu reorganization
+// 9 logical sections, fully collapsible, NON-DESTRUCTIVE rewire.
+// All original item IDs / hrefs are preserved (no route changes).
+// `superAdminOnly` sections are hidden for scoped sub-admins (e.g. "AI Lab").
+// ============================================================================
 const NAV_SECTIONS = [
   {
-    title: "OVERVIEW",
+    id: "dashboard",
+    title: "Dashboard",
+    icon: LayoutDashboard,
     items: [
-      { id: "overview", label: "Dashboard", icon: LayoutDashboard },
-      { id: "ai", label: "AI Investigator", icon: Bot, badge: "NEW" },
-      { id: "concierge", label: "Concierge & Security", icon: ShieldCheck, badge: "NEW" },
+      { id: "overview", label: "Dashboard Principal", icon: LayoutDashboard },
+      { id: "activity", label: "Activitate Live", icon: Sparkles },
       { id: "demo", label: "Demo Tools", icon: Zap, badge: "NEW" },
       { id: "leads", label: "Demo Leads", icon: Inbox, badge: "NEW" },
-      { id: "activity", label: "Activitate Live", icon: Sparkles },
     ],
   },
   {
-    title: "USERI",
-    items: [
-      { id: "users", label: "Toți userii", icon: Users },
-      { id: "verification", label: "Verificare specialiști", icon: ShieldCheck },
-      { id: "beta_testers", label: "Beta Testers", icon: Sparkles, badge: "NEW" },
-    ],
-  },
-  {
-    title: "OPERATIONS",
+    id: "operations",
+    title: "Operațiuni Zilnice",
+    icon: Briefcase,
     items: [
       { id: "projects", label: "Proiecte", icon: FolderKanban },
       { id: "disputes", label: "Dispute & NC", icon: Scale },
       { id: "finance", label: "Finanțe & Escrow", icon: Wallet },
+      { id: "todo_board", label: "ToDo Board", icon: FileText, badge: "NEW", href: "/admin/todo" },
+      { id: "manual_tester", label: "Tester Manual", icon: Bug, badge: "QA", href: "/admin/manual-tester" },
     ],
   },
   {
-    title: "CONȚINUT",
+    id: "users",
+    title: "Utilizatori",
+    icon: Users,
+    items: [
+      { id: "users", label: "Toți userii", icon: Users },
+      { id: "verification", label: "Verificare specialiști", icon: ShieldCheck },
+      { id: "beta_testers", label: "Beta Testers", icon: Sparkles, badge: "NEW" },
+      { id: "sub_admins", label: "Sub-Admini", icon: Users, badge: "NEW" },
+      { id: "approvals", label: "Aprobări Admin", icon: ShieldCheck, badge: "NEW" },
+      { id: "specialist_progression", label: "Progresie Specialiști", icon: Trophy, badge: "SPRINT A", href: "/admin/specialist-progression" },
+      { id: "experience_tiers", label: "Experience Tiers", icon: GraduationCap, badge: "NEW", href: "/admin/experience-tiers" },
+    ],
+  },
+  {
+    id: "content",
+    title: "Conținut",
+    icon: FileText,
     items: [
       { id: "cms", label: "Texte (CMS)", icon: FileText },
       { id: "emails", label: "Template-uri Email", icon: Mail },
       { id: "zones", label: "Zone Acoperire", icon: MapPin },
+      { id: "operating_manual", label: "Manual de Operare", icon: BookOpenCheck, badge: "START AICI", href: "/admin/operating-manual" },
+      { id: "docs_train", label: "Documentație & Training", icon: FileText, badge: "NEW", href: "/admin/documentation" },
+      { id: "docs", label: "Documentație internă", icon: FileText, badge: "NEW" },
+      { id: "qa_playbook", label: "QA Playbook", icon: ShieldCheck, badge: "NEW" },
     ],
   },
   {
-    title: "CONFIGURARE",
+    id: "compliance",
+    title: "Compliance",
+    icon: ShieldCheck,
     items: [
-      { id: "abtests", label: "A/B Tests", icon: Sparkles },
+      { id: "gdpr", label: "GDPR Pack", icon: ShieldCheck, badge: "NEW" },
+      { id: "impersonation", label: "Impersonări", icon: ShieldCheck, badge: "NEW" },
+      { id: "kyc", label: "KYC Identitate", icon: ShieldCheck, badge: "NEW" },
       { id: "trust", label: "Trust Score Weights", icon: Award },
       { id: "audit", label: "Audit Log", icon: FileText },
       { id: "settings", label: "Setări Platformă", icon: Settings },
       { id: "settings_control", label: "Control Administrare", icon: Settings, badge: "NEW", href: "/admin/settings-control" },
+    ],
+  },
+  {
+    id: "properties",
+    title: "Imobile",
+    icon: Building2,
+    items: [
       { id: "ve_admin", label: "Imobile Verificate", icon: Award, badge: "NEW", href: "/admin/imobile-verificate" },
-      { id: "docs_train", label: "Documentație & Training", icon: FileText, badge: "NEW", href: "/admin/documentation" },
+      { id: "house_health", label: "House Health", icon: Heart, badge: "NEW", href: "/admin/house-health" },
+      { id: "experience_spaces", label: "Experience Spaces", icon: Sparkles, badge: "BETA", href: "/admin/experience-spaces" },
+    ],
+  },
+  {
+    id: "ai_lab",
+    title: "AI & Engineering Lab",
+    icon: Bot,
+    superAdminOnly: true,
+    items: [
+      { id: "ai", label: "AI Investigator", icon: Bot, badge: "NEW" },
+      { id: "concierge", label: "Concierge & Security", icon: ShieldCheck, badge: "NEW" },
       { id: "qa_copilot", label: "QA Copilot · AI Testing", icon: Sparkles, badge: "NEW", href: "/admin/qa-copilot" },
       { id: "ai_control", label: "AI Control Center", icon: Sparkles, badge: "NEW", href: "/admin/ai-control" },
       { id: "ai_docs", label: "Document Intelligence", icon: FileText, badge: "NEW", href: "/ai-docs" },
       { id: "ai_dev_team", label: "AI Development Team", icon: Code2, badge: "NEW", href: "/admin/ai-dev-team" },
       { id: "ai_security", label: "AI Security Center", icon: Shield, badge: "NEW", href: "/admin/ai-security" },
+      { id: "ai_governance", label: "AI Governance Center", icon: Shield, badge: "NEW", href: "/admin/ai-governance" },
+      { id: "ai_pm", label: "AI Product Manager", icon: Layers, badge: "NEW", href: "/admin/ai-pm" },
       { id: "autonomy", label: "Autonomy Engine", icon: Sparkles, badge: "NEW", href: "/admin/autonomy" },
       { id: "twin", label: "Twin Orchestrator", icon: Bot, badge: "AI", href: "/admin/twin" },
-      { id: "house_health", label: "House Health", icon: Heart, badge: "NEW", href: "/admin/house-health" },
-      { id: "manual_tester", label: "Tester Manual", icon: Bug, badge: "QA", href: "/admin/manual-tester" },
-      { id: "todo_board", label: "ToDo Board", icon: FileText, badge: "NEW", href: "/admin/todo" },
-      { id: "experience_spaces", label: "Experience Spaces", icon: Sparkles, badge: "BETA", href: "/admin/experience-spaces" },
-    ],
-  },
-  {
-    title: "COMPLIANCE",
-    items: [
-      { id: "gdpr", label: "GDPR Pack", icon: ShieldCheck, badge: "NEW" },
-      { id: "impersonation", label: "Impersonări", icon: ShieldCheck, badge: "NEW" },
-      { id: "kyc", label: "KYC Identitate", icon: ShieldCheck, badge: "NEW" },
-    ],
-  },
-  {
-    title: "RBAC & APROBĂRI",
-    items: [
-      { id: "sub_admins", label: "Sub-Admini", icon: Users, badge: "NEW" },
-      { id: "approvals", label: "Aprobări Admin", icon: ShieldCheck, badge: "NEW" },
-    ],
-  },
-  {
-    title: "STRATEGIE & R&D",
-    items: [
-      { id: "operating_manual", label: "Manual de Operare", icon: BookOpenCheck, badge: "START AICI", href: "/admin/operating-manual" },
-      { id: "ai_governance", label: "AI Governance Center", icon: Shield, badge: "NEW", href: "/admin/ai-governance" },
       { id: "architecture_board", label: "Architecture Review Board", icon: Compass, badge: "NEW", href: "/admin/architecture-board" },
-      { id: "ai_pm", label: "AI Product Manager", icon: Layers, badge: "NEW", href: "/admin/ai-pm" },
-      { id: "experience_tiers", label: "Experience Tiers", icon: GraduationCap, badge: "NEW", href: "/admin/experience-tiers" },
-      { id: "feature_configurator", label: "Feature Configurator", icon: Gamepad2, badge: "GAMIFY", href: "/admin/feature-configurator" },
-      { id: "specialist_progression", label: "Progresie Specialiști", icon: Trophy, badge: "SPRINT A", href: "/admin/specialist-progression" },
-      { id: "bi_moe", label: "Business Intelligence", icon: BarChart3, badge: "SPRINT F", href: "/admin/bi-moe" },
-      { id: "founder_gate", label: "Founder Approval Gate", icon: ShieldCheck, badge: "FG-0", href: "/admin/founder-gate" },
       { id: "bug_memory", label: "Bug Memory Aggregator", icon: Bug, badge: "NEW", href: "/admin/bug-memory" },
       { id: "future_ideas", label: "Idei Dezvoltare Viitoare", icon: Lightbulb, badge: "REVIEW", href: "/admin/future-ideas" },
+      { id: "feature_configurator", label: "Feature Configurator", icon: Gamepad2, badge: "GAMIFY", href: "/admin/feature-configurator" },
     ],
   },
   {
-    title: "TRAINING",
+    id: "analytics",
+    title: "Analytics",
+    icon: BarChart3,
     items: [
-      { id: "docs", label: "Documentație & Training", icon: FileText, badge: "NEW" },
-      { id: "qa_playbook", label: "QA Playbook", icon: ShieldCheck, badge: "NEW" },
+      { id: "bi_moe", label: "Business Intelligence", icon: BarChart3, badge: "SPRINT F", href: "/admin/bi-moe" },
+      { id: "abtests", label: "A/B Tests", icon: Sparkles },
+    ],
+  },
+  {
+    id: "it_hub",
+    title: "IT Collaborators Hub",
+    icon: Code2,
+    superAdminOnly: true,
+    items: [
+      { id: "it_team", label: "Echipa IT", icon: Users, badge: "NEW", href: "/admin/it-collaborators" },
+      { id: "it_copilot", label: "AI Performance Copilot", icon: Bot, badge: "AI", href: "/admin/it-collaborators/copilot" },
+      { id: "founder_gate", label: "Founder Approval Gate", icon: ShieldCheck, badge: "FG-0", href: "/admin/founder-gate" },
     ],
   },
 ];
@@ -182,6 +212,34 @@ export const useAdminTheme = () => {
   }, [theme]);
   return [theme, () => setTheme(t => t === "light" ? "dark" : "light")];
 };
+
+// ── Favorites & Recents (localStorage, per-browser) ─────────────────────────
+const FAV_KEY = "pm_admin_fav_items_v1";
+const RECENT_KEY = "pm_admin_recent_items_v1";
+
+export const getFavoriteItems = () => {
+  try { return JSON.parse(localStorage.getItem(FAV_KEY) || "[]"); } catch { return []; }
+};
+export const toggleFavoriteItem = (itemId) => {
+  const cur = getFavoriteItems();
+  const next = cur.includes(itemId) ? cur.filter(id => id !== itemId) : [...cur, itemId];
+  localStorage.setItem(FAV_KEY, JSON.stringify(next));
+  window.dispatchEvent(new CustomEvent("pm:favorites-changed"));
+  return next;
+};
+export const getRecentItems = () => {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch { return []; }
+};
+export const pushRecentItem = (itemId) => {
+  const cur = getRecentItems().filter(id => id !== itemId);
+  const next = [itemId, ...cur].slice(0, 8);
+  localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  window.dispatchEvent(new CustomEvent("pm:recents-changed"));
+  return next;
+};
+
+// Expose NAV_SECTIONS for the CommandPalette
+export { NAV_SECTIONS };
 
 const GlobalSearch = ({ theme }) => {
   const [q, setQ] = useState("");
@@ -253,7 +311,7 @@ const GlobalSearch = ({ theme }) => {
                   </div>
                 ))}
                 {!results.users.length && !results.requests.length && !results.projects.length && (
-                  <div className={`p-4 text-xs text-center ${dark ? "text-slate-500" : "text-slate-400"}`}>Niciun rezultat pentru "{q}"</div>
+                  <div className={`p-4 text-xs text-center ${dark ? "text-slate-500" : "text-slate-400"}`}>Niciun rezultat pentru „{q}”</div>
                 )}
               </>
             )}
@@ -483,13 +541,109 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
   const navigate = useNavigate();
   const [theme, toggleTheme] = useAdminTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const { scope: adminScope } = useAdminScope();
 
   const handleLogout = async () => { await logout(); navigate("/login"); };
   const dark = theme === "dark";
 
   // Filter nav sections based on current admin's scope (general sees all)
-  const visibleSections = filterNavSections(NAV_SECTIONS, adminScope);
+  let visibleSections = filterNavSections(NAV_SECTIONS, adminScope);
+  // Hide `superAdminOnly` sections for scoped sub-admins
+  const isSuperAdmin = !adminScope || (adminScope.admin_scope || "general").toLowerCase() === "general";
+  if (!isSuperAdmin) {
+    visibleSections = visibleSections.filter(s => !s.superAdminOnly);
+  }
+
+  // Collapsible-section state (persisted per browser)
+  const COLLAPSED_KEY = "pm_admin_nav_collapsed_v2";
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(COLLAPSED_KEY) || "{}"); } catch { return {}; }
+  });
+  const toggleSection = (sid) => {
+    setCollapsed(prev => {
+      const next = { ...prev, [sid]: !prev[sid] };
+      localStorage.setItem(COLLAPSED_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  // Favorites — recomputed on storage changes
+  const [favIds, setFavIds] = useState(() => getFavoriteItems());
+  useEffect(() => {
+    const onChange = () => setFavIds(getFavoriteItems());
+    window.addEventListener("pm:favorites-changed", onChange);
+    window.addEventListener("storage", onChange);
+    return () => {
+      window.removeEventListener("pm:favorites-changed", onChange);
+      window.removeEventListener("storage", onChange);
+    };
+  }, []);
+
+  // Flat item index across all visible sections (used by Favorites + Cmd-K)
+  const flatItems = visibleSections.flatMap(s => s.items.map(it => ({ ...it, _sectionId: s.id, _sectionTitle: s.title })));
+  const favItems = favIds.map(id => flatItems.find(it => it.id === id)).filter(Boolean);
+
+  // Global Ctrl/Cmd + K hotkey for the Command Palette
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen(p => !p);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const handleNavClick = (it) => {
+    pushRecentItem(it.id);
+    if (it.href) { navigate(it.href); setSidebarOpen(false); return; }
+    onChange(it.id); setSidebarOpen(false);
+  };
+
+  const renderItem = (it, sectionId) => {
+    const ActiveIcon = it.icon;
+    const isActive = active === it.id;
+    const isFav = favIds.includes(it.id);
+    return (
+      <div key={`${sectionId || "fav"}-${it.id}`} className="group/item relative">
+        <button
+          onClick={() => handleNavClick(it)}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+            isActive
+              ? "bg-blue-50 text-blue-600 font-medium dark:bg-blue-500/10 dark:text-blue-400"
+              : dark ? "text-slate-300 hover:bg-slate-800" : "text-slate-700 hover:bg-slate-50"
+          }`}
+          style={isActive ? { backgroundColor: dark ? "rgba(59,130,246,0.1)" : "#eff6ff", color: dark ? "#60a5fa" : "#2563eb" } : {}}
+          data-testid={`admin-nav-${it.id}`}
+          data-tour={
+            it.id === "ai" ? "admin-ai-health"
+            : it.id === "qa_playbook" ? "admin-qa-playbook"
+            : it.id === "overview" ? "admin-analytics"
+            : it.id === "cms" ? "admin-content-tools"
+            : undefined
+          }
+        >
+          <ActiveIcon className="w-4 h-4 shrink-0" />
+          <span className="truncate flex-1 text-left">{it.label}</span>
+          {it.badge && (
+            <span className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white">{it.badge}</span>
+          )}
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); toggleFavoriteItem(it.id); }}
+          className={`absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover/item:opacity-100 transition-opacity ${
+            isFav ? "opacity-100 text-amber-500" : dark ? "text-slate-500 hover:text-amber-400" : "text-slate-400 hover:text-amber-500"
+          }`}
+          title={isFav ? "Elimină din favorite" : "Adaugă la favorite"}
+          data-testid={`fav-toggle-${it.id}`}
+        >
+          <Star className={`w-3.5 h-3.5 ${isFav ? "fill-amber-500" : ""}`} />
+        </button>
+      </div>
+    );
+  };
 
   const sidebar = (
     <aside
@@ -507,49 +661,62 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
           <X className={dark ? "text-slate-400" : "text-slate-500"} />
         </button>
       </div>
+
+      {/* Cmd+K trigger inside sidebar */}
+      <div className="px-3 pt-3">
+        <button
+          onClick={() => setPaletteOpen(true)}
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs transition-colors ${
+            dark ? "bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-slate-800" : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+          }`}
+          data-testid="open-command-palette-sidebar"
+        >
+          <Command className="w-3.5 h-3.5" />
+          <span className="flex-1 text-left">Caută rapid…</span>
+          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${dark ? "bg-slate-700 text-slate-300" : "bg-white border border-slate-200 text-slate-500"}`}>⌘K</span>
+        </button>
+      </div>
+
       <nav className="flex-1 overflow-y-auto py-4 px-3">
-        {visibleSections.map((section) => (
-          <div key={section.title} className="mb-6">
-            <div className={`px-3 mb-2 text-[10px] font-bold uppercase tracking-wider ${dark ? "text-slate-500" : "text-slate-400"}`}>{section.title}</div>
+        {/* Favorites pseudo-section */}
+        {favItems.length > 0 && (
+          <div className="mb-6" data-testid="nav-section-favorites">
+            <div className={`flex items-center gap-1.5 px-3 mb-2 text-[10px] font-bold uppercase tracking-wider ${dark ? "text-amber-400" : "text-amber-600"}`}>
+              <Star className="w-3 h-3 fill-current" />
+              Favorite
+            </div>
             <div className="space-y-0.5">
-              {section.items.map((it) => {
-                const ActiveIcon = it.icon;
-                const isActive = active === it.id;
-                return (
-                  <button
-                    key={it.id}
-                    onClick={() => {
-                      if (it.href) { navigate(it.href); setSidebarOpen(false); return; }
-                      onChange(it.id); setSidebarOpen(false);
-                    }}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                      isActive
-                        ? "bg-blue-50 text-blue-600 font-medium dark:bg-blue-500/10 dark:text-blue-400"
-                        : dark
-                          ? "text-slate-300 hover:bg-slate-800"
-                          : "text-slate-700 hover:bg-slate-50"
-                    }`}
-                    style={isActive ? { backgroundColor: dark ? "rgba(59,130,246,0.1)" : "#eff6ff", color: dark ? "#60a5fa" : "#2563eb" } : {}}
-                    data-testid={`admin-nav-${it.id}`}
-                    data-tour={
-                      it.id === "ai" ? "admin-ai-health"
-                      : it.id === "qa_playbook" ? "admin-qa-playbook"
-                      : it.id === "overview" ? "admin-analytics"
-                      : it.id === "cms" ? "admin-content-tools"
-                      : undefined
-                    }
-                  >
-                    <ActiveIcon className="w-4 h-4 shrink-0" />
-                    <span className="truncate">{it.label}</span>
-                    {it.badge && (
-                      <span className="ml-auto text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white">{it.badge}</span>
-                    )}
-                  </button>
-                );
-              })}
+              {favItems.map((it) => renderItem(it, "fav"))}
             </div>
           </div>
-        ))}
+        )}
+
+        {/* Mega-menu collapsable sections */}
+        {visibleSections.map((section) => {
+          const SectionIcon = section.icon || LayoutDashboard;
+          const isCollapsed = !!collapsed[section.id];
+          return (
+            <div key={section.id} className="mb-3" data-testid={`nav-section-${section.id}`}>
+              <button
+                onClick={() => toggleSection(section.id)}
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-colors ${
+                  dark ? "text-slate-400 hover:bg-slate-800/50" : "text-slate-500 hover:bg-slate-100/70"
+                }`}
+                data-testid={`nav-section-toggle-${section.id}`}
+              >
+                <SectionIcon className="w-3.5 h-3.5" />
+                <span className="flex-1 text-left">{section.title}</span>
+                <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${dark ? "bg-slate-800 text-slate-400" : "bg-slate-100 text-slate-500"}`}>{section.items.length}</span>
+                {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+              {!isCollapsed && (
+                <div className="space-y-0.5 mt-1">
+                  {section.items.map((it) => renderItem(it, section.id))}
+                </div>
+              )}
+            </div>
+          );
+        })}
         <LiveActivityRail theme={theme} />
       </nav>
       <div className={`p-4 border-t flex items-center gap-3 ${dark ? "border-slate-800" : "border-slate-200"}`}>
@@ -577,6 +744,17 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
             <Menu className={dark ? "text-slate-300" : "text-slate-700"} />
           </button>
           <GlobalSearch theme={theme} />
+          <button
+            onClick={() => setPaletteOpen(true)}
+            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              dark ? "bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200"
+            }`}
+            data-testid="open-command-palette-topbar"
+            title="Command Palette (Ctrl/Cmd + K)"
+          >
+            <Command className="w-3.5 h-3.5" />
+            <span>⌘K</span>
+          </button>
           <HealthScoreBadge dark={dark} />
           <AutonomyTierBadge dark={dark} />
           <ScopeBadgeTop scope={adminScope} />
@@ -604,6 +782,14 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
       <AIAdminTour />
       <AdminTourV2Wrapper />
       <PreviewAuditButton scope={getPreviewScope()} />
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        sections={visibleSections}
+        favIds={favIds}
+        onNavigate={(it) => { setPaletteOpen(false); handleNavClick(it); }}
+        onToggleFavorite={(id) => toggleFavoriteItem(id)}
+      />
     </div>
   );
 };

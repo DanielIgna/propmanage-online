@@ -123,6 +123,7 @@ from routes.tier_milestones import router as tier_milestones_router, cron_check_
 from routes.sub_admins import router as sub_admins_router
 from routes.admin_approvals import router as admin_approvals_router
 from routes.kyc import router as kyc_router
+from routes.it_collaborators import router as it_collaborators_router
 from middleware_scope import admin_scope_middleware
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
@@ -251,6 +252,7 @@ for r in (
     sub_admins_router,
     admin_approvals_router,
     kyc_router,
+    it_collaborators_router,
 ):
     app.include_router(r)
 
