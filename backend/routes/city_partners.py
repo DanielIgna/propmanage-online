@@ -559,3 +559,93 @@ async def partner_my_stats(user=Depends(get_current_user)):
         "revenue_generated": revenue,
         "conversion_rate": conv_rate,
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AI City Partner Copilot — personalized weekly nudges (Claude Sonnet 4.5)
+# ─────────────────────────────────────────────────────────────────────────────
+@partner_router.post("/copilot/nudges")
+async def partner_copilot_nudges(user=Depends(get_current_user)):
+    """Generates 3 personalized action nudges for the logged-in partner.
+
+    Response: {nudges: [{title, body, priority}], generated_at}
+    """
+    p = await _require_partner(user)
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    if not key:
+        raise HTTPException(503, "EMERGENT_LLM_KEY missing.")
+
+    # Build context: partner profile + lead breakdown
+    by_stage = {}
+    for st in ALLOWED_LEAD_STAGES:
+        by_stage[st] = await db.city_partner_leads.count_documents({"partner_id": p["_id"], "stage": st})
+    recent_leads = []
+    async for d in db.city_partner_leads.find({"partner_id": p["_id"]}).sort("created_at", -1).limit(8):
+        recent_leads.append({
+            "name": d.get("lead_name"),
+            "stage": d.get("stage"),
+            "introduced_at": d.get("introduced_at"),
+            "source": d.get("source"),
+        })
+
+    import json, uuid as _uuid
+    context = {
+        "partner": {
+            "company": p.get("company"),
+            "city": p.get("city"),
+            "status": p.get("status"),
+            "onboarding_step": p.get("onboarding_step", 0),
+            "units_managed": p.get("units_managed"),
+            "portfolio_type": p.get("portfolio_type"),
+        },
+        "leads_by_stage": by_stage,
+        "recent_leads": recent_leads,
+    }
+
+    system = (
+        "Ești un Growth Coach pentru parteneri locali ai PropManage. "
+        "Primești date despre un partener (administrator imobile / dezvoltator) și generezi "
+        "EXACT 3 nudge-uri practice și personalizate pentru SĂPTĂMÂNA aceasta. "
+        "Stil: concis, prietenos, în română, fără jargon. Răspunzi DOAR cu JSON valid: "
+        "{nudges: [{title (max 60 char), body (max 240 char, mentionează nume concrete dacă există), priority('high'|'medium'|'low')}]}. "
+        "Folosește numele clienților concreți din `recent_leads` când e relevant. "
+        "Dacă datele sunt sărace, propune acțiuni de explorare (ex: aducere primul lead)."
+    )
+
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=key,
+            session_id=f"city_partner_copilot_{_uuid.uuid4().hex[:8]}",
+            system_message=system,
+        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+        raw = await chat.send_message(UserMessage(text=json.dumps(context, ensure_ascii=False)))
+        text = (raw or "").strip()
+        if text.startswith("```"):
+            text = "\n".join(line for line in text.splitlines() if not line.startswith("```"))
+        i, j = text.find("{"), text.rfind("}")
+        if i == -1 or j <= i:
+            raise HTTPException(502, "AI nu a returnat JSON valid.")
+        payload = json.loads(text[i:j + 1])
+        nudges = []
+        for n in (payload.get("nudges") or [])[:3]:
+            nudges.append({
+                "title": str(n.get("title") or "")[:80],
+                "body": str(n.get("body") or "")[:300],
+                "priority": (n.get("priority") or "medium").lower(),
+            })
+        out = {
+            "nudges": nudges,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        # Persist last run for caching / audit
+        await db.city_partner_nudges.insert_one({
+            "partner_id": p["_id"],
+            **out,
+        })
+        return out
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        logger.exception(f"[city_partner_copilot] failed: {e}")
+        raise HTTPException(500, f"Eroare AI: {str(e)[:200]}")

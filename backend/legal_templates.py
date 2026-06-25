@@ -13,6 +13,7 @@ LEGAL_DOC_TYPES = [
     "infra_access",
     "regulation",
     "city_partner",
+    "marketplace_partner",
 ]
 
 DEFAULT_VERSION = "1.0"
@@ -333,6 +334,109 @@ Acordul este guvernat de legislația română și europeană aplicabilă.
 Prin acceptarea acestui acord, Partenerul confirmă că a citit, înțeles și acceptat limitarea expresă a colaborării la **etapa V1** descrisă mai sus.
 """,
     },
+    "marketplace_partner": {
+        "title": "Acord Marketplace Partner",
+        "summary": "Cadru de colaborare comercială între PropManage (platformă de intermediere) și partener Marketplace (magazin / depozit / fabrică / distribuitor / producător).",
+        "body": """# Acord Marketplace Partner
+
+**Între:** PropManage (denumită „Platforma") și Partenerul Marketplace semnatar.
+
+## 1. Natura colaborării
+Părțile încheie o colaborare comercială pentru promovarea produselor și serviciilor Partenerului în ecosistemul digital PropManage.
+
+**Platforma NU comercializează direct produsele.** Platforma funcționează ca:
+- generator de lead-uri;
+- ecosistem de recomandare;
+- canal de promovare;
+- marketplace de conectare;
+- platformă de colaborare comercială.
+
+Clientul final este direcționat către Partener pentru achiziție.
+
+## 2. ✋ Limitare expresă
+Colaborarea este **non-exclusivă**. Partenerul rămâne **independent juridic și operațional**. Nu există asociere, parteneriat societar sau drept asupra companiei.
+
+## 3. Categorii acceptate
+Magazine materiale construcții, depozite, fabrici, distribuitori, producători, showroom-uri, furnizori servicii — gresie/faianță, uși, sanitare, mobilier, vopsele, instalații, HVAC, smart home, tâmplărie, acoperișuri, electrocasnice, fotovoltaice, pompe căldură, sisteme securitate etc.
+
+## 4. Nivel partener
+Partenerul poate fi încadrat în unul dintre nivelurile:
+- **Basic Partner** — profil simplu;
+- **Verified Partner** — profil verificat;
+- **Premium Partner** — promovare extinsă;
+- **Strategic Partner** — campanii comune;
+- **Exclusive Partner** — partener unic per categorie/zonă.
+
+## 5. Politici comerciale
+Pentru fiecare partener se pot configura:
+- discount exclusiv pentru clienții Platformei;
+- discount special pentru specialiști;
+- promoții dedicate;
+- campanii sezoniere;
+- cupoane și bonusuri.
+
+## 6. Sistem de comisioane
+Comisionarea se poate face prin:
+- comision procentual;
+- comision fix;
+- comision per lead;
+- comision per vânzare;
+- abonament lunar;
+- taxă onboarding;
+- taxă promovare;
+- taxă administrare colaborare.
+
+Termenii exacti se stabilesc per partener prin act adițional sau pachet activat.
+
+## 7. Pachete de activare
+- **Starter** — activare basic;
+- **Business** — abonament + reduceri promovare;
+- **Premium** — vizibilitate sporită + campanii comune;
+- **Enterprise** — exclusivitate teritorială + suport dedicat.
+
+## 8. Beneficii Partener
+- profil dedicat în marketplace;
+- promovare în Platformă și campanii marketing;
+- acces la lead-uri verificate;
+- acces la statistici;
+- participare în campanii comune;
+- promovare pe rețelele sociale ale Platformei;
+- branding comun (când este cazul).
+
+## 9. Lead Engine
+Pentru fiecare lead generat se înregistrează: sursă, client, partener recomandat, dată, status, valoare estimată, conversie, venit generat.
+
+## 10. Marketing comun
+Campanii comune, bannere dedicate, promovare social media, newslettere, evenimente locale, webinarii, lansări de produse — toate prin acord scris prealabil.
+
+## 11. Principii comerciale
+Platforma:
+- conectează;
+- recomandă;
+- generează oportunități;
+- facilitează colaborarea;
+- urmărește performanța;
+- monetizează serviciul de intermediere și promovare.
+
+## 12. Reguli etice
+- bună credință;
+- transparență în facturare și preț;
+- nediscriminare între clienți;
+- protejarea datelor și confidențialitate;
+- respectarea concurenței loiale.
+
+## 13. GDPR
+Procesarea datelor clienților se face conform Regulamentului (UE) 2016/679 și politicilor Platformei.
+
+## 14. Încetare
+Preaviz de 30 zile pentru oricare parte. Comisioanele câștigate până la încetare se păstrează.
+
+## 15. Legea aplicabilă
+Acordul este guvernat de legislația română și europeană aplicabilă.
+
+Prin acceptarea acestui acord, Partenerul confirmă cunoașterea modelului de intermediere descris și acceptă termenii comerciali ai pachetului activat.
+""",
+    },
 }
 
 
@@ -351,6 +455,6 @@ def list_default_templates() -> list:
             "active": True,
             # audience: which user-type must sign this doc.
             # IT docs -> "it_collaborator"; partner contract -> "city_partner".
-            "audience": "city_partner" if t == "city_partner" else "it_collaborator",
+            "audience": "city_partner" if t == "city_partner" else ("marketplace_partner" if t == "marketplace_partner" else "it_collaborator"),
         })
     return out

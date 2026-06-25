@@ -199,6 +199,7 @@ const NAV_SECTIONS = [
     superAdminOnly: true,
     items: [
       { id: "city_partners_list", label: "City Partners", icon: Building2, badge: "NEW V1", href: "/admin/city-partners" },
+      { id: "marketplace_partners_list", label: "Marketplace Partners", icon: Award, badge: "AI", href: "/admin/marketplace-partners" },
     ],
   },
   {

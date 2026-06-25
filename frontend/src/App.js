@@ -84,6 +84,7 @@ import LegalSignPage from "./pages/LegalSignPage";
 import LegalGate from "./components/LegalGate";
 import CityPartnersPage from "./pages/admin/CityPartnersPage";
 import CityPartnerDetailPage from "./pages/admin/CityPartnerDetailPage";
+import MarketplacePartnersPage from "./pages/admin/MarketplacePartnersPage";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import ContractPage from "./pages/ContractPage";
 import { trackPageView } from "@/lib/analytics";
@@ -1651,6 +1652,7 @@ function App() {
               <Route path="/admin/legal-audit" element={<LegalAuditPage />} />
               <Route path="/admin/city-partners" element={<CityPartnersPage />} />
               <Route path="/admin/city-partners/:id" element={<CityPartnerDetailPage />} />
+              <Route path="/admin/marketplace-partners" element={<MarketplacePartnersPage />} />
               <Route path="/partner/dashboard" element={<PartnerDashboard />} />
               <Route path="/legal/sign" element={<LegalSignPage />} />
               <Route path="/contracts/:id" element={<ContractPage />} />

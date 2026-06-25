@@ -5,7 +5,7 @@ import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Building2, Users, TrendingUp, Plus, LogOut, Loader2, MapPin,
-  CheckCircle2, Circle, Save, X, AlertTriangle, Activity, Mail,
+  CheckCircle2, Circle, Save, X, AlertTriangle, Activity, Mail, Bot, Sparkles, Zap,
 } from "lucide-react";
 import { useAuth } from "../../auth";
 
@@ -96,6 +96,18 @@ const PartnerDashboard = () => {
 
   const doLogout = async () => { await logout(); navigate("/login"); };
 
+  // ── AI City Partner Copilot ──
+  const [nudges, setNudges] = useState(null);
+  const [nudgesBusy, setNudgesBusy] = useState(false);
+  const runNudges = async () => {
+    setNudgesBusy(true);
+    try {
+      const { data } = await ax.post("/api/partner/copilot/nudges");
+      setNudges(data.nudges || []);
+    } catch (e) { alert(e.response?.data?.detail || e.message); }
+    finally { setNudgesBusy(false); }
+  };
+
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>;
   if (error) return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8 gap-4">
@@ -131,6 +143,44 @@ const PartnerDashboard = () => {
 
       <div className="max-w-6xl mx-auto p-4 lg:p-8">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Bună, {me?.user?.name?.split(" ")[0] || "Partener"}!</h2>
+
+        {/* AI Copilot Nudges */}
+        <div className="mb-6 bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-cyan-500/10 dark:to-blue-500/10 rounded-2xl p-5 border border-cyan-200 dark:border-cyan-500/30" data-testid="copilot-nudges-card">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <Bot className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+              <h3 className="font-bold text-slate-900 dark:text-white">AI City Partner Copilot</h3>
+              <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-cyan-200 dark:bg-cyan-500/30 text-cyan-800 dark:text-cyan-200">Claude</span>
+            </div>
+            <button onClick={runNudges} disabled={nudgesBusy} className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-medium flex items-center gap-1.5 disabled:opacity-60" data-testid="run-nudges">
+              {nudgesBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+              {nudgesBusy ? "Se generează…" : nudges ? "Re-rulează" : "3 acțiuni săptămâna asta"}
+            </button>
+          </div>
+          {!nudges && !nudgesBusy && (
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Apasă butonul ca să primești 3 nudge-uri personalizate (bazate pe lead-urile tale curente).
+            </p>
+          )}
+          {nudges && nudges.length === 0 && <p className="text-sm text-slate-500">Niciun nudge generat.</p>}
+          {nudges && nudges.length > 0 && (
+            <div className="space-y-2.5">
+              {nudges.map((n, i) => (
+                <div key={i} className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-cyan-100 dark:border-cyan-500/20" data-testid={`nudge-${i}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="font-semibold text-sm text-slate-900 dark:text-white flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-cyan-500" />{n.title}</h4>
+                    <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                      n.priority === "high" ? "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"
+                      : n.priority === "low" ? "bg-slate-100 text-slate-600 dark:bg-slate-700/40 dark:text-slate-300"
+                      : "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+                    }`}>{n.priority}</span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-300">{n.body}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">

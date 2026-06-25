@@ -219,8 +219,8 @@ async def my_legal_status(user=Depends(get_current_user)):
 
     For city_partner users, IT documents are NOT mandatory — see /api/partner/legal/status.
     """
-    if user.get("role") == "city_partner":
-        # City partners have their own contract flow — return compliant=true for IT gate
+    if user.get("role") == "city_partner" or user.get("role") == "marketplace_partner":
+        # City / Marketplace partners have their own contract flow — IT gate skipped
         return {
             "is_strategic_contributor": False,
             "compliant": True,
