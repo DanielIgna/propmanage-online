@@ -222,6 +222,7 @@ const NAV_SECTIONS = [
     superAdminOnly: true,
     items: [
       { id: "marketing_department", label: "AI Marketing Department", icon: Megaphone, badge: "NEW · AI", href: "/admin/marketing" },
+      { id: "marketing_campaigns", label: "Campanii (Auto-Trigger)", icon: Zap, badge: "AI+IMG", href: "/admin/marketing?tab=campaigns" },
       { id: "marketing_insights", label: "Business Intelligence", icon: Brain, badge: "AI", href: "/admin/marketing?tab=insights" },
       { id: "marketing_copilot", label: "Marketing Copilot", icon: Bot, badge: "CHAT", href: "/admin/marketing?tab=copilot" },
       { id: "marketing_future", label: "Idei viitoare (Faza 2-3)", icon: Rocket, badge: "ROADMAP", href: "/admin/marketing?tab=future" },

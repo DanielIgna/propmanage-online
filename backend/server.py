@@ -130,6 +130,7 @@ from routes.city_partners import admin_router as city_partners_admin_router, par
 from routes.marketplace_partners import admin_router as marketplace_admin_router, partner_router as marketplace_portal_router
 from routes.strategic_partners import router as strategic_partners_router
 from routes.marketing_growth import router as marketing_growth_router
+from routes.marketing_campaigns import router as marketing_campaigns_router
 from middleware_scope import admin_scope_middleware
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
@@ -268,6 +269,7 @@ for r in (
     marketplace_portal_router,
     strategic_partners_router,
     marketing_growth_router,
+    marketing_campaigns_router,
 ):
     app.include_router(r)
 
