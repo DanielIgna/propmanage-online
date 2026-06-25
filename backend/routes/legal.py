@@ -38,11 +38,17 @@ ALLOWED_STATUSES = {"pending", "accepted", "expired", "revoked"}
 # Seeder
 # ─────────────────────────────────────────────────────────────────────────────
 async def seed_default_legal_documents() -> dict:
-    """Idempotent: insert any missing default templates."""
+    """Idempotent: insert any missing default templates and backfill `audience`."""
     inserted = 0
     for tpl in list_default_templates():
         existing = await db.legal_documents.find_one({"type": tpl["type"], "version": tpl["version"]})
         if existing:
+            # Backfill audience on existing legacy rows
+            if "audience" not in existing:
+                await db.legal_documents.update_one(
+                    {"_id": existing["_id"]},
+                    {"$set": {"audience": tpl["audience"]}},
+                )
             continue
         doc = {
             **tpl,
@@ -99,8 +105,20 @@ def _contract_out(c: dict, doc: dict | None = None) -> dict:
     return out
 
 
-async def _active_mandatory_documents() -> list:
-    cur = db.legal_documents.find({"mandatory": True, "active": True})
+async def _active_mandatory_documents(audience: str = "it_collaborator") -> list:
+    """Returns active mandatory docs scoped to the given audience.
+
+    Documents without an explicit `audience` are treated as `it_collaborator`
+    for backwards compatibility.
+    """
+    cur = db.legal_documents.find({
+        "mandatory": True,
+        "active": True,
+        "$or": [
+            {"audience": audience},
+            {"audience": {"$exists": False}} if audience == "it_collaborator" else {"audience": "__never__"},
+        ],
+    })
     return [d async for d in cur]
 
 
@@ -197,18 +215,20 @@ async def accept_document(payload: AcceptPayload, request: Request, user=Depends
 
 @router.get("/me/status")
 async def my_legal_status(user=Depends(get_current_user)):
-    """Returns the current user's compliance status.
+    """Returns the current user's compliance status for IT documents.
 
-    Response:
-      {
-        "is_strategic_contributor": bool,
-        "compliant": bool,
-        "required": [doc_type],
-        "signed": [{document_type, document_version, accepted_at, ...}],
-        "pending": [{type, title, summary, document_id}],
-        "expired": [...]
-      }
+    For city_partner users, IT documents are NOT mandatory — see /api/partner/legal/status.
     """
+    if user.get("role") == "city_partner":
+        # City partners have their own contract flow — return compliant=true for IT gate
+        return {
+            "is_strategic_contributor": False,
+            "compliant": True,
+            "required": [],
+            "signed": [],
+            "pending": [],
+            "expired": [],
+        }
     is_strategic = await _is_strategic_contributor(user)
     docs = await _active_mandatory_documents()
     user_email = (user.get("email") or "").lower()
@@ -258,6 +278,39 @@ async def my_legal_status(user=Depends(get_current_user)):
         "signed": signed,
         "pending": pending,
         "expired": expired,
+    }
+
+
+@router.get("/partner/status")
+async def partner_legal_status(user=Depends(get_current_user)):
+    """Returns the city_partner user's compliance status for the partner contract."""
+    if user.get("role") != "city_partner":
+        return {"applicable": False, "compliant": True, "pending": [], "signed": []}
+    docs = await _active_mandatory_documents(audience="city_partner")
+    user_email = (user.get("email") or "").lower()
+    signed_map = {}
+    cur = db.collaborator_contracts.find({"user_email": user_email, "status": "accepted"})
+    async for c in cur:
+        signed_map[c["document_type"]] = c
+    pending = []
+    signed = []
+    for d in docs:
+        c = signed_map.get(d["type"])
+        if not c or c.get("document_version") != d.get("version"):
+            pending.append({
+                "document_id": str(d["_id"]),
+                "type": d["type"],
+                "title": d["title"],
+                "summary": d.get("summary"),
+                "version": d.get("version"),
+            })
+        else:
+            signed.append(_contract_out(c, d))
+    return {
+        "applicable": True,
+        "compliant": not pending,
+        "pending": pending,
+        "signed": signed,
     }
 
 

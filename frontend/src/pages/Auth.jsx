@@ -48,14 +48,16 @@ export const LoginPage = () => {
   const _isSafeNext = (p) => typeof p === "string" && p.startsWith("/") && !p.startsWith("//");
   const safeNext = _isSafeNext(nextPath) ? nextPath : null;
 
-  if (user && user !== false) return <Navigate to={safeNext || `/${user.role}`} replace />;
+  const roleHome = (role) => role === "city_partner" ? "/partner/dashboard" : `/${role}`;
+
+  if (user && user !== false) return <Navigate to={safeNext || roleHome(user.role)} replace />;
 
   const submit = async (e) => {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
       const u = await login(email, password, totpCode || undefined);
-      navigate(safeNext || `/${u.role}`);
+      navigate(safeNext || roleHome(u.role));
     } catch (err) {
       const status = err?.response?.status;
       const detail = err?.response?.data?.detail;

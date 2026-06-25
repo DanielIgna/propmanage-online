@@ -12,6 +12,7 @@ LEGAL_DOC_TYPES = [
     "security_policy",
     "infra_access",
     "regulation",
+    "city_partner",
 ]
 
 DEFAULT_VERSION = "1.0"
@@ -247,6 +248,91 @@ Pozițiile pot fi retrase oricând, cu preaviz de 14 zile, în baza:
 Programul respectă legislația română și europeană, inclusiv GDPR.
 """,
     },
+    "city_partner": {
+        "title": "Acord Strategic City Partner",
+        "summary": "Acord-cadru cu partener local (administrator imobile / dezvoltator / companie locală) — etapa V1: aducere clienți. Funcționalități viitoare doar prin acte adiționale.",
+        "body": """# Acord Strategic City Partner
+
+**Între:** PropManage (denumită „Platforma") și Partenerul Local semnatar (denumit „Partener").
+
+## 1. Scop și etapă inițială
+Părțile lansează o colaborare strategică pentru dezvoltarea ecosistemului local. **Etapa V1 a colaborării actuale se limitează la următoarele:**
+- accesul Partenerului la rețeaua sa proprie de administratori/clienți pentru promovarea Platformei;
+- onboarding-ul clienților aduși de Partener în ecosistemul PropManage;
+- lansarea serviciului **Digital Twin** ca punct de intrare comun pe piață.
+
+> *„Orice funcționalități sau modele de business viitoare (marketplace, comisioane complexe, specialiști, servicii noi) NU fac parte din colaborarea actuală și pot fi adăugate exclusiv prin acte adiționale negociate separat."*
+
+## 2. ✋ Limitare expresă de proprietate
+**Colaborarea este NON-EXCLUSIVĂ.** Partenerul rămâne **independent juridic și operațional** și NU devine asociat, acționar, coproprietar sau părtaș la profitul companiei.
+
+## 3. Ce oferă Platforma
+- infrastructură digitală + tehnologia PropManage;
+- onboarding-ul administratorilor / clienților aduși;
+- suport tehnic și operațional;
+- marketing și branding comun (când e cazul);
+- dezvoltarea continuă a serviciilor;
+- acces la ecosistem.
+
+## 4. Ce oferă Partenerul
+- acces la rețeaua proprie de administratori și clienți;
+- promovare locală a Platformei (online + offline, în limitele bunei credințe);
+- introducerea Platformei în grupurile și comunitățile proprii;
+- facilitarea relației cu administratorii de imobile;
+- feedback de piață constant.
+
+## 5. Lead management
+Pentru fiecare client adus de Partener, Platforma înregistrează în mod transparent:
+- sursa și data introducerii;
+- partenerul care a făcut introducerea;
+- stadiul onboarding-ului;
+- conversia;
+- venitul generat (după activare).
+
+## 6. Reguli etice
+Părțile convin:
+- să acționeze cu bună credință;
+- să nu utilizeze informațiile primite pentru concurență directă neloială;
+- să dezvolte împreună piața locală;
+- să analizeze oportunități comune de monetizare;
+- să protejeze datele și confidențialitatea clienților, conform GDPR.
+
+## 7. Limitare teritorială (opțională)
+Partenerului i se poate acorda o **protecție parțială la nivel de oraș**, condiționată de:
+- statusul activ al colaborării;
+- îndeplinirea obiectivelor minime stabilite;
+- respectarea obligațiilor contractuale;
+- contribuția efectivă la dezvoltarea ecosistemului.
+
+În caz contrar, protecția teritorială încetează automat.
+
+## 8. Onboarding (flux standard)
+1. prezentare oficială;
+2. introducere în ecosistem;
+3. prezentare pe grupurile disponibile;
+4. invitație către administratori;
+5. creare conturi platformă;
+6. urmărire social media;
+7. activare campanii locale.
+
+## 9. Plan strategic primele 3 luni
+- **Faza 1**: Lansare Digital Twin (prezentare + testare piață);
+- **Faza 2**: Integrare specialiști verificați (firme/PFA/echipe locale) — *prin act adițional*;
+- **Faza 3**: Analiză piață (Digital Twin, mentenanță, amenajări, audituri, servicii tehnice);
+- **Faza 4**: Marketplace + sisteme de comisionare — *prin act adițional*.
+
+## 10. Confidențialitate și GDPR
+Părțile se obligă reciproc la confidențialitate. Datele personale ale clienților se prelucrează conform GDPR și politicilor de confidențialitate ale Platformei.
+
+## 11. Încetare
+Oricare parte poate înceta colaborarea cu preaviz de **30 zile**. Drepturile câștigate până la încetare se păstrează.
+
+## 12. Legea aplicabilă
+Acordul este guvernat de legislația română și europeană aplicabilă.
+
+Prin acceptarea acestui acord, Partenerul confirmă că a citit, înțeles și acceptat limitarea expresă a colaborării la **etapa V1** descrisă mai sus.
+""",
+    },
 }
 
 
@@ -263,5 +349,8 @@ def list_default_templates() -> list:
             "body": tpl["body"],
             "mandatory": True,
             "active": True,
+            # audience: which user-type must sign this doc.
+            # IT docs -> "it_collaborator"; partner contract -> "city_partner".
+            "audience": "city_partner" if t == "city_partner" else "it_collaborator",
         })
     return out

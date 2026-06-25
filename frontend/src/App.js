@@ -82,6 +82,9 @@ import ITCopilotPage from "./pages/admin/ITCopilotPage";
 import LegalAuditPage from "./pages/admin/LegalAuditPage";
 import LegalSignPage from "./pages/LegalSignPage";
 import LegalGate from "./components/LegalGate";
+import CityPartnersPage from "./pages/admin/CityPartnersPage";
+import CityPartnerDetailPage from "./pages/admin/CityPartnerDetailPage";
+import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import ContractPage from "./pages/ContractPage";
 import { trackPageView } from "@/lib/analytics";
 import { useDynamicSEO } from "@/lib/useDynamicSEO";
@@ -1646,6 +1649,9 @@ function App() {
               <Route path="/admin/it-collaborators" element={<ITCollaboratorsHubPage />} />
               <Route path="/admin/it-collaborators/copilot" element={<ITCopilotPage />} />
               <Route path="/admin/legal-audit" element={<LegalAuditPage />} />
+              <Route path="/admin/city-partners" element={<CityPartnersPage />} />
+              <Route path="/admin/city-partners/:id" element={<CityPartnerDetailPage />} />
+              <Route path="/partner/dashboard" element={<PartnerDashboard />} />
               <Route path="/legal/sign" element={<LegalSignPage />} />
               <Route path="/contracts/:id" element={<ContractPage />} />
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />

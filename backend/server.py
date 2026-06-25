@@ -126,6 +126,7 @@ from routes.kyc import router as kyc_router
 from routes.it_collaborators import router as it_collaborators_router
 from routes.it_digest import router as it_digest_router, run_weekly_it_sprint_digest, _get_settings as _it_digest_get_settings
 from routes.legal import router as legal_router, admin_router as legal_admin_router, seed_default_legal_documents
+from routes.city_partners import admin_router as city_partners_admin_router, partner_router as city_partners_portal_router
 from middleware_scope import admin_scope_middleware
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
@@ -258,6 +259,8 @@ for r in (
     it_digest_router,
     legal_router,
     legal_admin_router,
+    city_partners_admin_router,
+    city_partners_portal_router,
 ):
     app.include_router(r)
 

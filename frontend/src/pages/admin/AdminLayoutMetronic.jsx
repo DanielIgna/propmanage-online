@@ -193,6 +193,15 @@ const NAV_SECTIONS = [
     ],
   },
   {
+    id: "city_partners",
+    title: "Parteneri Strategici",
+    icon: Building2,
+    superAdminOnly: true,
+    items: [
+      { id: "city_partners_list", label: "City Partners", icon: Building2, badge: "NEW V1", href: "/admin/city-partners" },
+    ],
+  },
+  {
     id: "it_hub",
     title: "IT Collaborators Hub",
     icon: Code2,
