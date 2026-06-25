@@ -7,7 +7,7 @@ import {
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
   LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, ChevronRight, Sparkles, Bot, Zap, Inbox,
   UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb, Bug, Compass, Layers, BookOpenCheck, GraduationCap, Gamepad2, Trophy, BarChart3, Eye, Heart,
-  Star, Clock, Command, Network, Megaphone, Brain, Rocket, Activity
+  Star, Clock, Command, Network, Megaphone, Brain, Rocket, Activity, KeyRound
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { API } from "../DashShared";
@@ -213,6 +213,7 @@ const NAV_SECTIONS = [
       { id: "it_copilot", label: "AI Performance Copilot", icon: Bot, badge: "AI", href: "/admin/it-collaborators/copilot" },
       { id: "it_legal", label: "Audit Juridic IT", icon: ShieldCheck, badge: "LEGAL", href: "/admin/legal-audit" },
       { id: "founder_gate", label: "Founder Approval Gate", icon: ShieldCheck, badge: "FG-0", href: "/admin/founder-gate" },
+      { id: "demo_accounts", label: "Demo Accounts Manager", icon: KeyRound, badge: "0108", href: "/admin/demo-accounts" },
     ],
   },
   {
