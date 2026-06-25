@@ -4,6 +4,38 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 
+## 🚀 AI Marketing & Growth Department V1 — Phase 1 Core AI Brain (Feb 26, 2026, Part 2)
+
+**Scop**: departament intern de marketing, BI și growth, 24/7, alimentat de Claude Sonnet 4.5 pe datele reale ale platformei. User a ales **doar Faza 1**; Fazele 2 (Content & Automation) și 3 (External Integrations: Meta/Google Ads, Social) sunt expuse într-un tab „Idei viitoare" în pagină.
+
+**Backend** (`/app/backend/routes/marketing_growth.py`, ~700 linii, RBAC: `super_admin` sau `role=marketing_manager` sau `admin_scope=ai`):
+- `GET /api/admin/marketing/dashboard` — KPI executive: users (total/new_30d/active/inactive/retention/churn) + clients (total/new/recurring/AOV/LTV) + specialists (total/active/occupancy capped 100%/avg_revenue/accept_rate) + financial (total/monthly/MoM growth/profit_est/taxes/by_category/by_county/daily_30d) + marketplace (most_ordered/funnel/conversion/abandonment/completion).
+- `POST /api/admin/marketing/insights` — Claude analizează snapshot agregat (demand 30d vs prev, geo, specialists per category, abandonment) → 6-10 insights cu `{title, body ≤250c, severity, category, metric}`. Persistat în `marketing_insights`.
+- `GET /api/admin/marketing/insights/recent`
+- `POST /api/admin/marketing/recommendations` — Claude → `{marketing: [{action, audience, budget_ron, expected_impact, priority}], business: [{action, why, priority}]}`. Persistat în `marketing_recommendations`.
+- `POST /api/admin/marketing/copilot {session_id?, message}` — chat conversațional pe datele reale (sistem prompt cu snapshot agregat). Persistă sesiunile în `marketing_chat_sessions`.
+- `GET /api/admin/marketing/copilot/history?session_id=X`
+- `GET /api/admin/marketing/segments` — 5 bucket-uri RFM (VIP/Premium/Active30d/AtRisk/Inactive) cu count + acțiune recomandată.
+- `GET /api/admin/marketing/forecast` — linear regression pe ultimele 60 zile → 30-day forecast + trend (up/down/flat) + slope.
+- `GET /api/admin/marketing/growth` — underserved counties (demand/specialist ratio) + high-growth categories (≥20% growth) + new markets (0 specialiști).
+- `GET /api/admin/marketing/future-ideas` — backlog Faza 2 (Social AI Studio, Content Calendar, Campaign Generator, Automation Center, SEO Engine) + Faza 3 (Meta Ads API, Google Ads/Analytics, Social Connectors, Brand Monitoring) + Faza 4 (Multi-tenant, Microservices, AI Image Studio cu Gemini Nano Banana).
+
+**Frontend** (`/app/frontend/src/pages/admin/MarketingDepartmentPage.jsx`, ~520 linii):
+- Route `/admin/marketing` cu query param `?tab=X` pentru deep-linking.
+- 8 tab-uri: Dashboard | AI Insights | Recomandări | Segmente | Predictive | Growth | Copilot AI | Idei viitoare.
+- Dashboard: 4 secțiuni KPI (Users/Clients/Specialists/Financial) cu badge growth ↑/↓ + Marketplace funnel + top categorii/județe.
+- Insights/Recomandări: buton „Generează cu AI" → Claude roundtrip cu spinner.
+- Copilot: chat UI cu suggestion chips, mesaje user vs assistant, gradient violet→fuchsia.
+- Predictive: bar chart CSS pur cu 30-day forecast (no chart lib needed).
+- Future Ideas: 3 phase blocks cu priority badges P1/P2/P3 + effort_days + flags pentru chei API necesare.
+
+**Sidebar admin** (AdminLayoutMetronic.jsx L218): secțiune nouă „Marketing & Growth" (super_admin only) cu 4 sub-link-uri: AI Marketing Department, Business Intelligence, Marketing Copilot, Idei viitoare (Faza 2-3) — fiecare folosește deep-link cu `?tab=`.
+
+**Tests**: `iteration_73.json` → backend 16/16 pytest PASS (inclusiv 3 AI roundtrip reale Claude Sonnet 4.5 8-15s fiecare), frontend 100% smoke (toate 8 tab-uri render + AI buttons + Copilot chat funcțional), RBAC verified (client → 403 pe toate). Zero regresii. `retest_needed: false`.
+
+**Status**: ✅ COMPLET Faza 1.
+
+
 ## 🧠 Strategic Partners Dashboard + AI Cross-Reference Engine (Feb 26, 2026)
 
 **Scop**: vedere unificată City Partners + Marketplace Partners + motor AI care recomandă conexiuni cross-program între lead-urile City Partners și partenerii Marketplace din același oraș.
