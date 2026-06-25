@@ -134,6 +134,7 @@ from routes.marketing_campaigns import router as marketing_campaigns_router
 from routes.marketing_performance import router as marketing_performance_router
 from routes.demo_accounts import router as demo_accounts_router
 from routes.admin_accounts import router as admin_accounts_router
+from routes.demo_activity import router as demo_activity_router, schedule_log as _schedule_demo_log
 from middleware_scope import admin_scope_middleware
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
@@ -171,6 +172,27 @@ app.add_middleware(
 )
 # Admin-scope HTTP middleware (Milestone 2): URL-pattern → required-scope map
 app.middleware("http")(admin_scope_middleware)
+
+
+@app.middleware("http")
+async def _demo_activity_middleware(request, call_next):
+    """Log every API call made by demo sub-admins (fire-and-forget)."""
+    import time as _t
+    start = _t.time()
+    response = await call_next(request)
+    try:
+        # Only act on /api/* paths
+        if request.url.path.startswith("/api/"):
+            # Try to resolve user from request state (set by deps.get_current_user)
+            user = getattr(request.state, "user", None)
+            if user:
+                duration_ms = int((_t.time() - start) * 1000)
+                _schedule_demo_log(user, request, response.status_code, duration_ms)
+    except Exception:  # noqa: BLE001
+        pass
+    return response
+
+
 logger = logging.getLogger(__name__)
 logger.info(f"CORS configured: origins={_origins} regex={_origin_regex} credentials={_allow_credentials}")
 
@@ -276,6 +298,7 @@ for r in (
     marketing_performance_router,
     demo_accounts_router,
     admin_accounts_router,
+    demo_activity_router,
 ):
     app.include_router(r)
 

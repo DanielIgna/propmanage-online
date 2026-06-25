@@ -23,9 +23,8 @@ from sub_admin_seed import SUB_ADMINS, get_default_password, list_demo_emails
 logger = logging.getLogger("propmanage.demo_accounts")
 router = APIRouter(prefix="/api/admin/demo-accounts", tags=["admin-demo-accounts"])
 
-# Master code required for password operations. Hardcoded per super_admin request.
-# Could move to env var later if needed.
-MASTER_CODE = "0108"
+# Master code required for password operations. Configurable via env var DEMO_MASTER_CODE.
+MASTER_CODE = os.environ.get("DEMO_MASTER_CODE", "0108")
 
 DEMO_EMAILS = set(list_demo_emails())
 

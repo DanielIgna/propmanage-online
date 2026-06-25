@@ -89,6 +89,7 @@ import StrategicPartnersDashboard from "./pages/admin/StrategicPartnersDashboard
 import MarketingDepartmentPage from "./pages/admin/MarketingDepartmentPage";
 import DemoAccountsPage from "./pages/admin/DemoAccountsPage";
 import AdminAccountsPage from "./pages/admin/AdminAccountsPage";
+import DemoActivityPage from "./pages/admin/DemoActivityPage";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import ContractPage from "./pages/ContractPage";
 import { trackPageView } from "@/lib/analytics";
@@ -1661,6 +1662,7 @@ function App() {
               <Route path="/admin/marketing" element={<MarketingDepartmentPage />} />
               <Route path="/admin/demo-accounts" element={<DemoAccountsPage />} />
               <Route path="/admin/admin-accounts" element={<AdminAccountsPage />} />
+              <Route path="/admin/demo-activity" element={<DemoActivityPage />} />
               <Route path="/partner/dashboard" element={<PartnerDashboard />} />
               <Route path="/legal/sign" element={<LegalSignPage />} />
               <Route path="/contracts/:id" element={<ContractPage />} />

@@ -21,6 +21,7 @@ Endpoints:
   POST /api/admin/admin-accounts/change-password — set new password
 """
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -35,8 +36,9 @@ from sub_admin_deps import is_super_admin
 logger = logging.getLogger("propmanage.admin_accounts")
 router = APIRouter(prefix="/api/admin/admin-accounts", tags=["admin-admin-accounts"])
 
-MASTER_CODE = "0108"
-PROTECTED_EMAIL = "admin@propmanage.io"  # owner — cannot be blocked or demoted
+MASTER_CODE = os.environ.get("DEMO_MASTER_CODE", "0108")
+# Owner accounts — cannot be blocked or demoted (treated as super-admin)
+PROTECTED_EMAILS = {"admin@propmanage.io", "danieligna1@gmail.com"}
 
 ALLOWED_ROLES = {"admin", "marketing_manager", "operator", "specialist", "client"}
 ALLOWED_SCOPES = {"general", "testing", "frontend", "backend", "security",
@@ -54,7 +56,7 @@ def _require_code(code: str) -> None:
 
 
 def _check_not_protected(email: str, action: str) -> None:
-    if email == PROTECTED_EMAIL:
+    if email in PROTECTED_EMAILS:
         raise HTTPException(400, f"Contul super-admin ({email}) este protejat și nu poate fi {action}.")
 
 
@@ -100,7 +102,7 @@ async def list_admins(user=Depends(get_current_user)):
             "seniority": u.get("admin_seniority") or "—",
             "is_active": u.get("is_active") if u.get("is_active") is not None else True,
             "is_demo_sub_admin": bool(u.get("is_demo_sub_admin")),
-            "is_protected": email == PROTECTED_EMAIL,
+            "is_protected": email in PROTECTED_EMAILS,
             "last_login_at": u.get("last_login_at"),
             "created_at": u.get("created_at"),
             "updated_at": u.get("updated_at"),
@@ -108,7 +110,7 @@ async def list_admins(user=Depends(get_current_user)):
     return {
         "items": items,
         "count": len(items),
-        "protected_email": PROTECTED_EMAIL,
+        "protected_emails": sorted(PROTECTED_EMAILS),
         "allowed_roles": sorted(ALLOWED_ROLES),
         "allowed_scopes": sorted([s for s in ALLOWED_SCOPES if s]),
     }

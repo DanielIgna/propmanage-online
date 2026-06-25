@@ -215,6 +215,7 @@ const NAV_SECTIONS = [
       { id: "founder_gate", label: "Founder Approval Gate", icon: ShieldCheck, badge: "FG-0", href: "/admin/founder-gate" },
       { id: "demo_accounts", label: "Demo Accounts Manager", icon: KeyRound, badge: "0108", href: "/admin/demo-accounts" },
       { id: "admin_accounts", label: "Admin Accounts Manager", icon: Shield, badge: "0108", href: "/admin/admin-accounts" },
+      { id: "demo_activity", label: "Demo Activity Log", icon: Activity, badge: "AUDIT", href: "/admin/demo-activity" },
     ],
   },
   {
