@@ -4,6 +4,39 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 
+## 🌆 Strategic City Partnership Program V1 (Feb 25, 2026, Part 3)
+
+**Scop**: cadru enterprise pentru parteneriate locale non-exclusive cu administratori imobile / dezvoltatori / companii locale. Partener rămâne independent juridic.
+
+**Backend** (`/app/backend/routes/city_partners.py`):
+- Admin CRUD `/api/admin/city-partners` (super-admin only): create, list, get, patch, archive, onboarding-step (1–7), create-login.
+- Leads `/api/admin/city-partners/{id}/leads` cu stages: introduced → contacted → onboarded → converted → lost (auto conversion_date).
+- Stats `/api/admin/city-partners/stats` cu by_status, leads_by_stage, top_partners (aggregation pipeline).
+- Partner portal `/api/partner/me`, `/leads`, `/stats` — strict RBAC (partener vede DOAR propriile lead-uri).
+- Onboarding step 7 → auto-promovare status `onboarding`→`active`.
+- `create-login` generează cont `city_partner` cu temp_password expus o SINGURĂ DATĂ; `partner_id` stocat ca STRING pe `users` (workaround pentru serialize_doc cu ObjectId).
+
+**Legal — al 7-lea contract**:
+- `legal_templates.py` → adăugat template `city_partner` cu `audience='city_partner'`.
+- `legal.py` → `_active_mandatory_documents(audience)` filtrează strict per audience. `GET /api/legal/me/status` short-circuit pentru rol `city_partner` (returnează compliant=true, nu poluează cu IT docs). `GET /api/legal/partner/status` returnează contractul specific.
+- Migrație auto: docurile vechi (fără audience) sunt backfill-uite cu „it_collaborator" la startup.
+
+**Frontend**:
+- `/app/frontend/src/pages/admin/CityPartnersPage.jsx` (`/admin/city-partners`) — admin list cu stats + filter status + top partners.
+- `/app/frontend/src/pages/admin/CityPartnerDetailPage.jsx` (`/admin/city-partners/:id`) — contact card, 7-step onboarding wizard click-to-toggle, leads cu stage live PATCH, generare credențiale partener cu copy-to-clipboard.
+- `/app/frontend/src/pages/partner/PartnerDashboard.jsx` (`/partner/dashboard`) — portal partener cu stats, read-only onboarding tracker, lead-uri proprii, formular „Adaugă referință".
+- `Auth.jsx` → `roleHome(role)` redirectează rol `city_partner` la `/partner/dashboard`.
+- Sidebar admin: **a 10-a secțiune „Parteneri Strategici"** (superAdminOnly, collapsable, badge „NEW V1").
+
+**Test data created during dev**:
+- 1 partener `BlocAdmin SRL` (București, status=onboarding step=3) + login `ion@blocadmin.ro` / `owKT6oOYMIyOSM!1A`.
+- 1 lead pentru BlocAdmin: `Asociația Bloc B12` (stage=introduced).
+- Multiple `TEST_*` partners din testing agent.
+
+**Tests**: `iteration_70.json` → 25/25 pytest pass, 100% frontend testid coverage, RBAC verified (sub-admin & client = 403, partner1 ≠ partner2 leads).
+
+
+
 ## 🟢 Sprint Health Digest + Legal Sprint 1 (Feb 25, 2026, Part 2)
 
 **Sprint Health Digest** (weekly AI-powered founder email):
