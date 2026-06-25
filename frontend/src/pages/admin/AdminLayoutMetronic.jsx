@@ -556,10 +556,27 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
   }
 
   // Collapsible-section state (persisted per browser)
-  const COLLAPSED_KEY = "pm_admin_nav_collapsed_v2";
+  // Default behavior: ALL sections collapsed except the one containing the active item.
+  // This gives the clean "mega-menu" look (9 rows visible, expand on click).
+  const COLLAPSED_KEY = "pm_admin_nav_collapsed_v3";
   const [collapsed, setCollapsed] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(COLLAPSED_KEY) || "{}"); } catch { return {}; }
+    try {
+      const saved = localStorage.getItem(COLLAPSED_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch { /* noop */ }
+    // first visit → start with everything collapsed
+    const initial = {};
+    NAV_SECTIONS.forEach(s => { initial[s.id] = true; });
+    return initial;
   });
+  // Auto-expand the section that contains the currently active item
+  useEffect(() => {
+    if (!active) return;
+    const activeSection = NAV_SECTIONS.find(s => s.items.some(it => it.id === active));
+    if (activeSection) {
+      setCollapsed(prev => prev[activeSection.id] === false ? prev : { ...prev, [activeSection.id]: false });
+    }
+  }, [active]);
   const toggleSection = (sid) => {
     setCollapsed(prev => {
       const next = { ...prev, [sid]: !prev[sid] };
@@ -662,11 +679,11 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
         </button>
       </div>
 
-      {/* Cmd+K trigger inside sidebar */}
-      <div className="px-3 pt-3">
+      {/* Cmd+K trigger + Collapse-all inside sidebar */}
+      <div className="px-3 pt-3 flex items-center gap-2">
         <button
           onClick={() => setPaletteOpen(true)}
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs transition-colors ${
+          className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border text-xs transition-colors ${
             dark ? "bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-slate-800" : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
           }`}
           data-testid="open-command-palette-sidebar"
@@ -674,6 +691,22 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
           <Command className="w-3.5 h-3.5" />
           <span className="flex-1 text-left">Caută rapid…</span>
           <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${dark ? "bg-slate-700 text-slate-300" : "bg-white border border-slate-200 text-slate-500"}`}>⌘K</span>
+        </button>
+        <button
+          onClick={() => {
+            const allCollapsed = visibleSections.every(s => collapsed[s.id]);
+            const next = {};
+            visibleSections.forEach(s => { next[s.id] = !allCollapsed; });
+            setCollapsed(next);
+            localStorage.setItem(COLLAPSED_KEY, JSON.stringify(next));
+          }}
+          className={`p-2 rounded-lg border text-xs transition-colors ${
+            dark ? "bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-slate-800" : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+          }`}
+          title="Restrânge / Extinde toate secțiunile"
+          data-testid="collapse-all-sections"
+        >
+          <ChevronDown className="w-3.5 h-3.5" />
         </button>
       </div>
 
