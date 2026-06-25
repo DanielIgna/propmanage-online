@@ -4,6 +4,28 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 
+## 🧠 Strategic Partners Dashboard + AI Cross-Reference Engine (Feb 26, 2026)
+
+**Scop**: vedere unificată City Partners + Marketplace Partners + motor AI care recomandă conexiuni cross-program între lead-urile City Partners și partenerii Marketplace din același oraș.
+
+**Backend** (`/app/backend/routes/strategic_partners.py`, ~262 linii, super-admin only):
+- `GET /api/admin/strategic-partners/dashboard` — ecosistem unificat: city.{total,active,onboarding,leads,converted,revenue,conversion_rate} + marketplace.{...} + totals + coverage[] (acoperire geografică pe oraș cu flag FULL/PARȚIAL) + cross_ref_unmatched count.
+- `GET /api/admin/strategic-partners/unmatched-leads` — lead-uri City Partner cu stage in [introduced, contacted] și `cross_ref_done != true`.
+- `POST /api/admin/strategic-partners/cross-ref/{lead_id}` — invocă Claude Sonnet 4.5 (emergentintegrations) → top 3 marketplace partners (`relevance_score 0-100`, company, reason ≤250c) + introduction_email_subject + body în română. Marchează lead-ul `cross_ref_done=true` și persistă în `strategic_cross_refs` cu `generated_by=user.email` pentru audit.
+- `GET /api/admin/strategic-partners/opportunities?limit=N` — feed cu ultimele analize.
+- RBAC: 403 pentru non super-admin pe toate cele 4 endpoint-uri.
+
+**Frontend** (`/app/frontend/src/pages/admin/StrategicPartnersDashboard.jsx`):
+- Route `/admin/strategic-partners` (App.js linia 1657).
+- Sidebar entry „Strategic Dashboard" cu badge „AI XREF" în secțiunea „Parteneri Strategici" (AdminLayoutMetronic.jsx linia 201).
+- 4 stat cards (parteneri, leads, conversii, revenue) + 2 ecosystem cards side-by-side (City vs Marketplace) + tabel acoperire geografică + Cross-Reference Engine panel + Oportunități recente.
+- `CrossRefModal` (data-testid=cross-ref-modal): la click pe „Conectează" rulează AI roundtrip ~10-14s, afișează 3 matches cu score badge (green ≥80, amber ≥60), reason, draft email Romanian cu buton copy-to-clipboard.
+
+**Tests**: `iteration_72.json` → backend 14/14 pytest pass (inclusiv AI roundtrip real Claude), frontend 100% testid coverage (`strategic-dashboard-page`, `ecosystem-city`, `ecosystem-marketplace`, `coverage-{city}`, `unmatched-{id}`, `xref-{id}`, `recent-{id}`, `cross-ref-modal`). Zero regresii pe City/Marketplace/IT/Legal. retest_needed: false.
+
+**Status**: ✅ COMPLET — feature-ul de final al sprintului Strategic Partners.
+
+
 ## 🛒 AI City Partner Copilot + Marketplace Partners Ecosystem V1 (Feb 25, 2026, Part 4)
 
 **AI City Partner Copilot (Claude Sonnet 4.5)**:
