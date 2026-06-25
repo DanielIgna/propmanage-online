@@ -4,6 +4,39 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 
+## 👁️ Demo Activity Log + DEMO_MASTER_CODE env var + danieligna1 owner (Feb 26, 2026, Part 7)
+
+**Scop**: Vezi în timp real ce fac colaboratorii demo pe platformă + recunoaște `danieligna1@gmail.com` ca owner-super-admin protejat + mută `MASTER_CODE` în env var pentru rotare fără redeploy.
+
+**P1 quick wins:**
+- `/app/backend/.env`: adăugat `DEMO_MASTER_CODE=0108`.
+- `demo_accounts.py` + `admin_accounts.py`: `MASTER_CODE = os.environ.get("DEMO_MASTER_CODE", "0108")`.
+- `admin_accounts.py`: `PROTECTED_EMAIL` (str) → `PROTECTED_EMAILS = {"admin@propmanage.io", "danieligna1@gmail.com"}` (set). Returned ca sorted list `protected_emails[]` în GET.
+- danieligna1 password setat la `'0108'` direct în DB (bcrypt hashed). User cu role=admin scope=general → tratat ca super-admin via `is_super_admin()` helper existent.
+- BONUS fix: `marketing_growth.py::_require_marketing` acceptă acum `admin + scope=marketing` în plus față de `marketing_manager` (rezolvă pre-existing bug unde `_enforce_admin_role` reseta automat role la 'admin'). marketing.admin@propmanage.io poate acum accesa toate endpoint-urile marketing.
+
+**P2 Demo Activity Log:**
+- Backend (`/app/backend/routes/demo_activity.py`, ~187 linii):
+  - `schedule_log(user, request, status_code, duration_ms)` — helper fire-and-forget care creează `asyncio.create_task` doar dacă `user.is_demo_sub_admin == True`. Skip noisy endpoints (/auth/me, /health, /demo-activity self).
+  - `_friendly_label(path)`: mapează 25+ URL patterns la label-uri RO ("Vizualizat Marketing Dashboard", "Generat Campanie AI", "Cross-Reference AI"). Fallback "Admin · X" / "API · X".
+  - Persist în `demo_activity_logs` cu: email, name, scope, role, method, path, label, status_code, duration_ms, ip, user_agent, ts (ISO).
+  - `GET /api/admin/demo-activity` — filtre `?email&?days(1-90)&?q(regex case-insensitive)&?limit(max 500)`. Super-admin only.
+  - `GET /api/admin/demo-activity/summary` — agregat: total_actions + users[] sorted desc (email/name/scope/total/errors/last_seen/top_pages[5]) + global_top_pages[12].
+
+- Middleware (server.py `_demo_activity_middleware`): wraps every `/api/*` call, citește `request.state.user` setat de `deps.get_current_user`, apelează `schedule_log` cu status + duration. Try/except guard pentru fire-and-forget garantat zero impact pe latență.
+
+- Frontend (`DemoActivityPage.jsx`, ~190 linii): pagină `/admin/demo-activity` cu summary cards (total acțiuni / top utilizatori / global top pages chips) + tabel filtrabil (search live + email filter dropdown + days select 1/7/30/90). Status badges color-coded (verde 2xx, amber 4xx, roșu 5xx). Click pe user în top list → toggle filter pe acel user.
+
+- Sidebar admin: link „Demo Activity Log" badge `AUDIT` în IT Hub.
+
+**Tests**: `iteration_78.json` → **22/22 backend pytest PASS** în 20.6s. Frontend 100% verified visually. Owner login `danieligna1@gmail.com / 0108` → 200. PROTECTED enforcement verificat pe ambele emails. Activity logger captures ≥10 logs after marketing.admin calls. Non-demo users (super, owner) generate 0 logs. RBAC: client → 403. Filters all work. `retest_needed: false`. Test file: `/app/backend/tests/test_iter78_demo_activity.py`.
+
+**Code review notes** (din iter78):
+- ACTION_LABELS uses `startswith` first-match — specific routes listed before generic prefixes (confirmed correct order).
+- Activity middleware logs failed requests (403/500) too — intentional pentru security audit.
+- Pre-existing arch: `auth.py::_enforce_admin_role` auto-promotes any user with `admin_scope` la role='admin'. Fixed surface via marketing_growth scope allowlist; deeper fix amânat (low priority).
+
+
 ## 🛡️ Admin Accounts Manager + general.admin + Operating Manual update (Feb 26, 2026, Part 6)
 
 **Scop**: Super-admin poate gestiona TOȚI adminii (inclusiv conturile externe `carlospacu@gmail.com`, `danieligna1@gmail.com`), nu doar cele 6 demo. Block/unblock, change role+scope, change password — toate gated cu cod master 0108.

@@ -42,7 +42,7 @@ def _require_marketing(user: dict) -> None:
         return
     if user.get("role") == "marketing_manager":
         return
-    if user.get("role") == "admin" and (user.get("admin_scope") or "general").lower() in {"general", "ai"}:
+    if user.get("role") == "admin" and (user.get("admin_scope") or "general").lower() in {"general", "ai", "marketing"}:
         return
     raise HTTPException(403, "Acces refuzat — necesită super_admin sau marketing_manager.")
 
