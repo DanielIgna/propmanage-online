@@ -4,6 +4,38 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 
+## 🎨 AI Campaign Generator + Auto-Trigger + Image Studio Nano Banana — Faza 2 (Feb 26, 2026, Part 3)
+
+**Scop**: Pro-activizarea BI engine-ului — în loc de raport static, sistemul detectează automat oportunități și generează draft-uri de campanie cu creative AI (text + 2 imagini fotorealiste) ready-to-approve.
+
+**Backend** (`/app/backend/routes/marketing_campaigns.py`, ~410 linii, RBAC: super_admin / marketing_manager):
+- `POST /api/admin/marketing/campaigns/generate` — input `{objective, service_category, county, budget_ron, skip_images}`. Claude Sonnet 4.5 generează `{avatar(age_range/occupation/pain_points/motivations), audience(targeting/interests/exclusions), ad_texts[3](primary_text/headline/description), cta, image_prompts[2], kpis(impressions/clicks/leads/cpc/daily_budget/duration), rationale}`. Nano Banana (`gemini-3.1-flash-image-preview`, modalities=image+text) generează 2 imagini ad-creative fotorealiste din image_prompts. Durată: ~10s text-only / ~30-45s cu imagini. Persistat în `marketing_campaigns` cu `source='manual'`.
+- `GET /campaigns` — listă cu proiecție `{images:0}` (fără base64 ca să fie lightweight). Filtru `?status=X`.
+- `GET /campaigns/{id}` — detail complet cu imagini ca `data:image/jpeg;base64,...` URIs.
+- `POST /campaigns/{id}/approve` și `/reject` — workflow simplu cu audit (approved_at / approved_by).
+- `POST /campaigns/{id}/regenerate-image {image_index}` — regenerează doar imaginea specificată via Nano Banana.
+- `POST /auto-triggers/scan` — detector: scanează `(category × county)` din `db.requests` pe ultimele 30 zile vs prev 30; pentru orice pair cu creștere ≥30% MoM ȘI ≥5 cereri în perioada anterioară, generează draft Claude (text only, fără imagini ca să economisească tokeni) cu `source='auto_trigger'`, `status='auto_draft'`, `trigger_reason` populat. Idempotent: skip dacă există deja un `auto_draft` în ultimele 7 zile pentru același pair. Heuristic budget: `max(300, current_requests × 25)`.
+- `GET /auto-triggers/recent` — feed pentru dashboard.
+
+**Frontend** (`/app/frontend/src/pages/admin/marketing/CampaignsTab.jsx`, ~390 linii):
+- Tab nou „Campanii" în MarketingDepartmentPage (acum 9 tab-uri total).
+- 5 filter chips: Toate / Draft / Auto-Trigger / Aprobată / Respinsă (counts live).
+- 2 acțiuni rapide: **„Auto-Trigger Scan"** (rulează detectorul, afișează banner cu rezultate) + **„Campanie nouă"** (deschide GenerateModal).
+- GenerateModal: form complet (obiectiv dropdown, serviciu cu 12 quick-chips, județ cu 10 quick-chips, buget, skip-images toggle), butoane „Claude + Nano Banana lucrează…" cu spinner.
+- DetailModal: header cu status badge + Auto-Trigger badge + budget + trigger_reason banner; secțiune imagini 2-col cu hover „regenerează"; avatar client (vârstă/ocupație/pain/motivații); audiență țintă (targeting/interests/exclusions); 3 variante text reclamă cu copy button; KPI grid; rațional AI; butoane aprobă/respinge (doar pe draft+auto_draft).
+
+**Sidebar admin**: link nou „Campanii (Auto-Trigger)" în secțiunea „Marketing & Growth" cu badge „AI+IMG".
+
+**Tests**: `iteration_74.json` → backend **20/20 new pytest PASS** + **16/16 regression PASS** (Faza 1), frontend 100% smoke + e2e (modal, generate flow, scan flow, approve/reject), RBAC verified pe toate 9 endpoint-uri noi (client → 403). Zero regresii. `retest_needed: false`. Test file persistat: `/app/backend/tests/test_marketing_campaigns.py`.
+
+**Status**: ✅ COMPLET Faza 2 (parțial — restul Faza 2: Content Calendar, Automation Center, SEO Engine rămân în „Idei viitoare").
+
+**Code review notes** (din iter74 — neblocking):
+- Rate limiting pe `/campaigns/generate` recomandat (fiecare call = ~$0.10-0.20 token+image cost).
+- Migrare imagini base64 din Mongo → S3/GCS când volumul crește.
+- Constants externalizare pentru prompt-uri (versioning).
+
+
 ## 🚀 AI Marketing & Growth Department V1 — Phase 1 Core AI Brain (Feb 26, 2026, Part 2)
 
 **Scop**: departament intern de marketing, BI și growth, 24/7, alimentat de Claude Sonnet 4.5 pe datele reale ale platformei. User a ales **doar Faza 1**; Fazele 2 (Content & Automation) și 3 (External Integrations: Meta/Google Ads, Social) sunt expuse într-un tab „Idei viitoare" în pagină.
