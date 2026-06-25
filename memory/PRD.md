@@ -4,6 +4,59 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 
+## 🔄 Marketing Performance Loop — Closed AI Feedback System (Feb 26, 2026, Part 4)
+
+**Scop**: Închiderea buclei AI — transformă platforma dintr-un sistem static (predict→generate) într-unul **învățător continuu** (predict→generate→execute→measure→learn→recalibrate).
+
+**Fluxul complet**:
+```
+BI Engine → Auto-Trigger → Campaign Generator (cu calibration injection)
+   ↓                                                    ↓
+   ↑                                          Campaign Approved
+   ↑                                                    ↓
+   ↑                                          Execute pe Meta/Google Ads
+   ↑                                                    ↓
+   ← Claude generează Learnings ← Logging performanță reală (manual)
+       (calibration adjustments)        (deltas calculated automat)
+```
+
+**Backend** (`/app/backend/routes/marketing_performance.py`, ~372 linii, RBAC: super_admin / marketing_manager):
+- `POST /campaigns/{id}/performance` — log `{impressions, clicks, leads, conversions, spent_ron, notes}`. Helper `_compute_deltas()` calculează: `impressions_delta_pct`, `clicks_delta_pct`, `leads_delta_pct`, `cpc_actual_ron`, `cpc_predicted_ron`, `cpc_delta_pct`, `cpl_actual_ron`. Refuză log pe draft/rejected (400). Update și `campaign.last_performance` summary.
+- `GET /campaigns/{id}/performance` — toate logurile pentru o campanie, desc.
+- `POST /campaigns/{id}/complete` — approved → completed.
+- `GET /performance/summary` — agregat: `logs_count, totals(spent/leads/clicks/impressions/conversions), accuracy(impressions/clicks/leads/cpc avg_abs_delta_pct), top_performers[3], worst_performers[3], by_category[]`.
+- `POST /performance/learnings/generate` — Claude Sonnet 4.5 primește ultimele 30 loguri agregate, returnează `{learnings: [{category, metric, observation, adjustment, confidence (high/medium/low), sample_size}]}`. Necesită ≥3 loguri (400 altfel). Deactivează previous active learnings (atomic-ish: 1 doc activ la un moment dat).
+- `GET /performance/learnings/active` — set curent activ.
+- **Helper `get_active_calibration_hint()`** — returnează string formatted „CALIBRARE BAZATĂ PE PERFORMANȚE ISTORICE: - [HVAC/cpc] Predicțiile subestimează cu 18% → Crește expected_cpc_ron cu +18%. (confidence=high) ...".
+
+**Integration la generator** (`marketing_campaigns.py::_claude_generate_campaign`):
+- La fiecare apel către Claude, dacă există learnings active → append calibration string în system prompt.
+- Documentul campaniei stocat cu flag `calibration_applied: true/false`.
+- Try/except graceful: dacă perf module e indisponibil, generatorul continuă fără calibration.
+
+**Frontend** (`PerformanceTab.jsx`, ~307 linii + `LogPerformanceModal` exported):
+- Tab nou „Performance Loop" în MarketingDepartmentPage (acum **10 tab-uri**).
+- 4 KPI cards: Total cheltuit / Total leads / Total clicks+impresii / Conversii.
+- **Acuratețe predicții AI**: 4 progress bars cu gradient color-coded (verde ≥80% / amber ≥60% / roșu) pentru fiecare metric (impressions/clicks/leads/CPC) — scor = `100 - avg_abs_delta_pct`.
+- Top + Worst performers (3 fiecare) cu delta badges colorate.
+- Tabel performanță pe categorie cu CPL calculat.
+- **Învățăminte AI panel**: buton „Generează învățăminte" (disabled <3 loguri), listă cu badge confidence + observation + adjustment.
+
+**Integration în CampaignsTab DetailModal**:
+- Pentru status `approved`/`completed`: secțiune nouă „Performance Loop · N loguri" cu buton „Loghează rezultate" → deschide `LogPerformanceModal` (5 numeric inputs + notes; afișează prediction hint la top pentru context). După submit, modal arată ultimele 3 loguri cu delta badges colored inline.
+- Footer detail: badge „KPI-urile au fost calibrate pe baza învățămintelor istorice" pentru campaniile cu `calibration_applied:true`.
+
+**Sidebar admin**: link nou „Performance Loop" cu badge `LEARN` în „Marketing & Growth".
+
+**Tests**: `iteration_75.json` → backend **27/27 pytest PASS** (4 log, 2 get, 1 complete-refuse-draft, 1 summary, 3 learnings inc. Claude generate, **1 CRITICAL closed-loop test** confirmă calibration_applied:true după learnings, 6 RBAC, 9 regression iter74). Frontend 100% — toate testid-urile + flows verificate (4 accuracy bars, log modal cu 5 inputs, delta badges colored, sidebar link). `retest_needed: false`. Test file: `/app/backend/tests/test_marketing_performance.py`.
+
+**Status**: ✅ COMPLET — bucla AI este închisă. Platforma învață acum din rezultatele reale.
+
+**Code review notes** (neblocking):
+- Sortare top/worst poate include loguri fără `deltas.leads_delta_pct` — recomandat filter `{$exists:true}` la sort.
+- Active learnings deactivation nu e tranzacționalal — risc minor pentru metadata necritică.
+
+
 ## 🎨 AI Campaign Generator + Auto-Trigger + Image Studio Nano Banana — Faza 2 (Feb 26, 2026, Part 3)
 
 **Scop**: Pro-activizarea BI engine-ului — în loc de raport static, sistemul detectează automat oportunități și generează draft-uri de campanie cu creative AI (text + 2 imagini fotorealiste) ready-to-approve.
