@@ -4,6 +4,57 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 
+## 🔑 Demo Accounts Manager + Cookie Banner Fix + Docs Update (Feb 26, 2026, Part 5)
+
+**Scop**: Super-admin poate distribui acces demo unor colaboratori externi (testing/frontend/backend/security/marketing experts) cu parole vizibile/resetabile gated cu cod master + Cookie Banner mai compact + Documentația internă updated.
+
+**1. Demo Accounts (5 conturi):**
+| Email | Password | Scope | Role |
+|---|---|---|---|
+| testing.admin@propmanage.io | Test!Demo2026Strong | testing | admin |
+| frontend.admin@propmanage.io | Front!Demo2026Strong | frontend | admin |
+| backend.admin@propmanage.io | Back!Demo2026Strong | backend | admin |
+| security.admin@propmanage.io | Sec!Demo2026Strong | security | admin |
+| marketing.admin@propmanage.io | Mkt!Demo2026Strong | marketing | marketing_manager |
+
+**Backend** (`/app/backend/routes/demo_accounts.py`, ~141 linii, super_admin only):
+- `GET /api/admin/demo-accounts` — listă cu emails + default_password visible (DOAR super-admin → 403 pentru orice alt rol).
+- `POST /reset-password {email, master_code:"0108"}` — resetează la parola hardcoded din seed. Returnează new_password în response body.
+- `POST /set-password {email, new_password, master_code:"0108"}` — parolă custom (min 8 chars, litere + cifre).
+- Cod master `0108` hardcoded în `MASTER_CODE` constant. Toate operațiile auditate în logs.
+- Allowlist strictă: doar cele 5 emails din `DEMO_EMAILS` set.
+
+**Seed** (`/app/backend/sub_admin_seed.py`, REWRITTEN, ~120 linii):
+- 5 specs cu parole `<Prefix>!Demo2026Strong` (memorabile dar strong).
+- Idempotent: la restart, patch-ează role/scope/seniority dacă diferă; nu modifică parola existentă (folosește reset endpoint).
+- Flag `is_demo_sub_admin: True` pe fiecare cont.
+- Helpers exportate: `get_default_password()`, `list_demo_emails()`.
+
+**Frontend** (`/app/frontend/src/pages/admin/DemoAccountsPage.jsx`, ~210 linii):
+- Route `/admin/demo-accounts`.
+- 5 rânduri cu badge color-coded per scope (cyan/pink/blue/rose/fuchsia).
+- `PasswordCell`: masked default + eye-toggle + copy-to-clipboard.
+- Butoane „Reset implicit" și „Schimbă parola" → deschid `CodeModal` (input numeric 4 cifre + opțional parolă nouă).
+- Flash messages pentru succes/eroare.
+
+**Sidebar admin**: link „Demo Accounts Manager" cu badge `0108` în secțiunea „IT Collaborators Hub".
+
+**2. Cookie Banner fix** (`/app/frontend/src/components/CookieBanner.jsx`):
+- Era full-width bottom sticky (`bottom-0 left-0 right-0 max-w-3xl`) → acoperea conținut.
+- Acum: compact bottom-right corner (`bottom-4 right-4 max-w-sm`, mobile responsive cu `left-4 sm:left-auto`).
+- Verificat bbox: 373px pe desktop 1920 (19% width), 358px pe mobile 390 — NU mai overlap butoane action.
+
+**3. Documentație internă update** (`/app/frontend/src/pages/admin/AdminDocumentation.jsx`):
+- 3 topic-uri noi prepended (apar primele): `marketing-department` (Faza 1-2 cu BI/Auto-Trigger/Performance Loop), `strategic-partners` (Cross-Reference Engine), `demo-accounts` (cod 0108). Fiecare cu created/todo + content sections detaliate.
+
+**Tests**: `iteration_76.json` → **19/19 backend pytest PASS** (3 endpoints × auth/RBAC/code/email-allowlist/password-policy edge cases + 5 demo logins + regression iter73-75), **frontend 100%** (toate 5 demo rows + scope badges + show/copy + CodeModal + flash messages + sidebar entry + 3 doc topics + cookie banner repositioned). `retest_needed: false`. Test file: `/app/backend/tests/test_demo_accounts.py`.
+
+**Code review notes** (din iter76, neblocking):
+- `MASTER_CODE` poate fi mutat în env var (`DEMO_MASTER_CODE`) pentru rotabilitate fără redeploy.
+- Testid-uri în PasswordCell folosesc `password.slice(0,3)` — robust azi (prefixes unice) dar mai bine `{scope}` în viitor.
+- Cookie banner reposition verificată responsiv.
+
+
 ## 🔄 Marketing Performance Loop — Closed AI Feedback System (Feb 26, 2026, Part 4)
 
 **Scop**: Închiderea buclei AI — transformă platforma dintr-un sistem static (predict→generate) într-unul **învățător continuu** (predict→generate→execute→measure→learn→recalibrate).
