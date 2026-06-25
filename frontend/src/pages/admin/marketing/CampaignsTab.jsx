@@ -4,8 +4,9 @@ import axios from "axios";
 import {
   Megaphone, Plus, Loader2, Sparkles, CheckCircle2, XCircle, X,
   Image as ImageIcon, Copy, Zap, AlertTriangle, RefreshCw, Eye,
-  Target, DollarSign, ChevronRight, Wand2, Bot,
+  Target, DollarSign, ChevronRight, Wand2, Bot, Activity, GitBranch,
 } from "lucide-react";
+import { LogPerformanceModal } from "./PerformanceTab";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 const ax = axios.create({ baseURL: API, withCredentials: true });
@@ -34,6 +35,7 @@ const STATUS_STYLES = {
   auto_draft: { color: "text-violet-700 dark:text-violet-300", bg: "bg-violet-100 dark:bg-violet-500/20", label: "Auto-Trigger" },
   approved: { color: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-100 dark:bg-emerald-500/20", label: "Aprobată" },
   rejected: { color: "text-rose-700 dark:text-rose-300", bg: "bg-rose-100 dark:bg-rose-500/20", label: "Respinsă" },
+  completed: { color: "text-blue-700 dark:text-blue-300", bg: "bg-blue-100 dark:bg-blue-500/20", label: "Finalizată" },
 };
 
 // ----- Generate modal -----
@@ -126,12 +128,21 @@ const DetailModal = ({ campaignId, onClose, onUpdate }) => {
   const [busy, setBusy] = useState(true);
   const [acting, setActing] = useState(false);
   const [err, setErr] = useState("");
+  const [showLog, setShowLog] = useState(false);
+  const [perfLogs, setPerfLogs] = useState([]);
 
   const load = async () => {
     setBusy(true);
     try {
       const r = await ax.get(`/api/admin/marketing/campaigns/${campaignId}`);
       setC(r.data);
+      // Fetch perf logs if approved/completed
+      if (["approved", "completed"].includes(r.data.status)) {
+        const pR = await ax.get(`/api/admin/marketing/campaigns/${campaignId}/performance`);
+        setPerfLogs(pR.data.items || []);
+      } else {
+        setPerfLogs([]);
+      }
     } catch (e) {
       setErr(e.response?.data?.detail || e.message);
     } finally { setBusy(false); }
@@ -285,6 +296,47 @@ const DetailModal = ({ campaignId, onClose, onUpdate }) => {
                 </div>
               )}
 
+              {/* Performance loop section — for approved/completed */}
+              {["approved", "completed"].includes(c.status) && (
+                <div className="p-4 rounded-xl border border-violet-200 dark:border-violet-500/30 bg-gradient-to-br from-violet-50 to-fuchsia-50 dark:from-violet-500/10 dark:to-fuchsia-500/10">
+                  <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <h4 className="text-xs uppercase tracking-wider text-violet-700 dark:text-violet-300 font-bold flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5" /> Performance Loop · {perfLogs.length} log{perfLogs.length !== 1 ? "uri" : ""}
+                    </h4>
+                    <button onClick={() => setShowLog(true)}
+                      className="text-xs px-2.5 py-1 rounded-lg bg-violet-500 hover:bg-violet-600 text-white font-medium flex items-center gap-1"
+                      data-testid="log-perf-btn">
+                      <Plus className="w-3 h-3" /> Loghează rezultate
+                    </button>
+                  </div>
+                  {perfLogs.length === 0 ? (
+                    <p className="text-xs text-slate-600 dark:text-slate-300">Nicio metrică reală logată. Adaugă rezultatele din Meta/Google Ads pentru a permite AI-ului să învețe.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {perfLogs.slice(0, 3).map(log => (
+                        <div key={log.id} className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-violet-200 dark:border-violet-500/30 text-xs" data-testid={`perf-log-${log.id}`}>
+                          <div className="grid grid-cols-3 gap-2 mb-1">
+                            <div><span className="text-slate-400">Impresii:</span> <strong className="text-slate-900 dark:text-white">{log.impressions?.toLocaleString("ro-RO")}</strong>
+                              {log.deltas?.impressions_delta_pct != null && <span className={`ml-1 ${log.deltas.impressions_delta_pct >= 0 ? "text-emerald-600" : "text-rose-600"}`}>({log.deltas.impressions_delta_pct >= 0 ? "+" : ""}{log.deltas.impressions_delta_pct}%)</span>}
+                            </div>
+                            <div><span className="text-slate-400">Clicks:</span> <strong className="text-slate-900 dark:text-white">{log.clicks}</strong>
+                              {log.deltas?.clicks_delta_pct != null && <span className={`ml-1 ${log.deltas.clicks_delta_pct >= 0 ? "text-emerald-600" : "text-rose-600"}`}>({log.deltas.clicks_delta_pct >= 0 ? "+" : ""}{log.deltas.clicks_delta_pct}%)</span>}
+                            </div>
+                            <div><span className="text-slate-400">Leads:</span> <strong className="text-slate-900 dark:text-white">{log.leads}</strong>
+                              {log.deltas?.leads_delta_pct != null && <span className={`ml-1 ${log.deltas.leads_delta_pct >= 0 ? "text-emerald-600" : "text-rose-600"}`}>({log.deltas.leads_delta_pct >= 0 ? "+" : ""}{log.deltas.leads_delta_pct}%)</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between text-slate-500">
+                            <span>Cheltuit: <strong className="text-slate-900 dark:text-white">{log.spent_ron} RON</strong> · CPL: <strong>{log.deltas?.cpl_actual_ron || "—"} RON</strong></span>
+                            <span className="text-[10px]">{new Date(log.logged_at).toLocaleDateString("ro-RO")}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Actions */}
               {["draft", "auto_draft"].includes(c.status) && (
                 <div className="flex gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
@@ -304,10 +356,20 @@ const DetailModal = ({ campaignId, onClose, onUpdate }) => {
               {c.status === "rejected" && (
                 <div className="text-xs text-rose-600 dark:text-rose-400 text-center">✗ Respinsă la {new Date(c.rejected_at).toLocaleString("ro-RO")}</div>
               )}
+              {c.calibration_applied && (
+                <div className="text-xs text-violet-600 dark:text-violet-400 text-center flex items-center justify-center gap-1">
+                  <GitBranch className="w-3 h-3" /> KPI-urile au fost calibrate pe baza învățămintelor istorice
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
+      {showLog && c && (
+        <LogPerformanceModal campaignId={campaignId} predictedKpis={c.kpis}
+          onClose={() => setShowLog(false)}
+          onLogged={() => { setShowLog(false); load(); onUpdate?.(); }} />
+      )}
     </div>
   );
 };

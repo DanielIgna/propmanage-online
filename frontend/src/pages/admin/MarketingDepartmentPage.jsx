@@ -5,11 +5,12 @@ import axios from "axios";
 import { Link } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import CampaignsTab from "./marketing/CampaignsTab";
+import PerformanceTab from "./marketing/PerformanceTab";
 import {
   Megaphone, ChevronLeft, Loader2, Sparkles, TrendingUp, TrendingDown,
   Users, ShoppingBag, DollarSign, BarChart3, Send, MessageCircle,
   AlertTriangle, Lightbulb, Target, MapPin, Zap, Crown, UserX, X,
-  Copy, RefreshCw, ChevronRight, Rocket, Brain, Wand2,
+  Copy, RefreshCw, ChevronRight, Rocket, Brain, Wand2, Activity,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -463,6 +464,7 @@ const MarketingDepartmentPage = () => {
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: BarChart3 },
     { id: "campaigns", label: "Campanii", icon: Wand2 },
+    { id: "performance", label: "Performance Loop", icon: Activity },
     { id: "insights", label: "AI Insights", icon: Brain },
     { id: "recommendations", label: "Recomandări", icon: Target },
     { id: "segments", label: "Segmente", icon: Users },
@@ -499,6 +501,7 @@ const MarketingDepartmentPage = () => {
         <>
           {tab === "dashboard" && dashboard && <DashboardTab data={dashboard} />}
           {tab === "campaigns" && <CampaignsTab />}
+          {tab === "performance" && <PerformanceTab />}
           {tab === "insights" && (
             <AISection endpoint="/api/admin/marketing/insights" title="AI Business Intelligence Engine"
               color="text-violet-500" icon={Brain} renderer={InsightsRenderer} testid="mkt-tab-insights" />

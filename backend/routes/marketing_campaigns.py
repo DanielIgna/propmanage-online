@@ -65,6 +65,8 @@ def _serialize_campaign(d: dict, include_images: bool = False) -> dict:
         "image_count": d.get("image_count") if d.get("image_count") is not None else len(d.get("images") or []),
         "generated_at": d.get("generated_at"),
         "generated_by": d.get("generated_by"),
+        "calibration_applied": d.get("calibration_applied", False),
+        "last_performance": d.get("last_performance"),
         "approved_at": d.get("approved_at"),
         "approved_by": d.get("approved_by"),
         "rejected_at": d.get("rejected_at"),
@@ -84,6 +86,13 @@ async def _claude_generate_campaign(objective: str, service: str, county: str,
     if not key:
         raise HTTPException(503, "EMERGENT_LLM_KEY missing.")
     from emergentintegrations.llm.chat import LlmChat, UserMessage
+    # Inject performance-based calibration learnings if any
+    try:
+        from routes.marketing_performance import get_active_calibration_hint
+        calibration = await get_active_calibration_hint()
+    except Exception as e:
+        logger.warning(f"[generator] calibration fetch failed: {e}")
+        calibration = None
     system = (
         "Ești un AI Campaign Generator pentru PropManage (platformă property management România). "
         "Primești un brief: obiectiv + serviciu + județ + buget RON. Generezi un draft de campanie "
@@ -97,6 +106,8 @@ async def _claude_generate_campaign(objective: str, service: str, county: str,
         "kpis: {expected_impressions, expected_clicks, expected_leads, expected_cpc_ron, daily_budget_ron, duration_days}, "
         "rationale: string max 250c — de ce această strategie}"
     )
+    if calibration:
+        system += "\n\n" + calibration
     brief = {
         "obiectiv": objective,
         "serviciu": service,
@@ -180,6 +191,7 @@ async def generate_campaign(req: GenerateReq, user=Depends(get_current_user)):
         "image_count": len(images),
         "kpis": draft.get("kpis") or {},
         "rationale": str(draft.get("rationale") or "")[:300],
+        "calibration_applied": bool(await db.marketing_performance_learnings.find_one({"active": True})),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "generated_by": user.get("email"),
     }

@@ -7,7 +7,7 @@ import {
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
   LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, ChevronRight, Sparkles, Bot, Zap, Inbox,
   UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb, Bug, Compass, Layers, BookOpenCheck, GraduationCap, Gamepad2, Trophy, BarChart3, Eye, Heart,
-  Star, Clock, Command, Network, Megaphone, Brain, Rocket
+  Star, Clock, Command, Network, Megaphone, Brain, Rocket, Activity
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { API } from "../DashShared";
@@ -223,6 +223,7 @@ const NAV_SECTIONS = [
     items: [
       { id: "marketing_department", label: "AI Marketing Department", icon: Megaphone, badge: "NEW · AI", href: "/admin/marketing" },
       { id: "marketing_campaigns", label: "Campanii (Auto-Trigger)", icon: Zap, badge: "AI+IMG", href: "/admin/marketing?tab=campaigns" },
+      { id: "marketing_performance", label: "Performance Loop", icon: Activity, badge: "LEARN", href: "/admin/marketing?tab=performance" },
       { id: "marketing_insights", label: "Business Intelligence", icon: Brain, badge: "AI", href: "/admin/marketing?tab=insights" },
       { id: "marketing_copilot", label: "Marketing Copilot", icon: Bot, badge: "CHAT", href: "/admin/marketing?tab=copilot" },
       { id: "marketing_future", label: "Idei viitoare (Faza 2-3)", icon: Rocket, badge: "ROADMAP", href: "/admin/marketing?tab=future" },
