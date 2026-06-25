@@ -4,6 +4,33 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 
+## 🟢 Sprint Health Digest + Legal Sprint 1 (Feb 25, 2026, Part 2)
+
+**Sprint Health Digest** (weekly AI-powered founder email):
+- `/app/backend/routes/it_digest.py` — APScheduler job runs default **Sunday 18:00 Europe/Bucharest**, calls `_run_copilot_now()` (Claude Sonnet 4.5) and ships an HTML email via Resend.
+- Endpoints (super-admin only): `GET /settings`, `POST /settings`, `POST /run`, `POST /preview`.
+- UI: digest card on `/admin/it-collaborators/copilot` left rail with day/hour pickers, recipient email, „Trimite test acum" button, last_sent_at + status display.
+
+**Legal Sprint 1 — Cadrul Juridic & IP**:
+- `/app/backend/legal_templates.py` — 6 markdown templates auto-seeded on startup: **NDA**, **Contract Colaborare** (cu pct. 2 „NU devine asociat/acționar/coproprietar"), **Cesiune Drepturi Patrimoniale Autor Software**, **Politică Securitate IT**, **Politică Acces Infrastructură**, **Regulament Strategic Contributors** (cu 8 poziții cheie + disclaimer recompense).
+- `/app/backend/routes/legal.py` — split user/admin:
+  - User: `GET /api/legal/documents`, `GET /api/legal/documents/{type}`, `POST /api/legal/me/accept` (înregistrează IP+UA+versiune+nume semnătură), `GET /api/legal/me/status`.
+  - Admin: `GET /api/admin/legal/audit`, `GET /api/admin/legal/contracts/{email}`, `POST /api/admin/legal/documents` (versionare automată — dezactivează versiuni anterioare), `PATCH /api/admin/legal/documents/{id}`, `POST /api/admin/legal/seed`.
+- MongoDB: `legal_documents` (template-uri versionate) + `collaborator_contracts` (semnături per user).
+- **Strategic Contributor detection**: user e considerat strategic dacă email-ul există într-un `it_collaborators` activ (sau are flag explicit `is_strategic_contributor`). Non-strategic users primesc `compliant=true` automat.
+- Frontend:
+  - `/app/frontend/src/pages/LegalSignPage.jsx` (`/legal/sign`) — portal pentru colaborator cu progres conformitate, listă pending/signed/outdated, custom markdown viewer, modal de semnare digitală (checkbox + nume).
+  - `/app/frontend/src/components/LegalGate.jsx` — modal blocant globală pentru Strategic Contributors necompliant (ascunsă pe /legal/sign, /login, /register, /privacy, /terms).
+  - `/app/frontend/src/pages/admin/LegalAuditPage.jsx` (`/admin/legal-audit`) — matrix de conformitate cu 6 coloane × N colaboratori, search, filter non-conformi, istoric semnături.
+- Sidebar: link „Audit Juridic IT" apare în secțiunile **Compliance** (admin-nav-legal_audit) ȘI **IT Collaborators Hub** (admin-nav-it_legal).
+
+**Sidebar reorganization FIX (din rundă anterioară)**:
+- Cheia localStorage `pm_admin_nav_collapsed_v2` → `v3` cu **toate secțiunile colapsate by default**. Doar secțiunea care conține item-ul activ se auto-expandă. Buton „Restrânge/Extinde tot" lângă Cmd+K trigger.
+
+**Tests**: `iteration_69.json` → 24/24 pytest pass, 100% frontend selectors, RBAC verified, gate visibility correct pentru toate rolurile.
+
+
+
 ## 🎯 Admin Reorganization 2026 + IT Collaborators Hub (Feb 25, 2026)
 
 **Sprint 1 — Sidebar Reorg (NON-DESTRUCTIVE)**:
