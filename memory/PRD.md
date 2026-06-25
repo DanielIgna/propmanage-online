@@ -4,6 +4,36 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 
+## 🛒 AI City Partner Copilot + Marketplace Partners Ecosystem V1 (Feb 25, 2026, Part 4)
+
+**AI City Partner Copilot (Claude Sonnet 4.5)**:
+- `POST /api/partner/copilot/nudges` — generează 3 nudge-uri personalizate (`{title, body, priority}`) bazate pe lead-urile curente ale partenerului. Persistat în `city_partner_nudges`.
+- UI: card cu gradient cyan→blue în `/partner/dashboard`, buton „3 acțiuni săptămâna asta" + badge prioritate (high/medium/low).
+
+**Marketplace Partners Ecosystem V1** (massive enterprise module):
+- Backend `/app/backend/routes/marketplace_partners.py` (~700 linii):
+  - 5 niveluri partener (basic|verified|premium|strategic|exclusive) + 4 pachete (starter|business|premium|enterprise).
+  - CRUD admin `/api/admin/marketplace-partners/*` cu filter status/tier/category.
+  - Endpoint `/commissions` (8 tipuri: percent, fixed, per_lead, per_sale, monthly_subscription, onboarding_fee, promotion_fee, admin_fee).
+  - Endpoint `/policies` (client_discount, specialist_discount, promotions, seasonal_campaigns, coupons, bonuses).
+  - `create-login` generează cont `marketplace_partner` role; `marketplace_partner_id` stocat ca STRING pe users.
+  - 23 categorii pre-definite (gresie, sanitare, HVAC, fotovoltaice, smart home, pompe căldură, securitate, etc.).
+  - **AI Marketplace Copilot** `/copilot/analyze` (Claude) — returnează `{summary, hot_categories, top_converters, underperformers, pricing_recommendations, commercial_opportunities, growth_score 0–100}`.
+  - **Business Integration Presentation Engine** `/{id}/presentation` (Claude) — generează personalizat 9+ slides cu key_takeaway și estimated_opportunity_text, bazat pe categoria, locația și dimensiunea partenerului + dimensiunea ecosistemului.
+  - Portal partener `/api/marketplace-partner/me|leads|stats` cu RBAC strict.
+- Frontend `/app/frontend/src/pages/admin/MarketplacePartnersPage.jsx`:
+  - List cu tier/status/category filters + 4 stat cards + top categories.
+  - Multi-select categorii cu chips toggle.
+  - Modal AI Copilot (mkt-copilot-panel) cu growth score + hot categories + commercial opportunities.
+  - Modal Prezentare AI (mkt-presentation-modal) cu slides + key takeaway + estimated opportunity.
+  - Modal credentials post `create-login` cu copy temp_password (afișat o singură dată).
+- Sidebar: în secțiunea „Parteneri Strategici" → 2 link-uri (City Partners + Marketplace Partners).
+- Legal: a 8-a template `marketplace_partner` auto-seed-uit cu `audience='marketplace_partner'`. IT gate skip-uie pentru roluri `city_partner` ȘI `marketplace_partner` (zero poluare bidirecțională).
+
+**Tests**: `iteration_71.json` → 23/23 pytest pass, 100% frontend testid coverage, RBAC verified pe toate cele 4 roluri (super_admin, sub_admin, client, marketplace_partner). Zero regresii pe IT/City partners.
+
+
+
 ## 🌆 Strategic City Partnership Program V1 (Feb 25, 2026, Part 3)
 
 **Scop**: cadru enterprise pentru parteneriate locale non-exclusive cu administratori imobile / dezvoltatori / companii locale. Partener rămâne independent juridic.
