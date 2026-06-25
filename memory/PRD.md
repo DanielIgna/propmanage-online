@@ -4,6 +4,40 @@
 PropManage is a full-stack property management platform with: Digital Twin 3D viewer, Multi-Role auth, QA Automation, marketplace for specialists, GDPR/Trust Center, AI Console, support inbox, auth-health dashboard.
 
 
+## 🛡️ Admin Accounts Manager + general.admin + Operating Manual update (Feb 26, 2026, Part 6)
+
+**Scop**: Super-admin poate gestiona TOȚI adminii (inclusiv conturile externe `carlospacu@gmail.com`, `danieligna1@gmail.com`), nu doar cele 6 demo. Block/unblock, change role+scope, change password — toate gated cu cod master 0108.
+
+**Backend** (`/app/backend/routes/admin_accounts.py`, ~181 linii):
+- `GET /api/admin/admin-accounts` — listă completă admins (role în {admin, super_admin, marketing_manager, operator}). Returnează 22+ items cu `email/name/role/scope/seniority/is_active/is_demo_sub_admin/is_protected/last_login_at` + `protected_email='admin@propmanage.io'` + `allowed_roles[]` + `allowed_scopes[]`.
+- `POST /block-toggle {email, master_code}` — flip `is_active`. PROTECTED_EMAIL → 400.
+- `POST /change-role {email, new_role, new_scope, new_seniority, master_code}` — validates `ALLOWED_ROLES = {admin, marketing_manager, operator, specialist, client}` și `ALLOWED_SCOPES` (12 opts). PROTECTED_EMAIL → 400.
+- `POST /change-password {email, new_password, master_code}` — funcționează inclusiv pentru super-admin (pentru rotation). Validates >=8 chars + litere + cifre.
+- Cod master `0108` hardcoded în `MASTER_CODE`. Toate operațiile audited în logs cu email super-admin caller.
+
+**Seed update** (`/app/backend/sub_admin_seed.py`): adăugat 6th entry `general.admin@propmanage.io` / `Gen!Demo2026Strong` / scope general. Acum 6 demo accounts total.
+
+**Frontend** (`/app/frontend/src/pages/admin/AdminAccountsPage.jsx`, ~280 linii):
+- Tabel cu 22+ rânduri (search bar live + role filter dropdown).
+- Badges per rând: PROTECT (auriu pentru admin@propmanage.io), DEMO (cyan pentru 6 demo), ACTIV/BLOCAT (verde/rose).
+- 3 butoane acțiune per rând: Ban/Play (block-toggle), UserCog (change role), KeyRound (change password). Butoanele block și role sunt disabled cu opacity-30 pentru PROTECTED_EMAIL.
+- Modal generic `ActionModal` cu fields configurabile (code/text/select).
+- Route `/admin/admin-accounts`. Sidebar entry „Admin Accounts Manager" badge `0108` în IT Hub.
+
+**Operating Manual** (`/app/docs/OPERATING_MANUAL.md`, versiune 1.1):
+- Secțiune nouă „🔑 Demo Accounts Manager" cu cele 6 conturi + acțiuni + cod 0108.
+- Secțiune nouă „🛡️ Admin Accounts Manager" cu Scenarios 9/10/11:
+  - „Vreau să verific accesul unui admin extern" (search carlospacu/danieligna1, decizie Ban/Role/Pw)
+  - „Am blocat din greșeală un admin" (filter BLOCAT → Play → cod 0108)
+  - „Vreau să schimb parola super-admin" (PROTECTED row → KeyRound only)
+
+**Tests**: `iteration_77.json` → **18/18 backend pytest PASS** (list/RBAC/block-toggle/wrong-code/protected/change-role/invalid-role/invalid-scope/change-password/weak-pw/short-pw + 5 regression). Frontend 100% pe critical flows. `retest_needed: false`. Test file persistat: `/app/backend/tests/test_admin_accounts_iter77.py`.
+
+**Code review notes** (din iter77, neblocking):
+- `MASTER_CODE` + `PROTECTED_EMAIL` hardcoded — acceptabil pentru owner tool, poate fi mutat în env var pentru rotabilitate.
+- Distinction clearly explained: `Demo Accounts Manager` (6 fixed emails, reset to default) vs `Admin Accounts Manager` (toți, doar block/role/password).
+
+
 ## 🔑 Demo Accounts Manager + Cookie Banner Fix + Docs Update (Feb 26, 2026, Part 5)
 
 **Scop**: Super-admin poate distribui acces demo unor colaboratori externi (testing/frontend/backend/security/marketing experts) cu parole vizibile/resetabile gated cu cod master + Cookie Banner mai compact + Documentația internă updated.
