@@ -558,11 +558,64 @@ if (hasFeature("bulk_operations")) { ... }
 2. Cere-mi: `Adaugă admin@nume.com ca admin secundar. Vreau să poată vedea Governance dar NU să schimbe deprecations.`
 3. Eu implementez fine-grained permissions (după FG-3 Enforcement layer e gata)
 
-### Scenariu 8: "Cum testez UI-ul pentru clienți Junior?"
-1. Creează un cont client test
-2. (după implementare progressive disclosure) admin override: `POST /api/admin/users/{id}/set-tier {"tier": "junior"}`
-3. Loghează-te cu acel cont → vezi UI simplu
-4. Revino în admin → schimbă tier la "verified" → loghează-te din nou → vezi UI complet
+---
+
+## 🔑 Demo Accounts Manager (`/admin/demo-accounts`)
+
+**Scop:** 6 conturi destinate colaboratorilor externi care explorează platforma pe zona lor de expertiză. Tu controlezi parolele cu codul master **0108**.
+
+**Cele 6 conturi pre-seedate:**
+| Email | Parola implicită | Scope | Rol |
+|---|---|---|---|
+| `testing.admin@propmanage.io`   | `Test!Demo2026Strong`  | testing   | admin |
+| `frontend.admin@propmanage.io`  | `Front!Demo2026Strong` | frontend  | admin |
+| `backend.admin@propmanage.io`   | `Back!Demo2026Strong`  | backend   | admin |
+| `security.admin@propmanage.io`  | `Sec!Demo2026Strong`   | security  | admin |
+| `general.admin@propmanage.io`   | `Gen!Demo2026Strong`   | general   | admin |
+| `marketing.admin@propmanage.io` | `Mkt!Demo2026Strong`   | marketing | marketing_manager |
+
+**Acțiuni disponibile (super-admin only):**
+- **Vezi parola** — click pe iconița ochi în UI.
+- **Copy parola** — click iconița clipboard. Trimit-o prin email/Signal colaboratorului.
+- **Reset implicit** — readuce parola la valoarea hardcoded (din `/app/backend/sub_admin_seed.py`). Util dacă un colaborator a schimbat-o.
+- **Schimbă parola** — setezi una custom (min 8 caractere, litere + cifre).
+
+**Cod master:** `0108` (hardcoded în `/app/backend/routes/demo_accounts.py` constant `MASTER_CODE`). Schimbă-l direct în fișier dacă vrei să-l rotești.
+
+**Audit:** fiecare reset/schimbare e logată în `/var/log/supervisor/backend.*.log` cu email-ul super-adminului care a făcut acțiunea.
+
+---
+
+## 🛡️ Admin Accounts Manager (`/admin/admin-accounts`)
+
+**Scop:** control complet asupra TUTUROR conturilor cu rol admin (inclusiv demo, operatori, marketing manager, conturi externe ca `carlospacu@gmail.com` și `danieligna1@gmail.com`).
+
+**Ce poți face:**
+- **Listă completă** — toți admin/super_admin/marketing_manager/operator cu filtru pe rol + search după email/nume.
+- **Blochează / Activează** un cont — flag `is_active`. Userii blocați NU se pot loga (utile când apare ceva suspect).
+- **Schimbă rolul + scope** — promovezi/demotezi între `admin`, `marketing_manager`, `operator`, `specialist`, `client` cu scope opțional (general/testing/frontend/backend/security/marketing/ops/ai/finance/legal/growth).
+- **Schimbă parola** — direct pentru orice admin (inclusiv super-admin propriu pentru rotation).
+
+**Cont PROTEJAT:** `admin@propmanage.io` (tu) — nu poate fi blocat sau demotat. Poate doar avea parola schimbată (de tine).
+
+**Cod master:** `0108` pentru toate operațiile de scriere.
+
+### Scenariu 9: "Vreau să verific accesul unui admin extern"
+1. `/admin/admin-accounts` → search după email (ex: `carlospacu`)
+2. Vezi rol curent, scope, ultimul login, status activ
+3. Decizie:
+   - Suspect → click **Ban** (rosu) → cod 0108 → blocat instant
+   - Schimbă scope/rol → click **UserCog** (violet) → alege rol + scope + cod 0108
+   - Rotire parolă → click **KeyRound** (fuchsia) → parolă nouă + cod 0108
+
+### Scenariu 10: "Am blocat din greșeală un admin"
+1. `/admin/admin-accounts` → filter "BLOCAT" sau scroll
+2. Click iconița **Play** (verde) → cod 0108 → cont activat din nou
+
+### Scenariu 11: "Vreau să schimb parola super-admin (propriul cont)"
+1. `/admin/admin-accounts` → găsește rândul `admin@propmanage.io` (badge PROTECT)
+2. Click **KeyRound** → parolă nouă min 8 chars + cod 0108
+3. ATENȚIE: salvează parola într-un password manager înainte de submit. Dacă o uiți, recuperarea cere intervenție directă în DB.
 
 ---
 
@@ -575,4 +628,4 @@ if (hasFeature("bulk_operations")) { ... }
 
 ---
 
-*Manual versiune 1.0 — Feb 12, 2026. Re-citește când platforma evoluează semnificativ.*
+*Manual versiune 1.1 — Feb 26, 2026. Re-citește când platforma evoluează semnificativ.*

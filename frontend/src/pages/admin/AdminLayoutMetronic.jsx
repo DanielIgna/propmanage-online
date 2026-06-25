@@ -214,6 +214,7 @@ const NAV_SECTIONS = [
       { id: "it_legal", label: "Audit Juridic IT", icon: ShieldCheck, badge: "LEGAL", href: "/admin/legal-audit" },
       { id: "founder_gate", label: "Founder Approval Gate", icon: ShieldCheck, badge: "FG-0", href: "/admin/founder-gate" },
       { id: "demo_accounts", label: "Demo Accounts Manager", icon: KeyRound, badge: "0108", href: "/admin/demo-accounts" },
+      { id: "admin_accounts", label: "Admin Accounts Manager", icon: Shield, badge: "0108", href: "/admin/admin-accounts" },
     ],
   },
   {

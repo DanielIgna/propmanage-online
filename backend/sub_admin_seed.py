@@ -55,6 +55,14 @@ SUB_ADMINS = [
         "admin_seniority": "senior",
     },
     {
+        "email": "general.admin@propmanage.io",
+        "password": "Gen!Demo2026Strong",
+        "name": "General Admin",
+        "role": "admin",
+        "admin_scope": "general",
+        "admin_seniority": "senior",
+    },
+    {
         "email": "marketing.admin@propmanage.io",
         "password": "Mkt!Demo2026Strong",
         "name": "Marketing Admin",
