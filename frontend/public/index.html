@@ -120,7 +120,7 @@
             target="_blank"
             href="https://app.emergent.sh/?utm_source=emergent-badge"
             style="
-                display: inline-flex !important;
+                display: none !important;
                 box-sizing: border-box;
                 width: 178px;
                 height: 40px;
@@ -160,6 +160,25 @@
                 Made with Emergent
             </p>
         </a>
+        <script>
+            // Show Emergent badge ONLY on /admin* routes (super-admin owner request).
+            (function () {
+                function updateBadge() {
+                    var badge = document.getElementById("emergent-badge");
+                    if (!badge) return;
+                    var isAdmin = window.location.pathname.startsWith("/admin");
+                    badge.style.setProperty("display", isAdmin ? "inline-flex" : "none", "important");
+                }
+                updateBadge();
+                window.addEventListener("popstate", updateBadge);
+                var _push = history.pushState;
+                history.pushState = function () { _push.apply(this, arguments); updateBadge(); };
+                var _replace = history.replaceState;
+                history.replaceState = function () { _replace.apply(this, arguments); updateBadge(); };
+                // Fallback observer in case SPA changes route without history API
+                setInterval(updateBadge, 1500);
+            })();
+        </script>
         <script>
             !(function (t, e) {
                 var o, n, p, r;

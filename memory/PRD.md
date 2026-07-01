@@ -1,3 +1,39 @@
+## 📋 Roadmap & Backlog (prioritizat)
+
+### 🔴 P0 — Anomaly Detector (NEXT — necesar ~12-15 credite)
+**Trigger**: User a cerut Feb 26, 2026 dar buget insuficient (8 credite) → amânat la următoarea sesiune cu credite suficiente.
+
+**Scop**: Detector zilnic peste `demo_activity_logs` care alertează super-admin pe Resend când:
+- Demo user accesează 500+ endpoint-uri într-o oră (potențial scraping)
+- 10+ erori 4xx în 5 minute (testează permisiuni)
+- Demo user accesează rute outside scope (ex: testing.admin → /api/admin/marketing/*)
+- IP geografic suspect (foreign country)
+
+**Livrabile**:
+- `routes/anomaly_detector.py` cu reguli + endpoint GET /anomalies/recent
+- Scheduler APScheduler care rulează la 00:00 + 12:00 zilnic
+- Email Resend către super-admins cu summary HTML
+- UI tab în /admin/demo-activity cu lista alertelor + ack-uire
+
+### 🟠 P1 — Faza 2 Marketing
+- AI Content Calendar (~5 credite)
+- AI Automation Center (welcome/review/reactivare emails) (~6 credite)
+- SEO AI Engine (~5 credite)
+
+### 🟡 P2 — Faza 3 External Integrations (când ai chei API)
+- Meta Ads API + OAuth
+- Google Ads + Analytics
+- Social Connectors (FB/IG/LinkedIn/TikTok/YouTube)
+
+### ⚪ P3 — Tehnical Debt
+- Cookie banner: deja fixat ✅
+- _enforce_admin_role refactor (drop role-overwrite pentru sub-admin roles seedate)
+- Migrare imagini base64 → S3/GCS (la > 100 campanii)
+- Multi-tenant architecture
+- Cron auto-trigger zilnic 09:00 (vs manual button acum)
+
+---
+
 # PropManage — Product Requirements Document
 
 ## Original problem statement
