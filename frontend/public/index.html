@@ -161,14 +161,30 @@
             </p>
         </a>
         <script>
-            // Show Emergent badge ONLY on /admin* routes (super-admin owner request).
+            // Show Emergent badge ONLY on /admin* routes. On non-admin routes the
+            // badge is fully REMOVED from the DOM (not just hidden) so it cannot
+            // be inspected, forced-visible via devtools, or leak through any CSS.
             (function () {
+                var badge = document.getElementById("emergent-badge");
+                var parent = badge && badge.parentNode;
+                var placeholder = document.createComment("emergent-badge-slot");
+                if (badge && parent) parent.insertBefore(placeholder, badge);
+                var attached = true;
+
                 function updateBadge() {
-                    var badge = document.getElementById("emergent-badge");
-                    if (!badge) return;
+                    if (!badge || !parent) return;
                     var p = window.location.pathname;
                     var isAdmin = p === "/admin" || p.indexOf("/admin/") === 0;
-                    badge.style.setProperty("display", isAdmin ? "inline-flex" : "none", "important");
+                    if (isAdmin && !attached) {
+                        parent.insertBefore(badge, placeholder.nextSibling);
+                        badge.style.setProperty("display", "inline-flex", "important");
+                        attached = true;
+                    } else if (!isAdmin && attached) {
+                        badge.remove();
+                        attached = false;
+                    } else if (isAdmin) {
+                        badge.style.setProperty("display", "inline-flex", "important");
+                    }
                 }
                 updateBadge();
                 window.addEventListener("popstate", updateBadge);
