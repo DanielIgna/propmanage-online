@@ -166,7 +166,8 @@
                 function updateBadge() {
                     var badge = document.getElementById("emergent-badge");
                     if (!badge) return;
-                    var isAdmin = window.location.pathname.startsWith("/admin");
+                    var p = window.location.pathname;
+                    var isAdmin = p === "/admin" || p.indexOf("/admin/") === 0;
                     badge.style.setProperty("display", isAdmin ? "inline-flex" : "none", "important");
                 }
                 updateBadge();
