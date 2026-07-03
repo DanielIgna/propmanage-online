@@ -9,6 +9,7 @@ import os
 import pytest
 import requests
 from dotenv import load_dotenv
+from tests.test_config import OWNER_ADMIN_PASSWORD
 load_dotenv('/app/backend/.env')
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://phased-document.preview.emergentagent.com").rstrip("/")
@@ -72,7 +73,7 @@ def test_switch_view_blocks_without_specialist_profile():
 
 
 def test_admin_login_not_affected():
-    s = _login("admin@propmanage.io", "1!nasov01ADMIN")
+    s = _login("admin@propmanage.io", OWNER_ADMIN_PASSWORD)
     r = s.get(f"{BASE_URL}/api/auth/me")
     assert r.status_code == 200
     assert r.json()["role"] == "admin"

@@ -17,6 +17,7 @@ request, using the same ``admin_actions_log`` collection.
 """
 import re
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 import jwt
@@ -131,7 +132,7 @@ async def admin_scope_middleware(request: Request, call_next):
             "allowed_scopes": sorted(allowed),
             "outcome": "denied",
             "source": "middleware",
-            "ts": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+            "ts": datetime.now(timezone.utc).isoformat(),
         })
     except Exception:  # noqa: BLE001
         pass

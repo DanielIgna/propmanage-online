@@ -4,10 +4,11 @@ import time
 import uuid
 import pytest
 import requests
+from tests.test_config import OWNER_ADMIN_PASSWORD
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://phased-document.preview.emergentagent.com").rstrip("/")
 
-SUPER_ADMIN = {"email": "admin@propmanage.io", "password": "1!nasov01ADMIN"}
+SUPER_ADMIN = {"email": "admin@propmanage.io", "password": OWNER_ADMIN_PASSWORD}
 
 
 def _login(email, password):

@@ -16,6 +16,7 @@ import uuid
 import requests
 import pytest
 from pymongo import MongoClient
+from tests.test_config import OWNER_ADMIN_PASSWORD
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
@@ -54,6 +55,7 @@ class TestRegisterConsent:
     def test_register_without_terms_returns_400(self):
         email = _unique_email()
         r = requests.post(f"{BASE_URL}/api/auth/register", json={
+            "phone": "+40712000999",
             "email": email, "password": "Pass123!", "name": "Test", "role": "client",
             "terms_accepted": False, "privacy_policy_accepted": True,
         })
@@ -63,6 +65,7 @@ class TestRegisterConsent:
     def test_register_without_privacy_returns_400(self):
         email = _unique_email()
         r = requests.post(f"{BASE_URL}/api/auth/register", json={
+            "phone": "+40712000999",
             "email": email, "password": "Pass123!", "name": "Test", "role": "client",
             "terms_accepted": True, "privacy_policy_accepted": False,
         })
@@ -72,6 +75,7 @@ class TestRegisterConsent:
     def test_register_full_consent_success_and_audit_log(self):
         email = _unique_email()
         r = requests.post(f"{BASE_URL}/api/auth/register", json={
+            "phone": "+40712000999",
             "email": email, "password": "Pass123!", "name": "Test User", "role": "client",
             "terms_accepted": True, "privacy_policy_accepted": True, "marketing_consent": True,
         })
@@ -100,6 +104,7 @@ class TestEmailVerification:
     def test_verify_email_full_flow(self):
         email = _unique_email("verifytest")
         r = requests.post(f"{BASE_URL}/api/auth/register", json={
+            "phone": "+40712000999",
             "email": email, "password": "Pass123!", "name": "V", "role": "client",
             "terms_accepted": True, "privacy_policy_accepted": True,
         })
@@ -132,6 +137,7 @@ class TestEmailVerification:
     def test_resend_verification_and_rate_limit(self, s):
         email = _unique_email("resend")
         r = s.post(f"{BASE_URL}/api/auth/register", json={
+            "phone": "+40712000999",
             "email": email, "password": "Pass123!", "name": "R", "role": "client",
             "terms_accepted": True, "privacy_policy_accepted": True,
         })
@@ -152,6 +158,7 @@ class TestConsentPatch:
         email = _unique_email("consupd")
         s = requests.Session()
         r = s.post(f"{BASE_URL}/api/auth/register", json={
+            "phone": "+40712000999",
             "email": email, "password": "Pass123!", "name": "C", "role": "client",
             "terms_accepted": True, "privacy_policy_accepted": True, "marketing_consent": True,
         })
@@ -185,6 +192,7 @@ class TestCookieConsent:
         email = _unique_email("cook")
         s = requests.Session()
         r = s.post(f"{BASE_URL}/api/auth/register", json={
+            "phone": "+40712000999",
             "email": email, "password": "Pass123!", "name": "K", "role": "client",
             "terms_accepted": True, "privacy_policy_accepted": True,
         })
@@ -207,7 +215,7 @@ class TestAdminUsersFilters:
     def admin_session(self):
         s = requests.Session()
         r = s.post(f"{BASE_URL}/api/auth/login", json={
-            "email": "admin@propmanage.io", "password": "Admin123!"
+            "email": "admin@propmanage.io", "password": OWNER_ADMIN_PASSWORD
         })
         assert r.status_code == 200, f"Admin login failed: {r.text}"
         return s
@@ -255,7 +263,7 @@ class TestBackfill:
 # ============ LOGIN REGRESSION ============
 class TestLoginRegression:
     @pytest.mark.parametrize("email,password", [
-        ("admin@propmanage.io", "Admin123!"),
+        ("admin@propmanage.io", OWNER_ADMIN_PASSWORD),
         ("client@propmanage.io", "Client123!"),
         ("specialist@propmanage.io", "Spec123!"),
     ])

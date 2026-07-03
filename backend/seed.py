@@ -1,6 +1,7 @@
 """Idempotent seed for demo accounts, properties, requests, twins, regions, portfolio."""
 import uuid
 import logging
+import os
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
@@ -19,7 +20,7 @@ async def seed():
         {"email": "specialist@propmanage.io", "password": "Spec123!", "name": "Mihai Ionescu", "role": "specialist", "specialty": "hvac", "phone": "+40 723 456 789"},
         {"email": "specialist2@propmanage.io", "password": "Spec123!", "name": "Elena Dumitru", "role": "specialist", "specialty": "plumbing", "phone": "+40 734 567 890"},
         {"email": "pending@propmanage.io", "password": "Spec123!", "name": "Vasile Constantinescu", "role": "specialist", "specialty": "electric", "phone": "+40 745 678 901", "_pending": True},
-        {"email": "admin@propmanage.io", "password": "1!nasov01ADMIN", "name": "Administrator", "role": "admin", "phone": ""},
+        {"email": "admin@propmanage.io", "password": os.environ.get("SEED_ADMIN_PASSWORD", "Admin123!"), "name": "Administrator", "role": "admin", "phone": ""},
         {"email": "operator@propmanage.io", "password": "Op123!", "name": "Lucian Stan", "role": "operator", "phone": ""},
     ]
 
@@ -35,6 +36,9 @@ async def seed():
                 update_fields["coverage_zones"] = ["Bucuresti-Sector1", "Bucuresti-Sector2"]
                 update_fields["service_categories"] = [u.get("specialty"), "interior_design"] if u.get("specialty") else ["interior_design"]
                 update_fields["availability_status"] = existing.get("availability_status") or "available"
+                if not u.get("_pending"):
+                    # Verified demo specialists can switch to the client view (phase 11)
+                    update_fields["dual_role_enabled"] = True
                 if u.get("_pending") and existing.get("verified"):
                     update_fields["verified"] = False
                     update_fields["tier"] = None
@@ -71,6 +75,7 @@ async def seed():
             "coverage_zones": ["Bucuresti-Sector1", "Bucuresti-Sector2"] if u["role"] == "specialist" else [],
             "service_categories": [u.get("specialty"), "interior_design"] if u["role"] == "specialist" and u.get("specialty") else [],
             "availability_status": "available" if u["role"] == "specialist" else None,
+            "dual_role_enabled": u["role"] == "specialist" and not u.get("_pending"),
             "documents": [
                 {"id": str(uuid.uuid4()), "type": "id_card", "name": "CI Vasile Constantinescu.pdf", "url": "data:application/pdf;base64,placeholder", "status": "pending", "uploaded_at": datetime.now(timezone.utc).isoformat()},
                 {"id": str(uuid.uuid4()), "type": "certification", "name": "Atestat ANRE electrician.pdf", "url": "data:application/pdf;base64,placeholder", "status": "pending", "uploaded_at": datetime.now(timezone.utc).isoformat()},

@@ -10,10 +10,11 @@ import time
 import uuid
 import pytest
 import requests
+from tests.test_config import OWNER_ADMIN_PASSWORD
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 
-SUPER = {"email": "admin@propmanage.io", "password": "1!nasov01ADMIN"}
+SUPER = {"email": "admin@propmanage.io", "password": OWNER_ADMIN_PASSWORD}
 SUB = {"email": "testing.admin@propmanage.io", "password": "TestAdmin123!"}
 DEV = {"email": "dev1@team.com", "password": "Dev1Pass!"}
 CLIENT = {"email": "client@propmanage.io", "password": "Client123!"}
@@ -121,7 +122,7 @@ class TestDigestRun:
 # ─────────────────────────────────────────────────────────────────────────────
 # LEGAL — public-ish user endpoints
 # ─────────────────────────────────────────────────────────────────────────────
-EXPECTED_TYPES = {"nda", "collaboration", "ip_cession", "security_policy", "infra_access", "regulation"}
+EXPECTED_TYPES = {"nda", "collaboration", "ip_cession", "security_policy", "infra_access", "regulation", "marketplace_partner"}
 
 
 class TestLegalDocuments:
@@ -163,7 +164,7 @@ class TestLegalSignAndStatus:
         assert data["is_strategic_contributor"] is True
         assert set(data["required"]) == EXPECTED_TYPES
         total = len(data["signed"]) + len(data["pending"])
-        assert total == 6, f"expected 6 total, got signed={len(data['signed'])} pending={len(data['pending'])}"
+        assert total == len(EXPECTED_TYPES), f"expected {len(EXPECTED_TYPES)} total, got signed={len(data['signed'])} pending={len(data['pending'])}"
 
     def test_accept_agreed_false_returns_400(self, dev_session):
         # get a doc id
@@ -292,7 +293,7 @@ class TestLegalAdmin:
         data = r.json()
         # All defaults already exist => inserted should be 0
         assert data["inserted"] == 0
-        assert data["total"] == 6
+        assert data["total"] >= len(EXPECTED_TYPES)
 
     def test_create_document_subadmin_403(self, sub_session):
         r = sub_session.post(f"{BASE_URL}/api/admin/legal/documents",

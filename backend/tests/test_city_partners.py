@@ -3,10 +3,11 @@ import os
 import uuid
 import pytest
 import requests
+from tests.test_config import OWNER_ADMIN_PASSWORD
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://phased-document.preview.emergentagent.com").rstrip("/")
 
-SUPER_ADMIN = ("admin@propmanage.io", "1!nasov01ADMIN")
+SUPER_ADMIN = ("admin@propmanage.io", OWNER_ADMIN_PASSWORD)
 SUB_ADMIN = ("testing.admin@propmanage.io", "TestAdmin123!")
 CLIENT = ("client@propmanage.io", "Client123!")
 PARTNER1 = ("ion@blocadmin.ro", "owKT6oOYMIyOSM!1A")

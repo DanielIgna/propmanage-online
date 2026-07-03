@@ -3,6 +3,7 @@ import os
 import time
 import pytest
 import requests
+from tests.test_config import OWNER_ADMIN_PASSWORD
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
@@ -12,7 +13,7 @@ if not BASE_URL:
             if line.startswith("REACT_APP_BACKEND_URL"):
                 BASE_URL = line.split("=", 1)[1].strip().strip('"').rstrip("/")
 
-SUPER = ("admin@propmanage.io", "1!nasov01ADMIN")
+SUPER = ("admin@propmanage.io", OWNER_ADMIN_PASSWORD)
 OWNER = ("danieligna1@gmail.com", "0108")
 MKT   = ("marketing.admin@propmanage.io", "Mkt!Demo2026Strong")
 CLIENT = ("client@propmanage.io", "Client123!")

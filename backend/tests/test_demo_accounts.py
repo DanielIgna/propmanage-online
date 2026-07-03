@@ -2,16 +2,18 @@
 import os
 import pytest
 import requests
+from tests.test_config import OWNER_ADMIN_PASSWORD
 
 BASE = os.environ.get("REACT_APP_BACKEND_URL", "https://phased-document.preview.emergentagent.com").rstrip("/")
 API = f"{BASE}/api"
 
-SUPER = {"email": "admin@propmanage.io", "password": "1!nasov01ADMIN"}
+SUPER = {"email": "admin@propmanage.io", "password": OWNER_ADMIN_PASSWORD}
 DEMO_ACCOUNTS = [
     ("testing.admin@propmanage.io",  "Test!Demo2026Strong",  "testing",   "admin"),
     ("frontend.admin@propmanage.io", "Front!Demo2026Strong", "frontend",  "admin"),
     ("backend.admin@propmanage.io",  "Back!Demo2026Strong",  "backend",   "admin"),
     ("security.admin@propmanage.io", "Sec!Demo2026Strong",   "security",  "admin"),
+    ("general.admin@propmanage.io",  "Gen!Demo2026Strong",   "general",   "admin"),
     ("marketing.admin@propmanage.io","Mkt!Demo2026Strong",   "marketing", "marketing_manager"),
 ]
 MASTER = "0108"
@@ -49,7 +51,7 @@ def test_list_demo_accounts_as_super(super_session):
     r = super_session.get(f"{API}/admin/demo-accounts", timeout=20)
     assert r.status_code == 200, r.text
     data = r.json()
-    assert data["count"] == 5
+    assert data["count"] == 6
     by_email = {it["email"]: it for it in data["items"]}
     for email, pw, scope, role in DEMO_ACCOUNTS:
         assert email in by_email, f"missing {email}"

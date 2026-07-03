@@ -429,14 +429,15 @@ async def list_disputes(user: dict = Depends(require_role("admin"))):
     for d in docs:
         d = serialize_doc(d)
         req = reqs_map.get(d.get("request_id"))
-        if req:
-            d["request_title"] = req.get("title")
-            d["request_status"] = req.get("status")
-            d["escrow_amount"] = req.get("escrow_amount", 0)
-            client_u = users_map.get(req.get("client_id"))
-            spec_u = users_map.get(req.get("specialist_id"))
-            d["client_name"] = client_u.get("name") if client_u else None
-            d["specialist_name"] = spec_u.get("name") if spec_u else None
+        # Enriched fields are ALWAYS present (None/0 for orphaned disputes
+        # whose request was deleted) — stable contract for the admin UI.
+        d["request_title"] = req.get("title") if req else None
+        d["request_status"] = req.get("status") if req else None
+        d["escrow_amount"] = req.get("escrow_amount", 0) if req else 0
+        client_u = users_map.get(req.get("client_id")) if req else None
+        spec_u = users_map.get(req.get("specialist_id")) if req else None
+        d["client_name"] = client_u.get("name") if client_u else None
+        d["specialist_name"] = spec_u.get("name") if spec_u else None
         out.append(d)
     return out
 

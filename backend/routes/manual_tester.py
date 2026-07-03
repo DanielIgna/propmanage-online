@@ -59,7 +59,7 @@ SUITES = [
                 "id": "auth_login_admin",
                 "title": "Login ca ADMIN",
                 "steps": [
-                    "Login cu admin@propmanage.io / 1!nasov01ADMIN",
+                    "Login cu admin@propmanage.io / parola admin (SEED_ADMIN_PASSWORD din backend/.env)",
                 ],
                 "expected": "Redirecționare la /admin. Apare sidebar admin cu toate categoriile.",
             },

@@ -1,23 +1,16 @@
 """PropManage router: payments."""
 import os
-import asyncio
-import json
 import logging
 import uuid
-from typing import Optional, List, Literal, Dict
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from db import db
-from core_utils import serialize_doc, effective_role
 from deps import get_current_user, require_role
-from services import send_email, notify, send_web_push, log_event
-from models import *
+from services import log_event
 from email_service import (
-    send_template, tpl_welcome, tpl_dispute_opened, tpl_dispute_resolved,
-    tpl_design_phase_quote, tpl_specialist_verified, tpl_escrow_funded,
+    send_template, tpl_escrow_funded,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,7 +19,6 @@ router = APIRouter(prefix="/api", tags=["payments"])
 
 import stripe
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
-import httpx
 stripe.api_key = os.environ.get("STRIPE_API_KEY", "sk_test_emergent")
 
 # ============= STRIPE ESCROW =============# ============= STRIPE ESCROW =============

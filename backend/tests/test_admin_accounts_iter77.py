@@ -4,11 +4,12 @@ Covers list/block-toggle/change-role/change-password + general.admin seed.
 import os
 import pytest
 import requests
+from tests.test_config import OWNER_ADMIN_PASSWORD
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://phased-document.preview.emergentagent.com").rstrip("/")
 
 SUPER_EMAIL = "admin@propmanage.io"
-SUPER_PASS = "1!nasov01ADMIN"
+SUPER_PASS = OWNER_ADMIN_PASSWORD
 NON_SUPER_EMAIL = "testing.admin@propmanage.io"
 NON_SUPER_PASS = "Test!Demo2026Strong"
 GENERAL_EMAIL = "general.admin@propmanage.io"
@@ -71,7 +72,7 @@ def test_list_admins_super_ok(super_token):
     assert r.status_code == 200, r.text
     body = r.json()
     assert "items" in body and isinstance(body["items"], list)
-    assert body.get("protected_email") == SUPER_EMAIL
+    assert SUPER_EMAIL in (body.get("protected_emails") or [])
     assert isinstance(body.get("allowed_roles"), list) and len(body["allowed_roles"]) > 0
     assert isinstance(body.get("allowed_scopes"), list) and len(body["allowed_scopes"]) > 0
     # Item shape check

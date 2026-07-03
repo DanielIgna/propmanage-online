@@ -2,12 +2,13 @@
 import os
 import pytest
 import requests
+from tests.test_config import OWNER_ADMIN_PASSWORD
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://phased-document.preview.emergentagent.com").rstrip("/")
 
 CRED = {
     "client": {"email": "client@propmanage.io", "password": "Client123!"},
-    "admin": {"email": "admin@propmanage.io", "password": "1!nasov01ADMIN"},
+    "admin": {"email": "admin@propmanage.io", "password": OWNER_ADMIN_PASSWORD},
 }
 
 

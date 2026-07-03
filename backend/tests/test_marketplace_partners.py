@@ -4,11 +4,12 @@ import uuid
 import time
 import requests
 import pytest
+from tests.test_config import OWNER_ADMIN_PASSWORD
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 assert BASE_URL, "REACT_APP_BACKEND_URL not set"
 
-ADMIN = ("admin@propmanage.io", "1!nasov01ADMIN")
+ADMIN = ("admin@propmanage.io", OWNER_ADMIN_PASSWORD)
 CITY_PARTNER = ("ion@blocadmin.ro", "owKT6oOYMIyOSM!1A")
 SUB_ADMIN = ("testing.admin@propmanage.io", "TestAdmin123!")
 CLIENT = ("client@propmanage.io", "Client123!")

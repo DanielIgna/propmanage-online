@@ -34,6 +34,7 @@ def _register_specialist(api, email=None, name="Test Specialist Iter63"):
     payload = {
         "email": email,
         "password": "Test123!",
+        "terms_accepted": True, "privacy_policy_accepted": True,
         "name": name,
         "role": "specialist",
         "phone": "+40712345678",
@@ -52,6 +53,7 @@ def _register_client(api, email=None, name="Test Client Iter63"):
     payload = {
         "email": email,
         "password": "Test123!",
+        "terms_accepted": True, "privacy_policy_accepted": True,
         "name": name,
         "role": "client",
         "phone": "+40712345678",
@@ -113,6 +115,7 @@ class TestSpecialistWelcomeTopic:
         payload = {
             "email": email,
             "password": "Test123!",
+            "terms_accepted": True, "privacy_policy_accepted": True,
             "name": name,
             "role": "specialist",
             "phone": "+40712345678",

@@ -102,6 +102,7 @@ class TestPropertyCRUD:
         # Use second client account: register a temp client, try to update first client's property.
         sess = requests.Session()
         reg = sess.post(f"{API}/auth/register", json={
+            "terms_accepted": True, "privacy_policy_accepted": True, "phone": "+40712000999",
             "email": "TEST_phase4_otherclient@propmanage.io",
             "password": "Test123!",
             "name": "Other Client",

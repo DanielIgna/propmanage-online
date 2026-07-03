@@ -729,21 +729,30 @@ async def retry_conversion(model_id: str, user: dict = Depends(get_current_user)
 # ============= MULTI-LAYER VIEWER ENDPOINTS =============
 @router.get("/projects/{project_id}/models")
 async def list_project_models(project_id: str, user: dict = Depends(get_current_user)):
-    """List all uploaded models (layers) for a project — used by the multi-layer
-    viewer to render multiple `.glb` files simultaneously as glass-wall overlays."""
+    """List all uploaded models for a project.
+
+    Response is a superset serving both consumers:
+      • multi-layer viewer → `models` (.glb/.gltf layers) + `archives` (.skp)
+      • model versions list → `items` (everything, newest first) + `count`
+    """
     await _ensure_dt_access(user)
     await _ensure_project_access(project_id, user)
-    docs = await db.digital_twin_models.find({"project_id": project_id}).to_list(50)
-    # Only return viewable models (.glb/.gltf) — archives (.skp) listed separately
-    items = []
-    archives = []
+    docs = await db.digital_twin_models.find({"project_id": project_id}).sort("uploaded_at", -1).to_list(50)
+    items, models, archives = [], [], []
     for d in docs:
         clean = _clean(d)
+        items.append(clean)
         if d.get("kind") == "archive":
             archives.append(clean)
         else:
-            items.append(clean)
-    return {"models": items, "archives": archives, "total": len(items) + len(archives)}
+            models.append(clean)
+    return {
+        "models": models,
+        "archives": archives,
+        "total": len(items),
+        "items": items,
+        "count": len(items),
+    }
 
 
 class _LayerUpdateIn(BaseModel):
@@ -828,17 +837,6 @@ async def serve_model_file(project_id: str, filename: str, user: dict = Depends(
         filename=filename,
         headers={"Cache-Control": "private, max-age=3600"},
     )
-
-
-@router.get("/projects/{project_id}/models")
-async def list_models(project_id: str, user: dict = Depends(get_current_user)):
-    """List all uploaded model versions for a project."""
-    await _ensure_dt_access(user)
-    await _ensure_project_access(project_id, user)
-    items = []
-    async for m in db.digital_twin_models.find({"project_id": project_id}).sort("uploaded_at", -1):
-        items.append(_clean(m))
-    return {"items": items, "count": len(items)}
 
 
 # ----------------- pins (3D markup) -----------------

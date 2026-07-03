@@ -4,6 +4,7 @@ import time
 
 import pytest
 import requests
+from tests.test_config import OWNER_ADMIN_PASSWORD
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
@@ -18,7 +19,7 @@ if not BASE_URL:
 
 API = f"{BASE_URL}/api"
 
-ADMIN_PASSWORDS = ["1!nasov01ADMIN", "Admin123!"]
+ADMIN_PASSWORDS = [OWNER_ADMIN_PASSWORD, OWNER_ADMIN_PASSWORD]
 CLIENT_EMAIL = "client@propmanage.io"
 CLIENT_PASSWORD = "Client123!"
 
