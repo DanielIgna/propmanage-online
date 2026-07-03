@@ -614,15 +614,16 @@ const QuickProfileSwitch = ({ dark }) => {
 };
 
 // ── Zone Switcher — delimitare Business vs Infrastructure & Development ─────
-const ZoneSwitcher = ({ zone, onSwitch, dark }) => {
+const ZoneSwitcher = ({ zone, onSwitch, dark, allowedZones = ["business", "infrastructure"] }) => {
   const tabs = [
     { id: "business", icon: Briefcase, meta: ADMIN_ZONES.business },
     { id: "infrastructure", icon: Server, meta: ADMIN_ZONES.infrastructure },
-  ];
-  const activeMeta = ADMIN_ZONES[zone];
+  ].filter(t => allowedZones.includes(t.id));
+  const activeMeta = ADMIN_ZONES[zone] || ADMIN_ZONES[allowedZones[0]];
+  const restricted = tabs.length === 1;
   return (
     <div className="px-3 pt-3" data-testid="admin-zone-switcher">
-      <div className={`grid grid-cols-2 gap-1 p-1 rounded-xl border ${dark ? "bg-slate-800/60 border-slate-700" : "bg-slate-100 border-slate-200"}`}>
+      <div className={`grid ${restricted ? "grid-cols-1" : "grid-cols-2"} gap-1 p-1 rounded-xl border ${dark ? "bg-slate-800/60 border-slate-700" : "bg-slate-100 border-slate-200"}`}>
         {tabs.map((t) => {
           const isActive = zone === t.id;
           const TabIcon = t.icon;
@@ -653,6 +654,11 @@ const ZoneSwitcher = ({ zone, onSwitch, dark }) => {
           {activeMeta.label}
         </span>
         <span className="block">{activeMeta.description}</span>
+        {restricted && (
+          <span className="block mt-0.5 text-amber-500 font-semibold" data-testid="zone-restricted-note">
+            Acces restricționat la această zonă (rol de zonă asignat)
+          </span>
+        )}
       </div>
     </div>
   );
@@ -679,7 +685,24 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
 
   // ── Active admin zone: "business" | "infrastructure" (persisted) ──────────
   const [zone, setZone] = useState(() => getStoredZone());
+  // Enforcement: zonele permise pentru adminul curent (default ambele; se
+  // restrânge după răspunsul /api/admin/admin-zones/me când are zone_role)
+  const [allowedZones, setAllowedZones] = useState(["business", "infrastructure"]);
   const switchZone = (z) => { setZone(z); setStoredZone(z); };
+  useEffect(() => {
+    axios.get(`${API}/admin/admin-zones/me`, { withCredentials: true })
+      .then(r => {
+        const zs = Array.isArray(r.data?.zones) && r.data.zones.length ? r.data.zones : ["business", "infrastructure"];
+        setAllowedZones(zs);
+      })
+      .catch(() => {});
+  }, []);
+  // Forțează zona pe una permisă (ex: rol business → nu poate rămâne pe infra)
+  useEffect(() => {
+    if (!allowedZones.includes(zone)) switchZone(allowedZones[0]);
+  }, [allowedZones]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Enforcement pe navigație: doar secțiunile din zonele permise
+  visibleSections = visibleSections.filter(s => allowedZones.includes(s.zone));
   // Sidebar renders ONLY sections of the active zone (delimitare completă)
   const zoneSections = visibleSections.filter(s => s.zone === zone);
 
@@ -819,7 +842,7 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
       </div>
 
       {/* Zone switcher — Business vs Infrastructure & Development */}
-      <ZoneSwitcher zone={zone} onSwitch={switchZone} dark={dark} />
+      <ZoneSwitcher zone={zone} onSwitch={switchZone} dark={dark} allowedZones={allowedZones} />
 
       {/* Cmd+K trigger + Collapse-all inside sidebar */}
       <div className="px-3 pt-3 flex items-center gap-2">

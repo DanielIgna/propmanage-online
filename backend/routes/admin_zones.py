@@ -28,7 +28,7 @@ router = APIRouter(prefix="/api/admin/admin-zones", tags=["admin-zones"])
 
 MASTER_CODE = os.environ.get("DEMO_MASTER_CODE", "0108")
 
-ENFORCEMENT = "prepared"  # "prepared" → toți adminii văd ambele zone; "active" → enforce
+ENFORCEMENT = "active"  # "prepared" → toți adminii văd ambele zone; "active" → enforce
 
 ZONES = {
     "business": {
@@ -79,12 +79,13 @@ async def get_zones_registry(user: dict = Depends(get_current_user)):
 async def get_my_zones(user: dict = Depends(get_current_user)):
     _require_admin(user)
     zone_role: Optional[str] = user.get("zone_role")
-    if ENFORCEMENT == "prepared":
-        # Permisiunile nu sunt încă active — toți adminii văd ambele zone.
+    role_def = ZONE_ROLES.get(zone_role or "")
+    if ENFORCEMENT != "active" or is_super_admin(user) or not role_def:
+        # Super-adminii și adminii FĂRĂ zone_role asignat păstrează acces complet
+        # (nu blocăm pe nimeni implicit — enforcement doar pe roluri asignate explicit).
         zones = ["business", "infrastructure"]
     else:
-        role_def = ZONE_ROLES.get(zone_role or "", None)
-        zones = role_def["zones"] if role_def else ["business", "infrastructure"]
+        zones = role_def["zones"]
     return {"zones": zones, "zone_role": zone_role, "enforcement": ENFORCEMENT}
 
 
@@ -94,12 +95,26 @@ async def assign_zone_role(req: AssignZoneRoleReq, user: dict = Depends(get_curr
         raise HTTPException(403, "Doar super-admin poate asigna roluri de zonă.")
     if (req.master_code or "").strip() != MASTER_CODE:
         raise HTTPException(403, "Cod master incorect.")
-    if req.zone_role not in ZONE_ROLES:
-        raise HTTPException(400, f"Rol necunoscut: {req.zone_role}. Valide: {sorted(ZONE_ROLES)}")
 
     target = await db.users.find_one({"email": req.email})
     if not target:
         raise HTTPException(404, f"Nu există utilizator cu emailul {req.email}.")
+
+    if req.zone_role == "none":
+        # Elimină rolul de zonă → contul revine la acces complet (ambele zone)
+        await db.users.update_one(
+            {"email": req.email},
+            {"$unset": {"zone_role": "", "admin_zones": ""},
+             "$set": {"zone_role_assigned_at": datetime.now(timezone.utc).isoformat(),
+                      "zone_role_assigned_by": user.get("email")}},
+        )
+        logger.info("Zone role ȘTERS pentru %s de către %s", req.email, user.get("email"))
+        return {"ok": True, "email": req.email, "zone_role": None,
+                "admin_zones": ["business", "infrastructure"], "enforcement": ENFORCEMENT,
+                "note": "Rol de zonă eliminat — acces complet la ambele zone."}
+
+    if req.zone_role not in ZONE_ROLES:
+        raise HTTPException(400, f"Rol necunoscut: {req.zone_role}. Valide: {sorted(ZONE_ROLES)}")
 
     role_def = ZONE_ROLES[req.zone_role]
     await db.users.update_one(

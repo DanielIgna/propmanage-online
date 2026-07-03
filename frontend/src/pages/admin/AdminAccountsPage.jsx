@@ -6,8 +6,9 @@ import { Link } from "react-router-dom";
 import {
   Shield, ChevronLeft, Loader2, AlertTriangle, CheckCircle2, X,
   Lock, Search, Ban, Play, KeyRound, UserCog, ShieldAlert, Filter,
-  Users, Crown,
+  Users, Crown, Server, Briefcase,
 } from "lucide-react";
+import { ADMIN_ZONE_ROLES } from "../../config/adminZones";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 const ax = axios.create({ baseURL: API, withCredentials: true });
@@ -110,6 +111,9 @@ const AdminAccountsPage = () => {
       } else if (modal.kind === "password") {
         url = "/api/admin/admin-accounts/change-password";
         body.new_password = state.new_password;
+      } else if (modal.kind === "zone") {
+        url = "/api/admin/admin-zones/assign";
+        body.zone_role = state.zone_role;
       }
       const r = await ax.post(url, body);
       setFlash({ kind: "success", message: r.data.message || `Acțiune efectuată pentru ${modal.email}.` });
@@ -150,6 +154,19 @@ const AdminAccountsPage = () => {
           ...base,
         ],
         accent: "fuchsia",
+      };
+    }
+    if (modal.kind === "zone") {
+      const target = data.items.find(i => i.email === modal.email);
+      return {
+        title: `Rol de zonă pentru ${modal.email}`,
+        fields: [
+          { key: "zone_role", label: `Rol de zonă (actual: ${target?.zone_role || "acces complet"})`, type: "select", required: true,
+            options: ["none", ...ADMIN_ZONE_ROLES.map(r => r.id)],
+            hint: "«none» = elimină rolul → acces complet la ambele zone. Rolurile business_* văd doar zona Business; developer/devops/system_administrator doar Infrastructure." },
+          ...base,
+        ],
+        accent: "cyan",
       };
     }
     return null;
@@ -233,6 +250,16 @@ const AdminAccountsPage = () => {
                     </td>
                     <td className="px-2 py-3">
                       <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${ROLE_STYLES[i.role] || "bg-slate-100 text-slate-700"}`}>{i.role}</span>
+                      {i.zone_role && (
+                        <span className={`block mt-1 text-[9px] uppercase font-bold px-1.5 py-0.5 rounded w-fit ${
+                          (i.admin_zones || []).includes("infrastructure") && !(i.admin_zones || []).includes("business")
+                            ? "bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300"
+                            : "bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300"
+                        }`} data-testid={`zone-role-${i.email.replace(/[@.]/g, '_')}`}>
+                          {(i.admin_zones || []).includes("business") && !(i.admin_zones || []).includes("infrastructure") ? "🏢 " : "🛠 "}
+                          {i.zone_role.replace(/_/g, " ")}
+                        </span>
+                      )}
                     </td>
                     <td className="px-2 py-3 text-xs text-slate-600 dark:text-slate-300">{i.scope}</td>
                     <td className="px-2 py-3">
@@ -258,6 +285,12 @@ const AdminAccountsPage = () => {
                           data-testid={`role-${i.email.replace(/[@.]/g, '_')}`}>
                           <UserCog className="w-3.5 h-3.5" />
                         </button>
+                        <button onClick={() => openModal("zone", i.email)} disabled={i.is_protected}
+                          title={i.is_protected ? "Cont protejat" : "Rol de zonă (Business / Infrastructure)"}
+                          className="p-1.5 rounded-lg bg-cyan-100 hover:bg-cyan-200 dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 text-xs disabled:opacity-30 disabled:cursor-not-allowed"
+                          data-testid={`zone-${i.email.replace(/[@.]/g, '_')}`}>
+                          <Server className="w-3.5 h-3.5" />
+                        </button>
                         <button onClick={() => openModal("password", i.email)}
                           title="Schimbă parola"
                           className="p-1.5 rounded-lg bg-fuchsia-100 hover:bg-fuchsia-200 dark:bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300 text-xs"
@@ -281,6 +314,7 @@ const AdminAccountsPage = () => {
           <ul className="mt-2 space-y-1 list-disc pl-5">
             <li><Ban className="w-3 h-3 inline" /> <strong>Blochează / Activează</strong> — flag is_active. Userii blocați nu se pot loga.</li>
             <li><UserCog className="w-3 h-3 inline" /> <strong>Schimbă rol</strong> — selectezi rolul nou ({(data.allowed_roles || []).join(", ")}) și scope-ul opțional.</li>
+            <li><Server className="w-3 h-3 inline" /> <strong>Rol de zonă</strong> — restricționează accesul la 🏢 Business sau 🛠 Infrastructure & Development. Fără rol = acces complet. Super-adminii văd mereu ambele zone.</li>
             <li><KeyRound className="w-3 h-3 inline" /> <strong>Schimbă parola</strong> — parolă custom min 8 caractere cu litere + cifre.</li>
             <li>Toate acțiunile cer codul master <strong>0108</strong> și sunt auditate în logs.</li>
             <li>Contul <code>{data.protected_email}</code> nu poate fi blocat sau demotat (doar parolă schimbabilă).</li>

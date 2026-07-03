@@ -1968,3 +1968,12 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 2. Reia task-ul PE PAUZĂ: Client Junior UI (Hick's Law, 16 imagini) — ruta test /dashboard/client-junior
 3. Activare enforcement zone admin (ENFORCEMENT="active" în routes/admin_zones.py) + UI asignare roluri
 4. Deferate din raport (risc>beneficiu acum): split routes/auth.py (42 imports), admin_console.py (36) — auth necesită playbook
+
+## Update — Feb 2026 · ENFORCEMENT ZONE ADMIN ACTIVAT + UI asignare roluri (task 3 din backlog)
+- `routes/admin_zones.py`: ENFORCEMENT="active". `/me` → super-adminii și adminii FĂRĂ zone_role păstrează ambele zone; rolurile asignate primesc doar zona lor. `/assign` acceptă zone_role="none" pentru eliminare (revine la acces complet). Cod master 0108 obligatoriu.
+- `routes/admin_accounts.py`: items includ zone_role + admin_zones.
+- `AdminLayoutMetronic.jsx`: fetch /api/admin/admin-zones/me → allowedZones; taburile nepermise DISPAR din ZoneSwitcher + notă "Acces restricționat" (data-testid: zone-restricted-note); secțiunile din zona nepermisă sunt filtrate inclusiv din Cmd+K/favorites; zona forțată pe prima permisă.
+- `AdminAccountsPage.jsx`: buton nou (icon Server, data-testid zone-{email}) → modal "Rol de zonă" cu cele 11 roluri + "none", badge zone_role în coloana Rol (🏢 albastru business / 🛠 violet infra).
+- TESTAT: curl (super→ambele; developer→doar infrastructure; none→revine; cod greșit→403) + screenshot UI (admin restricționat vede DOAR tabul Infra + nota) — PASS.
+- Parola reală testing.admin@propmanage.io = Test!Demo2026Strong (nu DemoAdmin123!).
+- NEXT: Client Junior UI (Hick's Law, 16 imagini) — sesiune cu 50+ credite; triaj 17F+10E teste vechi.

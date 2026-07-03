@@ -103,6 +103,8 @@ async def list_admins(user=Depends(get_current_user)):
             "is_active": u.get("is_active") if u.get("is_active") is not None else True,
             "is_demo_sub_admin": bool(u.get("is_demo_sub_admin")),
             "is_protected": email in PROTECTED_EMAILS,
+            "zone_role": u.get("zone_role"),
+            "admin_zones": u.get("admin_zones"),
             "last_login_at": u.get("last_login_at"),
             "created_at": u.get("created_at"),
             "updated_at": u.get("updated_at"),
