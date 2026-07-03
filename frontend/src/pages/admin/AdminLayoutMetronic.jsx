@@ -7,10 +7,11 @@ import {
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
   LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, ChevronRight, Sparkles, Bot, Zap, Inbox,
   UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb, Bug, Compass, Layers, BookOpenCheck, GraduationCap, Gamepad2, Trophy, BarChart3, Eye, Heart,
-  Star, Clock, Command, Network, Megaphone, Brain, Rocket, Activity, KeyRound
+  Star, Clock, Command, Network, Megaphone, Brain, Rocket, Activity, KeyRound, Server
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { API } from "../DashShared";
+import { ADMIN_ZONES, getStoredZone, setStoredZone } from "../../config/adminZones";
 import { HealthScoreBadge } from "./HealthScoreBadge";
 import { AutonomyTierBadge } from "./AutonomyTierBadge";
 import { AIAdminTour, ReplayAIAdminTourButton } from "./AIAdminTour";
@@ -78,124 +79,63 @@ const ScopeBadgeTop = ({ scope }) => {
 };
 
 // ============================================================================
-// NAV_SECTIONS v2 (Feb 2026) — Mega-menu reorganization
-// 9 logical sections, fully collapsible, NON-DESTRUCTIVE rewire.
-// All original item IDs / hrefs are preserved (no route changes).
-// `superAdminOnly` sections are hidden for scoped sub-admins (e.g. "AI Lab").
+// NAV_SECTIONS v3 (Feb 2026) — SEPARARE COMPLETĂ ÎN DOUĂ ZONE
+//   🏢 zone: "business"        → Business Administration
+//   🛠 zone: "infrastructure"  → Infrastructure & Development
+// REGULĂ: orice secțiune nouă TREBUIE să declare `zone`. Fără module mixte.
+// NON-DESTRUCTIVE: toate ID-urile / href-urile originale sunt păstrate.
+// `superAdminOnly` sections are hidden for scoped sub-admins.
 // ============================================================================
 const NAV_SECTIONS = [
+  // ═══════════════════ 🏢 BUSINESS ADMINISTRATION ═══════════════════
   {
     id: "dashboard",
-    title: "Dashboard",
+    title: "Dashboard Business",
     icon: LayoutDashboard,
+    zone: "business",
     items: [
       { id: "overview", label: "Dashboard Principal", icon: LayoutDashboard },
       { id: "activity", label: "Activitate Live", icon: Sparkles },
-      { id: "demo", label: "Demo Tools", icon: Zap, badge: "NEW" },
-      { id: "leads", label: "Demo Leads", icon: Inbox, badge: "NEW" },
-    ],
-  },
-  {
-    id: "operations",
-    title: "Operațiuni Zilnice",
-    icon: Briefcase,
-    items: [
-      { id: "projects", label: "Proiecte", icon: FolderKanban },
-      { id: "disputes", label: "Dispute & NC", icon: Scale },
-      { id: "finance", label: "Finanțe & Escrow", icon: Wallet },
-      { id: "todo_board", label: "ToDo Board", icon: FileText, badge: "NEW", href: "/admin/todo" },
-      { id: "manual_tester", label: "Tester Manual", icon: Bug, badge: "QA", href: "/admin/manual-tester" },
     ],
   },
   {
     id: "users",
     title: "Utilizatori",
     icon: Users,
+    zone: "business",
     items: [
       { id: "users", label: "Toți userii", icon: Users },
       { id: "verification", label: "Verificare specialiști", icon: ShieldCheck },
+      { id: "kyc", label: "KYC Identitate", icon: ShieldCheck, badge: "NEW" },
       { id: "beta_testers", label: "Beta Testers", icon: Sparkles, badge: "NEW" },
-      { id: "sub_admins", label: "Sub-Admini", icon: Users, badge: "NEW" },
-      { id: "approvals", label: "Aprobări Admin", icon: ShieldCheck, badge: "NEW" },
       { id: "specialist_progression", label: "Progresie Specialiști", icon: Trophy, badge: "SPRINT A", href: "/admin/specialist-progression" },
       { id: "experience_tiers", label: "Experience Tiers", icon: GraduationCap, badge: "NEW", href: "/admin/experience-tiers" },
     ],
   },
   {
-    id: "content",
-    title: "Conținut",
-    icon: FileText,
+    id: "operations",
+    title: "Cereri & Proiecte",
+    icon: FolderKanban,
+    zone: "business",
     items: [
-      { id: "cms", label: "Texte (CMS)", icon: FileText },
-      { id: "emails", label: "Template-uri Email", icon: Mail },
-      { id: "zones", label: "Zone Acoperire", icon: MapPin },
-      { id: "operating_manual", label: "Manual de Operare", icon: BookOpenCheck, badge: "START AICI", href: "/admin/operating-manual" },
-      { id: "docs_train", label: "Documentație & Training", icon: FileText, badge: "NEW", href: "/admin/documentation" },
-      { id: "docs", label: "Documentație internă", icon: FileText, badge: "NEW" },
-      { id: "qa_playbook", label: "QA Playbook", icon: ShieldCheck, badge: "NEW" },
+      { id: "projects", label: "Proiecte", icon: FolderKanban },
+      { id: "disputes", label: "Dispute & NC", icon: Scale },
     ],
   },
   {
-    id: "compliance",
-    title: "Compliance",
-    icon: ShieldCheck,
+    id: "finance",
+    title: "Financiar",
+    icon: Wallet,
+    zone: "business",
     items: [
-      { id: "legal_audit", label: "Audit Juridic IT", icon: ShieldCheck, badge: "NEW", href: "/admin/legal-audit" },
-      { id: "gdpr", label: "GDPR Pack", icon: ShieldCheck, badge: "NEW" },
-      { id: "impersonation", label: "Impersonări", icon: ShieldCheck, badge: "NEW" },
-      { id: "kyc", label: "KYC Identitate", icon: ShieldCheck, badge: "NEW" },
-      { id: "trust", label: "Trust Score Weights", icon: Award },
-      { id: "audit", label: "Audit Log", icon: FileText },
-      { id: "settings", label: "Setări Platformă", icon: Settings },
-      { id: "settings_control", label: "Control Administrare", icon: Settings, badge: "NEW", href: "/admin/settings-control" },
-    ],
-  },
-  {
-    id: "properties",
-    title: "Imobile",
-    icon: Building2,
-    items: [
-      { id: "ve_admin", label: "Imobile Verificate", icon: Award, badge: "NEW", href: "/admin/imobile-verificate" },
-      { id: "house_health", label: "House Health", icon: Heart, badge: "NEW", href: "/admin/house-health" },
-      { id: "experience_spaces", label: "Experience Spaces", icon: Sparkles, badge: "BETA", href: "/admin/experience-spaces" },
-    ],
-  },
-  {
-    id: "ai_lab",
-    title: "AI & Engineering Lab",
-    icon: Bot,
-    superAdminOnly: true,
-    items: [
-      { id: "ai", label: "AI Investigator", icon: Bot, badge: "NEW" },
-      { id: "concierge", label: "Concierge & Security", icon: ShieldCheck, badge: "NEW" },
-      { id: "qa_copilot", label: "QA Copilot · AI Testing", icon: Sparkles, badge: "NEW", href: "/admin/qa-copilot" },
-      { id: "ai_control", label: "AI Control Center", icon: Sparkles, badge: "NEW", href: "/admin/ai-control" },
-      { id: "ai_docs", label: "Document Intelligence", icon: FileText, badge: "NEW", href: "/ai-docs" },
-      { id: "ai_dev_team", label: "AI Development Team", icon: Code2, badge: "NEW", href: "/admin/ai-dev-team" },
-      { id: "ai_security", label: "AI Security Center", icon: Shield, badge: "NEW", href: "/admin/ai-security" },
-      { id: "ai_governance", label: "AI Governance Center", icon: Shield, badge: "NEW", href: "/admin/ai-governance" },
-      { id: "ai_pm", label: "AI Product Manager", icon: Layers, badge: "NEW", href: "/admin/ai-pm" },
-      { id: "autonomy", label: "Autonomy Engine", icon: Sparkles, badge: "NEW", href: "/admin/autonomy" },
-      { id: "twin", label: "Twin Orchestrator", icon: Bot, badge: "AI", href: "/admin/twin" },
-      { id: "architecture_board", label: "Architecture Review Board", icon: Compass, badge: "NEW", href: "/admin/architecture-board" },
-      { id: "bug_memory", label: "Bug Memory Aggregator", icon: Bug, badge: "NEW", href: "/admin/bug-memory" },
-      { id: "future_ideas", label: "Idei Dezvoltare Viitoare", icon: Lightbulb, badge: "REVIEW", href: "/admin/future-ideas" },
-      { id: "feature_configurator", label: "Feature Configurator", icon: Gamepad2, badge: "GAMIFY", href: "/admin/feature-configurator" },
-    ],
-  },
-  {
-    id: "analytics",
-    title: "Analytics",
-    icon: BarChart3,
-    items: [
-      { id: "bi_moe", label: "Business Intelligence", icon: BarChart3, badge: "SPRINT F", href: "/admin/bi-moe" },
-      { id: "abtests", label: "A/B Tests", icon: Sparkles },
+      { id: "finance", label: "Finanțe & Escrow", icon: Wallet },
     ],
   },
   {
     id: "city_partners",
-    title: "Parteneri Strategici",
+    title: "Marketplace & Parteneri",
     icon: Building2,
+    zone: "business",
     superAdminOnly: true,
     items: [
       { id: "strategic_partners_dashboard", label: "Strategic Dashboard", icon: Network, badge: "AI XREF", href: "/admin/strategic-partners" },
@@ -204,24 +144,34 @@ const NAV_SECTIONS = [
     ],
   },
   {
-    id: "it_hub",
-    title: "IT Collaborators Hub",
-    icon: Code2,
-    superAdminOnly: true,
+    id: "properties",
+    title: "Imobile",
+    icon: Building2,
+    zone: "business",
     items: [
-      { id: "it_team", label: "Echipa IT", icon: Users, badge: "NEW", href: "/admin/it-collaborators" },
-      { id: "it_copilot", label: "AI Performance Copilot", icon: Bot, badge: "AI", href: "/admin/it-collaborators/copilot" },
-      { id: "it_legal", label: "Audit Juridic IT", icon: ShieldCheck, badge: "LEGAL", href: "/admin/legal-audit" },
-      { id: "founder_gate", label: "Founder Approval Gate", icon: ShieldCheck, badge: "FG-0", href: "/admin/founder-gate" },
-      { id: "demo_accounts", label: "Demo Accounts Manager", icon: KeyRound, badge: "0108", href: "/admin/demo-accounts" },
-      { id: "admin_accounts", label: "Admin Accounts Manager", icon: Shield, badge: "0108", href: "/admin/admin-accounts" },
-      { id: "demo_activity", label: "Demo Activity Log", icon: Activity, badge: "AUDIT", href: "/admin/demo-activity" },
+      { id: "ve_admin", label: "Imobile Verificate", icon: Award, badge: "NEW", href: "/admin/imobile-verificate" },
+      { id: "house_health", label: "House Health", icon: Heart, badge: "NEW", href: "/admin/house-health" },
+      { id: "experience_spaces", label: "Experience Spaces", icon: Sparkles, badge: "BETA", href: "/admin/experience-spaces" },
+    ],
+  },
+  {
+    id: "content",
+    title: "Conținut",
+    icon: FileText,
+    zone: "business",
+    items: [
+      { id: "cms", label: "Texte (CMS)", icon: FileText },
+      { id: "emails", label: "Template-uri Email", icon: Mail },
+      { id: "zones", label: "Zone Acoperire", icon: MapPin },
+      { id: "operating_manual", label: "Manual de Operare", icon: BookOpenCheck, badge: "START AICI", href: "/admin/operating-manual" },
+      { id: "docs_train", label: "Documentație & Training", icon: FileText, badge: "NEW", href: "/admin/documentation" },
     ],
   },
   {
     id: "marketing_growth",
     title: "Marketing & Growth",
     icon: Megaphone,
+    zone: "business",
     superAdminOnly: true,
     items: [
       { id: "marketing_department", label: "AI Marketing Department", icon: Megaphone, badge: "NEW · AI", href: "/admin/marketing" },
@@ -230,6 +180,103 @@ const NAV_SECTIONS = [
       { id: "marketing_insights", label: "Business Intelligence", icon: Brain, badge: "AI", href: "/admin/marketing?tab=insights" },
       { id: "marketing_copilot", label: "Marketing Copilot", icon: Bot, badge: "CHAT", href: "/admin/marketing?tab=copilot" },
       { id: "marketing_future", label: "Idei viitoare (Faza 2-3)", icon: Rocket, badge: "ROADMAP", href: "/admin/marketing?tab=future" },
+      { id: "leads", label: "Demo Leads", icon: Inbox, badge: "NEW" },
+    ],
+  },
+  {
+    id: "support_compliance",
+    title: "Suport & Compliance",
+    icon: ShieldCheck,
+    zone: "business",
+    items: [
+      { id: "approvals", label: "Aprobări Admin", icon: ShieldCheck, badge: "NEW" },
+      { id: "gdpr", label: "GDPR Pack", icon: ShieldCheck, badge: "NEW" },
+      { id: "trust", label: "Trust Score Weights", icon: Award },
+    ],
+  },
+  {
+    id: "analytics",
+    title: "Statistici & KPI",
+    icon: BarChart3,
+    zone: "business",
+    items: [
+      { id: "bi_moe", label: "Business Intelligence", icon: BarChart3, badge: "SPRINT F", href: "/admin/bi-moe" },
+      { id: "abtests", label: "A/B Tests", icon: Sparkles },
+    ],
+  },
+  // ═══════════════ 🛠 INFRASTRUCTURE & DEVELOPMENT ═══════════════
+  {
+    id: "infra_system",
+    title: "Sistem & Configurări",
+    icon: Settings,
+    zone: "infrastructure",
+    items: [
+      { id: "settings", label: "Setări Platformă", icon: Settings },
+      { id: "settings_control", label: "Control Administrare", icon: Settings, badge: "NEW", href: "/admin/settings-control" },
+      { id: "feature_configurator", label: "Feature Configurator", icon: Gamepad2, badge: "GAMIFY", href: "/admin/feature-configurator" },
+    ],
+  },
+  {
+    id: "infra_security",
+    title: "Security & Audit",
+    icon: Shield,
+    zone: "infrastructure",
+    items: [
+      { id: "audit", label: "Audit Log", icon: FileText },
+      { id: "impersonation", label: "Impersonări", icon: ShieldCheck, badge: "NEW" },
+      { id: "ai_security", label: "AI Security Center", icon: Shield, badge: "NEW", href: "/admin/ai-security" },
+      { id: "legal_audit", label: "Audit Juridic IT", icon: ShieldCheck, badge: "NEW", href: "/admin/legal-audit" },
+      { id: "sub_admins", label: "Sub-Admini & Permisiuni", icon: Users, badge: "NEW" },
+      { id: "admin_accounts", label: "Admin Accounts Manager", icon: Shield, badge: "0108", href: "/admin/admin-accounts" },
+      { id: "founder_gate", label: "Founder Approval Gate", icon: ShieldCheck, badge: "FG-0", href: "/admin/founder-gate" },
+    ],
+  },
+  {
+    id: "ai_lab",
+    title: "AI & Engineering Lab",
+    icon: Bot,
+    zone: "infrastructure",
+    superAdminOnly: true,
+    items: [
+      { id: "ai", label: "AI Investigator", icon: Bot, badge: "NEW" },
+      { id: "concierge", label: "Concierge & Security", icon: ShieldCheck, badge: "NEW" },
+      { id: "ai_control", label: "AI Control Center", icon: Sparkles, badge: "NEW", href: "/admin/ai-control" },
+      { id: "ai_docs", label: "Document Intelligence", icon: FileText, badge: "NEW", href: "/ai-docs" },
+      { id: "ai_dev_team", label: "AI Development Team", icon: Code2, badge: "NEW", href: "/admin/ai-dev-team" },
+      { id: "ai_governance", label: "AI Governance Center", icon: Shield, badge: "NEW", href: "/admin/ai-governance" },
+      { id: "ai_pm", label: "AI Product Manager", icon: Layers, badge: "NEW", href: "/admin/ai-pm" },
+      { id: "autonomy", label: "Autonomy Engine", icon: Sparkles, badge: "NEW", href: "/admin/autonomy" },
+      { id: "twin", label: "Twin Orchestrator", icon: Bot, badge: "AI", href: "/admin/twin" },
+      { id: "architecture_board", label: "Architecture Review Board", icon: Compass, badge: "NEW", href: "/admin/architecture-board" },
+    ],
+  },
+  {
+    id: "infra_dev",
+    title: "Development & QA",
+    icon: Code2,
+    zone: "infrastructure",
+    items: [
+      { id: "todo_board", label: "ToDo Board", icon: FileText, badge: "NEW", href: "/admin/todo" },
+      { id: "manual_tester", label: "Tester Manual", icon: Bug, badge: "QA", href: "/admin/manual-tester" },
+      { id: "qa_copilot", label: "QA Copilot · AI Testing", icon: Sparkles, badge: "NEW", href: "/admin/qa-copilot" },
+      { id: "qa_playbook", label: "QA Playbook", icon: ShieldCheck, badge: "NEW" },
+      { id: "docs", label: "Documentație internă", icon: FileText, badge: "NEW" },
+      { id: "bug_memory", label: "Bug Memory Aggregator", icon: Bug, badge: "NEW", href: "/admin/bug-memory" },
+      { id: "future_ideas", label: "Idei Dezvoltare Viitoare", icon: Lightbulb, badge: "REVIEW", href: "/admin/future-ideas" },
+      { id: "demo", label: "Demo Tools", icon: Zap, badge: "NEW" },
+      { id: "demo_accounts", label: "Demo Accounts Manager", icon: KeyRound, badge: "0108", href: "/admin/demo-accounts" },
+      { id: "demo_activity", label: "Demo Activity Log", icon: Activity, badge: "AUDIT", href: "/admin/demo-activity" },
+    ],
+  },
+  {
+    id: "it_hub",
+    title: "IT Collaborators Hub",
+    icon: Code2,
+    zone: "infrastructure",
+    superAdminOnly: true,
+    items: [
+      { id: "it_team", label: "Echipa IT", icon: Users, badge: "NEW", href: "/admin/it-collaborators" },
+      { id: "it_copilot", label: "AI Performance Copilot", icon: Bot, badge: "AI", href: "/admin/it-collaborators/copilot" },
     ],
   },
 ];
@@ -566,6 +613,51 @@ const QuickProfileSwitch = ({ dark }) => {
   );
 };
 
+// ── Zone Switcher — delimitare Business vs Infrastructure & Development ─────
+const ZoneSwitcher = ({ zone, onSwitch, dark }) => {
+  const tabs = [
+    { id: "business", icon: Briefcase, meta: ADMIN_ZONES.business },
+    { id: "infrastructure", icon: Server, meta: ADMIN_ZONES.infrastructure },
+  ];
+  const activeMeta = ADMIN_ZONES[zone];
+  return (
+    <div className="px-3 pt-3" data-testid="admin-zone-switcher">
+      <div className={`grid grid-cols-2 gap-1 p-1 rounded-xl border ${dark ? "bg-slate-800/60 border-slate-700" : "bg-slate-100 border-slate-200"}`}>
+        {tabs.map((t) => {
+          const isActive = zone === t.id;
+          const TabIcon = t.icon;
+          const activeCls = t.id === "business"
+            ? "bg-blue-600 text-white shadow-sm"
+            : "bg-violet-600 text-white shadow-sm";
+          return (
+            <button
+              key={t.id}
+              onClick={() => onSwitch(t.id)}
+              className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-[11px] font-bold transition-colors ${
+                isActive ? activeCls : dark ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-800"
+              }`}
+              data-testid={`zone-tab-${t.id}`}
+              title={t.meta.label}
+            >
+              <TabIcon className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{t.meta.short}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div
+        className={`mt-1.5 px-1 text-[10px] leading-snug ${dark ? "text-slate-500" : "text-slate-400"}`}
+        data-testid="admin-zone-description"
+      >
+        <span className={`font-bold uppercase tracking-wider ${zone === "business" ? "text-blue-500" : "text-violet-500"}`}>
+          {activeMeta.label}
+        </span>
+        <span className="block">{activeMeta.description}</span>
+      </div>
+    </div>
+  );
+};
+
 export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitle }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -585,10 +677,16 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
     visibleSections = visibleSections.filter(s => !s.superAdminOnly);
   }
 
+  // ── Active admin zone: "business" | "infrastructure" (persisted) ──────────
+  const [zone, setZone] = useState(() => getStoredZone());
+  const switchZone = (z) => { setZone(z); setStoredZone(z); };
+  // Sidebar renders ONLY sections of the active zone (delimitare completă)
+  const zoneSections = visibleSections.filter(s => s.zone === zone);
+
   // Collapsible-section state (persisted per browser)
   // Default behavior: ALL sections collapsed except the one containing the active item.
   // This gives the clean "mega-menu" look (9 rows visible, expand on click).
-  const COLLAPSED_KEY = "pm_admin_nav_collapsed_v3";
+  const COLLAPSED_KEY = "pm_admin_nav_collapsed_v4";
   const [collapsed, setCollapsed] = useState(() => {
     try {
       const saved = localStorage.getItem(COLLAPSED_KEY);
@@ -599,14 +697,16 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
     NAV_SECTIONS.forEach(s => { initial[s.id] = true; });
     return initial;
   });
-  // Auto-expand the section that contains the currently active item
+  // Auto-expand the section that contains the currently active item and
+  // auto-switch to its zone (so deep links / Cmd+K never land on a hidden item)
   useEffect(() => {
     if (!active) return;
     const activeSection = NAV_SECTIONS.find(s => s.items.some(it => it.id === active));
     if (activeSection) {
+      if (activeSection.zone !== zone) switchZone(activeSection.zone);
       setCollapsed(prev => prev[activeSection.id] === false ? prev : { ...prev, [activeSection.id]: false });
     }
-  }, [active]);
+  }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
   const toggleSection = (sid) => {
     setCollapsed(prev => {
       const next = { ...prev, [sid]: !prev[sid] };
@@ -709,6 +809,9 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
         </button>
       </div>
 
+      {/* Zone switcher — Business vs Infrastructure & Development */}
+      <ZoneSwitcher zone={zone} onSwitch={switchZone} dark={dark} />
+
       {/* Cmd+K trigger + Collapse-all inside sidebar */}
       <div className="px-3 pt-3 flex items-center gap-2">
         <button
@@ -724,9 +827,9 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
         </button>
         <button
           onClick={() => {
-            const allCollapsed = visibleSections.every(s => collapsed[s.id]);
-            const next = {};
-            visibleSections.forEach(s => { next[s.id] = !allCollapsed; });
+            const allCollapsed = zoneSections.every(s => collapsed[s.id]);
+            const next = { ...collapsed };
+            zoneSections.forEach(s => { next[s.id] = !allCollapsed; });
             setCollapsed(next);
             localStorage.setItem(COLLAPSED_KEY, JSON.stringify(next));
           }}
@@ -754,8 +857,8 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
           </div>
         )}
 
-        {/* Mega-menu collapsable sections */}
-        {visibleSections.map((section) => {
+        {/* Mega-menu collapsable sections — DOAR zona activă */}
+        {zoneSections.map((section) => {
           const SectionIcon = section.icon || LayoutDashboard;
           const isCollapsed = !!collapsed[section.id];
           return (

@@ -134,6 +134,7 @@ from routes.marketing_campaigns import router as marketing_campaigns_router
 from routes.marketing_performance import router as marketing_performance_router
 from routes.demo_accounts import router as demo_accounts_router
 from routes.admin_accounts import router as admin_accounts_router
+from routes.admin_zones import router as admin_zones_router
 from routes.demo_activity import router as demo_activity_router, schedule_log as _schedule_demo_log
 from middleware_scope import admin_scope_middleware
 from admin_briefing_digest import run_morning_briefing_job
@@ -298,6 +299,7 @@ for r in (
     marketing_performance_router,
     demo_accounts_router,
     admin_accounts_router,
+    admin_zones_router,
     demo_activity_router,
 ):
     app.include_router(r)
