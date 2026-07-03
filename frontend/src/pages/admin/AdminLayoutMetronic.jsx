@@ -697,13 +697,18 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
     NAV_SECTIONS.forEach(s => { initial[s.id] = true; });
     return initial;
   });
-  // Auto-expand the section that contains the currently active item and
-  // auto-switch to its zone (so deep links / Cmd+K never land on a hidden item)
+  // Auto-expand the section that contains the currently active item.
+  // Zone auto-switch happens ONLY when `active` genuinely changes (navigation),
+  // never on mount — so the persisted zone (localStorage) wins on cold-load.
+  // Robust to React StrictMode double-invoked effects.
+  const prevActiveRef = useRef(active);
   useEffect(() => {
     if (!active) return;
+    const activeChanged = prevActiveRef.current !== active;
+    prevActiveRef.current = active;
     const activeSection = NAV_SECTIONS.find(s => s.items.some(it => it.id === active));
     if (activeSection) {
-      if (activeSection.zone !== zone) switchZone(activeSection.zone);
+      if (activeChanged && activeSection.zone !== zone) switchZone(activeSection.zone);
       setCollapsed(prev => prev[activeSection.id] === false ? prev : { ...prev, [activeSection.id]: false });
     }
   }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -745,6 +750,10 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
 
   const handleNavClick = (it) => {
     pushRecentItem(it.id);
+    // User-intent zone switch: clicking an item from the other zone (favorites,
+    // Cmd+K) switches the zone so href-navigated pages mount with the right zone.
+    const itemSection = NAV_SECTIONS.find(s => s.items.some(x => x.id === it.id));
+    if (itemSection && itemSection.zone !== zone) switchZone(itemSection.zone);
     if (it.href) { navigate(it.href); setSidebarOpen(false); return; }
     onChange(it.id); setSidebarOpen(false);
   };

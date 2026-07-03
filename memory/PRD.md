@@ -1922,3 +1922,19 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 ### Status
 - Preview: verified ✅
 - Production (propmanage.ro): **awaiting user redeploy**
+
+## Update — Feb 2026 · SEPARARE ADMIN: Business vs Infrastructure & Development (iter81)
+**Cerință user:** delimitare completă vizual + logic a consolei admin în două zone; URL-uri păstrate `/admin/...` cu switcher vizual; permisiuni pe zone doar PREGĂTITE (enforcement="prepared"); task Client Junior UI (Hick's Law, 16 imagini) PE PAUZĂ, se reia după.
+
+**Implementat:**
+- `frontend/src/config/adminZones.js` — registru central: ADMIN_ZONES (business/infrastructure), ADMIN_ZONE_ROLES (11 roluri: Business Administrator, Operations/Finance/Marketplace/Support/Content Manager, Infrastructure Administrator, Developer, DevOps, System Administrator, Super Admin), getStoredZone/setStoredZone (localStorage `pm_admin_zone`).
+- `AdminLayoutMetronic.jsx` — NAV_SECTIONS v3: fiecare secțiune declară `zone` (REGULĂ: orice modul nou TREBUIE încadrat într-o zonă, fără module mixte). ZoneSwitcher în sidebar (taburi Business=albastru / Infra&Dev=violet, data-testid: admin-zone-switcher, zone-tab-business, zone-tab-infrastructure). Sidebar randează DOAR secțiunile zonei active.
+  - BUSINESS (10 secțiuni): Dashboard Business, Utilizatori (+KYC mutat aici), Cereri & Proiecte, Financiar, Marketplace & Parteneri, Imobile, Conținut, Marketing & Growth (+Demo Leads), Suport & Compliance (aprobări, GDPR, trust), Statistici & KPI.
+  - INFRASTRUCTURE (5 secțiuni): Sistem & Configurări (settings, feature flags), Security & Audit (audit log, impersonări, sub-admini, admin accounts, founder gate, legal audit, AI security), AI & Engineering Lab, Development & QA (QA tools, docs interne, bug memory, demo tools/accounts/activity), IT Collaborators Hub.
+  - Duplicatul `it_legal` eliminat (rămâne `legal_audit`). Toate celelalte ID-uri/href-uri păstrate — zero regresii.
+  - Zone persistence: localStorage câștigă la cold-load; auto-switch DOAR la schimbare reală de `active` (guard prevActiveRef, robust la StrictMode) + switch explicit în handleNavClick. Cmd+K caută în AMBELE zone.
+- `backend/routes/admin_zones.py` — prefix `/api/admin/admin-zones` (NU /zones — conflict cu zonele geografice): GET registry, GET /me, POST /assign (super-admin + cod 0108, salvează zone_role + admin_zones pe user; NU e enforced încă).
+
+**Testat:** testing agent iter81 — 9/9 backend (pytest /app/backend/tests/test_admin_zones_iter81.py), frontend 10/10 după fix persistență (verificat cu screenshot tool: persistență PASS, auto-switch PASS).
+
+**Activare viitoare permisiuni:** setează ENFORCEMENT="active" în admin_zones.py + filtrează zonele în frontend după GET /api/admin/admin-zones/me; asignare roluri din Admin Accounts Manager (endpoint /assign gata).
