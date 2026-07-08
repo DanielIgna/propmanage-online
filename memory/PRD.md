@@ -2029,3 +2029,9 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 - Fix în WhatsAppFloat.jsx: dacă userul e logat non-admin (bula AI e vizibilă) → pe desktop WA urcă la lg:bottom-24 lg:right-6 (stivuit DEASUPRA bulei AI, gap curat); vizitatori anonimi → rămâne bottom-4/right-4. Mobil neschimbat (era deja ok, AI e la bottom-20).
 - Verificat cu screenshot pe /client (client@propmanage.io): WA y=928, AI y≈1000 pe 1080p — separate clar.
 - ⚠️ Apare pe propmanage.ro după REDEPLOY.
+
+## Update — Iul 2026 · UX REDESIGN CLIENT V2: FAZA 1 aprobată + FAZA 2 (wireframe) LIVRATĂ
+- FAZA 1 (strategie): document în /app/memory/UX_REDESIGN_CLIENT_V2_FAZA1.md — audit 14 blocuri concurente pe /client, 7 decizii cheie APROBATE de user: Home=panou de acțiuni (1 Hero adaptiv + 4 acțiuni + contextual), nav 5 elemente (Notificări→clopoțel header), wallet/escrow mutate contextual, hub "Proprietatea mea" (Twin/HouseHealth/Timeline/Documente/Plăți), gamificare comprimată, tur neblocant, flux Solicită=model Client Junior.
+- FAZA 2 (wireframe vizual): rută test /dashboard/client-v2 (fără auth, mock, NU atinge /client) — pages/dashboard/ClientV2Wireframe.jsx. Monocrom low-fi cu: switcher stare user (A nou / B cu proprietate / C lucrare activă) care schimbă Hero + contextual; header slim cu clopoțel; grid 2×2 acțiuni; contextual condițional (0/1/2 carduri); Descoperă sub fold; bottom nav 5 cu "Solicită" accentuat central; view-uri wireframe: Proprietatea mea (hub instrumente), Lucrări (status pe pași), Setări (2FA/tier/portofel mutate aici), Solicită (link la prototipul Client Junior). Verificat cu screenshots — toate view-urile ok.
+- Bug fixat la creare: ghilimele românești „" în string JSX → SyntaxError babel; înlocuite cu «».
+- NEXT: aprobarea userului pe wireframe → FAZA 3 (UI design pe aceeași rută) → FAZA 4 (implementare + migrare /client).
