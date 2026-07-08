@@ -2055,3 +2055,13 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 ## Update — Iul 2026 · FIX contrast formulare Client V2 + cerere viitoare
 - BUG: tema globală dark făcea textul introdus în input/textarea/select din V2 aproape invizibil (alb pe alb). FIX fără modificări de layout: clasa scoped `.cv2-scope` în index.css (color #0f172a, bg #fff, caret #0f172a, placeholder #94a3b8 opacity 1, select option, webkit-autofill) aplicată pe rădăcinile: ClientDashboardV2, ClientJuniorDashboard, ClientV2Wireframe. Verificat computed styles cu playwright.
 - CERERE VIITOARE (user): AUDIT UX COMPLET per ecran (Home, Solicită, Lucrări, Proprietate, Setări) + rafinare la nivel Revolut/Airbnb — user e mulțumit de direcție ("arată mult mai bine", "onboarding mai clar", "Proprietatea mea mult mai ușor de înțeles"), urmează etapa de finisare.
+
+## Update — Iul 2026 · FAZA 5 (rafinare UX Client V2) — LIVRATĂ compact (buget limitat de user la ~40 credite; self-tested, fără testing agent)
+- Micro-interacțiuni: animații de intrare staggered (cv2-fade + cv2-d1/d2/d3, keyframes cv2FadeUp în index.css) pe Home (hero→acțiuni→contextual→descoperă), Lucrări, Proprietate; tranziție fade între pașii wizardului.
+- Skeleton loading: .cv2-skeleton (shimmer) + <Skeleton> în ui.jsx + HomeSkeleton (HomeV2.jsx) afișat până Promise.all(props/requests/notifs) se rezolvă (state `loaded` în ClientDashboardV2).
+- Salut contextual în header: „Bună dimineața/ziua/seara, {prenume}" (după oră).
+- Wizard: contor „Pasul X din 3" verde deasupra întrebării.
+- Lucrări: secțiuni cu contoare „Active (n)" / „Istoric (n)".
+- Setări: buton „Deconectare" (roșu subtil) + footer versiune „Client dashboard V2".
+- Bug-uri la implementare: (1) Skeleton neimportat în HomeV2 → ErrorBoundary „Skeleton is not defined" → fixat; (2) edit-ul salutului raportat succes dar NEPERSISTAT (a 2-a apariție a anomaliei search_replace în această sesiune!) → reaplicat + verificat cu grep.
+- Verificat cu playwright: home+greeting+step counter+logout+contoare secțiuni toate OK.

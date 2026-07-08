@@ -55,7 +55,7 @@ export const PropertyHubV2 = ({ user, prop, properties, setSelectedPropId, actio
     );
   }
   return (
-    <div className="px-5 pb-8" data-testid="v2-property-view">
+    <div className="px-5 pb-8 cv2-fade" data-testid="v2-property-view">
       <div className="rounded-3xl overflow-hidden border border-slate-100 bg-white shadow-sm">
         <div className="h-24 flex items-center justify-center" style={{ background: "linear-gradient(135deg, #E9F9EE 0%, #D2F2DC 100%)" }}>
           <Building2 className="w-9 h-9" style={{ color: GREEN }} />

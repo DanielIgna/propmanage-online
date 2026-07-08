@@ -57,11 +57,12 @@ export const JobsV2 = ({ requests, actions }) => {
   );
 
   return (
-    <div className="px-5 pb-8 space-y-3" data-testid="v2-jobs-view">
+    <div className="px-5 pb-8 space-y-3 cv2-fade" data-testid="v2-jobs-view">
+      {active.length > 0 && <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-400 px-1">Active ({active.length})</h3>}
       {active.map(r => <Card key={r.id} r={r} />)}
       {history.length > 0 && (
         <>
-          <h3 className="pt-3 text-[11px] font-black uppercase tracking-wider text-slate-400 px-1">Istoric</h3>
+          <h3 className="pt-3 text-[11px] font-black uppercase tracking-wider text-slate-400 px-1">Istoric ({history.length})</h3>
           {history.map(r => (
             <button key={r.id} onClick={() => actions.setTimelineRequestId(r.id)} data-testid={`v2-job-hist-${r.id}`}
               className="w-full flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm text-left">

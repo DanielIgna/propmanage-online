@@ -4,7 +4,7 @@ import {
   Plus, Building2, Wrench, MessageCircle, Sparkles, ShieldCheck, ChevronRight,
   Box, HeartPulse, FileText, CreditCard, Star, Bell,
 } from "lucide-react";
-import { GREEN, GREEN_SOFT, CTA, Steps, stepForStatus } from "./ui";
+import { GREEN, GREEN_SOFT, CTA, Steps, stepForStatus, Skeleton } from "./ui";
 
 // Hero A — fără proprietate
 const HeroA = ({ onAddProperty }) => (
@@ -57,6 +57,16 @@ const HeroC = ({ req, offersCount, onCta }) => {
   );
 };
 
+export const HomeSkeleton = () => (
+  <div data-testid="v2-home-skeleton">
+    <div className="mx-5"><Skeleton className="h-40 rounded-3xl" /></div>
+    <div className="mx-5 mt-5 grid grid-cols-2 gap-3">
+      {[0, 1, 2, 3].map(i => <Skeleton key={i} className="min-h-[100px]" />)}
+    </div>
+    <div className="mx-5 mt-6"><Skeleton className="h-16" /></div>
+  </div>
+);
+
 export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, go, actions }) => {
   const navigate = useNavigate();
   const activeReqs = requests.filter(r => r.status !== "confirmed");
@@ -83,11 +93,13 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
 
   return (
     <>
-      {properties.length === 0 ? <HeroA onAddProperty={actions.openPropManager} />
-        : activeReq ? <HeroC req={activeReq} offersCount={offersCount} onCta={heroCta} />
-        : <HeroB prop={prop} confirmedCount={confirmedCount} onRequest={actions.openWizard} />}
+      <div className="cv2-fade">
+        {properties.length === 0 ? <HeroA onAddProperty={actions.openPropManager} />
+          : activeReq ? <HeroC req={activeReq} offersCount={offersCount} onCta={heroCta} />
+          : <HeroB prop={prop} confirmedCount={confirmedCount} onRequest={actions.openWizard} />}
+      </div>
 
-      <div className="mx-5 mt-5 grid grid-cols-2 gap-3" data-testid="v2-actions">
+      <div className="mx-5 mt-5 grid grid-cols-2 gap-3 cv2-fade cv2-d1" data-testid="v2-actions">
         {[
           [Plus, "Solicită", "serviciu nou", actions.openWizard, "v2-action-request"],
           [Building2, "Proprietatea", prop ? prop.name : "adaugă prima", () => go("property"), "v2-action-property"],
@@ -106,7 +118,7 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
       </div>
 
       {contextual.length > 0 && (
-        <div className="mx-5 mt-6" data-testid="v2-contextual">
+        <div className="mx-5 mt-6 cv2-fade cv2-d2" data-testid="v2-contextual">
           <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-400 px-1">Noutăți pentru tine</h3>
           <div className="mt-2 space-y-2">
             {contextual.slice(0, 2).map(({ icon: Icon, text, cta, onClick, tid }) => (
@@ -121,7 +133,7 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
         </div>
       )}
 
-      <div className="mt-7 pb-8" data-testid="v2-discover">
+      <div className="mt-7 pb-8 cv2-fade cv2-d3" data-testid="v2-discover">
         <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-400 px-6">Descoperă</h3>
         <div className="mt-2 flex gap-3 overflow-x-auto px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {[["Digital Twin", "locuința ta în 3D", Box, actions.openTwin], ["House Health", "scorul casei tale", HeartPulse, actions.openHealth], ["Ghid întreținere", "sfaturi sezoniere", FileText, actions.openAI]].map(([l, s, Icon, onClick]) => (

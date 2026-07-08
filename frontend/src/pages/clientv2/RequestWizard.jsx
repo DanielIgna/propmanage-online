@@ -104,8 +104,11 @@ export const RequestWizard = ({ property, onClose, onCreated }) => {
       </div>
       <div className="h-1.5 bg-slate-100"><div className="h-full rounded-r-full transition-all" style={{ width: `${((step + 1) / (steps.length + 1)) * 100}%`, background: GREEN }} /></div>
       <div className="flex-1 overflow-y-auto px-5 pt-6 pb-28 max-w-md mx-auto w-full">
-        <h2 className="text-2xl font-black text-slate-900 leading-snug">{s.q}</h2>
-        <div className="mt-5">{s.body}</div>
+        <div key={step} className="cv2-fade">
+          <div className="text-[10px] font-black uppercase tracking-wider" style={{ color: GREEN }}>Pasul {step + 1} din {steps.length}</div>
+          <h2 className="mt-1 text-2xl font-black text-slate-900 leading-snug">{s.q}</h2>
+          <div className="mt-5">{s.body}</div>
+        </div>
       </div>
       <div className="fixed bottom-0 left-0 right-0 px-5 pb-6 pt-3 bg-gradient-to-t from-white via-white to-transparent">
         <div className="max-w-md mx-auto">

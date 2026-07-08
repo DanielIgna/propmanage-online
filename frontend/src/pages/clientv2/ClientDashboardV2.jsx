@@ -4,7 +4,7 @@ import { Home, Plus, Wrench, Building2, Settings, Bell, ChevronDown, Shield, Lay
 import { useAuth, formatApiError } from "../../auth";
 import { API } from "../DashShared";
 import { GREEN, Sheet } from "./ui";
-import { HomeV2 } from "./HomeV2";
+import { HomeV2, HomeSkeleton } from "./HomeV2";
 import { JobsV2 } from "./JobsV2";
 import { PropertyHubV2, WalletSheet } from "./PropertyHubV2";
 import { RequestWizard } from "./RequestWizard";
@@ -22,7 +22,8 @@ const NAV = [[Home, "Acasă", "home"], [Wrench, "Lucrări", "jobs"], [Plus, "Sol
 const TITLES = { home: null, jobs: "Lucrările mele", property: "Proprietatea mea", settings: "Setări" };
 
 export default function ClientDashboardV2() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, logout } = useAuth();
+  const [loaded, setLoaded] = useState(false);
   const [properties, setProperties] = useState([]);
   const [requests, setRequests] = useState([]);
   const [notifs, setNotifs] = useState([]);
@@ -50,7 +51,7 @@ export default function ClientDashboardV2() {
 
   useEffect(() => {
     if (!user || user === false) return;
-    loadProps(); loadRequests(); loadNotifs();
+    Promise.all([loadProps(), loadRequests(), loadNotifs()]).finally(() => setLoaded(true));
     const interval = setInterval(loadNotifs, 30000);
     // Stripe return polling (identic cu dashboardul clasic)
     const params = new URLSearchParams(window.location.search);
@@ -128,7 +129,9 @@ export default function ClientDashboardV2() {
             {(user?.name || "C")[0].toUpperCase()}
           </span>
           <div className="min-w-0">
-            <div className="text-sm font-black text-slate-900 leading-none truncate">Bună, {user?.name?.split(" ")[0] || ""}</div>
+            <div className="text-sm font-black text-slate-900 leading-none truncate">
+              {(() => { const h = new Date().getHours(); return h < 12 ? "Bună dimineața" : h < 18 ? "Bună ziua" : "Bună seara"; })()}, {user?.name?.split(" ")[0] || ""}
+            </div>
             {prop && (
               <button onClick={() => setTab("property")} className="mt-1 flex items-center gap-0.5 text-[11px] font-semibold text-slate-400">
                 {prop.name} <ChevronDown className="w-3 h-3" />
@@ -142,7 +145,7 @@ export default function ClientDashboardV2() {
         </div>
         {TITLES[tab] && <h1 className="px-5 pb-3 text-xl font-black text-slate-900">{TITLES[tab]}</h1>}
 
-        {tab === "home" && <HomeV2 user={user} prop={prop} properties={properties} requests={requests} notifs={notifs} offersCount={offersCount} go={setTab} actions={actions} />}
+        {tab === "home" && (!loaded ? <HomeSkeleton /> : <HomeV2 user={user} prop={prop} properties={properties} requests={requests} notifs={notifs} offersCount={offersCount} go={setTab} actions={actions} />)}
         {tab === "jobs" && <JobsV2 requests={requests} actions={actions} />}
         {tab === "property" && <PropertyHubV2 user={user} prop={prop} properties={properties} setSelectedPropId={setSelectedPropId} actions={actions} />}
         {tab === "settings" && (
@@ -163,6 +166,11 @@ export default function ClientDashboardV2() {
               <ChevronRight className="w-4 h-4 text-slate-300" />
             </button>
             <div className="pt-2 rounded-3xl bg-stone-900 p-4" data-testid="v2-settings-legacy-panel"><SettingsPanel /></div>
+            <button onClick={logout} data-testid="v2-logout"
+              className="w-full py-3.5 rounded-full border-2 border-rose-100 text-sm font-bold text-rose-500 bg-white active:scale-[0.98] transition-transform">
+              Deconectare
+            </button>
+            <p className="text-center text-[10px] text-slate-300 pt-1">PropManage · Client dashboard V2</p>
           </div>
         )}
 

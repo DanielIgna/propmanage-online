@@ -727,3 +727,10 @@ html, body, [class*="bg-"], [class*="text-"], [class*="border-"] {
   -webkit-text-fill-color: #0f172a;
   -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
 }
+
+/* ── Client V2 — micro-interacțiuni & skeleton (Faza 5) ── */
+@keyframes cv2FadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.cv2-fade { animation: cv2FadeUp .45s cubic-bezier(.16,1,.3,1) both; }
+.cv2-d1 { animation-delay: .06s; } .cv2-d2 { animation-delay: .14s; } .cv2-d3 { animation-delay: .22s; }
+@keyframes cv2Shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+.cv2-skeleton { background: linear-gradient(90deg, #f1f5f9 25%, #e8edf3 37%, #f1f5f9 63%); background-size: 400px 100%; animation: cv2Shimmer 1.3s infinite linear; }

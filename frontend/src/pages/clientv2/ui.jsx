@@ -63,6 +63,8 @@ export const Sheet = ({ title, onClose, children, testid }) => {
   );
 };
 
+export const Skeleton = ({ className = "" }) => <div className={`cv2-skeleton rounded-2xl ${className}`} />;
+
 export const STATUS_CHIP = {
   open: ["Deschis", "#EFF6FF", "#3B82F6"],
   assigned: ["Asignat", "#FFF7ED", "#F97316"],
