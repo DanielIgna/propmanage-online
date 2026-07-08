@@ -36,7 +36,8 @@ const Header = ({ title, onBack, onClose }) => (
 
 const HomeView = ({ onPickCategory }) => {
   const [query, setQuery] = useState("");
-  const filtered = query ? CATEGORIES.filter(c => c.label.toLowerCase().includes(query.toLowerCase())) : CATEGORIES;
+  const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const filtered = query ? CATEGORIES.filter(c => norm(c.label).includes(norm(query))) : CATEGORIES;
   return (
     <div className="pb-24" data-testid="cj-home-view">
       <div className="px-5 pt-6 flex items-center gap-2">

@@ -1,6 +1,7 @@
 // PropManage — GDPR Cookie Consent Banner
 // Shows on first visit. Stores prefs in localStorage + (if logged in) syncs to /api/cookies/consent.
 import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import axios from "axios";
 import { Cookie, ChevronDown, X } from "lucide-react";
 
@@ -8,6 +9,7 @@ const API = process.env.REACT_APP_BACKEND_URL;
 const STORAGE_KEY = "pm_cookie_consent_v1";
 
 export const CookieBanner = () => {
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const [customize, setCustomize] = useState(false);
   const [prefs, setPrefs] = useState({
@@ -51,6 +53,9 @@ export const CookieBanner = () => {
   const acceptAll = () => persist({ analytics: true, marketing: true });
   const rejectOptional = () => persist({ analytics: false, marketing: false });
   const saveCustom = () => persist({ analytics: prefs.analytics, marketing: prefs.marketing });
+
+  // pe ruta mobilă client-junior bannerul se suprapune cu BottomNav — îl ascundem
+  if (pathname.startsWith("/dashboard/client-junior")) return null;
 
   if (!open) {
     return (

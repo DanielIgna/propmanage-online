@@ -1995,3 +1995,21 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 - Fix: AdminLayoutMetronic.jsx — flatItems include _zone; favItems filtrat pe zona activă. Cmd+K caută în continuare în ambele zone (comută automat zona). FAV_KEY='pm_admin_fav_items_v1'.
 - Validat de testing agent (iter83): filtrare favorite per zonă, 10 vs 5 secțiuni, persistență zonă, item Analytics & Growth în Business → Statistici & KPI — toate PASS.
 - ⚠️ PRODUCȚIE: fix-ul + modulul Analytics & Growth apar pe propmanage.ro DOAR după REDEPLOY (deploy-ul userului a fost făcut înainte de aceste schimbări).
+
+## Update — Iul 2026 · ANALYTICS & GROWTH — FAZA 2 COMPLETĂ + CLIENT JUNIOR UI (testat iter84: backend 15/15, frontend 100%)
+**Faza 2 Analytics** (routes/analytics_growth.py — secțiunea "FAZA 2" după export_csv):
+- Heatmap/click-map: GET /api/admin/analytics/heatmap?period&path → pagini cu click-uri + puncte (x%,y%); UI tab nou cu selector pagini + canvas puncte roșii + buton deep-link MS Clarity (dacă clarity_id setat).
+- Bounce detaliat: GET /api/admin/analytics/bounce → summary (bounce_rate, quick_bounce <10s), serie zilnică, pe surse, pe pagini de intrare, bucket-uri durată (5). UI tab cu 4 KPI + 2 grafice + 2 tabele.
+- Retenție avansată: GET /api/admin/analytics/retention?weeks=8 → cohorte săptămânale (min(week)=cohortă, % activi S0..Sn) + summary revenire. UI tab cu heatmap-tabel albastru.
+- A/B Testing: colecție ab_experiments; CRUD /api/admin/analytics/ab (+status active/stopped); rezultate per variantă (vizitatori/conversii/rate) + z-test 2 proporții (semnificativ p<0.05, min 5 vizitatori/var) + uplift + winner. Tracking: getAbVariant(key) în lib/analytics.js (hash determinist vid+key → A/B, expunere 1x/sesiune, event type "ab" → sesiune ab_{key}=variant). Goal = pas funnel. E2E verificat (track → visitor numărat).
+- Export PDF: GET /api/admin/analytics/export.pdf (reportlab + FreeSans pt diacritice) — raport complet: KPI, surse+bounce, funnel, top pagini, bounce intrare, campanii, cohorte retenție. Buton roșu "PDF" în header pagina admin.
+- Frontend: 4 taburi noi în AnalyticsGrowthPage.jsx → componente în pages/admin/analytics/{HeatmapTab,BounceTab,RetentionTab,AbTestingTab}.jsx. (Bug fixat de tester: 5 iconuri lucide lipsă din import.)
+
+**Client Junior UI (Hick's Law, referință: 16 imagini HomeRun — verde #34C759, alb, mobile-first):**
+- Rută TEST: /dashboard/client-junior (fără auth, MOCK frontend-only — cererile NU merg la backend încă, prin design).
+- Componente: pages/dashboard/clientjunior/components.jsx → QuestionCard, OptionRadio, StickyCTA, BottomNav (4 destinații), CategoryCard. Pagina: pages/dashboard/ClientJuniorDashboard.jsx.
+- Flux: Home (logo, search cu filtrare fără diacritice, carusel + grid 6 categorii cu interval de preț) → wizard 3 întrebări (o întrebare/ecran, max 3 opțiuni, progress bar, preț mediu, CTA sticky disabled până la selecție) → confirmare (fundal verde pal, "Am primit cererea…", CTA "Mergi la lucrările mele", "Anulează cererea") → Lucrările mele (card cu pași progres + Q&A + număr cerere).
+- CookieBanner ascuns pe această rută (se suprapunea cu BottomNav pe mobil).
+- test_credentials.md actualizat cu Owner Super Admin (danieligna1@gmail.com / 0108, auth pe cookie httpOnly).
+
+**NEXT:** decizie user pe Client Junior (integrare backend real requests? extindere la toate categoriile?); AI Marketing Faza 2 (Social Media AI Studio, Content Calendar) & Faza 3 (Meta/Google Ads API); triaj teste vechi (49 skips + E2E fragile); restore parteneri terminați (P2); DNS Resend (blocat pe user).
