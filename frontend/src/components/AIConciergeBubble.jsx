@@ -33,6 +33,12 @@ const ROLE_TITLES = {
 export const AIConciergeBubble = () => {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const h = () => setOpen(true);
+    window.addEventListener("pm-open-ai", h);
+    return () => window.removeEventListener("pm-open-ai", h);
+  }, []);
   const [enabled, setEnabled] = useState(false);
   const [supportEmail, setSupportEmail] = useState("contact@propmanage.ro");
   const [messages, setMessages] = useState([]);

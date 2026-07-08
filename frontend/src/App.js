@@ -95,6 +95,7 @@ import DemoActivityPage from "./pages/admin/DemoActivityPage";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import ClientJuniorDashboard from "./pages/dashboard/ClientJuniorDashboard";
 import ClientV2Wireframe from "./pages/dashboard/ClientV2Wireframe";
+import ClientDashboardSwitch from "./pages/clientv2/ClientDashboardSwitch";
 import ContractPage from "./pages/ContractPage";
 import { trackPageView } from "@/lib/analytics";
 import { useDynamicSEO } from "@/lib/useDynamicSEO";
@@ -1678,7 +1679,7 @@ function App() {
               <Route path="/ghiduri/:slug" element={<GhidPage />} />
               <Route path="/help/:token" element={<HelpPage />} />
               <Route path="/specialists/:id" element={<SpecialistProfile />} />
-              <Route path="/client" element={<ClientDashboard />} />
+              <Route path="/client" element={<ClientDashboardSwitch />} />
               <Route path="/specialist" element={<SpecialistDashboard />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/auth-health" element={<AdminAuthHealthPage />} />
