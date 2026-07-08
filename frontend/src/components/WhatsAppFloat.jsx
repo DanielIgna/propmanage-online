@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "../auth";
 
 // Buton flotant WhatsApp — config din Admin → Analytics & Growth → Integrări
 // (telefon + mesaj editabile fără cod). Ascuns pe /admin și client-junior.
@@ -13,6 +14,7 @@ const WaIcon = () => (
 
 export const WhatsAppFloat = () => {
   const { pathname } = useLocation();
+  const { user } = useAuth();
   const [cfg, setCfg] = useState(null);
 
   useEffect(() => {
@@ -24,10 +26,14 @@ export const WhatsAppFloat = () => {
 
   const phone = cfg.whatsapp_phone.replace(/[^0-9]/g, "");
   const href = `https://wa.me/${phone}?text=${encodeURIComponent(cfg.whatsapp_message || "")}`;
+  // utilizator logat (client/specialist/operator) → bula AI Concierge ocupă colțul:
+  // pe desktop urcăm WhatsApp deasupra ei, pe mobil rămâne jos (AI e deja la bottom-20)
+  const hasAiBubble = !!user && user !== false && user.role !== "admin";
+  const posClass = hasAiBubble ? "bottom-4 right-4 lg:bottom-24 lg:right-6" : "bottom-4 right-4";
 
   return (
     <a href={href} target="_blank" rel="noreferrer" data-testid="whatsapp-float-btn" aria-label="Scrie-ne pe WhatsApp" title="Scrie-ne pe WhatsApp"
-      className="fixed bottom-4 right-4 z-40 w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-black/20 hover:scale-110 active:scale-95 transition-transform"
+      className={`fixed ${posClass} z-40 w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-black/20 hover:scale-110 active:scale-95 transition-transform`}
       style={{ background: "#25D366" }}>
       <WaIcon />
     </a>

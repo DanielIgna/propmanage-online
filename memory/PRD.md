@@ -2023,3 +2023,9 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 - Notă bug tool: un search_replace pe tracker_config a raportat succes dar nu s-a aplicat — reaplicat + restart backend manual.
 - ⚠️ PRODUCȚIE: apare pe propmanage.ro DOAR după REDEPLOY.
 **NEXT (cerut de user)**: ajustare design Client Junior UI — de clarificat ce anume dorește modificat.
+
+## Update — Iul 2026 · FIX: suprapunere widget WhatsApp cu bula AI Concierge (desktop, client/specialist)
+- Raportat de user pe producție: pe desktop WhatsApp era ASCUNS în spatele bulei AI (ambele fixed bottom-right; AI la z-55 bottom-6/right-6, WA la z-40 bottom-4/right-4).
+- Fix în WhatsAppFloat.jsx: dacă userul e logat non-admin (bula AI e vizibilă) → pe desktop WA urcă la lg:bottom-24 lg:right-6 (stivuit DEASUPRA bulei AI, gap curat); vizitatori anonimi → rămâne bottom-4/right-4. Mobil neschimbat (era deja ok, AI e la bottom-20).
+- Verificat cu screenshot pe /client (client@propmanage.io): WA y=928, AI y≈1000 pe 1080p — separate clar.
+- ⚠️ Apare pe propmanage.ro după REDEPLOY.
