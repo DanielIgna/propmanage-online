@@ -757,8 +757,13 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
   }, []);
 
   // Flat item index across all visible sections (used by Favorites + Cmd-K)
-  const flatItems = visibleSections.flatMap(s => s.items.map(it => ({ ...it, _sectionId: s.id, _sectionTitle: s.title })));
-  const favItems = favIds.map(id => flatItems.find(it => it.id === id)).filter(Boolean);
+  const flatItems = visibleSections.flatMap(s => s.items.map(it => ({ ...it, _sectionId: s.id, _sectionTitle: s.title, _zone: s.zone })));
+  // Favoritele respectă zona activă — altfel sidebar-ul arată identic în ambele
+  // zone când există multe favorite (bug raportat pe producție).
+  const favItems = favIds
+    .map(id => flatItems.find(it => it.id === id))
+    .filter(Boolean)
+    .filter(it => it._zone === zone);
 
   // Global Ctrl/Cmd + K hotkey for the Command Palette
   useEffect(() => {
