@@ -200,6 +200,7 @@ const NAV_SECTIONS = [
     icon: BarChart3,
     zone: "business",
     items: [
+      { id: "growth_analytics", label: "Analytics & Growth", icon: Activity, badge: "NEW", href: "/admin/analytics-growth" },
       { id: "bi_moe", label: "Business Intelligence", icon: BarChart3, badge: "SPRINT F", href: "/admin/bi-moe" },
       { id: "abtests", label: "A/B Tests", icon: Sparkles },
     ],

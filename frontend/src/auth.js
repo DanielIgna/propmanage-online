@@ -36,7 +36,9 @@ export const AuthProvider = ({ children }) => {
   };
   
   const register = async (payload) => {
+    try { const { trackFunnel } = await import("@/lib/analytics"); trackFunnel("signup_started"); } catch { /* noop */ }
     const { data } = await axios.post(`${API}/auth/register`, payload);
+    try { const { trackFunnel } = await import("@/lib/analytics"); trackFunnel("account_created"); } catch { /* noop */ }
     setUser(data);
     return data;
   };

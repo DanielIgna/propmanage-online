@@ -77,6 +77,7 @@ import ExperienceTiersPage from "./pages/admin/ExperienceTiersPage";
 import FeatureConfiguratorPage from "./pages/admin/FeatureConfiguratorPage";
 import SpecialistProgressionPage from "./pages/admin/SpecialistProgressionPage";
 import BIMoePage from "./pages/admin/BIMoePage";
+import AnalyticsGrowthPage from "./pages/admin/AnalyticsGrowthPage";
 import ITCollaboratorsHubPage from "./pages/admin/ITCollaboratorsHubPage";
 import ITCopilotPage from "./pages/admin/ITCopilotPage";
 import LegalAuditPage from "./pages/admin/LegalAuditPage";
@@ -1652,6 +1653,7 @@ function App() {
               <Route path="/admin/feature-configurator" element={<FeatureConfiguratorPage />} />
               <Route path="/admin/specialist-progression" element={<SpecialistProgressionPage />} />
               <Route path="/admin/bi-moe" element={<BIMoePage />} />
+              <Route path="/admin/analytics-growth" element={<AnalyticsGrowthPage />} />
               <Route path="/admin/it-collaborators" element={<ITCollaboratorsHubPage />} />
               <Route path="/admin/it-collaborators/copilot" element={<ITCopilotPage />} />
               <Route path="/admin/legal-audit" element={<LegalAuditPage />} />

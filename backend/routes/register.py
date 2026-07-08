@@ -109,6 +109,7 @@ from routes.marketing_performance import router as marketing_performance_router
 from routes.demo_accounts import router as demo_accounts_router
 from routes.admin_accounts import router as admin_accounts_router
 from routes.admin_zones import router as admin_zones_router
+from routes.analytics_growth import router as analytics_track_router, admin_router as analytics_admin_router
 from routes.demo_activity import router as demo_activity_router
 
 # Registration order matters — kept identical to the original server.py loop.
@@ -214,5 +215,7 @@ ALL_ROUTERS = (
     demo_accounts_router,
     admin_accounts_router,
     admin_zones_router,
+    analytics_track_router,
+    analytics_admin_router,
     demo_activity_router,
 )
