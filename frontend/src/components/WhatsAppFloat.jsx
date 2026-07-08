@@ -26,10 +26,10 @@ export const WhatsAppFloat = () => {
 
   const phone = cfg.whatsapp_phone.replace(/[^0-9]/g, "");
   const href = `https://wa.me/${phone}?text=${encodeURIComponent(cfg.whatsapp_message || "")}`;
-  // utilizator logat (client/specialist/operator) → bula AI Concierge ocupă colțul:
-  // pe desktop urcăm WhatsApp deasupra ei, pe mobil rămâne jos (AI e deja la bottom-20)
+  // utilizator logat (client/specialist/operator) → bula AI + bottom nav ocupă zona de jos:
+  // mobil: deasupra AI bubble (care e la bottom-20); desktop: deasupra bulei AI (bottom-6)
   const hasAiBubble = !!user && user !== false && user.role !== "admin";
-  const posClass = hasAiBubble ? "bottom-4 right-4 lg:bottom-24 lg:right-6" : "bottom-4 right-4";
+  const posClass = hasAiBubble ? "bottom-36 right-4 lg:bottom-24 lg:right-6" : "bottom-4 right-4";
 
   return (
     <a href={href} target="_blank" rel="noreferrer" data-testid="whatsapp-float-btn" aria-label="Scrie-ne pe WhatsApp" title="Scrie-ne pe WhatsApp"

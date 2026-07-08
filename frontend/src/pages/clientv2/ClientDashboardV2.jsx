@@ -162,7 +162,7 @@ export default function ClientDashboardV2() {
               </div>
               <ChevronRight className="w-4 h-4 text-slate-300" />
             </button>
-            <div className="pt-2"><SettingsPanel /></div>
+            <div className="pt-2 rounded-3xl bg-stone-900 p-4" data-testid="v2-settings-legacy-panel"><SettingsPanel /></div>
           </div>
         )}
 

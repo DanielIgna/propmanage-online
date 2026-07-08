@@ -42,7 +42,13 @@ export const ListItem = ({ icon: Icon, label, sub, right, onClick, testid, muted
   </button>
 );
 
-export const Sheet = ({ title, onClose, children, testid }) => (
+export const Sheet = ({ title, onClose, children, testid }) => {
+  React.useEffect(() => {
+    const h = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
+  return (
   <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40" onClick={onClose} data-testid={testid}>
     <div className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl max-h-[88vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
       <div className="sticky top-0 bg-white flex items-center gap-3 px-5 py-4 border-b border-slate-100 z-10">
@@ -54,7 +60,8 @@ export const Sheet = ({ title, onClose, children, testid }) => (
       <div className="p-5">{children}</div>
     </div>
   </div>
-);
+  );
+};
 
 export const STATUS_CHIP = {
   open: ["Deschis", "#EFF6FF", "#3B82F6"],
