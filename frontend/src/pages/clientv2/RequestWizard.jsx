@@ -14,14 +14,16 @@ const CATS = [
 // Wizard „Solicită" — o întrebare pe ecran (model Client Junior), POST real la /requests
 export const RequestWizard = ({ property, onClose, onCreated }) => {
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState({ category: "", title: "", description: "", priority: "normal", budget_estimate: 200 });
+  // budget_estimate is a string during editing (avoids cursor jump / "0" prefix); parsed at submit.
+  const [form, setForm] = useState({ category: "", title: "", description: "", priority: "normal", budget_estimate: "200" });
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const submit = async () => {
     setLoading(true);
     try {
-      const { data } = await axios.post(`${API}/requests`, { ...form, property_id: property.id, photos: [] });
+      const payload = { ...form, budget_estimate: parseFloat(form.budget_estimate) || 0, property_id: property.id, photos: [] };
+      const { data } = await axios.post(`${API}/requests`, payload);
       onCreated(data);
       setDone(true);
     } catch (e) { alert(formatApiError(e)); }
@@ -86,7 +88,8 @@ export const RequestWizard = ({ property, onClose, onCreated }) => {
             </button>
           ))}
           <label className="block text-xs font-bold text-slate-500 pt-1">Buget estimat (RON)
-            <input type="number" min="1" value={form.budget_estimate} onChange={e => setForm(f => ({ ...f, budget_estimate: parseFloat(e.target.value) || 0 }))}
+            <input type="number" inputMode="numeric" min="1" value={form.budget_estimate}
+              onChange={e => setForm(f => ({ ...f, budget_estimate: e.target.value }))}
               className="mt-1.5 w-full px-4 py-3.5 rounded-2xl border-2 border-slate-200 text-sm font-normal outline-none focus:border-[#34C759]" data-testid="v2-wiz-budget" />
           </label>
         </div>
