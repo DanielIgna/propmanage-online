@@ -1989,3 +1989,9 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 
 **FAZA 2 (următoarea):** heatmap/click-map vizual (datele click x_pct/y_pct DEJA se colectează), bounce detaliat, dashboard A/B testing mesaje/landing, export PDF, retenție avansată, funnel hooks pt property_added/subscription/specialist_request în fluxurile respective.
 **Alte pending:** Client Junior UI (Hick's Law, 16 imagini), triaj 17F+10E teste vechi, restore parteneri terminați (P2). NOTĂ PRODUCȚIE: modulul apare pe propmanage.ro DOAR după redeploy.
+
+## Update — Iul 2026 · BUGFIX: Favoritele din sidebar filtrate pe zona activă (iter83 — toate PASS)
+- Bug raportat pe producție: comutarea Business ↔ Infra & Dev părea că nu schimbă nimic — secțiunea ★ FAVORITE (identică în ambele zone) umplea ecranul și împingea secțiunile de zonă sub fold.
+- Fix: AdminLayoutMetronic.jsx — flatItems include _zone; favItems filtrat pe zona activă. Cmd+K caută în continuare în ambele zone (comută automat zona). FAV_KEY='pm_admin_fav_items_v1'.
+- Validat de testing agent (iter83): filtrare favorite per zonă, 10 vs 5 secțiuni, persistență zonă, item Analytics & Growth în Business → Statistici & KPI — toate PASS.
+- ⚠️ PRODUCȚIE: fix-ul + modulul Analytics & Growth apar pe propmanage.ro DOAR după REDEPLOY (deploy-ul userului a fost făcut înainte de aceste schimbări).
