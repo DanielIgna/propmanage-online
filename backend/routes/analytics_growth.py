@@ -180,11 +180,13 @@ async def campaign_short_link(code: str, qr: int = 0):
 # ═══════════════════════ SETTINGS / INTEGRĂRI (admin) ═══════════════════════
 
 async def _get_settings() -> dict:
+    defaults = {"tracker_enabled": True, "clarity_id": "", "ga4_id": "", "meta_pixel_id": ""}
     s = await db.analytics_settings.find_one({"_id": "integrations"})
     if not s:
-        s = {"_id": "integrations", "tracker_enabled": True, "clarity_id": "", "ga4_id": "", "meta_pixel_id": ""}
+        s = {"_id": "integrations", **defaults}
         await db.analytics_settings.insert_one(s)
-    return s
+    # chei canonice garantate chiar dacă documentul e parțial (seed vechi)
+    return {**defaults, **s}
 
 
 class IntegrationsUpdate(BaseModel):

@@ -1977,3 +1977,15 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 - TESTAT: curl (super→ambele; developer→doar infrastructure; none→revine; cod greșit→403) + screenshot UI (admin restricționat vede DOAR tabul Infra + nota) — PASS.
 - Parola reală testing.admin@propmanage.io = Test!Demo2026Strong (nu DemoAdmin123!).
 - NEXT: Client Junior UI (Hick's Law, 16 imagini) — sesiune cu 50+ credite; triaj 17F+10E teste vechi.
+
+## Update — Iul 2026 · ANALYTICS & GROWTH DASHBOARD — FAZA 1 COMPLETĂ (testat iter82: totul PASS)
+**Modul nou** (zona Business → Statistici & KPI → "Analytics & Growth", /admin/analytics-growth):
+- Tracker first-party: `frontend/src/lib/analytics.js` (auto-init din index.js; trackPageView folosit de AnalyticsRouteTracker din App.js; trackFunnel apelat în auth.js register → signup_started + account_created). Vizitator (pm_vid) + sesiune 30min (pm_sid) + atribuire campanie 30 zile (pm_attr din ?c= și utm_source). Trafic /admin exclus intenționat.
+- Backend: `routes/analytics_growth.py` — POST /api/track (batch, public), GET /api/track/config, GET /api/go/{code} (link scurt 302 + contorizare opens/qr_opens), /api/admin/analytics/{overview,pages,integrations,export.csv}, /api/admin/growth/campaigns CRUD + /{id}/qr (PNG). Colecții: analytics_events, analytics_sessions, growth_campaigns, analytics_settings (indexuri create).
+- Campanii: nume/administrator/asociație/apartamente/canal/primit/trimis + link personalizat (APP_PUBLIC_URL/api/go/{code}) + QR descărcabil + indicatori startup: primit→deschis→vizitatori→30s+→început înreg.→conturi→abonamente→revenit 7z→conversie% + venit manual (revenue_manual, PATCH).
+- Dashboard: 6 KPI, grafic trafic zilnic (recharts Area), pie surse (whatsapp/facebook/google/direct/qr/admin/other — classify_source), funnel orizontal, tab Pagini (views/timp mediu/bounce), export CSV (overview/pages/campaigns), filtre Azi/7z/30z, responsive.
+- Integrări MODULARE: Clarity (ID xj5fspkgjj CONFIGURAT — script injectat la vizitatori, window.clarity verificat), GA4 + Meta Pixel (câmpuri goale, se injectează automat când sunt setate). Fără modificări de arhitectură la adăugare.
+- Testat: iter82 — backend 15/15 pytest (tests create de agent), frontend E2E complet PASS.
+
+**FAZA 2 (următoarea):** heatmap/click-map vizual (datele click x_pct/y_pct DEJA se colectează), bounce detaliat, dashboard A/B testing mesaje/landing, export PDF, retenție avansată, funnel hooks pt property_added/subscription/specialist_request în fluxurile respective.
+**Alte pending:** Client Junior UI (Hick's Law, 16 imagini), triaj 17F+10E teste vechi, restore parteneri terminați (P2). NOTĂ PRODUCȚIE: modulul apare pe propmanage.ro DOAR după redeploy.
