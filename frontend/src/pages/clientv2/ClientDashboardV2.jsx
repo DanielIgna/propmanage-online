@@ -120,7 +120,7 @@ export default function ClientDashboardV2() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAFBFA]" data-testid="client-dashboard-v2">
+    <div className="min-h-screen bg-[#FAFBFA] cv2-scope" data-testid="client-dashboard-v2">
       <div className="max-w-md mx-auto min-h-screen sm:border-x sm:border-slate-100 relative pb-20">
         {/* Header slim */}
         <div className="flex items-center gap-2.5 px-5 pt-5 pb-3" data-testid="v2-header">

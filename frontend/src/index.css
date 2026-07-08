@@ -704,3 +704,26 @@ html[data-theme="light"] .grain::before { opacity: 0.02 !important; }
 html, body, [class*="bg-"], [class*="text-"], [class*="border-"] {
   transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
 }
+
+/* ── Client V2 (light) — contrast formulare: text slate-900, placeholder slate-400 ── */
+.cv2-scope input,
+.cv2-scope textarea,
+.cv2-scope select {
+  color: #0f172a;
+  background-color: #ffffff;
+  caret-color: #0f172a;
+}
+.cv2-scope input::placeholder,
+.cv2-scope textarea::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+.cv2-scope select option {
+  color: #0f172a;
+  background-color: #ffffff;
+}
+.cv2-scope input:-webkit-autofill,
+.cv2-scope textarea:-webkit-autofill {
+  -webkit-text-fill-color: #0f172a;
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
+}

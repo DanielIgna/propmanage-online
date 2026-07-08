@@ -2051,3 +2051,7 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 - LIMITĂRI cunoscute (disponibile în dashboardul clasic): faze design interior (DesignPhasesViewer), filtre căutare lucrări, quest/tier widgets. Rută oferte /client/requests/{id}/offers = pagina existentă (funcțională).
 - Tester a creat cererea TEST_V2_iter85 (open, zugravit) pe contul client demo + a plătit escrow demo pe o cerere test.
 - ⚠️ PRODUCȚIE: apare pe propmanage.ro după REDEPLOY. FAZELE 1-4 complete.
+
+## Update — Iul 2026 · FIX contrast formulare Client V2 + cerere viitoare
+- BUG: tema globală dark făcea textul introdus în input/textarea/select din V2 aproape invizibil (alb pe alb). FIX fără modificări de layout: clasa scoped `.cv2-scope` în index.css (color #0f172a, bg #fff, caret #0f172a, placeholder #94a3b8 opacity 1, select option, webkit-autofill) aplicată pe rădăcinile: ClientDashboardV2, ClientJuniorDashboard, ClientV2Wireframe. Verificat computed styles cu playwright.
+- CERERE VIITOARE (user): AUDIT UX COMPLET per ecran (Home, Solicită, Lucrări, Proprietate, Setări) + rafinare la nivel Revolut/Airbnb — user e mulțumit de direcție ("arată mult mai bine", "onboarding mai clar", "Proprietatea mea mult mai ușor de înțeles"), urmează etapa de finisare.

@@ -271,7 +271,7 @@ export default function ClientV2Design() {
   const [state, setState] = useState("activ");
   const [tab, setTab] = useState("home");
   return (
-    <div className="min-h-screen bg-slate-100 sm:py-6" data-testid="client-v2-wireframe">
+    <div className="min-h-screen bg-slate-100 sm:py-6 cv2-scope" data-testid="client-v2-wireframe">
       <div className="max-w-md mx-auto px-4 pt-4 sm:pt-0">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-500"><Sparkles className="w-4 h-4" style={{ color: GREEN }} /> FAZA 3 · UI Design Client V2 — direcția B (light)</div>
         <div className="mt-2 flex gap-1.5" data-testid="v2-state-switcher">

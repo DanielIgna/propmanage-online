@@ -179,7 +179,7 @@ export default function ClientJuniorDashboard() {
   const goHome = () => { setView("home"); setTab("home"); };
 
   return (
-    <div className="min-h-screen bg-[#FAFBFA]" data-testid="client-junior-page">
+    <div className="min-h-screen bg-[#FAFBFA] cv2-scope" data-testid="client-junior-page">
       <div className="max-w-md mx-auto min-h-screen bg-white sm:border-x sm:border-slate-100">
         {view === "flow" ? (
           <FlowView category={category} onDone={finishFlow} onExit={goHome} />
