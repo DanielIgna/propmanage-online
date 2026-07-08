@@ -3,7 +3,7 @@ import axios from "axios";
 import {
   BarChart3, Users, MousePointerClick, UserPlus, Building2, Wallet, RefreshCw,
   Download, Plus, QrCode, Copy, Trash2, Link2, Megaphone, Settings2, CheckCircle2, Loader2,
-  Flame, TrendingDown, Repeat, FlaskConical, FileText,
+  Flame, FlaskConical, Repeat, TrendingDown, FileText, MessageCircle,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -16,6 +16,7 @@ import { HeatmapTab } from "./analytics/HeatmapTab";
 import { BounceTab } from "./analytics/BounceTab";
 import { RetentionTab } from "./analytics/RetentionTab";
 import { AbTestingTab } from "./analytics/AbTestingTab";
+import { WhatsAppTab } from "./analytics/WhatsAppTab";
 
 const SOURCE_COLORS = { whatsapp: "#25D366", facebook: "#1877F2", google: "#EA4335", direct: "#64748b", qr: "#8b5cf6", admin: "#f59e0b", other: "#0ea5e9" };
 const PERIODS = [["day", "Azi"], ["week", "7 zile"], ["month", "30 zile"]];
@@ -79,6 +80,9 @@ export default function AnalyticsGrowthPage() {
       const { data } = await axios.put(`${API}/admin/analytics/integrations`, {
         clarity_id: integrations.clarity_id || "", ga4_id: integrations.ga4_id || "",
         meta_pixel_id: integrations.meta_pixel_id || "", tracker_enabled: integrations.tracker_enabled !== false,
+        whatsapp_enabled: integrations.whatsapp_enabled !== false,
+        whatsapp_phone: integrations.whatsapp_phone || "",
+        whatsapp_message: integrations.whatsapp_message || "",
       });
       setIntegrations(data); toast.success("Integrări salvate — scripturile se injectează automat la vizitatori");
     } catch (e) { toast.error("Eroare la salvare"); }
@@ -92,7 +96,7 @@ export default function AnalyticsGrowthPage() {
       <div className="space-y-5" data-testid="analytics-growth-page">
         {/* Controls */}
         <div className="flex flex-wrap items-center gap-2">
-          {[["overview", "Dashboard KPI", BarChart3], ["heatmap", "Heatmap", Flame], ["bounce", "Bounce", TrendingDown], ["retention", "Retenție", Repeat], ["abtest", "A/B Testing", FlaskConical], ["pages", "Pagini", MousePointerClick], ["campaigns", "Campanii", Megaphone], ["integrations", "Integrări", Settings2]].map(([id, label, Icon]) => (
+          {[["overview", "Dashboard KPI", BarChart3], ["heatmap", "Heatmap", Flame], ["bounce", "Bounce", TrendingDown], ["retention", "Retenție", Repeat], ["abtest", "A/B Testing", FlaskConical], ["whatsapp", "WhatsApp", MessageCircle], ["pages", "Pagini", MousePointerClick], ["campaigns", "Campanii", Megaphone], ["integrations", "Integrări", Settings2]].map(([id, label, Icon]) => (
             <button key={id} onClick={() => setTab(id)} data-testid={`ag-tab-${id}`}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold transition-colors ${tab === id ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"}`}>
               <Icon className="w-4 h-4" /> {label}
@@ -188,6 +192,8 @@ export default function AnalyticsGrowthPage() {
           <RetentionTab />
         ) : tab === "abtest" ? (
           <AbTestingTab />
+        ) : tab === "whatsapp" ? (
+          <WhatsAppTab period={period} />
         ) : tab === "pages" ? (
           <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-x-auto">
             <div className="flex items-center justify-between p-4 pb-0">
@@ -297,6 +303,21 @@ export default function AnalyticsGrowthPage() {
               <input type="checkbox" checked={integrations.tracker_enabled !== false} onChange={e => setIntegrations(s => ({ ...s, tracker_enabled: e.target.checked }))} />
               Tracker first-party activ (vizitatori, sesiuni, funnel)
             </label>
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-700 space-y-3" data-testid="ag-int-whatsapp">
+              <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-1.5"><MessageCircle className="w-4 h-4 text-[#25D366]" /> Widget WhatsApp (buton flotant)</h4>
+              <label className="flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                <input type="checkbox" checked={integrations.whatsapp_enabled !== false} onChange={e => setIntegrations(s => ({ ...s, whatsapp_enabled: e.target.checked }))} data-testid="ag-int-wa-enabled" />
+                Activ pe toate paginile publice (dreapta-jos)
+              </label>
+              <label className="block text-xs font-bold text-slate-500">Număr de telefon (editabil oricând)
+                <input value={integrations.whatsapp_phone || ""} onChange={e => setIntegrations(s => ({ ...s, whatsapp_phone: e.target.value.trim() }))} data-testid="ag-int-wa-phone"
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-transparent text-sm font-mono font-normal" placeholder="+40790541342" />
+              </label>
+              <label className="block text-xs font-bold text-slate-500">Mesaj predefinit
+                <input value={integrations.whatsapp_message || ""} onChange={e => setIntegrations(s => ({ ...s, whatsapp_message: e.target.value }))} data-testid="ag-int-wa-message"
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-transparent text-sm font-normal" placeholder="Bună! Doresc informații despre PropManage." />
+              </label>
+            </div>
             <button onClick={saveIntegrations} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-blue-600 text-white" data-testid="ag-int-save">
               <CheckCircle2 className="w-4 h-4" /> Salvează integrările
             </button>

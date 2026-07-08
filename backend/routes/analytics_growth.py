@@ -74,6 +74,7 @@ class TrackEvent(BaseModel):
     path: str = ""
     referrer: str = ""
     utm_source: str = ""
+    utm_medium: str = ""
     utm_campaign: str = ""
     campaign_code: str = ""
     via_qr: bool = False
@@ -115,6 +116,7 @@ async def ingest_events(batch: TrackBatch, request: Request):
             "referrer": (ev.referrer or "")[:300],
             "source": source,
             "utm_source": (ev.utm_source or "")[:100],
+            "utm_medium": (ev.utm_medium or "")[:100],
             "utm_campaign": (ev.utm_campaign or "")[:100],
             "campaign_code": (ev.campaign_code or "")[:40],
             "duration_ms": max(0, min(ev.duration_ms, 3_600_000)),
@@ -133,6 +135,12 @@ async def ingest_events(batch: TrackBatch, request: Request):
             inc["duration_ms"] += max(0, min(ev.duration_ms, 300_000))
         if ev.campaign_code:
             sess_updates["campaign_code"] = ev.campaign_code[:40]
+        if ev.utm_source:
+            sess_updates["utm_source"] = ev.utm_source[:100]
+        if ev.utm_medium:
+            sess_updates["utm_medium"] = ev.utm_medium[:100]
+        if ev.utm_campaign:
+            sess_updates["utm_campaign"] = ev.utm_campaign[:100]
         if source != "direct" or "source" not in sess_updates:
             sess_updates.setdefault("source", source)
         if ev.type == "funnel" and ev.funnel_step:
@@ -160,13 +168,16 @@ async def ingest_events(batch: TrackBatch, request: Request):
 
 @router.get("/track/config")
 async def tracker_config():
-    """Config public pentru tracker + integrări externe (Clarity/GA4/Meta)."""
+    """Config public pentru tracker + integrări externe (Clarity/GA4/Meta) + widget WhatsApp."""
     s = await _get_settings()
     return {
         "enabled": s.get("tracker_enabled", True),
         "clarity_id": s.get("clarity_id") or "",
         "ga4_id": s.get("ga4_id") or "",
         "meta_pixel_id": s.get("meta_pixel_id") or "",
+        "whatsapp_enabled": s.get("whatsapp_enabled", True),
+        "whatsapp_phone": s.get("whatsapp_phone") or "",
+        "whatsapp_message": s.get("whatsapp_message") or "",
     }
 
 
@@ -186,7 +197,12 @@ async def campaign_short_link(code: str, qr: int = 0):
 # ═══════════════════════ SETTINGS / INTEGRĂRI (admin) ═══════════════════════
 
 async def _get_settings() -> dict:
-    defaults = {"tracker_enabled": True, "clarity_id": "", "ga4_id": "", "meta_pixel_id": ""}
+    defaults = {
+        "tracker_enabled": True, "clarity_id": "", "ga4_id": "", "meta_pixel_id": "",
+        "whatsapp_enabled": True,
+        "whatsapp_phone": "+40790541342",
+        "whatsapp_message": "Bună! Doresc informații despre PropManage.",
+    }
     s = await db.analytics_settings.find_one({"_id": "integrations"})
     if not s:
         s = {"_id": "integrations", **defaults}
@@ -200,6 +216,9 @@ class IntegrationsUpdate(BaseModel):
     clarity_id: Optional[str] = None
     ga4_id: Optional[str] = None
     meta_pixel_id: Optional[str] = None
+    whatsapp_enabled: Optional[bool] = None
+    whatsapp_phone: Optional[str] = None
+    whatsapp_message: Optional[str] = None
 
 
 @admin_router.get("/analytics/integrations")
@@ -526,6 +545,46 @@ import math
 import re as _re
 
 FUNNEL_GOALS = ["signup_started", "account_created", "property_added", "subscription", "specialist_request"]
+
+WA_MEDIUM_LABELS = {"group": "Grupuri", "channel": "Canale", "private": "Privat", "status": "Status"}
+
+
+@admin_router.get("/analytics/whatsapp")
+async def analytics_whatsapp(
+    period: str = Query("month", pattern="^(day|week|month|custom)$"),
+    date_from: str = "", date_to: str = "",
+    user: dict = Depends(require_role("admin")),
+):
+    """Breakdown trafic WhatsApp pe utm_medium (group/channel/private/status) și utm_campaign."""
+    d_from, d_to = _period_range(period, date_from, date_to)
+    sessions = await db.analytics_sessions.find({"day": {"$gte": d_from, "$lte": d_to}, "source": "whatsapp"}).to_list(20000)
+    by_medium: dict = defaultdict(lambda: {"sessions": 0, "visitors": set(), "accounts": set()})
+    by_campaign: dict = defaultdict(lambda: {"sessions": 0, "visitors": set(), "accounts": set()})
+    for s in sessions:
+        m = ((s.get("utm_medium") or "").lower().strip()) or "nespecificat"
+        c = s.get("utm_campaign") or s.get("campaign_code") or "—"
+        for key, agg in ((m, by_medium), (c, by_campaign)):
+            a = agg[key]
+            a["sessions"] += 1
+            a["visitors"].add(s["visitor_id"])
+            if s.get("funnel_account_created"):
+                a["accounts"].add(s["visitor_id"])
+
+    def fmt(agg, labels=None):
+        return sorted([{
+            "key": k, "label": (labels or {}).get(k, k),
+            "sessions": v["sessions"], "visitors": len(v["visitors"]),
+            "accounts_created": len(v["accounts"]),
+        } for k, v in agg.items()], key=lambda x: -x["sessions"])
+
+    visitors = {s["visitor_id"] for s in sessions}
+    accounts = {s["visitor_id"] for s in sessions if s.get("funnel_account_created")}
+    return {
+        "period": {"from": d_from, "to": d_to},
+        "summary": {"sessions": len(sessions), "visitors": len(visitors), "accounts_created": len(accounts)},
+        "by_medium": fmt(by_medium, WA_MEDIUM_LABELS),
+        "by_campaign": fmt(by_campaign),
+    }
 
 
 @admin_router.get("/analytics/heatmap")

@@ -2013,3 +2013,13 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 - test_credentials.md actualizat cu Owner Super Admin (danieligna1@gmail.com / 0108, auth pe cookie httpOnly).
 
 **NEXT:** decizie user pe Client Junior (integrare backend real requests? extindere la toate categoriile?); AI Marketing Faza 2 (Social Media AI Studio, Content Calendar) & Faza 3 (Meta/Google Ads API); triaj teste vechi (49 skips + E2E fragile); restore parteneri terminați (P2); DNS Resend (blocat pe user).
+
+## Update — Iul 2026 · WHATSAPP: WIDGET + TRACKING UTM COMPLET + BREAKDOWN (self-tested: curl + 3 screenshots, totul PASS)
+**Audit**: Clarity/Analytics/clasificare whatsapp existau; lipseau utm_medium, widget WhatsApp, breakdown pe medium/campanie, tag-uri UTM în Clarity → implementate.
+- **Widget WhatsApp flotant** (`components/WhatsAppFloat.jsx`, montat în App.js lângă CookieBanner): buton verde #25D366 dreapta-jos, toate paginile publice (ascuns pe /admin și /dashboard/client-junior), deschide wa.me/{phone}?text={mesaj}. Config NATIVĂ din Admin → Analytics & Growth → Integrări: whatsapp_enabled / whatsapp_phone (default +40790541342, editabil) / whatsapp_message ("Bună! Doresc informații despre PropManage.") — salvate în analytics_settings, servite public prin GET /api/track/config.
+- **UTM complet**: tracker (`lib/analytics.js`) capturează acum și utm_medium + utm_campaign (persistate 30 zile în pm_attr); trimise în evenimente și salvate pe sesiune (utm_source/medium/campaign). Backend TrackEvent + ingest actualizate.
+- **Clarity tags**: după inject, dacă există atribuire → window.clarity("set", utm_source/utm_medium/utm_campaign/campaign_code) → filtrare înregistrări în dashboardul Clarity.
+- **Tab nou "WhatsApp"** în /admin/analytics-growth: GET /api/admin/analytics/whatsapp → summary + breakdown pe utm_medium (Grupuri/Canale/Privat/Status + nespecificat) + pe utm_campaign (vizitatori/sesiuni/conturi create) + GENERATOR de link UTM cu copy (medium select + nume campanie → slug).
+- Notă bug tool: un search_replace pe tracker_config a raportat succes dar nu s-a aplicat — reaplicat + restart backend manual.
+- ⚠️ PRODUCȚIE: apare pe propmanage.ro DOAR după REDEPLOY.
+**NEXT (cerut de user)**: ajustare design Client Junior UI — de clarificat ce anume dorește modificat.

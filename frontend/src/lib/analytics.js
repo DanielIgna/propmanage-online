@@ -50,9 +50,11 @@ const captureAttribution = () => {
   const p = new URLSearchParams(window.location.search);
   const c = p.get("c") || "";
   const utm = p.get("utm_source") || "";
+  const utmMedium = p.get("utm_medium") || "";
+  const utmCampaign = p.get("utm_campaign") || "";
   const viaQr = p.get("via_qr") === "1";
   if (c || utm) {
-    localStorage.setItem(ATTR_KEY, JSON.stringify({ c, utm_source: utm, via_qr: viaQr, ts: Date.now() }));
+    localStorage.setItem(ATTR_KEY, JSON.stringify({ c, utm_source: utm, utm_medium: utmMedium, utm_campaign: utmCampaign, via_qr: viaQr, ts: Date.now() }));
   }
 };
 
@@ -61,7 +63,7 @@ const getAttribution = () => {
     const a = JSON.parse(localStorage.getItem(ATTR_KEY) || "null");
     if (a && Date.now() - a.ts < ATTR_TTL) return a;
   } catch { /* noop */ }
-  return { c: "", utm_source: "", via_qr: false };
+  return { c: "", utm_source: "", utm_medium: "", utm_campaign: "", via_qr: false };
 };
 
 const push = (ev) => {
@@ -69,6 +71,8 @@ const push = (ev) => {
   queue.push({
     referrer: document.referrer || "",
     utm_source: attr.utm_source,
+    utm_medium: attr.utm_medium || "",
+    utm_campaign: attr.utm_campaign || "",
     campaign_code: attr.c,
     via_qr: !!attr.via_qr,
     ts: new Date().toISOString(),
@@ -208,6 +212,14 @@ export function initAnalytics() {
     injectClarity(cfg.clarity_id);
     injectGA4(cfg.ga4_id);
     injectMetaPixel(cfg.meta_pixel_id);
+    // tag-uri UTM în sesiunile Clarity → filtrabile în dashboardul Clarity
+    if (cfg.clarity_id && window.clarity) {
+      const attr = getAttribution();
+      ["utm_source", "utm_medium", "utm_campaign"].forEach((k) => {
+        if (attr[k]) window.clarity("set", k, attr[k]);
+      });
+      if (attr.c) window.clarity("set", "campaign_code", attr.c);
+    }
   }).catch(() => {});
 }
 

@@ -16,6 +16,7 @@ import { EmailVerifyPage } from "./pages/EmailVerifyPage";
 import { ClientRequestOffersPage } from "./pages/ClientRequestOffersPage";
 import { PremiumProfileEditorPage } from "./pages/PremiumProfileEditorPage";
 import { CookieBanner } from "./components/CookieBanner";
+import { WhatsAppFloat } from "./components/WhatsAppFloat";
 import { ThemeToggle } from "./pages/DashShared";
 import { ClientDashboard, SpecialistDashboard, AdminDashboard, OperatorDashboard } from "./pages/Dashboards";
 import { AuthCallback } from "./pages/AuthCallback";
@@ -1689,6 +1690,7 @@ function App() {
             <RoleTour />
             <AIConciergeBubble />
             <CookieBanner />
+            <WhatsAppFloat />
             <LegalGate />
             </ErrorBoundary>
           </BrowserRouter>
