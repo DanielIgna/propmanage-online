@@ -3,7 +3,7 @@ import axios from "axios";
 import { ArrowLeft, PaintRoller, Building, Briefcase, Wrench, Zap, Wind, Palette, Hammer, PartyPopper } from "lucide-react";
 import { API } from "../DashShared";
 import { formatApiError } from "../../auth";
-import { GREEN, GREEN_SOFT, CTA } from "./ui";
+import { GREEN, GREEN_SOFT, CTA, AmountInput } from "./ui";
 
 const CATS = [
   ["zugravit", "Zugrăvit", PaintRoller], ["parchet", "Parchet", Building], ["faianta", "Faianță / Gresie", Building],
@@ -88,8 +88,8 @@ export const RequestWizard = ({ property, onClose, onCreated }) => {
             </button>
           ))}
           <label className="block text-xs font-bold text-slate-500 pt-1">Buget estimat (RON)
-            <input type="number" inputMode="numeric" min="1" value={form.budget_estimate}
-              onChange={e => setForm(f => ({ ...f, budget_estimate: e.target.value }))}
+            <AmountInput value={form.budget_estimate}
+              onChange={(raw) => setForm(f => ({ ...f, budget_estimate: raw }))}
               className="mt-1.5 w-full px-4 py-3.5 rounded-2xl border-2 border-slate-200 text-sm font-normal outline-none focus:border-[#34C759]" data-testid="v2-wiz-budget" />
           </label>
         </div>

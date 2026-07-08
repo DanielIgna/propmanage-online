@@ -12,7 +12,7 @@ Format: `BUG #NNN – Titlu` · Status: `Open` | `In Progress` | `Fixed (verific
 - **Verificat de user:** ✅
 
 ## BUG #002 – Cursor săre la început în input numeric "Buget estimat (RON)"
-- **Status:** Fixed (verificare pending user)
+- **Status:** Fixed + Enhanced (verificare pending user)
 - **Simptom:** Utilizatorul scria `250` dar primea `0250`, cursorul repoziționat forțat la începutul câmpului.
 - **Cauză root:**
   1. `budget_estimate` era stocat ca **număr** în state, iar `onChange` făcea `parseFloat(e.target.value) || 0` pe fiecare tastă.
@@ -25,6 +25,19 @@ Format: `BUG #NNN – Titlu` · Status: `Open` | `In Progress` | `Fixed (verific
 - **Alte input-uri numerice audit-uite:**
   - `PropertyHubV2.jsx` (Wallet topup): ✅ deja folosea string state — no fix needed.
   - Nu există alte `type="number"` în Client V2.
+
+## ENH #001 – Formatare live cu separator de mii pe input-uri de sumă (Revolut-style)
+- **Status:** Delivered (verificare pending user)
+- **Cerință:** Ex: user tastează `35000` → afișează `35.000` live, cu caret păstrat la locul corect.
+- **Implementare:**
+  - Nouă componentă `AmountInput` în `frontend/src/pages/clientv2/ui.jsx`.
+  - Stochează raw digits (string) în state parent; afișează formatat cu `Intl.NumberFormat("ro-RO")`.
+  - Restaurează caret position după fiecare re-format prin `useLayoutEffect` (numără cifrele înaintea caret-ului).
+  - Optional prop `suffix` pentru ex: "RON" inline.
+- **Aplicat în:**
+  - `RequestWizard.jsx` — câmp "Buget estimat (RON)".
+  - `PropertyHubV2.jsx` (WalletSheet) — câmp "Altă sumă (RON)".
+- **Payload backend:** Neschimbat. `parseFloat("35000")` → `35000` (număr) la submit.
 
 ---
 

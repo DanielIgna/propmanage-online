@@ -3,7 +3,7 @@ import axios from "axios";
 import { Building2, Box, HeartPulse, Clock, Wallet, Settings2, CreditCard } from "lucide-react";
 import { API } from "../DashShared";
 import { formatApiError } from "../../auth";
-import { GREEN, GREEN_SOFT, ListItem, Sheet, CTA } from "./ui";
+import { GREEN, GREEN_SOFT, ListItem, Sheet, CTA, AmountInput } from "./ui";
 
 export const WalletSheet = ({ user, onClose }) => {
   const [amount, setAmount] = useState("");
@@ -31,7 +31,7 @@ export const WalletSheet = ({ user, onClose }) => {
         ))}
       </div>
       <div className="mt-2 flex gap-2">
-        <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Altă sumă (RON)" min="1" max="50000"
+        <AmountInput value={amount} onChange={setAmount} placeholder="Altă sumă (RON)"
           className="flex-1 px-4 py-3 rounded-full border-2 border-slate-200 text-sm outline-none focus:border-[#34C759]" data-testid="v2-topup-custom" />
         <button onClick={() => topup()} disabled={busy || !amount} data-testid="v2-topup-custom-btn"
           className="px-5 rounded-full text-sm font-bold text-white disabled:opacity-50" style={{ background: GREEN }}>

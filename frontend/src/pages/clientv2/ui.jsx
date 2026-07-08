@@ -1,8 +1,57 @@
-import React from "react";
+import React, { useRef, useLayoutEffect } from "react";
 import { X } from "lucide-react";
 
 export const GREEN = "#34C759";
 export const GREEN_SOFT = "#E9F9EE";
+
+// ---- AmountInput: input de sumă cu formatare live (separator mii ro-RO)
+// State-ul din parent stochează DOAR cifrele raw (string, ex: "35000").
+// Afișează formatat ("35.000") și restaurează caret-ul după re-format.
+const NF = new Intl.NumberFormat("ro-RO");
+export const formatAmount = (raw) => (raw ? NF.format(parseInt(raw, 10)) : "");
+
+export const AmountInput = React.forwardRef(({ value, onChange, suffix, className = "", ...props }, ref) => {
+  const inputRef = useRef(null);
+  const caretDigitsRef = useRef(null);
+
+  const handleChange = (e) => {
+    const rawInput = e.target.value;
+    const selStart = e.target.selectionStart ?? rawInput.length;
+    // Câte cifre există înaintea caret-ului în input-ul curent
+    caretDigitsRef.current = rawInput.slice(0, selStart).replace(/\D/g, "").length;
+    const digitsOnly = rawInput.replace(/\D/g, "");
+    onChange(digitsOnly);
+  };
+
+  const formatted = formatAmount(value);
+  const display = suffix && formatted ? `${formatted} ${suffix}` : formatted;
+
+  useLayoutEffect(() => {
+    if (caretDigitsRef.current == null) return;
+    const el = inputRef.current;
+    if (!el || document.activeElement !== el) { caretDigitsRef.current = null; return; }
+    let digits = 0, pos = 0;
+    for (; pos < display.length && digits < caretDigitsRef.current; pos++) {
+      if (/\d/.test(display[pos])) digits++;
+    }
+    try { el.setSelectionRange(pos, pos); } catch { /* ignore */ }
+    caretDigitsRef.current = null;
+  }, [display]);
+
+  return (
+    <input
+      {...props}
+      ref={(el) => { inputRef.current = el; if (typeof ref === "function") ref(el); else if (ref) ref.current = el; }}
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      value={display}
+      onChange={handleChange}
+      className={className}
+    />
+  );
+});
+AmountInput.displayName = "AmountInput";
 
 export const CTA = ({ children, onClick, testid, disabled, subtle }) => (
   <button onClick={onClick} disabled={disabled} data-testid={testid}
