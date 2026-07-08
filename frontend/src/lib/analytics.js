@@ -123,6 +123,23 @@ export const trackFunnel = (step) => {
   flush();
 };
 
+// A/B testing: variantă deterministă per vizitator (hash vid+key) + expunere trimisă o dată/sesiune
+export const getAbVariant = (key) => {
+  const s = getVisitorId() + key;
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  const variant = h % 2 === 0 ? "A" : "B";
+  const seenKey = `pm_ab_${key}`;
+  try {
+    if (!sessionStorage.getItem(seenKey)) {
+      sessionStorage.setItem(seenKey, variant);
+      push({ type: "ab", path: currentPath, ab_key: key, ab_variant: variant });
+      flush();
+    }
+  } catch { /* noop */ }
+  return variant;
+};
+
 // ── Integrări externe (modulare — se pot adăuga altele fără schimbări) ──────
 const injectClarity = (id) => {
   if (!id || window.clarity) return;

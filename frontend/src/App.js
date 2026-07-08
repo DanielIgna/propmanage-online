@@ -92,6 +92,7 @@ import DemoAccountsPage from "./pages/admin/DemoAccountsPage";
 import AdminAccountsPage from "./pages/admin/AdminAccountsPage";
 import DemoActivityPage from "./pages/admin/DemoActivityPage";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
+import ClientJuniorDashboard from "./pages/dashboard/ClientJuniorDashboard";
 import ContractPage from "./pages/ContractPage";
 import { trackPageView } from "@/lib/analytics";
 import { useDynamicSEO } from "@/lib/useDynamicSEO";
@@ -1666,6 +1667,7 @@ function App() {
               <Route path="/admin/admin-accounts" element={<AdminAccountsPage />} />
               <Route path="/admin/demo-activity" element={<DemoActivityPage />} />
               <Route path="/partner/dashboard" element={<PartnerDashboard />} />
+              <Route path="/dashboard/client-junior" element={<ClientJuniorDashboard />} />
               <Route path="/legal/sign" element={<LegalSignPage />} />
               <Route path="/contracts/:id" element={<ContractPage />} />
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />

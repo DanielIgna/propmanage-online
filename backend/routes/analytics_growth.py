@@ -81,6 +81,8 @@ class TrackEvent(BaseModel):
     x_pct: Optional[float] = None  # click: coordonate % (pt heatmap Faza 2)
     y_pct: Optional[float] = None
     funnel_step: str = ""          # signup_started | account_created | property_added | subscription | specialist_request
+    ab_key: str = ""               # A/B testing: cheia experimentului
+    ab_variant: str = ""           # A | B
     ts: str = ""
 
 
@@ -118,6 +120,8 @@ async def ingest_events(batch: TrackBatch, request: Request):
             "duration_ms": max(0, min(ev.duration_ms, 3_600_000)),
             "x_pct": ev.x_pct, "y_pct": ev.y_pct,
             "funnel_step": (ev.funnel_step or "")[:40],
+            "ab_key": (ev.ab_key or "")[:40],
+            "ab_variant": (ev.ab_variant or "")[:2],
             "visitor_id": batch.visitor_id,
             "session_id": batch.session_id,
             "day": _day(now),
@@ -133,6 +137,8 @@ async def ingest_events(batch: TrackBatch, request: Request):
             sess_updates.setdefault("source", source)
         if ev.type == "funnel" and ev.funnel_step:
             sess_updates[f"funnel_{ev.funnel_step[:30]}"] = True
+        if ev.type == "ab" and ev.ab_key and ev.ab_variant in ("A", "B"):
+            sess_updates[f"ab_{ev.ab_key[:30]}"] = ev.ab_variant
     if docs:
         await db.analytics_events.insert_many(docs)
     await db.analytics_sessions.update_one(
@@ -512,3 +518,349 @@ async def export_csv(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="propmanage_{report}.csv"'},
     )
+
+
+# ═══════════ FAZA 2 — HEATMAP / BOUNCE / RETENȚIE / A/B TESTING / PDF ═══════════
+
+import math
+import re as _re
+
+FUNNEL_GOALS = ["signup_started", "account_created", "property_added", "subscription", "specialist_request"]
+
+
+@admin_router.get("/analytics/heatmap")
+async def analytics_heatmap(
+    period: str = Query("month", pattern="^(day|week|month|custom)$"),
+    date_from: str = "", date_to: str = "", path: str = "",
+    user: dict = Depends(require_role("admin")),
+):
+    """Click-map: pagini cu click-uri + puncte (x%, y%) pentru pagina selectată."""
+    d_from, d_to = _period_range(period, date_from, date_to)
+    base_q = {"type": "click", "day": {"$gte": d_from, "$lte": d_to}, "x_pct": {"$ne": None}}
+    pipe = [{"$match": base_q}, {"$group": {"_id": "$path", "clicks": {"$sum": 1}}}, {"$sort": {"clicks": -1}}, {"$limit": 50}]
+    pages = [{"path": p["_id"] or "/", "clicks": p["clicks"]} async for p in db.analytics_events.aggregate(pipe)]
+    points = []
+    if path:
+        async for e in db.analytics_events.find({**base_q, "path": path}, {"x_pct": 1, "y_pct": 1}).limit(3000):
+            points.append({"x": e.get("x_pct") or 0, "y": e.get("y_pct") or 0})
+    return {"pages": pages, "points": points, "total_clicks": sum(p["clicks"] for p in pages), "period": {"from": d_from, "to": d_to}}
+
+
+@admin_router.get("/analytics/bounce")
+async def analytics_bounce(
+    period: str = Query("week", pattern="^(day|week|month|custom)$"),
+    date_from: str = "", date_to: str = "",
+    user: dict = Depends(require_role("admin")),
+):
+    """Bounce detaliat: serie zilnică, pe surse, pe pagini de intrare, distribuție durată."""
+    d_from, d_to = _period_range(period, date_from, date_to)
+    sessions = await db.analytics_sessions.find({"day": {"$gte": d_from, "$lte": d_to}}).to_list(20000)
+    daily = defaultdict(lambda: {"sessions": 0, "bounces": 0})
+    by_source = defaultdict(lambda: {"sessions": 0, "bounces": 0})
+    by_entry = defaultdict(lambda: {"sessions": 0, "bounces": 0})
+    buckets = {"<10s": 0, "10-30s": 0, "30-60s": 0, "1-3min": 0, ">3min": 0}
+    quick = 0
+    for s in sessions:
+        b = 1 if (s.get("pageviews") or 0) <= 1 else 0
+        daily[s.get("day")]["sessions"] += 1
+        daily[s.get("day")]["bounces"] += b
+        src = by_source[s.get("source") or "direct"]
+        src["sessions"] += 1
+        src["bounces"] += b
+        en = by_entry[s.get("entry_path") or "/"]
+        en["sessions"] += 1
+        en["bounces"] += b
+        dur = (s.get("duration_ms") or 0) / 1000
+        if dur < 10:
+            buckets["<10s"] += 1
+            if b:
+                quick += 1
+        elif dur < 30:
+            buckets["10-30s"] += 1
+        elif dur < 60:
+            buckets["30-60s"] += 1
+        elif dur < 180:
+            buckets["1-3min"] += 1
+        else:
+            buckets[">3min"] += 1
+    series = []
+    cur = datetime.fromisoformat(d_from).date()
+    end = datetime.fromisoformat(d_to).date()
+    while cur <= end:
+        k = cur.isoformat()
+        d = daily[k]
+        series.append({"day": k, "sessions": d["sessions"], "bounces": d["bounces"],
+                       "bounce_pct": round(d["bounces"] / d["sessions"] * 100, 1) if d["sessions"] else 0.0})
+        cur += timedelta(days=1)
+    total = len(sessions)
+    total_b = sum(1 for s in sessions if (s.get("pageviews") or 0) <= 1)
+    return {
+        "period": {"from": d_from, "to": d_to},
+        "summary": {
+            "sessions": total,
+            "bounces": total_b,
+            "bounce_rate_pct": round(total_b / total * 100, 1) if total else 0.0,
+            "quick_bounce_pct": round(quick / total * 100, 1) if total else 0.0,
+        },
+        "series": series,
+        "by_source": sorted(
+            [{"source": k, "sessions": v["sessions"], "bounces": v["bounces"],
+              "bounce_rate_pct": round(v["bounces"] / v["sessions"] * 100, 1) if v["sessions"] else 0.0}
+             for k, v in by_source.items()], key=lambda x: -x["sessions"]),
+        "entry_pages": sorted(
+            [{"path": k, "sessions": v["sessions"], "bounces": v["bounces"],
+              "bounce_rate_pct": round(v["bounces"] / v["sessions"] * 100, 1) if v["sessions"] else 0.0}
+             for k, v in by_entry.items()], key=lambda x: -x["sessions"])[:20],
+        "duration_buckets": [{"bucket": k, "sessions": v} for k, v in buckets.items()],
+    }
+
+
+def _week_start(day: str) -> str:
+    d = datetime.fromisoformat(day).date()
+    return (d - timedelta(days=d.weekday())).isoformat()
+
+
+@admin_router.get("/analytics/retention")
+async def analytics_retention(weeks: int = Query(8, ge=2, le=16), user: dict = Depends(require_role("admin"))):
+    """Retenție avansată: cohorte săptămânale de vizitatori + rezumat nou vs. revenit."""
+    visitors: dict = {}
+    async for s in db.analytics_sessions.find({}, {"visitor_id": 1, "day": 1}):
+        if not s.get("day") or not s.get("visitor_id"):
+            continue
+        visitors.setdefault(s["visitor_id"], set()).add(_week_start(s["day"]))
+    today = datetime.now(timezone.utc).date()
+    this_week = (today - timedelta(days=today.weekday())).isoformat()
+    week_starts = [(datetime.fromisoformat(this_week).date() - timedelta(weeks=w)).isoformat() for w in range(weeks - 1, -1, -1)]
+    cohorts = []
+    for i, ws in enumerate(week_starts):
+        cohort = [wkset for wkset in visitors.values() if min(wkset) == ws]
+        size = len(cohort)
+        row = []
+        for j in range(len(week_starts) - i):
+            target = week_starts[i + j]
+            active = sum(1 for wkset in cohort if target in wkset)
+            row.append({"week": j, "active": active, "pct": round(active / size * 100, 1) if size else 0.0})
+        cohorts.append({"cohort_week": ws, "size": size, "retention": row})
+    returning = sum(1 for wkset in visitors.values() if len(wkset) >= 2)
+    total_v = len(visitors)
+    return {
+        "cohorts": cohorts,
+        "summary": {
+            "total_visitors": total_v,
+            "returning_visitors": returning,
+            "returning_pct": round(returning / total_v * 100, 1) if total_v else 0.0,
+        },
+    }
+
+
+# ── A/B TESTING ──────────────────────────────────────────────────────────────
+
+class AbExperimentCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    page_path: str = "/"
+    goal: str = Field("account_created")
+    hypothesis: str = ""
+
+
+class AbExperimentUpdate(BaseModel):
+    name: Optional[str] = None
+    hypothesis: Optional[str] = None
+    status: Optional[str] = None  # active | stopped
+
+
+def _ab_slug(name: str) -> str:
+    return _re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")[:28] or "exp"
+
+
+def _z_test(c1: int, n1: int, c2: int, n2: int):
+    if n1 < 5 or n2 < 5:
+        return {"z": None, "p_value": None, "significant": False, "note": "Date insuficiente (min. 5 vizitatori/variantă)"}
+    p1, p2 = c1 / n1, c2 / n2
+    p = (c1 + c2) / (n1 + n2)
+    se = math.sqrt(p * (1 - p) * (1 / n1 + 1 / n2))
+    if se == 0:
+        return {"z": None, "p_value": None, "significant": False, "note": "Fără variație"}
+    z = (p1 - p2) / se
+    pval = 2 * (1 - 0.5 * (1 + math.erf(abs(z) / math.sqrt(2))))
+    return {"z": round(z, 2), "p_value": round(pval, 4), "significant": pval < 0.05, "note": ""}
+
+
+async def _ab_results(key: str, goal: str) -> dict:
+    field = f"ab_{key[:30]}"
+    per_visitor: dict = {}
+    async for s in db.analytics_sessions.find({field: {"$exists": True}}, {field: 1, "visitor_id": 1, f"funnel_{goal}": 1}):
+        v = per_visitor.setdefault(s["visitor_id"], {"variant": s.get(field), "converted": False})
+        if s.get(f"funnel_{goal}"):
+            v["converted"] = True
+    agg = {"A": {"visitors": 0, "conversions": 0}, "B": {"visitors": 0, "conversions": 0}}
+    for v in per_visitor.values():
+        var = v["variant"] if v["variant"] in ("A", "B") else "A"
+        agg[var]["visitors"] += 1
+        agg[var]["conversions"] += 1 if v["converted"] else 0
+    for var in ("A", "B"):
+        a = agg[var]
+        a["rate_pct"] = round(a["conversions"] / a["visitors"] * 100, 1) if a["visitors"] else 0.0
+    uplift = None
+    if agg["A"]["rate_pct"] > 0:
+        uplift = round((agg["B"]["rate_pct"] - agg["A"]["rate_pct"]) / agg["A"]["rate_pct"] * 100, 1)
+    sig = _z_test(agg["B"]["conversions"], agg["B"]["visitors"], agg["A"]["conversions"], agg["A"]["visitors"])
+    winner = ""
+    if sig["significant"]:
+        winner = "B" if agg["B"]["rate_pct"] > agg["A"]["rate_pct"] else "A"
+    return {"variants": agg, "uplift_pct": uplift, "significance": sig, "winner": winner}
+
+
+@admin_router.post("/analytics/ab")
+async def create_ab_experiment(body: AbExperimentCreate, user: dict = Depends(require_role("admin"))):
+    if body.goal not in FUNNEL_GOALS:
+        raise HTTPException(400, f"Goal invalid. Opțiuni: {', '.join(FUNNEL_GOALS)}")
+    key = _ab_slug(body.name)
+    if await db.ab_experiments.find_one({"key": key}):
+        key = f"{key[:24]}_{secrets.token_hex(2)}"
+    doc = {
+        "id": str(uuid.uuid4()),
+        "key": key,
+        **body.model_dump(),
+        "status": "active",
+        "created_by": user.get("email"),
+        "created_at": _now(),
+    }
+    await db.ab_experiments.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@admin_router.get("/analytics/ab")
+async def list_ab_experiments(user: dict = Depends(require_role("admin"))):
+    docs = await db.ab_experiments.find({}).sort("created_at", -1).to_list(100)
+    items = []
+    for d in docs:
+        d.pop("_id", None)
+        d["results"] = await _ab_results(d["key"], d.get("goal") or "account_created")
+        items.append(d)
+    return {"items": items, "count": len(items)}
+
+
+@admin_router.patch("/analytics/ab/{eid}")
+async def update_ab_experiment(eid: str, body: AbExperimentUpdate, user: dict = Depends(require_role("admin"))):
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    if updates.get("status") not in (None, "active", "stopped"):
+        raise HTTPException(400, "Status invalid")
+    if not updates:
+        raise HTTPException(400, "Nimic de actualizat")
+    res = await db.ab_experiments.update_one({"id": eid}, {"$set": updates})
+    if not res.matched_count:
+        raise HTTPException(404, "Experiment inexistent")
+    d = await db.ab_experiments.find_one({"id": eid})
+    d.pop("_id", None)
+    return d
+
+
+@admin_router.delete("/analytics/ab/{eid}")
+async def delete_ab_experiment(eid: str, user: dict = Depends(require_role("admin"))):
+    res = await db.ab_experiments.delete_one({"id": eid})
+    if not res.deleted_count:
+        raise HTTPException(404, "Experiment inexistent")
+    return {"ok": True}
+
+
+# ── EXPORT PDF (raport complet dashboard) ────────────────────────────────────
+
+@admin_router.get("/analytics/export.pdf")
+async def export_pdf(
+    period: str = Query("month", pattern="^(day|week|month|custom)$"),
+    date_from: str = "", date_to: str = "",
+    user: dict = Depends(require_role("admin")),
+):
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    try:
+        if "FSans" not in pdfmetrics.getRegisteredFontNames():
+            pdfmetrics.registerFont(TTFont("FSans", "/usr/share/fonts/truetype/freefont/FreeSans.ttf"))
+            pdfmetrics.registerFont(TTFont("FSansB", "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf"))
+        F, FB = "FSans", "FSansB"
+    except Exception:
+        F, FB = "Helvetica", "Helvetica-Bold"
+
+    overview = await analytics_overview(period, date_from, date_to, user)
+    pages_data = await analytics_pages(period, date_from, date_to, user)
+    bounce = await analytics_bounce(period, date_from, date_to, user)
+    retention = await analytics_retention(8, user)
+    camps = await db.growth_campaigns.find({}).sort("created_at", -1).to_list(50)
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=14 * mm, rightMargin=14 * mm,
+                            topMargin=14 * mm, bottomMargin=14 * mm, title="Raport Analytics PropManage")
+    h1 = ParagraphStyle("h1", fontName=FB, fontSize=17, spaceAfter=2, textColor=colors.HexColor("#0f172a"))
+    h2 = ParagraphStyle("h2", fontName=FB, fontSize=11.5, spaceBefore=12, spaceAfter=4, textColor=colors.HexColor("#1e293b"))
+    small = ParagraphStyle("small", fontName=F, fontSize=8.5, textColor=colors.HexColor("#64748b"))
+
+    def tbl(headers, rows, widths=None):
+        t = Table([headers] + rows, colWidths=widths, hAlign="LEFT")
+        t.setStyle(TableStyle([
+            ("FONTNAME", (0, 0), (-1, 0), FB), ("FONTNAME", (0, 1), (-1, -1), F),
+            ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
+            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#e2e8f0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]))
+        return t
+
+    p = overview["period"]
+    k = overview["kpi"]
+    story = [
+        Paragraph("PropManage — Raport Analytics & Growth", h1),
+        Paragraph(f"Perioadă: {p['from']} → {p['to']} · Generat: {_now()[:16].replace('T', ' ')} UTC", small),
+        Spacer(1, 4),
+        Paragraph("Indicatori cheie (KPI)", h2),
+        tbl(["Indicator", "Valoare"], [
+            ["Vizitatori unici", str(k["unique_visitors"])],
+            ["Sesiuni", str(k["sessions"])],
+            ["Conturi create", str(k["accounts_created"])],
+            ["Specialiști înscriși", str(k["specialists_signed"])],
+            ["Proprietăți adăugate", str(k["properties_added"])],
+            ["Solicitări specialiști", str(k["specialist_requests"])],
+            ["Abonamente", str(k["subscriptions"])],
+            ["Bounce rate", f'{k["bounce_rate_pct"]}%'],
+            ["Durată medie sesiune", f'{k["avg_session_sec"]}s'],
+            ["Vizitatori care revin (istoric)", f'{retention["summary"]["returning_pct"]}%'],
+        ], widths=[95 * mm, 40 * mm]),
+        Paragraph("Surse de trafic", h2),
+        tbl(["Sursă", "Sesiuni", "Vizitatori", "Bounce"],
+            [[s["source"], str(s["sessions"]), str(s["visitors"]),
+              f'{next((b["bounce_rate_pct"] for b in bounce["by_source"] if b["source"] == s["source"]), 0)}%']
+             for s in overview["sources"]] or [["—", "0", "0", "0%"]],
+            widths=[55 * mm, 27 * mm, 27 * mm, 27 * mm]),
+        Paragraph("Funnel conversie", h2),
+        tbl(["Pas", "Număr"], [[f["step"], str(f["count"])] for f in overview["funnel"]], widths=[95 * mm, 40 * mm]),
+        Paragraph("Top pagini", h2),
+        tbl(["Pagină", "Vizualizări", "Timp mediu", "Bounce"],
+            [[i["path"][:60], str(i["views"]), f'{i["avg_time_sec"]}s', f'{i["bounce_rate_pct"]}%'] for i in pages_data["items"][:12]] or [["—", "0", "0s", "0%"]],
+            widths=[78 * mm, 20 * mm, 20 * mm, 18 * mm]),
+        Paragraph("Bounce detaliat — pagini de intrare", h2),
+        tbl(["Pagină de intrare", "Sesiuni", "Bounce"],
+            [[e["path"][:60], str(e["sessions"]), f'{e["bounce_rate_pct"]}%'] for e in bounce["entry_pages"][:10]] or [["—", "0", "0%"]],
+            widths=[80 * mm, 27 * mm, 27 * mm]),
+        Paragraph("Campanii growth", h2),
+    ]
+    c_rows = []
+    for c in camps:
+        st = (await _campaign_stats(c))["stats"]
+        c_rows.append([str(c.get("name", ""))[:28], c.get("channel", ""), str(st["recipients"]), str(st["opened"]),
+                       str(st["unique_visitors"]), str(st["accounts_created"]), f'{st["conversion_pct"]}%'])
+    story.append(tbl(["Campanie", "Canal", "Primit", "Deschis", "Vizitatori", "Conturi", "Conversie"],
+                     c_rows or [["—"] * 7], widths=[42 * mm, 20 * mm, 16 * mm, 17 * mm, 20 * mm, 16 * mm, 19 * mm]))
+    story.append(Paragraph("Retenție — cohorte săptămânale (% activi în săptămânile următoare)", h2))
+    coh_rows = [[c["cohort_week"], str(c["size"])] + [f'{r["pct"]}%' for r in c["retention"][:6]] +
+                [""] * max(0, 6 - len(c["retention"][:6])) for c in retention["cohorts"][-8:]]
+    story.append(tbl(["Cohortă", "Vizitatori", "S0", "S1", "S2", "S3", "S4", "S5"],
+                     coh_rows or [["—"] * 8], widths=[26 * mm, 20 * mm] + [14 * mm] * 6))
+    doc.build(story)
+    return Response(content=buf.getvalue(), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="propmanage_raport_{p["from"]}_{p["to"]}.pdf"'})

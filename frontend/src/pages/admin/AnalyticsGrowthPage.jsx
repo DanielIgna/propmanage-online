@@ -3,6 +3,7 @@ import axios from "axios";
 import {
   BarChart3, Users, MousePointerClick, UserPlus, Building2, Wallet, RefreshCw,
   Download, Plus, QrCode, Copy, Trash2, Link2, Megaphone, Settings2, CheckCircle2, Loader2,
+  Flame, TrendingDown, Repeat, FlaskConical, FileText,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -11,6 +12,10 @@ import {
 import { AdminLayoutMetronic } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
 import { toast } from "sonner";
+import { HeatmapTab } from "./analytics/HeatmapTab";
+import { BounceTab } from "./analytics/BounceTab";
+import { RetentionTab } from "./analytics/RetentionTab";
+import { AbTestingTab } from "./analytics/AbTestingTab";
 
 const SOURCE_COLORS = { whatsapp: "#25D366", facebook: "#1877F2", google: "#EA4335", direct: "#64748b", qr: "#8b5cf6", admin: "#f59e0b", other: "#0ea5e9" };
 const PERIODS = [["day", "Azi"], ["week", "7 zile"], ["month", "30 zile"]];
@@ -87,7 +92,7 @@ export default function AnalyticsGrowthPage() {
       <div className="space-y-5" data-testid="analytics-growth-page">
         {/* Controls */}
         <div className="flex flex-wrap items-center gap-2">
-          {[["overview", "Dashboard KPI", BarChart3], ["pages", "Pagini", MousePointerClick], ["campaigns", "Campanii", Megaphone], ["integrations", "Integrări", Settings2]].map(([id, label, Icon]) => (
+          {[["overview", "Dashboard KPI", BarChart3], ["heatmap", "Heatmap", Flame], ["bounce", "Bounce", TrendingDown], ["retention", "Retenție", Repeat], ["abtest", "A/B Testing", FlaskConical], ["pages", "Pagini", MousePointerClick], ["campaigns", "Campanii", Megaphone], ["integrations", "Integrări", Settings2]].map(([id, label, Icon]) => (
             <button key={id} onClick={() => setTab(id)} data-testid={`ag-tab-${id}`}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold transition-colors ${tab === id ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"}`}>
               <Icon className="w-4 h-4" /> {label}
@@ -100,6 +105,10 @@ export default function AnalyticsGrowthPage() {
                 {label}
               </button>
             ))}
+            <button onClick={() => window.open(`${API}/admin/analytics/export.pdf?period=${period}`, "_blank")} data-testid="ag-export-pdf"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600 text-white" title="Descarcă raport PDF complet">
+              <FileText className="w-3.5 h-3.5" /> PDF
+            </button>
             <button onClick={load} className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700" data-testid="ag-refresh">
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </button>
@@ -171,6 +180,14 @@ export default function AnalyticsGrowthPage() {
               </ResponsiveContainer>
             </div>
           </>
+        ) : tab === "heatmap" ? (
+          <HeatmapTab period={period} clarityId={integrations?.clarity_id} />
+        ) : tab === "bounce" ? (
+          <BounceTab period={period} />
+        ) : tab === "retention" ? (
+          <RetentionTab />
+        ) : tab === "abtest" ? (
+          <AbTestingTab />
         ) : tab === "pages" ? (
           <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-x-auto">
             <div className="flex items-center justify-between p-4 pb-0">
