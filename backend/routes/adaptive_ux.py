@@ -111,20 +111,20 @@ async def admin_override_maturity(payload: MaturityOverrideIn, user=Depends(requ
 # ============================================================================
 CHECKLIST_TEMPLATES = {
     "client": [
-        {"id": "client_profile", "title": "Completează profilul", "icon": "👤", "cta_route": "/client/profile"},
-        {"id": "client_first_property", "title": "Adaugă o proprietate", "icon": "🏠", "cta_route": "/client/properties"},
-        {"id": "client_notifications", "title": "Activează notificările", "icon": "🔔", "cta_route": "/client/settings"},
-        {"id": "client_first_request", "title": "Creează prima cerere", "icon": "📝", "cta_route": "/client/requests/new"},
+        {"id": "client_profile", "title": "Completează profilul", "icon": "👤", "cta_route": "/client?tab=settings"},
+        {"id": "client_first_property", "title": "Adaugă o proprietate", "icon": "🏠", "cta_route": "/client?tab=property"},
+        {"id": "client_notifications", "title": "Activează notificările", "icon": "🔔", "cta_route": "/client?tab=settings"},
+        {"id": "client_first_request", "title": "Creează prima cerere", "icon": "📝", "cta_route": "/client?tab=request"},
         {"id": "client_explore_hh", "title": "Explorează House Health (opțional)", "icon": "❤", "cta_route": "/house-health/upgrade", "optional": True},
-        {"id": "client_explore_twin", "title": "Activează Digital Twin (opțional)", "icon": "🏗", "cta_route": "/client/twin", "optional": True},
+        {"id": "client_explore_twin", "title": "Activează Digital Twin (opțional)", "icon": "🏗", "cta_route": "/digital-twin", "optional": True},
     ],
     "specialist": [
-        {"id": "spec_profile", "title": "Completează profilul", "icon": "👤", "cta_route": "/specialist/profile"},
-        {"id": "spec_documents", "title": "Încarcă documentele obligatorii", "icon": "📄", "cta_route": "/specialist/documents"},
-        {"id": "spec_kyc", "title": "Verifică identitatea", "icon": "🪪", "cta_route": "/specialist/verification"},
-        {"id": "spec_services", "title": "Configurează serviciile + zone", "icon": "🔧", "cta_route": "/specialist/services"},
-        {"id": "spec_first_offer", "title": "Trimite prima ofertă", "icon": "💼", "cta_route": "/specialist/requests"},
-        {"id": "spec_notifications", "title": "Activează notificările push", "icon": "🔔", "cta_route": "/specialist/settings"},
+        {"id": "spec_profile", "title": "Completează profilul", "icon": "👤", "cta_route": "/specialist?tab=settings"},
+        {"id": "spec_documents", "title": "Încarcă documentele obligatorii", "icon": "📄", "cta_route": "/specialist?tab=settings"},
+        {"id": "spec_kyc", "title": "Verifică identitatea", "icon": "🪪", "cta_route": "/specialist?tab=settings"},
+        {"id": "spec_services", "title": "Configurează serviciile + zone", "icon": "🔧", "cta_route": "/specialist?tab=settings"},
+        {"id": "spec_first_offer", "title": "Trimite prima ofertă", "icon": "💼", "cta_route": "/specialist?tab=opportunities"},
+        {"id": "spec_notifications", "title": "Activează notificările push", "icon": "🔔", "cta_route": "/specialist?tab=notifications"},
     ],
 }
 

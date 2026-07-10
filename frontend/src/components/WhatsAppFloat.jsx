@@ -29,11 +29,13 @@ export const WhatsAppFloat = () => {
   // utilizator logat (client/specialist/operator) → bula AI + bottom nav ocupă zona de jos:
   // mobil: deasupra AI bubble (care e la bottom-20); desktop: deasupra bulei AI (bottom-6)
   const hasAiBubble = !!user && user !== false && user.role !== "admin";
-  const posClass = hasAiBubble ? "bottom-36 right-4 lg:bottom-24 lg:right-6" : "bottom-4 right-4";
+  // Mobil logat: stânga-jos deasupra bottom-nav (AI bubble e dreapta) — nu acoperă CTA-urile.
+  const posClass = hasAiBubble ? "bottom-20 left-3 lg:bottom-24 lg:right-6 lg:left-auto" : "bottom-4 right-4";
+  const sizeClass = hasAiBubble ? "w-12 h-12 lg:w-14 lg:h-14" : "w-14 h-14";
 
   return (
     <a href={href} target="_blank" rel="noreferrer" data-testid="whatsapp-float-btn" aria-label="Scrie-ne pe WhatsApp" title="Scrie-ne pe WhatsApp"
-      className={`fixed ${posClass} z-40 w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-black/20 hover:scale-110 active:scale-95 transition-transform`}
+      className={`fixed ${posClass} z-40 ${sizeClass} rounded-full flex items-center justify-center shadow-lg shadow-black/20 hover:scale-110 active:scale-95 transition-transform`}
       style={{ background: "#25D366" }}>
       <WaIcon />
     </a>

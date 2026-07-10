@@ -42,7 +42,15 @@ export const SpecialistDashboard = () => {
   const [proposePhaseFor, setProposePhaseFor] = useState(null);
   const [showPortfolio, setShowPortfolio] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
-  const [tab, setTab] = useState("opportunities");
+  const [tab, setTab] = useState(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    return ["opportunities", "jobs", "notifications", "settings"].includes(t) ? t : "opportunities";
+  });
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab")) {
+      window.history.replaceState(null, "", "/specialist");
+    }
+  }, []);
   const [searchQ, setSearchQ] = useState("");
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [acceptingReq, setAcceptingReq] = useState(null);  // {id, title} for ScheduleProposalModal

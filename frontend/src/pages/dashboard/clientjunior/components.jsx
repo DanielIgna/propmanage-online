@@ -54,7 +54,7 @@ export const BottomNav = ({ active, onChange }) => (
   <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-slate-100" data-testid="cj-bottom-nav">
     <div className="max-w-md mx-auto grid grid-cols-4">
       {NAV_ITEMS.map(([id, label, Icon]) => (
-        <button key={id} onClick={() => onChange(id)} data-testid={`cj-nav-${id}`}
+        <button key={id} onClick={() => { window.scrollTo({ top: 0 }); onChange(id); }} data-testid={`cj-nav-${id}`}
           className="flex flex-col items-center gap-1 py-2.5">
           <Icon className="w-5 h-5" style={{ color: active === id ? CJ_GREEN : "#94a3b8" }} strokeWidth={active === id ? 2.5 : 2} />
           <span className={`text-[10px] ${active === id ? "font-bold text-[#34C759]" : "font-medium text-slate-400"}`}>{label}</span>

@@ -16,7 +16,7 @@ export const BottomNav = ({ tabs, active, onChange, dataPrefix = "tab" }) => {
             return (
               <button
                 key={tab.id}
-                onClick={() => onChange(tab.id)}
+                onClick={() => { window.scrollTo({ top: 0 }); onChange(tab.id); }}
                 className={`relative flex flex-col items-center justify-center gap-1 py-3 transition-colors ${
                   isActive ? "text-[#d4ff3a]" : "text-stone-500 hover:text-stone-300"
                 }`}

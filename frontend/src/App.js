@@ -110,6 +110,9 @@ const AnalyticsRouteTracker = () => {
   React.useEffect(() => {
     trackPageView(location.pathname + location.search);
   }, [location.pathname, location.search]);
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
   return null;
 };
 import { ImpersonationBanner } from "./components/ImpersonationBanner";

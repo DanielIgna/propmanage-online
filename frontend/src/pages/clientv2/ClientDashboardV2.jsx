@@ -53,10 +53,20 @@ export default function ClientDashboardV2() {
     if (!user || user === false) return;
     Promise.all([loadProps(), loadRequests(), loadNotifs()]).finally(() => setLoaded(true));
     const interval = setInterval(loadNotifs, 30000);
-    // Stripe return polling (identic cu dashboardul clasic)
+    // Deep-link taburi (onboarding checklist etc.): /client?tab=home|jobs|property|settings|request
     const params = new URLSearchParams(window.location.search);
-    if (params.get("payment") === "success" && params.get("session_id")) {
-      const sessionId = params.get("session_id");
+    const wantedTab = params.get("tab");
+    if (wantedTab) {
+      if (wantedTab === "request") setShowWizard(true);
+      else if (["home", "jobs", "property", "settings"].includes(wantedTab)) setTab(wantedTab);
+      params.delete("tab");
+      const rest = params.toString();
+      window.history.replaceState(null, "", `/client${rest ? `?${rest}` : ""}`);
+    }
+    // Stripe return polling (identic cu dashboardul clasic)
+    const payParams = new URLSearchParams(window.location.search);
+    if (payParams.get("payment") === "success" && payParams.get("session_id")) {
+      const sessionId = payParams.get("session_id");
       let attempts = 0;
       const poll = async () => {
         if (attempts >= 6) { alert("Verificarea plății a expirat. Verifică în câteva minute."); window.history.replaceState(null, "", "/client"); return; }
@@ -178,7 +188,7 @@ export default function ClientDashboardV2() {
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-100" data-testid="v2-bottom-nav">
           <div className="max-w-md mx-auto grid grid-cols-5">
             {NAV.map(([Icon, label, id]) => (
-              <button key={id} onClick={() => (id === "request" ? actions.openWizard() : setTab(id))} data-testid={`v2-nav-${id}`} className="flex flex-col items-center gap-0.5 py-2.5">
+              <button key={id} onClick={() => { window.scrollTo({ top: 0 }); (id === "request" ? actions.openWizard() : setTab(id)); }} data-testid={`v2-nav-${id}`} className="flex flex-col items-center gap-0.5 py-2.5">
                 {id === "request" ? (
                   <span className="w-12 h-12 -mt-6 rounded-full flex items-center justify-center border-4 border-white shadow-lg shadow-[#34C759]/30" style={{ background: GREEN }}>
                     <Icon className="w-5 h-5 text-white" strokeWidth={2.5} />
