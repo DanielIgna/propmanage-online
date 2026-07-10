@@ -100,6 +100,8 @@ class RequestIn(BaseModel):
     priority: Literal["low", "normal", "medium", "high", "urgent"] = "normal"
     budget_estimate: Optional[float] = None
     photos: Optional[List[str]] = None
+    taxonomy_node_id: Optional[str] = None
+    subcategory: Optional[str] = None
 
     @field_validator("priority", mode="before")
     @classmethod

@@ -34,6 +34,7 @@ from routes.settings_snapshots import take_auto_snapshot
 from routes.autonomy import weekly_auto_tune_job
 from autonomy.snapshots import take_autonomy_snapshot_with_reflex
 from orchestrator.engine import orchestrator_retry_tick
+from construction.taxonomy import construction_visibility_cron
 from routes.house_health_billing import seed_default_plans as hh_seed_default_plans
 from autonomy.founder_digest import weekly_founder_digest
 from autonomy.autopilot import bootstrap_autonomy_defaults, daily_autopilot_sweep
@@ -148,6 +149,13 @@ async def startup():
         await bootstrap_autonomy_defaults()
     except Exception as e:
         logger.warning(f"Autonomy autopilot bootstrap failed: {e}")
+    # CIP-A: seed nomenclator construcții + gate inițial de vizibilitate (idempotent)
+    try:
+        from construction.taxonomy import seed_construction_taxonomy, refresh_category_visibility
+        await seed_construction_taxonomy()
+        await refresh_category_visibility()
+    except Exception as e:
+        logger.warning(f"Construction taxonomy bootstrap failed: {e}")
     # Sub-admin RBAC — seed demo scoped admins (testing/frontend/backend/security)
     try:
         from sub_admin_seed import seed_sub_admins
@@ -381,6 +389,14 @@ async def startup():
             id="orchestrator_retry_tick",
             replace_existing=True,
             misfire_grace_time=300,
+        )
+        # CIP-A: Category Visibility Gate — daily 04:30 (via Orchestrator playbook)
+        scheduler.add_job(
+            construction_visibility_cron,
+            CronTrigger(hour=4, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="construction_visibility_daily",
+            replace_existing=True,
+            misfire_grace_time=7200,
         )
         # Morning Briefing digest — daily 09:00, sent only when warn/fail
         scheduler.add_job(

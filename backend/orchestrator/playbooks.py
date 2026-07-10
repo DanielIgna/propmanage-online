@@ -197,6 +197,41 @@ async def handle_webhook_fail(payload: dict) -> dict:
 
 
 # ============================================================================
+# 4. CATEGORY VISIBILITY GATE (CIP-A Etapa 5)
+# ============================================================================
+async def handle_category_visibility(payload: dict) -> dict:
+    from orchestrator.engine import notify_admins
+    from construction.taxonomy import refresh_category_visibility
+    steps_log = []
+    res = await refresh_category_visibility()
+    steps_log.append({
+        "action": "recompute_visibility", "ok": True,
+        "detail": (
+            f"{res['visible_count']}/{res['total_nodes']} noduri vizibile public · "
+            f"{res['visibility_changes']} schimbări de vizibilitate (trigger: {payload.get('trigger', 'necunoscut')})"
+        ),
+    })
+    hp = res.get("hidden_with_potential") or []
+    if hp:
+        names = ", ".join(f"{h['name']} ({h['requests_90d']} cereri/90d)" for h in hp[:5])
+        n = await notify_admins(
+            "🏗️ Categorii ascunse cu potențial de business",
+            f"{len(hp)} categorii au cereri de la clienți dar 0 specialiști verificați: {names}. Oportunitate de recrutare specialiști.",
+            link="/admin/construction",
+        )
+        steps_log.append({
+            "action": "flag_hidden_with_potential", "ok": True,
+            "detail": f"{len(hp)} categorii cu cerere dar fără specialiști — {n} admini notificați",
+        })
+    else:
+        steps_log.append({
+            "action": "flag_hidden_with_potential", "ok": True,
+            "detail": "Nicio categorie ascunsă cu cerere activă — acoperire OK",
+        })
+    return {"steps": steps_log, "outcome": "auto_resolved", "minutes_saved": 10, "escalate": False}
+
+
+# ============================================================================
 # REGISTRY — signal kind → playbook
 # ============================================================================
 PLAYBOOKS = {
@@ -217,5 +252,11 @@ PLAYBOOKS = {
         "name": "Webhook Retry Guardian",
         "description": "Email Resend eșuat → retry automat cu backoff (max 3). Webhook Stripe eșuat → monitorizare; alertă doar la ≥3 eșuări/oră (~10 min/incident).",
         "handler": handle_webhook_fail,
+    },
+    "category_visibility_refresh": {
+        "id": "category_visibility_gate",
+        "name": "Category Visibility Gate",
+        "description": "CIP-A: recalculează automat vizibilitatea publică a nomenclatorului de construcții (nod vizibil = are ≥1 specialist verificat) la fiecare verificare specialist + zilnic 04:30. Flag-uiește categoriile ascunse cu cerere de la clienți (oportunitate recrutare).",
+        "handler": handle_category_visibility,
     },
 }

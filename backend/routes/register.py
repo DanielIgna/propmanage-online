@@ -112,6 +112,7 @@ from routes.admin_zones import router as admin_zones_router
 from routes.analytics_growth import router as analytics_track_router, admin_router as analytics_admin_router
 from routes.demo_activity import router as demo_activity_router
 from routes.orchestrator import router as orchestrator_router
+from routes.construction import router as construction_router
 
 # Registration order matters — kept identical to the original server.py loop.
 ALL_ROUTERS = (
@@ -182,6 +183,7 @@ ALL_ROUTERS = (
     ai_governance_router,
     bug_memory_router,
     orchestrator_router,
+    construction_router,
     deprecation_pulse_router,
     architecture_board_router,
     ai_pm_router,

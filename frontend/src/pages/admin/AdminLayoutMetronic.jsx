@@ -120,6 +120,7 @@ const NAV_SECTIONS = [
     items: [
       { id: "projects", label: "Proiecte", icon: FolderKanban },
       { id: "disputes", label: "Dispute & NC", icon: Scale },
+      { id: "construction", label: "Construction Intelligence", icon: Wrench, badge: "CIP-A", href: "/admin/construction" },
     ],
   },
   {
@@ -247,6 +248,7 @@ const NAV_SECTIONS = [
       { id: "ai_governance", label: "AI Governance Center", icon: Shield, badge: "NEW", href: "/admin/ai-governance" },
       { id: "ai_pm", label: "AI Product Manager", icon: Layers, badge: "NEW", href: "/admin/ai-pm" },
       { id: "autonomy", label: "Autonomy Engine", icon: Sparkles, badge: "NEW", href: "/admin/autonomy" },
+      { id: "orchestrator", label: "Autonomy Orchestrator", icon: Zap, badge: "SPRINT 1", href: "/admin/orchestrator" },
       { id: "twin", label: "Twin Orchestrator", icon: Bot, badge: "AI", href: "/admin/twin" },
       { id: "architecture_board", label: "Architecture Review Board", icon: Compass, badge: "NEW", href: "/admin/architecture-board" },
     ],

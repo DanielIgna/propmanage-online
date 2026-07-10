@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { ArrowLeft, PaintRoller, Building, Briefcase, Wrench, Zap, Wind, Palette, Hammer, PartyPopper } from "lucide-react";
 import { API } from "../DashShared";
@@ -15,9 +15,20 @@ const CATS = [
 export const RequestWizard = ({ property, onClose, onCreated }) => {
   const [step, setStep] = useState(0);
   // budget_estimate is a string during editing (avoids cursor jump / "0" prefix); parsed at submit.
-  const [form, setForm] = useState({ category: "", title: "", description: "", priority: "normal", budget_estimate: "200" });
+  const [form, setForm] = useState({ category: "", title: "", description: "", priority: "normal", budget_estimate: "200", subcategory: "", taxonomy_node_id: null });
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
+  // CIP-A: nomenclator ierarhic public (doar noduri vizibile) → chips subcategorii
+  const [taxonomy, setTaxonomy] = useState({});
+  useEffect(() => {
+    axios.get(`${API}/construction/taxonomy/public`)
+      .then(r => {
+        const map = {};
+        (r.data?.tree || []).forEach(root => { map[root.legacy_category] = root.children || []; });
+        setTaxonomy(map);
+      })
+      .catch(() => setTaxonomy({}));
+  }, []);
 
   const submit = async () => {
     setLoading(true);
@@ -52,14 +63,32 @@ export const RequestWizard = ({ property, onClose, onCreated }) => {
       q: "Ce serviciu ai nevoie?",
       valid: !!form.category,
       body: (
-        <div className="grid grid-cols-2 gap-2.5">
-          {CATS.map(([id, label, Icon]) => (
-            <button key={id} onClick={() => setForm(f => ({ ...f, category: id }))} data-testid={`v2-wiz-cat-${id}`}
-              className={`rounded-2xl border-2 p-3.5 text-left transition-colors ${form.category === id ? "border-[#34C759] bg-[#34C759]/5" : "border-slate-200 bg-white"}`}>
-              <Icon className="w-5 h-5" style={{ color: GREEN }} />
-              <div className="mt-1.5 text-xs font-bold text-slate-900">{label}</div>
-            </button>
-          ))}
+        <div>
+          <div className="grid grid-cols-2 gap-2.5">
+            {CATS.map(([id, label, Icon]) => (
+              <button key={id} onClick={() => setForm(f => ({ ...f, category: id, subcategory: "", taxonomy_node_id: null }))} data-testid={`v2-wiz-cat-${id}`}
+                className={`rounded-2xl border-2 p-3.5 text-left transition-colors ${form.category === id ? "border-[#34C759] bg-[#34C759]/5" : "border-slate-200 bg-white"}`}>
+                <Icon className="w-5 h-5" style={{ color: GREEN }} />
+                <div className="mt-1.5 text-xs font-bold text-slate-900">{label}</div>
+              </button>
+            ))}
+          </div>
+          {form.category && (taxonomy[form.category] || []).length > 0 && (
+            <div className="mt-5 cv2-fade" data-testid="v2-wiz-subcats">
+              <div className="text-xs font-bold text-slate-500">Detaliază (opțional)</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(taxonomy[form.category] || []).map(sub => (
+                  <button key={sub.id} data-testid={`v2-wiz-subcat-${sub.id}`}
+                    onClick={() => setForm(f => f.taxonomy_node_id === sub.id
+                      ? { ...f, subcategory: "", taxonomy_node_id: null }
+                      : { ...f, subcategory: sub.name, taxonomy_node_id: sub.id })}
+                    className={`px-3 py-2 rounded-full border-2 text-xs font-semibold transition-colors ${form.taxonomy_node_id === sub.id ? "border-[#34C759] bg-[#34C759]/10 text-slate-900" : "border-slate-200 bg-white text-slate-600"}`}>
+                    {sub.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ),
     },

@@ -374,6 +374,12 @@ async def verify_specialist(spec_id: str, user: dict = Depends(require_role("adm
         await check_tier_milestones(spec_id)
     except Exception:
         pass
+    # CIP-A: specialist verificat → recalculează vizibilitatea nomenclatorului
+    try:
+        from orchestrator.engine import emit_signal
+        await emit_signal("category_visibility_refresh", {"trigger": f"specialist_verified:{spec_id}"})
+    except Exception:  # noqa: BLE001
+        pass
     return {"ok": True}
 
 
