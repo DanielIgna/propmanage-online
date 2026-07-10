@@ -2173,3 +2173,10 @@ Sprint A (SEO Pages) → Sprint B (finalizare DS: Specialist, Admin Overview, Fi
 - **KG-0** (Blueprint §12): `/app/backend/kg/links.py` — registrul `entity_links` (graf logic peste Mongo, index unic pe 5-tuple, idempotent). 7 relații: owned_by, requested_by, on_property, assigned_to, disputes, pays_for, for_work. Backfill: 1625 muchii din datele existente. API: /api/admin/kg/{stats, entity/{type}/{id}, backfill}. Convenție: orice feature nou scrie legăturile via kg.links.link().
 - **Control Tower v1** (Blueprint Phase 2): /api/admin/control-tower + pagina /admin/control-tower (DS): Pulse (5 KPI) → Attention Layer (top 5 decizii cu schema fixă {situatie, propunere, impact_estimat, actiune_1tap, sursa_semnalului}: escaladări orchestrator, KYC pending, dispute, categorii cerere-fără-supply, retry queue) → Autonomy Report (rezolvate automat 7z + ore economisite) → card KG-0 cu backfill.
 - **AdminConsole**: suport deep-link /admin?tab={kyc|disputes|...} (acțiunile 1-click din Control Tower).
+
+## Update — Iun 2026 · SPRINT D: AUTONOMY SPRINT 3 — COMPLET (iter95: 8/8 backend + frontend PASS)
+Orchestratorul are acum 10 playbook-uri. Cele 3 noi (`/app/backend/orchestrator/playbooks_sprint3.py`):
+- **Pattern Hunter** (luni 06:00, rule-based): demand surge per categorie (7z vs medie 28z ×2), dispute hotspots (2 dispute/30z — early-warning sub pragul Medic), cereri stagnante >7z fără specialist → findings în `pattern_findings` + notificare admin
+- **Finance Reconciler** (zilnic 04:50): solduri negative, tranzacții orfane 30z (restrâns de la istoric total → semnal acționabil; 12 orfane reale detectate = escaladare corectă), lucrări confirmate fără tranzacție → escaladează la discrepanțe
+- **Roadmap Advisor** (vineri 09:00): Claude analizează ledger 7z + patterns + pulse → top 3 priorități în `roadmap_advice` + notificare. Validat REAL o dată (3 priorități generate). Mod test NU apelează LLM.
+- simulate/{kind} extins pentru toate 3; toggle enable/disable funcțional; cron-uri în server.py
