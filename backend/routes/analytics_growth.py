@@ -442,6 +442,25 @@ async def analytics_overview(
         series.append({"day": k, "sessions": daily[k]["sessions"], "visitors": len(daily[k]["visitors"])})
         cur += timedelta(days=1)
 
+    # Comparație cu perioada anterioară (trend KPI — Design System standard)
+    days_len = (datetime.fromisoformat(d_to).date() - datetime.fromisoformat(d_from).date()).days + 1
+    p_to = (datetime.fromisoformat(d_from).date() - timedelta(days=1)).isoformat()
+    p_from = (datetime.fromisoformat(d_from).date() - timedelta(days=days_len)).isoformat()
+    prev_sessions = await db.analytics_sessions.find({"day": {"$gte": p_from, "$lte": p_to}}).to_list(20000)
+    prev_visitors = {s["visitor_id"] for s in prev_sessions}
+    prev_bounces = sum(1 for s in prev_sessions if (s.get("pageviews") or 0) <= 1)
+    pf, pt = p_from, p_to + "T23:59:59"
+    kpi_prev = {
+        "unique_visitors": len(prev_visitors),
+        "sessions": len(prev_sessions),
+        "accounts_created": await db.users.count_documents({"created_at": {"$gte": pf, "$lte": pt}}),
+        "specialists_signed": await db.users.count_documents({"role": "specialist", "created_at": {"$gte": pf, "$lte": pt}}),
+        "properties_added": await db.properties.count_documents({"created_at": {"$gte": pf, "$lte": pt}}),
+        "specialist_requests": await db.requests.count_documents({"created_at": {"$gte": pf, "$lte": pt}}),
+        "subscriptions": await db.hh_subscriptions.count_documents({"created_at": {"$gte": pf, "$lte": pt}}),
+        "bounce_rate_pct": round(prev_bounces / len(prev_sessions) * 100, 1) if prev_sessions else 0.0,
+    }
+
     return {
         "period": {"from": d_from, "to": d_to},
         "kpi": {
@@ -455,6 +474,7 @@ async def analytics_overview(
             "bounce_rate_pct": round(bounces / len(sessions) * 100, 1) if sessions else 0.0,
             "avg_session_sec": round(total_dur / len(sessions) / 1000) if sessions else 0,
         },
+        "kpi_prev": kpi_prev,
         "sources": [
             {"source": k, "sessions": v["sessions"], "visitors": len(v["visitors"])}
             for k, v in sorted(by_source.items(), key=lambda x: -x[1]["sessions"])
@@ -462,6 +482,52 @@ async def analytics_overview(
         "funnel": funnel,
         "series": series,
     }
+
+
+@admin_router.get("/analytics/insights")
+async def analytics_insights(
+    period: str = Query("week", pattern="^(day|week|month|custom)$"),
+    date_from: str = "", date_to: str = "",
+    user: dict = Depends(require_role("admin")),
+):
+    """AI Insights standard (Design System): bullets + alerts + recomandări derivate din KPI."""
+    data = await analytics_overview(period, date_from, date_to, user)
+    k, kp = data["kpi"], data.get("kpi_prev", {})
+    bullets, alerts, recs = [], [], []
+
+    def pct(cur, prev):
+        return round((cur - prev) / prev * 100) if prev else None
+
+    if k["sessions"] == 0:
+        bullets.append("Nu există trafic în perioada selectată — trackerul așteaptă primii vizitatori.")
+        recs.append("Conectează integrările (Clarity, GA4) și distribuie primul link de campanie.")
+    else:
+        dv = pct(k["unique_visitors"], kp.get("unique_visitors", 0))
+        if dv is not None and dv != 0:
+            bullets.append(f"Vizitatorii unici au {'crescut' if dv > 0 else 'scăzut'} cu {abs(dv)}% față de perioada anterioară.")
+        da = pct(k["accounts_created"], kp.get("accounts_created", 0))
+        if da is not None and da != 0:
+            bullets.append(f"Conturile create au {'crescut' if da > 0 else 'scăzut'} cu {abs(da)}%.")
+        elif k["accounts_created"] == 0 and k["unique_visitors"] > 5:
+            alerts.append("Trafic fără conversii: niciun cont creat în perioadă.")
+            recs.append("Verifică fluxul de înregistrare și CTA-urile de pe paginile cu trafic mare.")
+        if data["sources"]:
+            top = data["sources"][0]
+            bullets.append(f"Sursa «{top['source']}» produce cele mai multe vizite ({top['sessions']} sesiuni).")
+        if k["bounce_rate_pct"] >= 55:
+            alerts.append(f"Bounce rate ridicat ({k['bounce_rate_pct']}%) — vizitatorii pleacă după o singură pagină.")
+            recs.append("Optimizează homepage-ul: mesaj mai clar în primele 3 secunde + un singur CTA dominant.")
+        drops = []
+        f = data["funnel"]
+        for i in range(len(f) - 1):
+            if f[i]["count"] > 0:
+                drops.append((f[i]["count"] - f[i + 1]["count"], f[i]["step"], f[i + 1]["step"]))
+        if drops:
+            loss, a, b = max(drops)
+            if loss > 0:
+                recs.append(f"Cea mai mare pierdere din funnel: «{a}» → «{b}» (−{loss}). Concentrează optimizarea aici.")
+
+    return {"bullets": bullets, "alerts": alerts, "recommendations": recs}
 
 
 @admin_router.get("/analytics/pages")

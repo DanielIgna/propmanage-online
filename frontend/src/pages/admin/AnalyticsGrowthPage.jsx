@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import {
-  BarChart3, Users, MousePointerClick, UserPlus, Building2, Wallet, RefreshCw,
-  Download, Plus, QrCode, Copy, Trash2, Link2, Megaphone, Settings2, CheckCircle2, Loader2,
-  Flame, FlaskConical, Repeat, TrendingDown, FileText, MessageCircle,
+  BarChart3, Users, MousePointerClick, UserPlus, Building2, Wallet, Plus, QrCode, Trash2,
+  Link2, Megaphone, Settings2, CheckCircle2, Flame, FlaskConical, Repeat, TrendingDown, MessageCircle,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -12,6 +11,10 @@ import {
 import { AdminLayoutMetronic } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
 import { toast } from "sonner";
+import {
+  KpiCard, AIInsightCard, ChartCard, DataTable, EmptyState, DSSkeleton, ActionBar, TabBar,
+  DSButton, DSBadge, CHART, CHART_COLORS,
+} from "../../design-system";
 import { HeatmapTab } from "./analytics/HeatmapTab";
 import { BounceTab } from "./analytics/BounceTab";
 import { RetentionTab } from "./analytics/RetentionTab";
@@ -19,21 +22,18 @@ import { AbTestingTab } from "./analytics/AbTestingTab";
 import { WhatsAppTab } from "./analytics/WhatsAppTab";
 
 const SOURCE_COLORS = { whatsapp: "#25D366", facebook: "#1877F2", google: "#EA4335", direct: "#64748b", qr: "#8b5cf6", admin: "#f59e0b", other: "#0ea5e9" };
-const PERIODS = [["day", "Azi"], ["week", "7 zile"], ["month", "30 zile"]];
 
-const Kpi = ({ icon: Icon, label, value, accent }) => (
-  <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4" data-testid={`kpi-${label.toLowerCase().replace(/[^a-z]+/g, '-')}`}>
-    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wide">
-      <Icon className={`w-4 h-4 ${accent}`} /> {label}
-    </div>
-    <div className="mt-2 text-3xl font-black text-slate-900 dark:text-white">{value}</div>
-  </div>
-);
+const trendOf = (k, kp, key) => {
+  const prev = kp?.[key];
+  if (!prev) return null;
+  return Math.round(((k[key] ?? 0) - prev) / prev * 100);
+};
 
 export default function AnalyticsGrowthPage() {
   const [tab, setTab] = useState("overview");
   const [period, setPeriod] = useState("week");
   const [overview, setOverview] = useState(null);
+  const [insights, setInsights] = useState(null);
   const [pages, setPages] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [integrations, setIntegrations] = useState(null);
@@ -44,13 +44,14 @@ export default function AnalyticsGrowthPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const [o, p, c, i] = await Promise.all([
+      const [o, p, c, i, ins] = await Promise.all([
         axios.get(`${API}/admin/analytics/overview?period=${period}`),
         axios.get(`${API}/admin/analytics/pages?period=${period}`),
         axios.get(`${API}/admin/growth/campaigns`),
         axios.get(`${API}/admin/analytics/integrations`),
+        axios.get(`${API}/admin/analytics/insights?period=${period}`),
       ]);
-      setOverview(o.data); setPages(p.data.items); setCampaigns(c.data.items); setIntegrations(i.data);
+      setOverview(o.data); setPages(p.data.items); setCampaigns(c.data.items); setIntegrations(i.data); setInsights(ins.data);
     } catch (e) { toast.error("Eroare la încărcarea datelor analytics"); }
     setLoading(false);
   };
@@ -90,99 +91,100 @@ export default function AnalyticsGrowthPage() {
 
   const sourceData = useMemo(() => (overview?.sources || []).map(s => ({ ...s, fill: SOURCE_COLORS[s.source] || "#0ea5e9" })), [overview]);
   const k = overview?.kpi || {};
+  const kp = overview?.kpi_prev || {};
 
   return (
-    <AdminLayoutMetronic active="growth_analytics" title="Analytics & Growth" subtitle="Decizii pe bază de date — trafic, conversii, campanii">
-      <div className="space-y-5" data-testid="analytics-growth-page">
-        {/* Controls */}
+    <AdminLayoutMetronic active="growth_analytics" title="Analytics & Growth" subtitle="Decizii bazate pe date despre trafic, campanii și conversii">
+      <div className="space-y-6" data-testid="analytics-growth-page">
+        {/* 1. Navigare secundară (TabBar standard) */}
         <div className="flex flex-wrap items-center gap-2">
-          {[["overview", "Dashboard KPI", BarChart3], ["heatmap", "Heatmap", Flame], ["bounce", "Bounce", TrendingDown], ["retention", "Retenție", Repeat], ["abtest", "A/B Testing", FlaskConical], ["whatsapp", "WhatsApp", MessageCircle], ["pages", "Pagini", MousePointerClick], ["campaigns", "Campanii", Megaphone], ["integrations", "Integrări", Settings2]].map(([id, label, Icon]) => (
-            <button key={id} onClick={() => setTab(id)} data-testid={`ag-tab-${id}`}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold transition-colors ${tab === id ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"}`}>
-              <Icon className="w-4 h-4" /> {label}
-            </button>
-          ))}
-          <div className="ml-auto flex items-center gap-1.5">
-            {PERIODS.map(([id, label]) => (
-              <button key={id} onClick={() => setPeriod(id)} data-testid={`ag-period-${id}`}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold ${period === id ? "bg-blue-600 text-white" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"}`}>
-                {label}
-              </button>
-            ))}
-            <button onClick={() => window.open(`${API}/admin/analytics/export.pdf?period=${period}`, "_blank")} data-testid="ag-export-pdf"
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600 text-white" title="Descarcă raport PDF complet">
-              <FileText className="w-3.5 h-3.5" /> PDF
-            </button>
-            <button onClick={load} className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700" data-testid="ag-refresh">
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            </button>
+          <TabBar
+            tabs={[["overview", "Dashboard", BarChart3], ["heatmap", "Heatmap", Flame], ["bounce", "Bounce", TrendingDown], ["retention", "Retenție", Repeat], ["abtest", "A/B Testing", FlaskConical], ["whatsapp", "WhatsApp", MessageCircle], ["pages", "Pagini", MousePointerClick], ["campaigns", "Campanii", Megaphone], ["integrations", "Integrări", Settings2]]}
+            active={tab} onChange={setTab} testidPrefix="ag-tab"
+          />
+          {/* 2. Action Bar standard: perioadă · CSV · PDF · refresh */}
+          <div className="ml-auto">
+            <ActionBar
+              period={period} onPeriod={setPeriod} onRefresh={load} loading={loading}
+              onExportCsv={() => exportCsv("overview")}
+              onExportPdf={() => window.open(`${API}/admin/analytics/export.pdf?period=${period}`, "_blank")}
+              testidPrefix="ag"
+            />
           </div>
         </div>
 
         {loading && !overview ? (
-          <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>
+          <DSSkeleton kpis={6} blocks={2} />
         ) : tab === "overview" && overview ? (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <Kpi icon={Users} label="Vizitatori unici" value={k.unique_visitors ?? 0} accent="text-blue-500" />
-              <Kpi icon={MousePointerClick} label="Sesiuni" value={k.sessions ?? 0} accent="text-cyan-500" />
-              <Kpi icon={UserPlus} label="Conturi create" value={k.accounts_created ?? 0} accent="text-emerald-500" />
-              <Kpi icon={Users} label="Specialiști înscriși" value={k.specialists_signed ?? 0} accent="text-violet-500" />
-              <Kpi icon={Building2} label="Proprietăți adăugate" value={k.properties_added ?? 0} accent="text-amber-500" />
-              <Kpi icon={Wallet} label="Bounce rate" value={`${k.bounce_rate_pct ?? 0}%`} accent="text-rose-500" />
+            {/* 3. KPI Cards standard: icon → titlu → valoare → evoluție */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <KpiCard icon={Users} label="Vizitatori unici" value={k.unique_visitors ?? 0} trend={trendOf(k, kp, "unique_visitors")} accent="info" />
+              <KpiCard icon={MousePointerClick} label="Sesiuni" value={k.sessions ?? 0} trend={trendOf(k, kp, "sessions")} accent="info" />
+              <KpiCard icon={UserPlus} label="Conturi create" value={k.accounts_created ?? 0} trend={trendOf(k, kp, "accounts_created")} accent="success" />
+              <KpiCard icon={Users} label="Specialiști înscriși" value={k.specialists_signed ?? 0} trend={trendOf(k, kp, "specialists_signed")} accent="ai" />
+              <KpiCard icon={Building2} label="Proprietăți adăugate" value={k.properties_added ?? 0} trend={trendOf(k, kp, "properties_added")} accent="warning" />
+              <KpiCard icon={Wallet} label="Bounce rate" value={`${k.bounce_rate_pct ?? 0}%`} trend={trendOf(k, kp, "bounce_rate_pct")} invertTrend accent="critical" />
             </div>
+
+            {/* 4. AI Insights — obligatoriu după KPI */}
+            <AIInsightCard
+              bullets={insights?.bullets || []} alerts={insights?.alerts || []}
+              recommendations={insights?.recommendations || []}
+              onAction={() => insights?.recommendations?.length && toast.info(insights.recommendations.join(" · "), { duration: 8000 })}
+              loading={loading} testid="ag-ai-insights"
+            />
+
+            {/* 5. Grafice standard */}
             <div className="grid lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-bold text-slate-800 dark:text-slate-100">Trafic zilnic</h3>
-                  <button onClick={() => exportCsv("overview")} className="flex items-center gap-1 text-xs font-bold text-blue-600" data-testid="ag-export-overview"><Download className="w-3.5 h-3.5" /> CSV</button>
-                </div>
+              <ChartCard title="Trafic zilnic" className="lg:col-span-2" testid="ag-chart-traffic"
+                actions={<DSButton variant="ghost" onClick={() => exportCsv("overview")} data-testid="ag-export-overview">CSV</DSButton>}>
                 <ResponsiveContainer width="100%" height={220}>
                   <AreaChart data={overview.series}>
-                    <defs><linearGradient id="gv" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3b82f6" stopOpacity={0.5} /><stop offset="100%" stopColor="#3b82f6" stopOpacity={0} /></linearGradient></defs>
-                    <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
-                    <XAxis dataKey="day" tick={{ fontSize: 10 }} tickFormatter={(d) => d.slice(5)} />
-                    <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                    <defs><linearGradient id="gv" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={CHART_COLORS[0]} stopOpacity={0.5} /><stop offset="100%" stopColor={CHART_COLORS[0]} stopOpacity={0} /></linearGradient></defs>
+                    <CartesianGrid strokeDasharray={CHART.gridDash} strokeOpacity={CHART.gridOpacity} />
+                    <XAxis dataKey="day" tick={{ fontSize: CHART.tickFontSize }} tickFormatter={(d) => d.slice(5)} />
+                    <YAxis tick={{ fontSize: CHART.tickFontSize }} allowDecimals={false} />
                     <Tooltip />
-                    <Area type="monotone" dataKey="visitors" name="Vizitatori" stroke="#3b82f6" fill="url(#gv)" strokeWidth={2} />
-                    <Area type="monotone" dataKey="sessions" name="Sesiuni" stroke="#8b5cf6" fill="none" strokeWidth={2} />
+                    <Area type="monotone" dataKey="visitors" name="Vizitatori" stroke={CHART_COLORS[0]} fill="url(#gv)" strokeWidth={CHART.strokeWidth} />
+                    <Area type="monotone" dataKey="sessions" name="Sesiuni" stroke={CHART_COLORS[1]} fill="none" strokeWidth={CHART.strokeWidth} />
                   </AreaChart>
                 </ResponsiveContainer>
-              </div>
-              <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
-                <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-2">Surse trafic</h3>
-                {sourceData.length === 0 ? <p className="text-sm text-slate-400 py-8 text-center">Fără trafic în perioadă</p> : (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <PieChart>
-                      <Pie data={sourceData} dataKey="sessions" nameKey="source" innerRadius={45} outerRadius={80} paddingAngle={2}>
-                        {sourceData.map((s, i) => <Cell key={i} fill={s.fill} />)}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+              </ChartCard>
+              <ChartCard title="Surse trafic" testid="ag-chart-sources">
+                {sourceData.length === 0 ? <EmptyState title="Fără trafic în perioadă" hint="Sursele apar odată cu primele sesiuni." /> : (
+                  <>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                        <Pie data={sourceData} dataKey="sessions" nameKey="source" innerRadius={45} outerRadius={80} paddingAngle={2}>
+                          {sourceData.map((s, i) => <Cell key={i} fill={s.fill} />)}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {sourceData.map(s => (
+                        <span key={s.source} className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                          <span className="w-2 h-2 rounded-full" style={{ background: s.fill }} /> {s.source} ({s.sessions})
+                        </span>
+                      ))}
+                    </div>
+                  </>
                 )}
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {sourceData.map(s => (
-                    <span key={s.source} className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                      <span className="w-2 h-2 rounded-full" style={{ background: s.fill }} /> {s.source} ({s.sessions})
-                    </span>
-                  ))}
-                </div>
-              </div>
+              </ChartCard>
             </div>
-            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
-              <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-2">Funnel conversie</h3>
+            <ChartCard title="Funnel conversie" testid="ag-chart-funnel">
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={overview.funnel} layout="vertical" margin={{ left: 40 }}>
                   <XAxis type="number" hide />
                   <YAxis type="category" dataKey="step" width={150} tick={{ fontSize: 11 }} />
                   <Tooltip />
-                  <Bar dataKey="count" fill="#3b82f6" radius={[0, 8, 8, 0]} barSize={22}>
+                  <Bar dataKey="count" fill={CHART_COLORS[0]} radius={[0, 8, 8, 0]} barSize={22}>
                     <LabelList dataKey="count" position="right" style={{ fontSize: 12, fontWeight: 700 }} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            </div>
+            </ChartCard>
           </>
         ) : tab === "heatmap" ? (
           <HeatmapTab period={period} clarityId={integrations?.clarity_id} />
@@ -195,35 +197,26 @@ export default function AnalyticsGrowthPage() {
         ) : tab === "whatsapp" ? (
           <WhatsAppTab period={period} />
         ) : tab === "pages" ? (
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-x-auto">
-            <div className="flex items-center justify-between p-4 pb-0">
-              <h3 className="font-bold text-slate-800 dark:text-slate-100">Performanța paginilor</h3>
-              <button onClick={() => exportCsv("pages")} className="flex items-center gap-1 text-xs font-bold text-blue-600" data-testid="ag-export-pages"><Download className="w-3.5 h-3.5" /> CSV</button>
-            </div>
-            <table className="w-full text-sm mt-2">
-              <thead><tr className="text-left text-[11px] uppercase text-slate-400 border-b border-slate-100 dark:border-slate-700">
-                <th className="px-4 py-2">Pagină</th><th className="px-4 py-2">Vizualizări</th><th className="px-4 py-2">Timp mediu</th><th className="px-4 py-2">Bounce</th>
-              </tr></thead>
-              <tbody data-testid="ag-pages-table">
-                {pages.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">Fără date încă — trackerul colectează de la primii vizitatori</td></tr>}
-                {pages.map(p => (
-                  <tr key={p.path} className="border-b border-slate-50 dark:border-slate-700/50">
-                    <td className="px-4 py-2 font-mono text-xs">{p.path}</td>
-                    <td className="px-4 py-2 font-bold">{p.views}</td>
-                    <td className="px-4 py-2">{p.avg_time_sec}s</td>
-                    <td className="px-4 py-2">{p.bounce_rate_pct}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          /* 6. Tabel standard: sticky header · sortare · căutare · export · hover */
+          <DataTable
+            title="Performanța paginilor"
+            columns={[
+              { key: "path", label: "Pagină", render: r => <span className="font-mono text-xs">{r.path}</span> },
+              { key: "views", label: "Vizualizări", render: r => <b>{r.views}</b> },
+              { key: "avg_time_sec", label: "Timp mediu", render: r => `${r.avg_time_sec}s` },
+              { key: "bounce_rate_pct", label: "Bounce", render: r => `${r.bounce_rate_pct}%` },
+            ]}
+            rows={pages} searchKeys={["path"]} exportName={`pagini-${period}`}
+            emptyTitle="Fără date încă." emptyHint="Trackerul colectează de la primii vizitatori."
+            testid="ag-pages-table"
+          />
         ) : tab === "campaigns" ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-xs text-slate-500">Indicatori per campanie: primit → deschis → 30s+ → înregistrare → cont → revenit 7z</p>
               <div className="flex gap-2">
-                <button onClick={() => exportCsv("campaigns")} className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700" data-testid="ag-export-campaigns"><Download className="w-3.5 h-3.5" /> CSV</button>
-                <button onClick={() => setShowCreate(true)} className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white" data-testid="ag-new-campaign"><Plus className="w-4 h-4" /> Campanie nouă</button>
+                <DSButton variant="secondary" onClick={() => exportCsv("campaigns")} data-testid="ag-export-campaigns">CSV</DSButton>
+                <DSButton variant="primary" icon={Plus} onClick={() => setShowCreate(true)} data-testid="ag-new-campaign">Campanie nouă</DSButton>
               </div>
             </div>
             {showCreate && (
@@ -249,18 +242,21 @@ export default function AnalyticsGrowthPage() {
                   </select>
                 </label>
                 <div className="md:col-span-3 flex gap-2 justify-end">
-                  <button onClick={() => setShowCreate(false)} className="px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-600">Anulează</button>
-                  <button onClick={createCampaign} className="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white" data-testid="ag-form-submit">Creează + generează link & QR</button>
+                  <DSButton variant="secondary" onClick={() => setShowCreate(false)}>Anulează</DSButton>
+                  <DSButton variant="primary" onClick={createCampaign} data-testid="ag-form-submit">Creează + generează link & QR</DSButton>
                 </div>
               </div>
             )}
             <div className="grid gap-3" data-testid="ag-campaigns-list">
-              {campaigns.length === 0 && !showCreate && <p className="text-center text-slate-400 py-10 text-sm">Nicio campanie încă. Creează prima campanie și primești automat link personalizat + QR.</p>}
+              {campaigns.length === 0 && !showCreate && (
+                <EmptyState icon={Megaphone} title="Nicio campanie încă." hint="Creează prima campanie și primești automat link personalizat + QR."
+                  action={<DSButton variant="primary" icon={Plus} onClick={() => setShowCreate(true)}>Creează prima campanie</DSButton>} />
+              )}
               {campaigns.map(c => (
                 <div key={c.id} className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-black text-slate-900 dark:text-white">{c.name}</span>
-                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500">{c.channel}</span>
+                    <DSBadge type="ACTIVE">{c.channel}</DSBadge>
                     <span className="text-xs text-slate-400">{c.administrator}{c.association ? ` · ${c.association}` : ""}{c.apartments_count ? ` · ${c.apartments_count} ap.` : ""} · trimis {String(c.sent_at || "").slice(0, 10)}</span>
                     <div className="ml-auto flex items-center gap-1.5">
                       <button onClick={() => { navigator.clipboard.writeText(c.url); toast.success("Link copiat"); }} title={c.url}
@@ -318,9 +314,7 @@ export default function AnalyticsGrowthPage() {
                   className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-transparent text-sm font-normal" placeholder="Bună! Doresc informații despre PropManage." />
               </label>
             </div>
-            <button onClick={saveIntegrations} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-blue-600 text-white" data-testid="ag-int-save">
-              <CheckCircle2 className="w-4 h-4" /> Salvează integrările
-            </button>
+            <DSButton variant="primary" icon={CheckCircle2} onClick={saveIntegrations} data-testid="ag-int-save">Salvează integrările</DSButton>
           </div>
         ) : null}
       </div>
