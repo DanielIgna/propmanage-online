@@ -2151,3 +2151,13 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 - P2: Operator workspace ("rezolvă în 2 clickuri"), AdminUsers/Approvals, BI MoE, Construction Intelligence
 - P3: Module AI secundare; AI Insights v2 cu LLM (Emergent Key) pe toate modulele
 - Amânat (pre-DS): Faza 2 Blueprint — Executive Control Tower + KG-0 (entity_links)
+
+## Update — Iun 2026 · SPRINT A: SEO PRICE PAGES — COMPLET (iter92: 15/15 backend + 25 Playwright PASS)
+### Prioritizare master aprobată de user (opțiunea a)
+Sprint A (SEO Pages) → Sprint B (finalizare DS: Specialist, Admin Overview, Financiar/Escrow, Marketplace Partners) → Sprint C (Faza 2 Blueprint: Control Tower + KG-0) → Sprint D (Autonomy Sprint 3: Pattern Hunter, Finance Reconciler, Roadmap Advisor). CIP-C reevaluat după acumulare date reale.
+
+### Sprint A livrat
+- Backend: `/app/backend/construction/price_seo.py` (14 categorii mapate slug→meta) + endpoints publice `GET /api/construction/prices/seo-pages` (index) și `/{slug}` (detaliu: title, cities, prices_by_city grupate serviciu×nivel, FAQ 4 itemi, related, disclaimer)
+- Sitemap: /preturi + 14 /preturi/{slug} (15 URL-uri noi în /api/public/sitemap.xml)
+- Frontend: `/preturi` (index cu 14 carduri + interval preț) și `/preturi/:slug` („Cât costă {noun} în {oraș} în 2026?", taburi oraș cu switch live, tabel Standard/Expert cu badge preliminar, FAQ accordion + FAQPage JSON-LD, CTA /register, related chips), lazy routes în App.js
+- Fix pe parcurs: SyntaxError ghilimea românească în DISCLAIMER
