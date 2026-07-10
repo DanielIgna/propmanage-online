@@ -36,6 +36,7 @@ from autonomy.snapshots import take_autonomy_snapshot_with_reflex
 from orchestrator.engine import orchestrator_retry_tick
 from construction.taxonomy import construction_visibility_cron
 from orchestrator.playbooks import marketplace_medic_cron
+from orchestrator.playbooks_sprint3 import pattern_hunter_cron, finance_reconciler_cron, roadmap_advisor_cron
 from maintenance import telemetry_retention_tick
 from routes.house_health_billing import seed_default_plans as hh_seed_default_plans
 from autonomy.founder_digest import weekly_founder_digest
@@ -411,6 +412,30 @@ async def startup():
             marketplace_medic_cron,
             CronTrigger(hour=5, minute=10, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="marketplace_medic_daily",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        # Sprint 3: Pattern Hunter — weekly Monday 06:00
+        scheduler.add_job(
+            pattern_hunter_cron,
+            CronTrigger(day_of_week="mon", hour=6, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="pattern_hunter_weekly",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        # Sprint 3: Finance Reconciler — daily 04:50
+        scheduler.add_job(
+            finance_reconciler_cron,
+            CronTrigger(hour=4, minute=50, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="finance_reconciler_daily",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        # Sprint 3: Roadmap Advisor — weekly Friday 09:00
+        scheduler.add_job(
+            roadmap_advisor_cron,
+            CronTrigger(day_of_week="fri", hour=9, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="roadmap_advisor_weekly",
             replace_existing=True,
             misfire_grace_time=7200,
         )

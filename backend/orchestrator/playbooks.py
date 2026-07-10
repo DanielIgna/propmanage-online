@@ -476,3 +476,6 @@ PLAYBOOKS = {
         "handler": handle_marketplace_medic,
     },
 }
+
+from orchestrator.playbooks_sprint3 import SPRINT3_PLAYBOOKS  # noqa: E402
+PLAYBOOKS.update(SPRINT3_PLAYBOOKS)

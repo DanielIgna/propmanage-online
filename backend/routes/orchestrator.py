@@ -113,8 +113,10 @@ async def simulate_signal(kind: str, user=Depends(require_role("admin"))):
                    "match_score": 94, "flags": ["face_match_good"]}
     elif kind == "marketplace_medic_scan":
         payload = {"test": True}
+    elif kind in ("pattern_scan", "finance_reconcile", "roadmap_advise"):
+        payload = {"test": True, "trigger": f"manual_simulate:{user.get('email')}"}
     else:
-        raise HTTPException(400, "kind trebuie să fie unul dintre: smoke_fail | autonomy_score_drop | webhook_fail | category_visibility_refresh | dispute_opened | kyc_prevalidated | marketplace_medic_scan")
+        raise HTTPException(400, "kind trebuie să fie unul dintre: smoke_fail | autonomy_score_drop | webhook_fail | category_visibility_refresh | dispute_opened | kyc_prevalidated | marketplace_medic_scan | pattern_scan | finance_reconcile | roadmap_advise")
 
     result = await emit_signal(kind, payload)
     return {"simulated": kind, **result}

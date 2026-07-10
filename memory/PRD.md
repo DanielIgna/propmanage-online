@@ -2168,3 +2168,8 @@ Sprint A (SEO Pages) → Sprint B (finalizare DS: Specialist, Admin Overview, Fi
 - **Admin Finanțe & Escrow** (AdminPlatformTools.jsx): 3 KpiCard DS + AIInsightCard (finance-ai-insights) + DataTable Top 10 Wallets (căutare/sortare/export CSV)
 - **Marketplace Partners**: 4 KpiCard DS + AIInsightCard (mkt-ai-insights) cu acțiunea „Rulează AI Copilot" → deschide panelul Claude existent
 - Actualizare DESIGN_SYSTEM.md §7: aceste 4 module = ✅
+
+## Update — Iun 2026 · SPRINT C: EXECUTIVE CONTROL TOWER v1 + KG-0 — COMPLET (iter94: 12/12 backend + frontend PASS)
+- **KG-0** (Blueprint §12): `/app/backend/kg/links.py` — registrul `entity_links` (graf logic peste Mongo, index unic pe 5-tuple, idempotent). 7 relații: owned_by, requested_by, on_property, assigned_to, disputes, pays_for, for_work. Backfill: 1625 muchii din datele existente. API: /api/admin/kg/{stats, entity/{type}/{id}, backfill}. Convenție: orice feature nou scrie legăturile via kg.links.link().
+- **Control Tower v1** (Blueprint Phase 2): /api/admin/control-tower + pagina /admin/control-tower (DS): Pulse (5 KPI) → Attention Layer (top 5 decizii cu schema fixă {situatie, propunere, impact_estimat, actiune_1tap, sursa_semnalului}: escaladări orchestrator, KYC pending, dispute, categorii cerere-fără-supply, retry queue) → Autonomy Report (rezolvate automat 7z + ore economisite) → card KG-0 cu backfill.
+- **AdminConsole**: suport deep-link /admin?tab={kyc|disputes|...} (acțiunile 1-click din Control Tower).
