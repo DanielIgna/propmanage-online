@@ -2111,3 +2111,8 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 - Auth.jsx corupt temporar la editare (fragment duplicat) — reparat; verificat vizual /register cu parametri.
 - test_credentials.md corectat definitiv (admin = SEED_ADMIN_PASSWORD din backend/.env).
 - NEXT: DEPLOY (user a cerut deploy după aceste 2 sprinturi) → apoi CIP-C sau Autonomy Sprint 3 (Pattern Hunter, Finance Reconciler, Roadmap Advisor).
+
+## Update — Iul 2026 · AUDIT COMPLET DE PLATFORMĂ (zero-cod, la cererea userului)
+- Creat `/app/memory/PLATFORM_AUDIT_2026.md`: diagnoză completă (113 module API, 185 colecții, ~140 pagini), puncte forte, 17 probleme prioritizate P0-P2, recomandări UX/Product/Arhitectură/DB/AI, roadmap în 5 faze cu impact × complexitate.
+- Diagnostic-cheie: „Featureship > Craftsmanship" — dualitate V1/V2 client, App.js fără lazy-loading, admin-labirint (86 pagini/15 secțiuni), vocabular categorii istoric dual, fișiere-gigant (admin_console 2.745 l.).
+- NEXT propus: Phase 1 „Stabilizare & Viteză" (lazy routes, migrare vocabular categorii, indexuri, api client unic) → Phase 2 „Admin Command Center".
