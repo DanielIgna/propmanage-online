@@ -66,3 +66,41 @@ async def take_autonomy_snapshot() -> dict:
     except Exception as e:  # noqa: BLE001
         logger.error(f"Autonomy snapshot failed: {e}", exc_info=True)
         return {"error": str(e)}
+
+
+DROP_THRESHOLD_PP = 5
+
+
+async def take_autonomy_snapshot_with_reflex() -> dict:
+    """Scheduler entry-point: snapshot + Autonomy Reflex signal on >5pp drop.
+
+    The orchestrator playbook re-snapshots via the plain take_autonomy_snapshot,
+    so no signal loop is possible.
+    """
+    prev = await db.autonomy_snapshots.find_one({}, sort=[("timestamp", -1)])
+    doc = await take_autonomy_snapshot()
+    if doc.get("error") or not prev:
+        return doc
+    try:
+        drops = {}
+        prev_axes = prev.get("breakdown_summary") or {}
+        new_axes = doc.get("breakdown_summary") or {}
+        for axis, new_v in new_axes.items():
+            old_v = prev_axes.get(axis)
+            if old_v is not None and (old_v - new_v) > DROP_THRESHOLD_PP:
+                drops[axis] = round(old_v - new_v, 1)
+        prev_general = (prev.get("scores") or {}).get("general") or 0
+        new_general = (doc.get("scores") or {}).get("general") or 0
+        if (prev_general - new_general) > DROP_THRESHOLD_PP:
+            drops["general"] = round(prev_general - new_general, 1)
+        if drops:
+            from orchestrator.engine import emit_signal
+            await emit_signal("autonomy_score_drop", {
+                "drops": drops,
+                "prev_general": prev_general,
+                "new_general": new_general,
+                "tier": doc.get("tier"),
+            })
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[autonomy.snapshot] reflex signal failed: {e}")
+    return doc

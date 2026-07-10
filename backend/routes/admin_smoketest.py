@@ -567,6 +567,23 @@ async def run_smoke_test_monitor_tick() -> Optional[dict]:
     new_status = "ok" if report["ok"] else "fail"
     last_alert_at = cfg.get("last_alert_at")
 
+    # Orchestrator signal — auto-creates a QA session with the failed steps
+    if not report["ok"]:
+        try:
+            from orchestrator.engine import emit_signal
+            failed_steps = [
+                {"name": s.get("name"), "error": (s.get("error") or "")[:300], "status_code": s.get("status_code")}
+                for s in report.get("steps", []) if not s.get("ok")
+            ]
+            await emit_signal("smoke_fail", {
+                "failed": report.get("failed"),
+                "total": report.get("total"),
+                "base_url": base_url,
+                "steps": failed_steps,
+            })
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[SmokeTest][monitor] orchestrator signal failed: {e}")
+
     # Decide whether to send an alert
     should_alert = False
     if not report["ok"]:

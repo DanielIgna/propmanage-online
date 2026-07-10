@@ -117,7 +117,7 @@ def _layout(title: str, preheader: str, body_html: str, cta_url: Optional[str] =
 
 # ===================== Send function =====================
 
-async def send_email(to: str | List[str], subject: str, html: str, plain: Optional[str] = None, attachments: Optional[List[dict]] = None) -> dict:
+async def send_email(to: str | List[str], subject: str, html: str, plain: Optional[str] = None, attachments: Optional[List[dict]] = None, _from_retry: bool = False) -> dict:
     """Sends an email via active provider. Returns dict {ok, provider, id|error}.
 
     attachments: optional list of dicts. Resend format: [{filename, content (base64 str)}].
@@ -136,6 +136,12 @@ async def send_email(to: str | List[str], subject: str, html: str, plain: Option
             return {"ok": True, "provider": "resend", "id": result.get("id")}
         except Exception as e:
             logger.error(f"Resend send failed: {e}")
+            if not _from_retry and not attachments:
+                try:
+                    from orchestrator.engine import emit_signal
+                    await emit_signal("webhook_fail", {"source": "resend_email", "to": recipients, "subject": subject, "html": html})
+                except Exception:  # noqa: BLE001
+                    pass
             return {"ok": False, "provider": "resend", "error": str(e)}
 
     if PROVIDER == "sendgrid":

@@ -489,6 +489,9 @@ export const AutonomyEnginePage = () => {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <Link to="/admin/orchestrator" className="pm-btn pm-btn-sm bg-violet-500/15 border border-violet-500/40 text-violet-200 hover:bg-violet-500/25" data-testid="autonomy-to-orchestrator" title="Orchestrator: playbook-uri self-healing + ledger acțiuni automate">
+              <Activity className="w-3.5 h-3.5" /> Orchestrator
+            </Link>
             <button
               onClick={autoTune}
               disabled={autoTuning}

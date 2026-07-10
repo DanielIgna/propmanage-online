@@ -32,7 +32,8 @@ from executive_briefing import run_exec_briefing_job
 from routes.verified_estate import seed_demo_listings as seed_verified_estate_demo
 from routes.settings_snapshots import take_auto_snapshot
 from routes.autonomy import weekly_auto_tune_job
-from autonomy.snapshots import take_autonomy_snapshot
+from autonomy.snapshots import take_autonomy_snapshot_with_reflex
+from orchestrator.engine import orchestrator_retry_tick
 from routes.house_health_billing import seed_default_plans as hh_seed_default_plans
 from autonomy.founder_digest import weekly_founder_digest
 from autonomy.autopilot import bootstrap_autonomy_defaults, daily_autopilot_sweep
@@ -173,7 +174,7 @@ async def startup():
             misfire_grace_time=3600,
         )
         scheduler.add_job(
-            take_autonomy_snapshot,
+            take_autonomy_snapshot_with_reflex,
             CronTrigger(hour=3, minute=15, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="autonomy_snapshot_daily",
             replace_existing=True,
@@ -372,6 +373,14 @@ async def startup():
             id="smoke_test_monitor",
             replace_existing=True,
             misfire_grace_time=600,
+        )
+        # Autonomy Orchestrator — retry queue tick (Webhook Retry Guardian), every 5 min
+        scheduler.add_job(
+            orchestrator_retry_tick,
+            CronTrigger(minute="*/5", timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="orchestrator_retry_tick",
+            replace_existing=True,
+            misfire_grace_time=300,
         )
         # Morning Briefing digest — daily 09:00, sent only when warn/fail
         scheduler.add_job(

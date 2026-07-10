@@ -6,7 +6,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   ShoppingBag, Plus, Loader2, ChevronLeft, X, Save, Edit3, Eye, KeyRound,
   Sparkles, TrendingUp, AlertTriangle, Trash2, Award, FileText, Mail,
-  MapPin, Tag, Building, Bot,
+  MapPin, Tag, Building, Bot, RotateCcw,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -291,6 +291,14 @@ const MarketplacePartnersPage = () => {
     } catch (e) { alert(e.response?.data?.detail || e.message); }
   };
 
+  const restore = async (p) => {
+    if (!window.confirm(`Reactivezi colaborarea cu ${p.company}?`)) return;
+    try {
+      const { data } = await ax.patch(`/api/admin/marketplace-partners/${p.id}`, { status: "active" });
+      setItems(arr => arr.map(x => x.id === p.id ? data : x));
+    } catch (e) { alert(e.response?.data?.detail || e.message); }
+  };
+
   const createLogin = async (p) => {
     if (!window.confirm(`Creezi un cont MARKETPLACE_PARTNER pentru ${p.company}?`)) return;
     try {
@@ -376,6 +384,9 @@ const MarketplacePartnersPage = () => {
                     <button onClick={() => { setEditing(p); setFormOpen(true); }} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" title="Editează" data-testid={`edit-${p.id}`}><Edit3 className="w-4 h-4" /></button>
                     {p.status !== "terminated" && (
                       <button onClick={() => archive(p)} className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10" title="Încetează" data-testid={`archive-${p.id}`}><Trash2 className="w-4 h-4" /></button>
+                    )}
+                    {p.status === "terminated" && (
+                      <button onClick={() => restore(p)} className="p-1.5 rounded-lg text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10" title="Restaurează partenerul" data-testid={`restore-${p.id}`}><RotateCcw className="w-4 h-4" /></button>
                     )}
                   </div>
                 </div>

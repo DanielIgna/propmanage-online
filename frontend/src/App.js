@@ -60,6 +60,7 @@ import DocsAIPage from "./pages/DocsAIPage";
 import AIDevTeamPage from "./pages/admin/AIDevTeamPage";
 import AISecurityCenterPage from "./pages/admin/AISecurityCenterPage";
 import AutonomyEnginePage from "./pages/admin/AutonomyEnginePage";
+import AutonomyOrchestratorPage from "./pages/admin/AutonomyOrchestratorPage";
 import TwinPage from "./pages/admin/TwinPage";
 import AdminHouseHealthPage from "./pages/admin/AdminHouseHealthPage";
 import ManualTesterPage from "./pages/admin/ManualTesterPage";
@@ -1638,6 +1639,7 @@ function App() {
               <Route path="/admin/ai-dev-team" element={<AIDevTeamPage />} />
               <Route path="/admin/ai-security" element={<AISecurityCenterPage />} />
               <Route path="/admin/autonomy" element={<AutonomyEnginePage />} />
+              <Route path="/admin/orchestrator" element={<AutonomyOrchestratorPage />} />
               <Route path="/admin/twin" element={<TwinPage />} />
               <Route path="/house-health/:twinId" element={<HouseHealthPage />} />
               <Route path="/house-health/upgrade" element={<HouseHealthUpgradePage />} />

@@ -218,6 +218,11 @@ async def stripe_webhook(request: Request):
     try:
         evt = await stripe_checkout.handle_webhook(body, signature)
     except Exception as e:
+        try:
+            from orchestrator.engine import emit_signal
+            await emit_signal("webhook_fail", {"source": "stripe", "error": str(e)[:300]})
+        except Exception:  # noqa: BLE001
+            pass
         raise HTTPException(400, f"Webhook error: {e}")
     if evt.payment_status == "paid":
         payment = await db.payment_transactions.find_one({"session_id": evt.session_id})
