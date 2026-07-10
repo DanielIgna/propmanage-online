@@ -2065,3 +2065,17 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 - Setări: buton „Deconectare" (roșu subtil) + footer versiune „Client dashboard V2".
 - Bug-uri la implementare: (1) Skeleton neimportat în HomeV2 → ErrorBoundary „Skeleton is not defined" → fixat; (2) edit-ul salutului raportat succes dar NEPERSISTAT (a 2-a apariție a anomaliei search_replace în această sesiune!) → reaplicat + verificat cu grep.
 - Verificat cu playwright: home+greeting+step counter+logout+contoare secțiuni toate OK.
+
+## Update — Iul 2026 · AUTONOMY ORCHESTRATOR SPRINT 1 — COMPLET (testat iter86: 19/19 backend PASS + E2E frontend PASS)
+- **Raport Chief Autonomy Officer:** elimină triajul manual la smoke fail (~20 min/incident), intervenția la score drop (~15 min/incident) și re-trimiterea manuală de emailuri eșuate (~10 min/incident) ≈ 4.5h/săpt. Rulează fără fondator și fără admin; escaladează la om DOAR când automatizarea eșuează.
+- **Backend nou** `/app/backend/orchestrator/`: `engine.py` (emit_signal → playbook cascade → ledger + escalation in-app/push/email; orchestrator_retry_tick cron */5min cu backoff exponențial) + `playbooks.py` (registry 3 playbook-uri).
+- **Playbook 1 — Smoke-Fail → Auto QA Session:** hook în `run_smoke_test_monitor_tick`; creează sesiune QA `AUTO · Smoke Test FAILED · <data>` cu pașii eșuați ca findings (dedupe: append la sesiunea din aceeași zi) + notifică adminii in-app.
+- **Playbook 2 — Autonomy Reflex:** `take_autonomy_snapshot_with_reflex` (folosit de cron 03:15) detectează drop >5pp (general sau per axă) → semnal → sweep corectiv (`daily_autopilot_sweep`) → verificare recuperare → escaladare doar dacă scorul nu revine. Fără loop de semnal (playbook-ul folosește snapshot-ul simplu).
+- **Playbook 3 — Webhook Retry Guardian:** `email_service.send_email` (param nou `_from_retry`) emite semnal la eșec Resend → coadă `orchestrator_retry_queue` (max 3 încercări, backoff 10/20/40 min) → escaladare in-app după 3 eșecuri. Stripe webhook fail (payments.py) → monitorizare, alertă doar la ≥3 eșuări/oră.
+- **API** `/api/admin/orchestrator/*`: overview (KPI azi + total minute salvate + playbooks), ledger, playbooks/{id}/toggle, simulate/{kind} (semnale TEST marcate), retry-tick (forțare manuală).
+- **Frontend** `/admin/orchestrator` (AutonomyOrchestratorPage.jsx, dark theme consistent cu Autonomy Engine): 5 KPI cards, 3 carduri playbook cu toggle + Simulează, ledger cu pași detaliați + badge TEST + minute salvate. Cross-link bidirecțional cu /admin/autonomy (buton „Orchestrator").
+- **Colecții noi Mongo:** orchestrator_signals (cap 500), orchestrator_ledger (cap 500), orchestrator_retry_queue, orchestrator_config (toggles).
+- **BUG #004 CLOSED:** buton Restore (RotateCcw, `restore-{id}`) pentru partenerii marketplace terminați → PATCH status=active. Testat E2E.
+- **BUG #002 + ENH #001 VERIFICATE de agent** (playwright): 35000 → „35.000" live, caret stabil — ambele Closed în BUGS.md.
+- **Credential fix:** parola admin reală = SEED_ADMIN_PASSWORD din backend/.env (actualizat test_credentials.md).
+- NEXT (conform roadmap aprobat): CIP-A (taxonomie ierarhică + visibility gate ca playbook orchestrator + /admin/construction) → Autonomy Sprint 2 (Dispute AI Triage, KYC Auto-Approve, Marketplace Medic) → CIP-B (Price Observatory).

@@ -12,7 +12,7 @@ Format: `BUG #NNN – Titlu` · Status: `Open` | `In Progress` | `Fixed (verific
 - **Verificat de user:** ✅
 
 ## BUG #002 – Cursor săre la început în input numeric "Buget estimat (RON)"
-- **Status:** Fixed + Enhanced (verificare pending user)
+- **Status:** Closed ✅ (verificat de agent cu playwright: tastare `35000` → `35.000`, append `9` → `350.009`, caret stabil)
 - **Simptom:** Utilizatorul scria `250` dar primea `0250`, cursorul repoziționat forțat la începutul câmpului.
 - **Cauză root:**
   1. `budget_estimate` era stocat ca **număr** în state, iar `onChange` făcea `parseFloat(e.target.value) || 0` pe fiecare tastă.
@@ -27,7 +27,7 @@ Format: `BUG #NNN – Titlu` · Status: `Open` | `In Progress` | `Fixed (verific
   - Nu există alte `type="number"` în Client V2.
 
 ## ENH #001 – Formatare live cu separator de mii pe input-uri de sumă (Revolut-style)
-- **Status:** Delivered (verificare pending user)
+- **Status:** Closed ✅ (verificat de agent cu playwright — formatare live corectă, caret păstrat)
 - **Cerință:** Ex: user tastează `35000` → afișează `35.000` live, cu caret păstrat la locul corect.
 - **Implementare:**
   - Nouă componentă `AmountInput` în `frontend/src/pages/clientv2/ui.jsx`.
@@ -43,4 +43,4 @@ Format: `BUG #NNN – Titlu` · Status: `Open` | `In Progress` | `Fixed (verific
 
 ## Backlog Open (pre-existing)
 - **BUG #003 – Resend Custom Domain DNS** — Status: Blocked (user action pe registrar DKIM/SPF)
-- **BUG #004 – Restore icon lipsă pentru marketplace partners terminate** — Status: Open (P2)
+- **BUG #004 – Restore icon lipsă pentru marketplace partners terminate** — Status: Closed ✅ (buton RotateCcw `restore-{id}` în MarketplacePartnersPage → PATCH status=active; testat E2E iter86)
