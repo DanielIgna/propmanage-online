@@ -2091,3 +2091,23 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 - **Client V2 adaptat la ierarhie**: RequestWizard afișează chips subcategorii vizibile („Detaliază (opțional)") după selectarea categoriei; cererea salvează `subcategory` + `taxonomy_node_id` (RequestIn extins). Categoriile fără specialiști nu afișează chips (gate-ul funcționează e2e până în UI client).
 - Morning Briefing include acum și activitatea orchestratorului (secțiunea din update-ul anterior).
 - NEXT: Autonomy Sprint 2 (Dispute AI Triage, KYC Auto-Approve, Marketplace Medic) SAU CIP-B (Price Observatory — piesa unică de piață). CIP-C/D după acumulare date.
+
+## Update — Iul 2026 · AUTONOMY SPRINT 2 + CIP-B + FUNNEL RECRUTARE — COMPLET (testat iter88: 21/21 backend PASS + E2E frontend PASS)
+### Autonomy Sprint 2 (playbook-uri #5-7 în Orchestrator — total 7)
+- **Dispute AI Triage** (`dispute_opened`): la deschiderea unei dispute, Claude (Emergent LLM Key, `orchestrator/llm.py`) clasifică (no_show/quality/price/communication/damage), stabilește severitatea, propune rezoluție + 3 argumente + split escrow sugerat → salvat ca `ai_triage` pe dispută → panou violet în AdminDisputes (`ai-triage-{id}`). Testat REAL cu Claude: no_show/high, split 100/0. ~15 min/dispută.
+- **KYC Pre-Validation mod recomandare** (GDPR-safe, alegerea userului): `kyc.py` calculează `ai_verification.recommendation` (approve dacă scor ≥85 fără flags negative, altfel review) → badge „Recomandat spre aprobare / Necesită review" în AdminKYCQueue → semnal orchestrator + notificare admin. Adminul dă click-ul final. Auto-approve full rămâne config opt-in (dezactivat).
+- **Marketplace Medic** (`marketplace_medic_scan`, cron 05:10): suspendă automat specialiștii cu ≥3 dispute deschise/30d (`users.medic_suspended`) — excluși din matching (matching.py) și marketplace (marketplace.py) — și îi reactivează după 30d curate. Notificări specialist + admin.
+- Simulate endpoint extins la toate 7 kinds.
+### CIP-B Price Observatory + Experience Levels
+- Colecție `price_observations`; seed idempotent 132 observații orientative (22 servicii × 3 orașe × 2 niveluri experiență, marcate source=seed → „preliminar"). `construction/prices.py`.
+- Agregare per categorie × serviciu × oraș × UM × nivel experiență cu **trust grading** (A=≥3 obs, B=2, C=1; preliminary dacă doar seed).
+- API: GET `/api/construction/prices/public` (fără auth, cu disclaimer), admin: POST (validare 0<min≤med≤max, UM valide), DELETE, import CSV (cu raport erori per linie), export CSV.
+- Admin UI: tab „Prețuri (Observatory)" în /admin/construction — quick-add form, import/export CSV, tabel cu trust badges.
+- Client: hint preț orientativ în RequestWizard la pasul de buget (`v2-wiz-price-hint`) pentru categoria selectată.
+### Funnel recrutare (cerut de user)
+- Buton „Invită specialiști" per categorie în banner-ul „ascunse cu potențial" → copiază link `/register?role=specialist&category={legacy}&utm_source=recruitment`.
+- RegisterPage citește `role` + `category` → preselectează rolul Specialist + specializarea; SPECIALTIES aliniate la vocabularul taxonomiei (zugravit, parchet, faianta, gips_carton, handyman + 5 categorii noi: constructii, acoperisuri, fatade_termoizolatii, tamplarie, amenajari_exterioare). Închide bucla: cerere nedeservită → recrutare → verificare → gate deschide categoria automat.
+### Fix pe parcurs
+- Auth.jsx corupt temporar la editare (fragment duplicat) — reparat; verificat vizual /register cu parametri.
+- test_credentials.md corectat definitiv (admin = SEED_ADMIN_PASSWORD din backend/.env).
+- NEXT: DEPLOY (user a cerut deploy după aceste 2 sprinturi) → apoi CIP-C sau Autonomy Sprint 3 (Pattern Hunter, Finance Reconciler, Roadmap Advisor).
