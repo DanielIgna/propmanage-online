@@ -2130,3 +2130,24 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 - Rămase din Phase 1 pentru boy-scout continuu: TD-04 (descompunere fișiere-gigant — la atingere), TD-06 (DB_REGISTRY).
 - NEXT: **Phase 2 — Admin Command Center** (Executive Control Tower v1: /api/admin/attention + Attention Layer / Pulse / Autonomy Report + meniu 4 huburi), apoi Phase 3 Specialist Cockpit. Toate cu fișă de integrare conform §11.2.
 - ⚠️ Modificările apar pe propmanage.ro după REDEPLOY.
+
+## Update — Iun 2026 · FAZA 1.5 UX STABILIZARE + BUSINESS DESIGN SYSTEM (testat iter90 + iter91: toate PASS)
+### Faza 1.5 — UX Stabilizare & Navigare (COMPLETĂ, iter90 10/10 PASS)
+- Fix eroare compilare: `const params` duplicat în ClientDashboardV2.jsx (bloca tot frontend-ul)
+- ScrollToTop global pe schimbare rută (App.js AnalyticsRouteTracker) + scroll reset pe toate BottomNav-urile (deja existent)
+- Deep-links validate: /client?tab=..., /specialist?tab=... + curățare URL
+- Elemente flotante fără suprapuneri (WhatsApp stânga-jos mobil, AI bubble dreapta, BottomNav)
+- Parola admin actualizată în test_credentials.md: admin@propmanage.io / 1!nasov01ADMIN
+
+### Business Design System (mandat user: 17 reguli — COMPLET, iter91 12/12 backend + frontend PASS)
+- Constituția UI: `/app/memory/DESIGN_SYSTEM.md`; bibliotecă: `/app/frontend/src/design-system/` (tokens.js + index.jsx)
+- Componente obligatorii: KpiCard (icon+valoare+trend "vs perioada trecută"), AIInsightCard (obligatoriu după KPI), ChartCard, DataTable (sticky/sort/căutare/export), DSButton (5 variante), DSBadge (7 tipuri), EmptyState, DSSkeleton, ActionBar, TabBar
+- Backend: `kpi_prev` (comparație perioadă anterioară) în /admin/analytics/overview + endpoint NOU /admin/analytics/insights (rule-based v1: bullets/alerts/recommendations)
+- Implementare de referință: AnalyticsGrowthPage.jsx rescrisă integral pe DS (ordine: Titlu→Tabs→ActionBar→KPI→AI→Grafice→Tabele→Export)
+- Decizie teme: Business/Admin = slate Metronic (acest DS); Client = light V2; Specialist/Operator migrează progresiv (backlog DESIGN_SYSTEM.md §7)
+
+### Backlog standardizare DS (din DESIGN_SYSTEM.md §7)
+- P1: Admin Overview/Console (KpiCard+AI), Marketplace Partners, Financiar/Escrow, Specialist Dashboard (sprint dedicat "Astăzi ai...")
+- P2: Operator workspace ("rezolvă în 2 clickuri"), AdminUsers/Approvals, BI MoE, Construction Intelligence
+- P3: Module AI secundare; AI Insights v2 cu LLM (Emergent Key) pe toate modulele
+- Amânat (pre-DS): Faza 2 Blueprint — Executive Control Tower + KG-0 (entity_links)
