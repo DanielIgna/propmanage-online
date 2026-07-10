@@ -36,6 +36,7 @@ from autonomy.snapshots import take_autonomy_snapshot_with_reflex
 from orchestrator.engine import orchestrator_retry_tick
 from construction.taxonomy import construction_visibility_cron
 from orchestrator.playbooks import marketplace_medic_cron
+from maintenance import telemetry_retention_tick
 from routes.house_health_billing import seed_default_plans as hh_seed_default_plans
 from autonomy.founder_digest import weekly_founder_digest
 from autonomy.autopilot import bootstrap_autonomy_defaults, daily_autopilot_sweep
@@ -410,6 +411,14 @@ async def startup():
             marketplace_medic_cron,
             CronTrigger(hour=5, minute=10, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="marketplace_medic_daily",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        # Phase 1 (TD-08): retenție telemetrie — daily 03:40
+        scheduler.add_job(
+            telemetry_retention_tick,
+            CronTrigger(hour=3, minute=40, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="telemetry_retention_daily",
             replace_existing=True,
             misfire_grace_time=7200,
         )

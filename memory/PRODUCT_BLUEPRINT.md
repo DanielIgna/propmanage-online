@@ -57,6 +57,17 @@ Competitorii pot copia un marketplace în 6 luni. Nu pot copia 3 ani de istoric 
 
 ---
 
+## 1.5 PRINCIPIILE FUNDAMENTALE (ratificate de owner — prioritate peste orice implementare)
+
+1. **PropManage nu administrează proprietăți. Administrează ciclul de viață al unei proprietăți.** Testul oricărei funcționalități: *„Cum ajută asta proprietatea să fie mai sănătoasă, mai valoroasă, mai ușor de administrat și mai ușor de tranzacționat?"* Fără răspuns clar → nu se construiește.
+2. **Efect de rețea obligatoriu.** Fiecare modul nou consumă date din alte module ȘI produce date utile altora (Health → Twin → Audit → Marketplace → AI → Analytics → Observatory → Autonomy). Un modul care nu contribuie la buclă își reconsideră existența.
+3. **AI nu este o funcționalitate — este stratul de orchestrare.** Nu „AI Features", ci AI prezent în fiecare flux important fără să pară modul separat: **observă → recomandă → execută unde are permisiuni → învață.**
+4. **Fiecare utilizator simte că platforma lucrează pentru el.** Standardul tuturor dashboard-urilor = AI Workspace (§8): spații care generează acțiuni, nu pagini care afișează informații.
+5. **Datele sunt activul principal.** Marketplace, escrow, wallet — importante, dar valoarea companiei = datele despre proprietăți + inteligența generată din ele. Orice dezvoltare îmbogățește baza de cunoștințe.
+6. **Nicio funcționalitate fără clasificare.** Înainte de implementare, fiecare feature primește obligatoriu: **clasa** (CORE/AI/AUTONOMY/BUSINESS/PREMIUM/GROWTH/INFRASTRUCTURE/EXPERIMENTAL/LEGACY), **versiunea** în care intră, **dependențele** (contra §4), **impactul** asupra altor module, **KPI-urile** urmărite.
+
+---
+
 # 2. USER JOURNEYS (per persona)
 
 > Format: Stadii → momentul adevărului (✦) → unde intervine AI Workspace-ul (⚙).
@@ -364,3 +375,76 @@ Phase 6  Autonomy Engine 2.0            → Pattern Hunter & co (V3.0)
 ```
 
 **Definiția de „gata" pentru Phase 0:** acest document este aprobat de owner și devine referință obligatorie: orice cerere viitoare de feature primește răspunsul „în ce strat, ce clasă de modul, ce versiune și ce dependențe are conform Blueprint-ului?"
+
+---
+
+# 10. PRODUCT CONSTITUTION — reguli care NU pot fi încălcate
+
+> Ratificată de owner. Orice PR/feature care încalcă un articol se respinge indiferent de urgență.
+
+**Art. 1** — Nu se dezvoltă funcționalități izolate. Fiecare feature consumă și produce date în ecosistem (Principiul 2).
+**Art. 2** — Nu se dublează logica existentă. Nu se creează al doilea mod de a face același lucru. (Cauza directă a TD-02/TD-10 — nu se repetă.)
+**Art. 3** — LEGACY nu primește funcționalități noi. Cine cere feature pe legacy finanțează migrarea.
+**Art. 4** — AI execută doar prin API-urile oficiale, cu aceleași permisiuni ca un utilizator uman, și lasă urmă în ledger. Fără căi privilegiate.
+**Art. 5** — Toate modulele și componentele se construiesc reutilizabil (un pattern, adaptoare per rol/context — vezi motorul unic de recomandări §8).
+**Art. 6** — Orice feature nou îmbogățește ecosistemul de date (Principiul 5). Feature care doar consumă = taxă; se respinge sau se re-proiectează.
+**Art. 7** — Mobile-first este obligatoriu pentru orice ecran de Client și Specialist.
+**Art. 8** — Performanța și experiența utilizatorului au aceeași prioritate ca funcționalitatea. Un feature lent sau confuz nu e „gata".
+**Art. 9** — Efectele cross-modul circulă prin semnale (Orchestrator), nu prin apeluri directe.
+**Art. 10** — Orice feature intră cu clasificare completă (clasă/versiune/dependențe/impact/KPI — Principiul 6) și cu data-testid pe elementele interactive.
+**Art. 11** — Deciziile automate cu impact legal/financiar asupra persoanelor rămân în mod „recomandare" până la aviz juridic explicit (precedent: KYC).
+**Art. 12** — Blueprint-ul are întâietate: conflictul între o cerere de feature și Blueprint se rezolvă întâi la nivel de Blueprint (amendament), apoi în cod.
+
+---
+
+# 11. LIVING PRODUCT — Blueprint-ul ca organism viu
+
+1. **Sincronizare obligatorie:** Blueprint-ul se actualizează la fiecare versiune majoră (V2.0, V2.5, V3.0…) — secțiunile §5 (roadmap), §6 (ownership), §7 (TD register) primesc revizie de versiune.
+2. **Ritual de intrare a modulelor noi:** înainte de implementare, orice modul nou primește o fișă de integrare (clasă, strat, dependențe contra §4, efect de rețea contra §3, KPI) — anexată la PRD și reflectată în Blueprint.
+3. **Ritual de ieșire:** modulele EXPERIMENTAL sunt evaluate la fiecare 2 cicluri: promovare (cu clasă nouă) sau eliminare. Modulele LEGACY au dată-țintă de retragere.
+4. **Audit de sincronizare:** la fiecare versiune majoră se rulează un mini-audit (stil PLATFORM_AUDIT) care confirmă că aplicația și Blueprint-ul nu au divergat; divergențele devin TD-uri.
+5. **Proprietate:** owner-ul produsului ratifică amendamentele; agentul de dezvoltare propune, nu decide unilateral asupra Constituției.
+
+---
+
+# 12. PROPERTY KNOWLEDGE GRAPH — avantajul competitiv pe termen lung
+
+**Concept (ratificat de owner):** toate entitățile platformei nu sunt tabele izolate, ci **noduri într-un graf de cunoștințe al proprietății**:
+
+```
+   PROPRIETATE ──are──► CAMERE ──conțin──► INSTALAȚII/ECHIPAMENTE
+        │                                       │
+     deținută de                        întreținute prin
+        ▼                                       ▼
+     CLIENT ──deschide──► CERERI ──devin──► INTERVENȚII/PROIECTE
+                              │                 │
+                        executate de      folosesc
+                              ▼                 ▼
+                        SPECIALIȘTI       MATERIALE ──au──► COSTURI
+                              │                                │
+                        evaluați prin                   agregate în
+                              ▼                                ▼
+                          REVIEWS          AUDITURI      PRICE OBSERVATORY
+                              │                │               │
+                              └────► RECOMANDĂRI AI ◄──────────┘
+                                          │
+                                   DOCUMENTE · TRANZACȚII · GARANȚII
+```
+
+**Ce deblochează graful (imposibil cu colecții disparate):**
+- *Explicabilitate:* „Recomand revizia centralei pentru că are 7 ani, ultima intervenție a fost în 2024, iar 3 case similare din zona ta au avut defecțiuni iarna asta."
+- *Predicție:* durata de viață rămasă a echipamentelor din case comparabile → mentenanță predictivă.
+- *Automatizare complexă:* orchestratorul poate raționa pe lanțuri de noduri (instalație → garanție expiră → specialistul care a montat-o → ofertă de revizie pre-aprobată).
+- *Valoare de exit:* graful complet al ciclului de viață a mii de proprietăți este activul care nu poate fi replicat.
+
+**Strategie de implementare (pragmatică, fără big-bang):**
+- **Etapa KG-0 (V2.0):** *graful logic peste Mongo* — nu se schimbă baza de date. Se formalizează un registru de relații (`entity_links`: {from_type, from_id, rel, to_type, to_id}) + convenția ca orice feature nou să scrie legăturile pe care le creează (Art. 6 devine măsurabil).
+- **Etapa KG-1 (V2.5):** serviciul de interogare a grafului (walk pe relații) alimentează motorul unic de recomandări (§8) — primele recomandări explicabile.
+- **Etapa KG-2 (V3.0):** evaluare pragmatică a unui strat de graf dedicat (doar dacă volumele o cer); embeddings pe noduri pentru similaritate (case comparabile, specialiști similari).
+- **Regulă imediată (de azi):** orice colecție/feature nou definește explicit ce noduri și ce relații adaugă în graf — parte din fișa de integrare (§11.2).
+
+---
+
+## STATUS RATIFICARE
+- **Blueprint v1.1 — VALIDAT de owner (Iulie 2026)** cu amendamentele: Principii Fundamentale (§1.5), Product Constitution (§10), Living Product (§11), Property Knowledge Graph (§12).
+- **Phase 1 — APROBATĂ**, cu condiția: fiecare modificare tehnică se verifică și prin prisma Blueprint-ului (fără optimizări locale care creează datorie arhitecturală).

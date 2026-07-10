@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -18,7 +18,10 @@ import { PremiumProfileEditorPage } from "./pages/PremiumProfileEditorPage";
 import { CookieBanner } from "./components/CookieBanner";
 import { WhatsAppFloat } from "./components/WhatsAppFloat";
 import { ThemeToggle } from "./pages/DashShared";
-import { ClientDashboard, SpecialistDashboard, AdminDashboard, OperatorDashboard } from "./pages/Dashboards";
+const ClientDashboard = lazy(() => import("./pages/Dashboards").then(m => ({ default: m.ClientDashboard })));
+const SpecialistDashboard = lazy(() => import("./pages/Dashboards").then(m => ({ default: m.SpecialistDashboard })));
+const AdminDashboard = lazy(() => import("./pages/Dashboards").then(m => ({ default: m.AdminDashboard })));
+const OperatorDashboard = lazy(() => import("./pages/Dashboards").then(m => ({ default: m.OperatorDashboard })));
 import { AuthCallback } from "./pages/AuthCallback";
 import { SpecialistProfile } from "./pages/SpecialistProfile";
 import { PublicMarketplace } from "./pages/Marketplace";
@@ -40,65 +43,65 @@ import { PrivacyPage, TermsPage, CookiePolicyPage } from "./pages/LegalPages";
 import { TrustCenterPage } from "./pages/TrustCenterPage";
 import { PrivacyNoticesPage } from "./pages/PrivacyNoticesPage";
 import { StatusPage } from "./pages/StatusPage";
-import ComponentsV2 from "./pages/ComponentsV2";
-import CommunityPage from "./pages/CommunityPage";
+const ComponentsV2 = lazy(() => import("./pages/ComponentsV2"));
+const CommunityPage = lazy(() => import("./pages/CommunityPage"));
 import { GDPRAuditBadge } from "./components/GDPRAuditBadge";
 import { TrustStrip } from "./components/TrustStrip";
-import DigitalTwinPage from "./pages/DigitalTwinPage";
-import ReportApprovalPage from "./pages/ReportApprovalPage";
-import KYCPage from "./pages/KYCPage";
+const DigitalTwinPage = lazy(() => import("./pages/DigitalTwinPage"));
+const ReportApprovalPage = lazy(() => import("./pages/ReportApprovalPage"));
+const KYCPage = lazy(() => import("./pages/KYCPage"));
 import { EstateBrowse } from "./pages/verified-estate/EstateBrowse";
 import { EstateDetail } from "./pages/verified-estate/EstateDetail";
 import { SellMyProperty } from "./pages/verified-estate/SellMyProperty";
 import { VerifiedEstateAdmin } from "./pages/verified-estate/VerifiedEstateAdmin";
-import WhyUsPage from "./pages/WhyUsPage";
-import AdminSettingsControl from "./pages/admin/AdminSettingsControl";
-import AdminDocumentation from "./pages/admin/AdminDocumentation";
-import QACopilotPage from "./pages/admin/QACopilotPage";
-import AIControlCenterPage from "./pages/admin/AIControlCenterPage";
-import DocsAIPage from "./pages/DocsAIPage";
-import AIDevTeamPage from "./pages/admin/AIDevTeamPage";
-import AISecurityCenterPage from "./pages/admin/AISecurityCenterPage";
-import AutonomyEnginePage from "./pages/admin/AutonomyEnginePage";
-import AutonomyOrchestratorPage from "./pages/admin/AutonomyOrchestratorPage";
-import ConstructionIntelligencePage from "./pages/admin/ConstructionIntelligencePage";
-import TwinPage from "./pages/admin/TwinPage";
-import AdminHouseHealthPage from "./pages/admin/AdminHouseHealthPage";
-import ManualTesterPage from "./pages/admin/ManualTesterPage";
-import HouseHealthPage from "./pages/HouseHealthPage";
+const WhyUsPage = lazy(() => import("./pages/WhyUsPage"));
+const AdminSettingsControl = lazy(() => import("./pages/admin/AdminSettingsControl"));
+const AdminDocumentation = lazy(() => import("./pages/admin/AdminDocumentation"));
+const QACopilotPage = lazy(() => import("./pages/admin/QACopilotPage"));
+const AIControlCenterPage = lazy(() => import("./pages/admin/AIControlCenterPage"));
+const DocsAIPage = lazy(() => import("./pages/DocsAIPage"));
+const AIDevTeamPage = lazy(() => import("./pages/admin/AIDevTeamPage"));
+const AISecurityCenterPage = lazy(() => import("./pages/admin/AISecurityCenterPage"));
+const AutonomyEnginePage = lazy(() => import("./pages/admin/AutonomyEnginePage"));
+const AutonomyOrchestratorPage = lazy(() => import("./pages/admin/AutonomyOrchestratorPage"));
+const ConstructionIntelligencePage = lazy(() => import("./pages/admin/ConstructionIntelligencePage"));
+const TwinPage = lazy(() => import("./pages/admin/TwinPage"));
+const AdminHouseHealthPage = lazy(() => import("./pages/admin/AdminHouseHealthPage"));
+const ManualTesterPage = lazy(() => import("./pages/admin/ManualTesterPage"));
+const HouseHealthPage = lazy(() => import("./pages/HouseHealthPage"));
 import HouseHealthUpgradePage, { HouseHealthUpgradeSuccess } from "./pages/HouseHealthUpgradePage";
-import AdminTodoBoard from "./pages/admin/AdminTodoBoard";
-import ExperienceSpacesPage from "./pages/admin/ExperienceSpacesPage";
-import FutureIdeasVault from "./pages/admin/FutureIdeasVault";
-import FounderGatePage from "./pages/admin/FounderGatePage";
-import AIGovernancePage from "./pages/admin/AIGovernancePage";
-import BugMemoryAggregatorPage from "./pages/admin/BugMemoryAggregatorPage";
-import ArchitectureBoardPage from "./pages/admin/ArchitectureBoardPage";
-import AIProductManagerPage from "./pages/admin/AIProductManagerPage";
-import OperatingManualPage from "./pages/admin/OperatingManualPage";
-import ExperienceTiersPage from "./pages/admin/ExperienceTiersPage";
-import FeatureConfiguratorPage from "./pages/admin/FeatureConfiguratorPage";
-import SpecialistProgressionPage from "./pages/admin/SpecialistProgressionPage";
-import BIMoePage from "./pages/admin/BIMoePage";
-import AnalyticsGrowthPage from "./pages/admin/AnalyticsGrowthPage";
-import ITCollaboratorsHubPage from "./pages/admin/ITCollaboratorsHubPage";
-import ITCopilotPage from "./pages/admin/ITCopilotPage";
-import LegalAuditPage from "./pages/admin/LegalAuditPage";
-import LegalSignPage from "./pages/LegalSignPage";
+const AdminTodoBoard = lazy(() => import("./pages/admin/AdminTodoBoard"));
+const ExperienceSpacesPage = lazy(() => import("./pages/admin/ExperienceSpacesPage"));
+const FutureIdeasVault = lazy(() => import("./pages/admin/FutureIdeasVault"));
+const FounderGatePage = lazy(() => import("./pages/admin/FounderGatePage"));
+const AIGovernancePage = lazy(() => import("./pages/admin/AIGovernancePage"));
+const BugMemoryAggregatorPage = lazy(() => import("./pages/admin/BugMemoryAggregatorPage"));
+const ArchitectureBoardPage = lazy(() => import("./pages/admin/ArchitectureBoardPage"));
+const AIProductManagerPage = lazy(() => import("./pages/admin/AIProductManagerPage"));
+const OperatingManualPage = lazy(() => import("./pages/admin/OperatingManualPage"));
+const ExperienceTiersPage = lazy(() => import("./pages/admin/ExperienceTiersPage"));
+const FeatureConfiguratorPage = lazy(() => import("./pages/admin/FeatureConfiguratorPage"));
+const SpecialistProgressionPage = lazy(() => import("./pages/admin/SpecialistProgressionPage"));
+const BIMoePage = lazy(() => import("./pages/admin/BIMoePage"));
+const AnalyticsGrowthPage = lazy(() => import("./pages/admin/AnalyticsGrowthPage"));
+const ITCollaboratorsHubPage = lazy(() => import("./pages/admin/ITCollaboratorsHubPage"));
+const ITCopilotPage = lazy(() => import("./pages/admin/ITCopilotPage"));
+const LegalAuditPage = lazy(() => import("./pages/admin/LegalAuditPage"));
+const LegalSignPage = lazy(() => import("./pages/LegalSignPage"));
 import LegalGate from "./components/LegalGate";
-import CityPartnersPage from "./pages/admin/CityPartnersPage";
-import CityPartnerDetailPage from "./pages/admin/CityPartnerDetailPage";
-import MarketplacePartnersPage from "./pages/admin/MarketplacePartnersPage";
-import StrategicPartnersDashboard from "./pages/admin/StrategicPartnersDashboard";
-import MarketingDepartmentPage from "./pages/admin/MarketingDepartmentPage";
-import DemoAccountsPage from "./pages/admin/DemoAccountsPage";
-import AdminAccountsPage from "./pages/admin/AdminAccountsPage";
-import DemoActivityPage from "./pages/admin/DemoActivityPage";
-import PartnerDashboard from "./pages/partner/PartnerDashboard";
-import ClientJuniorDashboard from "./pages/dashboard/ClientJuniorDashboard";
-import ClientV2Wireframe from "./pages/dashboard/ClientV2Wireframe";
-import ClientDashboardSwitch from "./pages/clientv2/ClientDashboardSwitch";
-import ContractPage from "./pages/ContractPage";
+const CityPartnersPage = lazy(() => import("./pages/admin/CityPartnersPage"));
+const CityPartnerDetailPage = lazy(() => import("./pages/admin/CityPartnerDetailPage"));
+const MarketplacePartnersPage = lazy(() => import("./pages/admin/MarketplacePartnersPage"));
+const StrategicPartnersDashboard = lazy(() => import("./pages/admin/StrategicPartnersDashboard"));
+const MarketingDepartmentPage = lazy(() => import("./pages/admin/MarketingDepartmentPage"));
+const DemoAccountsPage = lazy(() => import("./pages/admin/DemoAccountsPage"));
+const AdminAccountsPage = lazy(() => import("./pages/admin/AdminAccountsPage"));
+const DemoActivityPage = lazy(() => import("./pages/admin/DemoActivityPage"));
+const PartnerDashboard = lazy(() => import("./pages/partner/PartnerDashboard"));
+const ClientJuniorDashboard = lazy(() => import("./pages/dashboard/ClientJuniorDashboard"));
+const ClientV2Wireframe = lazy(() => import("./pages/dashboard/ClientV2Wireframe"));
+const ClientDashboardSwitch = lazy(() => import("./pages/clientv2/ClientDashboardSwitch"));
+const ContractPage = lazy(() => import("./pages/ContractPage"));
 import { trackPageView } from "@/lib/analytics";
 import { useDynamicSEO } from "@/lib/useDynamicSEO";
 
@@ -1606,6 +1609,7 @@ function App() {
             <ErrorBoundary>
               <ImpersonationBanner />
               <AnalyticsRouteTracker />
+              <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
               <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/demo" element={<PublicDemoPage />} />
@@ -1693,6 +1697,7 @@ function App() {
               <Route path="/payment-success" element={<PaymentSuccess />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+              </Suspense>
             <TutorialOverlay />
             <RoleTour />
             <AIConciergeBubble />
