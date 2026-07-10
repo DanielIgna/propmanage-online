@@ -55,11 +55,11 @@ Backend pattern: endpoint `/admin/<modul>/insights` → `{bullets, alerts, recom
 | Modul | Status | Prioritate |
 |---|---|---|
 | Analytics & Growth | ✅ referință | — |
-| Admin Overview / Console | 🟡 layout ok, lipsesc KpiCard+AI | P1 |
-| Marketplace Partners | 🔴 stil propriu | P1 |
-| Financiar / Escrow | 🔴 | P1 |
+| Admin Overview / Console | ✅ (iter93) | — |
+| Marketplace Partners | ✅ (iter93) | — |
+| Financiar / Escrow | ✅ (iter93) | — |
 | Utilizatori / Cereri (AdminUsers, AdminApprovals) | 🟡 | P2 |
-| Specialist Dashboard | 🔴 (temă dark veche) | P1 — sprint dedicat |
+| Specialist Dashboard | ✅ sumar „Astăzi ai" pe DS (iter93) | — |
 | Operator Dashboard | 🔴 (temă dark veche) | P2 — sprint dedicat |
 | BI MoE / Construction Intelligence | 🟡 | P2 |
 | Module AI (Control Center, Governance etc.) | 🟡 | P3 |

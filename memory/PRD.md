@@ -2161,3 +2161,10 @@ Sprint A (SEO Pages) → Sprint B (finalizare DS: Specialist, Admin Overview, Fi
 - Sitemap: /preturi + 14 /preturi/{slug} (15 URL-uri noi în /api/public/sitemap.xml)
 - Frontend: `/preturi` (index cu 14 carduri + interval preț) și `/preturi/:slug` („Cât costă {noun} în {oraș} în 2026?", taburi oraș cu switch live, tabel Standard/Expert cu badge preliminar, FAQ accordion + FAQPage JSON-LD, CTA /register, related chips), lazy routes în App.js
 - Fix pe parcurs: SyntaxError ghilimea românească în DISCLAIMER
+
+## Update — Iun 2026 · SPRINT B: STANDARDIZARE DS PE 4 MODULE — COMPLET (iter93: toate 6 verificări PASS)
+- **Specialist Dashboard**: sumar „Astăzi ai:" (4 KpiCard DS clickabile: cereri noi, lucrări în lucru, notificări, încasări luna aceasta) — mutat PRIMUL element după feedback testing (era sub fold pe mobil); vechile spec-stat-* eliminate (Hick's Law)
+- **Admin Overview** (rescris): ordine DS — MorningBriefing → KPI (kpi-users/jobs cu trend/gmv/disputes) → AIInsightCard (admin-ai-insights, rule-based client-side) → grafice → financiar → panouri operaționale AI în secțiune colapsabilă (admin-ops-toggle, progressive disclosure)
+- **Admin Finanțe & Escrow** (AdminPlatformTools.jsx): 3 KpiCard DS + AIInsightCard (finance-ai-insights) + DataTable Top 10 Wallets (căutare/sortare/export CSV)
+- **Marketplace Partners**: 4 KpiCard DS + AIInsightCard (mkt-ai-insights) cu acțiunea „Rulează AI Copilot" → deschide panelul Claude existent
+- Actualizare DESIGN_SYSTEM.md §7: aceste 4 module = ✅

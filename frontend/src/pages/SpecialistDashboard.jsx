@@ -110,6 +110,18 @@ export const SpecialistDashboard = () => {
 
   return (
     <DashLayout role="specialist" title={title} bottomNav={<BottomNav tabs={tabs} active={tab} onChange={setTab} dataPrefix="spec-tab" />}>
+      {/* „Astăzi ai" — PRIMUL element (Hick's Law: răspunde imediat la „ce fac azi?") */}
+      {tab === "opportunities" && (
+        <div className="dark mb-6 pm-fade-in" data-testid="spec-today-summary">
+          <h3 className="text-sm font-bold text-stone-300 mb-3">Astăzi ai:</h3>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard icon={Target} label="Cereri noi" value={open.length} accent="info" onClick={() => document.querySelector('[data-tour="specialist-leads"]')?.scrollIntoView({ behavior: "smooth" })} testid="spec-today-open" />
+            <KpiCard icon={Briefcase} label="Lucrări în lucru" value={mine.filter(r => r.status !== "confirmed").length} accent="warning" onClick={() => setTab("jobs")} testid="spec-today-active" />
+            <KpiCard icon={Bell} label="Notificări necitite" value={unreadNotifs} accent="neutral" onClick={() => setTab("notifications")} testid="spec-today-notifs" />
+            <KpiCard icon={Wallet} label="Încasări luna aceasta" value={`${monthlyEarnings.toLocaleString("ro")} RON`} accent="success" onClick={() => setTab("jobs")} testid="spec-today-earnings" />
+          </div>
+        </div>
+      )}
       <WelcomeChecklist />
       <MaturityCard />
       <TierCelebrationBanner />
@@ -163,17 +175,6 @@ export const SpecialistDashboard = () => {
               </div>
             </PMCardPrimary>
           )}
-
-          {/* „Astăzi ai" — sumar de acțiuni (Design System, Hick's Law: max 4 decizii) */}
-          <div className="dark mb-6 pm-fade-in-delay-1" data-testid="spec-today-summary">
-            <h3 className="text-sm font-bold text-stone-300 mb-3">Astăzi ai:</h3>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <KpiCard icon={Target} label="Cereri noi" value={open.length} accent="info" onClick={() => document.querySelector('[data-tour="specialist-leads"]')?.scrollIntoView({ behavior: "smooth" })} testid="spec-today-open" />
-              <KpiCard icon={Briefcase} label="Lucrări în lucru" value={mine.filter(r => r.status !== "confirmed").length} accent="warning" onClick={() => setTab("jobs")} testid="spec-today-active" />
-              <KpiCard icon={Bell} label="Notificări necitite" value={unreadNotifs} accent="neutral" onClick={() => setTab("notifications")} testid="spec-today-notifs" />
-              <KpiCard icon={Wallet} label="Încasări luna aceasta" value={`${monthlyEarnings.toLocaleString("ro")} RON`} accent="success" onClick={() => setTab("jobs")} testid="spec-today-earnings" />
-            </div>
-          </div>
 
           {/* ENTRY/JUNIOR: friendly intro card for newcomers */}
           {!tierInfo.canSeeStats && (
