@@ -180,6 +180,144 @@ async def overview(user=Depends(require_role("admin"))):
     }
 
 
+# ============================ PRICE OBSERVATORY (CIP-B) ============================
+@router.get("/prices/public")
+async def public_prices(category: Optional[str] = None, city: Optional[str] = None):
+    """Prețuri orientative publice, agregate per categorie × oraș × UM × nivel experiență."""
+    from construction.prices import aggregate_prices
+    rows = await aggregate_prices(category, city)
+    return {
+        "items": rows,
+        "count": len(rows),
+        "disclaimer": "Prețuri orientative bazate pe observații de piață. Cele marcate „preliminar\u201d provin din cercetare de piață, nu din tranzacții pe platformă.",
+    }
+
+
+@router.get("/prices")
+async def list_price_observations(
+    category: Optional[str] = None,
+    city: Optional[str] = None,
+    limit: int = 200,
+    user=Depends(require_role("admin")),
+):
+    q = {}
+    if category and category != "all":
+        q["category"] = category
+    if city and city != "all":
+        q["city"] = city
+    limit = max(1, min(int(limit), 500))
+    items = [_clean(d) async for d in db.price_observations.find(q).sort("created_at", -1).limit(limit)]
+    return {"items": items, "count": len(items)}
+
+
+def _validate_price_row(row: dict) -> Optional[str]:
+    from construction.prices import UNITS, EXPERIENCE_LEVELS
+    if not row.get("category"):
+        return "categoria lipsește"
+    if not (row.get("service") or "").strip():
+        return "serviciul lipsește"
+    if not (row.get("city") or "").strip():
+        return "orașul lipsește"
+    if (row.get("unit") or "") not in UNITS:
+        return f"unitate invalidă (permise: {', '.join(sorted(UNITS))})"
+    if (row.get("experience_level") or "mid") not in EXPERIENCE_LEVELS:
+        return "nivel experiență invalid (beginner/mid/expert)"
+    try:
+        pmin, pmed, pmax = float(row["price_min"]), float(row["price_med"]), float(row["price_max"])
+    except (KeyError, TypeError, ValueError):
+        return "prețurile min/med/max trebuie să fie numere"
+    if not (0 < pmin <= pmed <= pmax):
+        return "condiția 0 < min ≤ med ≤ max nu e respectată"
+    return None
+
+
+@router.post("/prices")
+async def add_price_observation(payload: dict = Body(...), user=Depends(require_role("admin"))):
+    err = _validate_price_row(payload)
+    if err:
+        raise HTTPException(400, err)
+    doc = {
+        "id": uuid.uuid4().hex,
+        "category": payload["category"],
+        "service": payload["service"].strip()[:120],
+        "city": payload["city"].strip()[:60],
+        "unit": payload["unit"],
+        "price_min": float(payload["price_min"]),
+        "price_med": float(payload["price_med"]),
+        "price_max": float(payload["price_max"]),
+        "experience_level": payload.get("experience_level") or "mid",
+        "source": "admin_manual",
+        "notes": (payload.get("notes") or "")[:300],
+        "created_by": user.get("email") or "",
+        "created_at": _now(),
+    }
+    await db.price_observations.insert_one({**doc})
+    return _clean(doc)
+
+
+@router.delete("/prices/{obs_id}")
+async def delete_price_observation(obs_id: str, user=Depends(require_role("admin"))):
+    res = await db.price_observations.delete_one({"id": obs_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Observație inexistentă")
+    return {"deleted": True}
+
+
+@router.post("/prices/import-csv")
+async def import_prices_csv(payload: dict = Body(...), user=Depends(require_role("admin"))):
+    """Body: {"csv": "category,service,city,unit,price_min,price_med,price_max,experience_level\\n..."}"""
+    raw = (payload.get("csv") or "").strip()
+    if not raw:
+        raise HTTPException(400, "CSV gol")
+    reader = csv.DictReader(io.StringIO(raw))
+    required = {"category", "service", "city", "unit", "price_min", "price_med", "price_max"}
+    if not reader.fieldnames or not required.issubset({(f or "").strip() for f in reader.fieldnames}):
+        raise HTTPException(400, f"Header CSV invalid. Coloane obligatorii: {', '.join(sorted(required))} (+opțional experience_level, notes)")
+    imported, errors = 0, []
+    for i, row in enumerate(reader, start=2):
+        row = {(k or "").strip(): (v or "").strip() for k, v in row.items()}
+        err = _validate_price_row(row)
+        if err:
+            errors.append(f"linia {i}: {err}")
+            continue
+        await db.price_observations.insert_one({
+            "id": uuid.uuid4().hex,
+            "category": row["category"],
+            "service": row["service"][:120],
+            "city": row["city"][:60],
+            "unit": row["unit"],
+            "price_min": float(row["price_min"]),
+            "price_med": float(row["price_med"]),
+            "price_max": float(row["price_max"]),
+            "experience_level": row.get("experience_level") or "mid",
+            "source": "csv_import",
+            "notes": (row.get("notes") or "")[:300],
+            "created_by": user.get("email") or "",
+            "created_at": _now(),
+        })
+        imported += 1
+    return {"imported": imported, "errors": errors[:20], "error_count": len(errors)}
+
+
+@router.get("/prices/export")
+async def export_prices_csv(user=Depends(require_role("admin"))):
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["category", "service", "city", "unit", "price_min", "price_med", "price_max",
+                     "experience_level", "source", "notes", "created_at"])
+    async for r in db.price_observations.find({}).sort("category", 1):
+        writer.writerow([r.get("category"), r.get("service"), r.get("city"), r.get("unit"),
+                         r.get("price_min"), r.get("price_med"), r.get("price_max"),
+                         r.get("experience_level"), r.get("source"), r.get("notes"), r.get("created_at")])
+    buf.seek(0)
+    fname = f"price_observatory_{datetime.now(timezone.utc).date().isoformat()}.csv"
+    return StreamingResponse(
+        iter([buf.getvalue().encode("utf-8-sig")]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
+    )
+
+
 # ============================ PROJECT CENTRAL ============================
 async def _query_projects(
     category: Optional[str], city: Optional[str], status: Optional[str],

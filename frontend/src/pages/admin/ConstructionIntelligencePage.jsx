@@ -6,7 +6,7 @@ import axios from "axios";
 import {
   Hammer, ChevronLeft, ChevronRight, ChevronDown, Loader2, RefreshCcw, Plus,
   Pencil, Trash2, Eye, EyeOff, Users, AlertTriangle, Download, Search,
-  FolderTree, FolderKanban, Sparkles, CheckCircle2,
+  FolderTree, FolderKanban, Sparkles, CheckCircle2, Coins,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -251,10 +251,145 @@ const ProjectsTab = ({ categories }) => {
   );
 };
 
+// ============================ PRICES TAB (CIP-B) ============================
+const UNIT_OPTIONS = ["mp", "ml", "buc", "ora", "proiect", "zi"];
+const LEVEL_LABEL = { beginner: "Începător", mid: "Intermediar", expert: "Expert" };
+
+const PricesTab = ({ categories }) => {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [f, setF] = useState({ category: "all", city: "all" });
+  const [form, setForm] = useState({ category: "", service: "", city: "", unit: "mp", price_min: "", price_med: "", price_max: "", experience_level: "mid" });
+  const [showImport, setShowImport] = useState(false);
+  const [csvText, setCsvText] = useState("");
+  const [msg, setMsg] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await ax.get("/api/construction/prices/public", { params: { category: f.category, city: f.city } });
+      setRows(r.data?.items || []);
+    } catch { setRows([]); }
+    finally { setLoading(false); }
+  }, [f]);
+  useEffect(() => { load(); }, [load]);
+
+  const addObservation = async () => {
+    setSaving(true);
+    try {
+      await ax.post("/api/construction/prices", form);
+      setMsg(`✅ Observație adăugată: ${form.service} · ${form.city}.`);
+      setForm(x => ({ ...x, service: "", price_min: "", price_med: "", price_max: "" }));
+      await load();
+    } catch (e) { setMsg(`❌ ${e?.response?.data?.detail || e.message}`); }
+    finally { setSaving(false); }
+  };
+
+  const importCsv = async () => {
+    setSaving(true);
+    try {
+      const r = await ax.post("/api/construction/prices/import-csv", { csv: csvText });
+      setMsg(`✅ Import: ${r.data.imported} rânduri · ${r.data.error_count} erori${r.data.errors?.length ? ` (${r.data.errors[0]}…)` : ""}`);
+      setCsvText("");
+      setShowImport(false);
+      await load();
+    } catch (e) { setMsg(`❌ ${e?.response?.data?.detail || e.message}`); }
+    finally { setSaving(false); }
+  };
+
+  const inputCls = "px-3 py-1.5 text-xs rounded-lg border border-stone-700 bg-stone-900 text-stone-200 outline-none focus:border-violet-500";
+  return (
+    <div data-testid="cip-prices-tab">
+      <div className="bg-stone-900/30 border border-stone-800 rounded-2xl p-4 mb-4" data-testid="price-add-form">
+        <div className="text-xs font-bold uppercase tracking-wider text-stone-500 mb-2.5">Adaugă observație de preț</div>
+        <div className="flex flex-wrap gap-2 items-center">
+          <select value={form.category} onChange={e => setForm(x => ({ ...x, category: e.target.value }))} className={inputCls} data-testid="price-form-category">
+            <option value="">Categorie…</option>
+            {categories.map(c => <option key={c.legacy_category} value={c.legacy_category}>{c.name}</option>)}
+          </select>
+          <input value={form.service} onChange={e => setForm(x => ({ ...x, service: e.target.value }))} placeholder="Serviciu (ex: Montaj gresie)" className={`${inputCls} w-52`} data-testid="price-form-service" />
+          <input value={form.city} onChange={e => setForm(x => ({ ...x, city: e.target.value }))} placeholder="Oraș" className={`${inputCls} w-28`} data-testid="price-form-city" />
+          <select value={form.unit} onChange={e => setForm(x => ({ ...x, unit: e.target.value }))} className={inputCls} data-testid="price-form-unit">
+            {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+          </select>
+          <select value={form.experience_level} onChange={e => setForm(x => ({ ...x, experience_level: e.target.value }))} className={inputCls} data-testid="price-form-level">
+            {Object.entries(LEVEL_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          <input value={form.price_min} onChange={e => setForm(x => ({ ...x, price_min: e.target.value }))} placeholder="Min" type="number" className={`${inputCls} w-20`} data-testid="price-form-min" />
+          <input value={form.price_med} onChange={e => setForm(x => ({ ...x, price_med: e.target.value }))} placeholder="Med" type="number" className={`${inputCls} w-20`} data-testid="price-form-med" />
+          <input value={form.price_max} onChange={e => setForm(x => ({ ...x, price_max: e.target.value }))} placeholder="Max" type="number" className={`${inputCls} w-20`} data-testid="price-form-max" />
+          <button onClick={addObservation} disabled={saving || !form.category || !form.service || !form.city} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white flex items-center gap-1.5" data-testid="price-form-submit">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Adaugă
+          </button>
+          <button onClick={() => setShowImport(v => !v)} className="px-3 py-1.5 text-xs font-medium rounded-lg border border-stone-700 text-stone-300 hover:text-white flex items-center gap-1.5" data-testid="price-import-toggle">
+            <Download className="w-3.5 h-3.5 rotate-180" /> Import CSV
+          </button>
+          <button onClick={() => window.open(`${API}/api/construction/prices/export`, "_blank")} className="px-3 py-1.5 text-xs font-medium rounded-lg border border-stone-700 text-stone-300 hover:text-white flex items-center gap-1.5" data-testid="price-export">
+            <Download className="w-3.5 h-3.5" /> Export
+          </button>
+        </div>
+        {showImport && (
+          <div className="mt-3" data-testid="price-import-panel">
+            <textarea value={csvText} onChange={e => setCsvText(e.target.value)} rows={5}
+              placeholder={"category,service,city,unit,price_min,price_med,price_max,experience_level\nzugravit,Vopsea lavabilă,București,mp,12,18,28,mid"}
+              className="w-full text-xs font-mono rounded-xl border border-stone-700 bg-stone-950 text-stone-200 p-3 outline-none focus:border-violet-500" data-testid="price-import-textarea" />
+            <button onClick={importCsv} disabled={saving || !csvText.trim()} className="mt-2 px-3 py-1.5 text-xs font-medium rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white" data-testid="price-import-submit">
+              Importă rândurile
+            </button>
+          </div>
+        )}
+      </div>
+
+      {msg && <div className="mb-3 px-4 py-2 rounded-xl bg-stone-900/60 border border-stone-700 text-sm text-stone-200" data-testid="price-message">{msg}</div>}
+
+      <div className="flex items-center gap-2 mb-3">
+        <select value={f.category} onChange={e => setF(x => ({ ...x, category: e.target.value }))} className={inputCls} data-testid="price-filter-category">
+          <option value="all">Toate categoriile</option>
+          {categories.map(c => <option key={c.legacy_category} value={c.legacy_category}>{c.name}</option>)}
+        </select>
+        <input value={f.city === "all" ? "" : f.city} onChange={e => setF(x => ({ ...x, city: e.target.value || "all" }))} placeholder="Oraș (toate)" className={`${inputCls} w-32`} data-testid="price-filter-city" />
+        <span className="text-[11px] text-stone-500">Trust: A = ≥3 observații · B = 2 · C = 1 · „preliminar" = date orientative seed</span>
+      </div>
+
+      <div className="bg-stone-900/30 border border-stone-800 rounded-2xl overflow-x-auto" data-testid="price-table">
+        {loading ? <div className="p-10 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-stone-500" /></div> : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wider text-stone-500 border-b border-stone-800">
+                <th className="px-4 py-2.5">Serviciu</th><th className="px-3 py-2.5">Categorie</th><th className="px-3 py-2.5">Oraș</th>
+                <th className="px-3 py-2.5">Nivel</th><th className="px-3 py-2.5 text-right">Min–Med–Max (RON/{"{UM}"})</th>
+                <th className="px-3 py-2.5">Trust</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-stone-500">Nicio observație pentru filtrele curente.</td></tr>}
+              {rows.map((r, i) => (
+                <tr key={i} className="border-b border-stone-800/60 hover:bg-stone-800/30">
+                  <td className="px-4 py-2.5 text-white font-medium">{r.service}</td>
+                  <td className="px-3 py-2.5 text-stone-400">{r.category}</td>
+                  <td className="px-3 py-2.5 text-stone-300">{r.city}</td>
+                  <td className="px-3 py-2.5"><span className="text-[10px] px-1.5 py-0.5 rounded bg-stone-700/50 text-stone-300">{LEVEL_LABEL[r.experience_level] || r.experience_level}</span></td>
+                  <td className="px-3 py-2.5 text-right text-stone-200 whitespace-nowrap">{r.price_min} – <span className="font-bold text-white">{r.price_med}</span> – {r.price_max} <span className="text-stone-500 text-xs">/{r.unit}</span></td>
+                  <td className="px-3 py-2.5">
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.trust_grade === "A" ? "bg-emerald-500/15 text-emerald-300" : r.trust_grade === "B" ? "bg-cyan-500/15 text-cyan-300" : "bg-stone-600/30 text-stone-300"}`}>{r.trust_grade}</span>
+                    {r.preliminary && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">preliminar</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ============================ PAGE ============================
 export default function ConstructionIntelligencePage() {
   const [tab, setTab] = useState("taxonomy");
   const [ov, setOv] = useState(null);
+  const [inviteMsg, setInviteMsg] = useState(null);
 
   const loadOverview = useCallback(async () => {
     try {
@@ -288,19 +423,37 @@ export default function ConstructionIntelligencePage() {
               <KPI label="Ascunse cu potențial" value={ov.hidden_with_potential.length} accent={ov.hidden_with_potential.length ? "text-amber-400" : "text-stone-400"} />
             </div>
             {ov.hidden_with_potential.length > 0 && (
-              <div className="mb-4 px-4 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-sm text-amber-200 flex items-start gap-2" data-testid="cip-hidden-potential">
-                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-                <div>
-                  <span className="font-semibold">Oportunitate recrutare:</span>{" "}
-                  {ov.hidden_with_potential.map(h => `${h.name} (${h.requests_90d} cereri/90d)`).join(" · ")} — categorii cu cerere de la clienți dar fără specialiști verificați.
+              <div className="mb-4 px-4 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-sm text-amber-200" data-testid="cip-hidden-potential">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span className="font-semibold">Oportunitate recrutare — categorii cu cerere de la clienți dar fără specialiști verificați:</span>
                 </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {ov.hidden_with_potential.map(h => (
+                    <div key={h.legacy_category} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-stone-900/50 border border-amber-500/20" data-testid={`hp-item-${h.legacy_category}`}>
+                      <span>{h.name} <span className="text-amber-400/80">({h.requests_90d} cereri/90d)</span></span>
+                      <button
+                        onClick={() => {
+                          const link = `${window.location.origin}/register?role=specialist&category=${h.legacy_category}&utm_source=recruitment&utm_campaign=hidden_potential`;
+                          navigator.clipboard?.writeText(link);
+                          setInviteMsg(`🔗 Link de recrutare copiat pentru „${h.name}": ${link}`);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-amber-500/90 hover:bg-amber-400 text-stone-950 text-[11px] font-bold flex items-center gap-1"
+                        data-testid={`invite-specialists-${h.legacy_category}`}
+                      >
+                        <Users className="w-3 h-3" /> Invită specialiști
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {inviteMsg && <div className="mt-2 text-xs text-emerald-300 break-all" data-testid="invite-copied-msg">{inviteMsg}</div>}
               </div>
             )}
           </>
         )}
 
         <div className="flex items-center gap-1 mb-4 border-b border-stone-800">
-          {[["taxonomy", "Nomenclator", FolderTree], ["projects", "Proiecte (vedere centrală)", FolderKanban]].map(([id, label, Icon]) => (
+          {[["taxonomy", "Nomenclator", FolderTree], ["projects", "Proiecte (vedere centrală)", FolderKanban], ["prices", "Prețuri (Observatory)", Coins]].map(([id, label, Icon]) => (
             <button key={id} onClick={() => setTab(id)} data-testid={`cip-tab-${id}`}
               className={`px-4 py-2.5 text-sm font-medium flex items-center gap-1.5 border-b-2 -mb-px transition-colors ${tab === id ? "border-amber-400 text-white" : "border-transparent text-stone-500 hover:text-stone-300"}`}>
               <Icon className="w-4 h-4" /> {label}
@@ -310,6 +463,7 @@ export default function ConstructionIntelligencePage() {
 
         {tab === "taxonomy" && <TaxonomyTab onChanged={loadOverview} />}
         {tab === "projects" && <ProjectsTab categories={ov?.coverage || []} />}
+        {tab === "prices" && <PricesTab categories={ov?.coverage || []} />}
       </div>
     </div>
   );

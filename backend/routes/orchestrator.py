@@ -104,8 +104,17 @@ async def simulate_signal(kind: str, user=Depends(require_role("admin"))):
             "subject": "[TEST] Orchestrator Retry Guardian",
             "html": "<p>Acest email a fost re-trimis automat de Webhook Retry Guardian (simulare).</p>",
         }
+    elif kind == "category_visibility_refresh":
+        payload = {"trigger": f"manual_simulate:{user.get('email')}"}
+    elif kind == "dispute_opened":
+        payload = {"test": True}
+    elif kind == "kyc_prevalidated":
+        payload = {"test": True, "user_name": "Specialist Test (simulare)", "recommendation": "approve",
+                   "match_score": 94, "flags": ["face_match_good"]}
+    elif kind == "marketplace_medic_scan":
+        payload = {"test": True}
     else:
-        raise HTTPException(400, "kind trebuie să fie: smoke_fail | autonomy_score_drop | webhook_fail")
+        raise HTTPException(400, "kind trebuie să fie unul dintre: smoke_fail | autonomy_score_drop | webhook_fail | category_visibility_refresh | dispute_opened | kyc_prevalidated | marketplace_medic_scan")
 
     result = await emit_signal(kind, payload)
     return {"simulated": kind, **result}

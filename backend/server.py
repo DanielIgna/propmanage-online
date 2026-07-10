@@ -35,6 +35,7 @@ from routes.autonomy import weekly_auto_tune_job
 from autonomy.snapshots import take_autonomy_snapshot_with_reflex
 from orchestrator.engine import orchestrator_retry_tick
 from construction.taxonomy import construction_visibility_cron
+from orchestrator.playbooks import marketplace_medic_cron
 from routes.house_health_billing import seed_default_plans as hh_seed_default_plans
 from autonomy.founder_digest import weekly_founder_digest
 from autonomy.autopilot import bootstrap_autonomy_defaults, daily_autopilot_sweep
@@ -156,6 +157,12 @@ async def startup():
         await refresh_category_visibility()
     except Exception as e:
         logger.warning(f"Construction taxonomy bootstrap failed: {e}")
+    # CIP-B: seed Price Observatory cu date orientative (idempotent)
+    try:
+        from construction.prices import seed_price_observations
+        await seed_price_observations()
+    except Exception as e:
+        logger.warning(f"Price observatory bootstrap failed: {e}")
     # Sub-admin RBAC — seed demo scoped admins (testing/frontend/backend/security)
     try:
         from sub_admin_seed import seed_sub_admins
@@ -395,6 +402,14 @@ async def startup():
             construction_visibility_cron,
             CronTrigger(hour=4, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="construction_visibility_daily",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        # Sprint 2: Marketplace Medic — daily 05:10 (via Orchestrator playbook)
+        scheduler.add_job(
+            marketplace_medic_cron,
+            CronTrigger(hour=5, minute=10, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="marketplace_medic_daily",
             replace_existing=True,
             misfire_grace_time=7200,
         )

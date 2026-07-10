@@ -42,7 +42,7 @@ async def public_marketplace(
       - city:     expands to ALL zones inside that city (uses regions collection).
       - style:    matches at least one portfolio item with that style.
     """
-    q = {"role": "specialist", "deleted": {"$ne": True}}
+    q = {"role": "specialist", "deleted": {"$ne": True}, "medic_suspended": {"$ne": True}}
     if category:
         q["$or"] = [{"specialty": category}, {"service_categories": category}]
     if verified_only:

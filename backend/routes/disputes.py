@@ -83,6 +83,13 @@ async def open_dispute(req_id: str, data: DisputeOpenIn, user: dict = Depends(ge
     for a in admins:
         await notify(str(a["_id"]), "Nouă dispută", f"Dispută deschisă pe '{req.get('title','')}' de către {role}.", type_="dispute", link="/admin")
     await log_event(req_id, "dispute.opened", actor=user, payload={"reason": data.reason[:200], "opened_by_role": role})
+    # Orchestrator: Dispute AI Triage (async, nu blochează răspunsul)
+    try:
+        import asyncio
+        from orchestrator.engine import emit_signal
+        asyncio.create_task(emit_signal("dispute_opened", {"dispute_id": str(result.inserted_id)}))
+    except Exception:  # noqa: BLE001
+        pass
     return {"ok": True, "id": str(result.inserted_id)}
 
 @router.get("/requests/{req_id}/dispute")

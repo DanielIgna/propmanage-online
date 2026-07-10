@@ -18,6 +18,23 @@ export const RequestWizard = ({ property, onClose, onCreated }) => {
   const [form, setForm] = useState({ category: "", title: "", description: "", priority: "normal", budget_estimate: "200", subcategory: "", taxonomy_node_id: null });
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
+  // CIP-B: hint preț orientativ pentru categoria selectată
+  const [priceHint, setPriceHint] = useState(null);
+  useEffect(() => {
+    if (!form.category) { setPriceHint(null); return; }
+    axios.get(`${API}/construction/prices/public`, { params: { category: form.category } })
+      .then(r => {
+        const rows = (r.data?.items || []).filter(x => x.experience_level === "mid");
+        if (!rows.length) { setPriceHint(null); return; }
+        const byUnit = {};
+        rows.forEach(x => { (byUnit[x.unit] = byUnit[x.unit] || []).push(x); });
+        const [unit, list] = Object.entries(byUnit).sort((a, b) => b[1].length - a[1].length)[0];
+        const min = Math.min(...list.map(x => x.price_min));
+        const med = Math.round(list.reduce((s, x) => s + x.price_med, 0) / list.length);
+        setPriceHint(`${min.toLocaleString("ro-RO")}–${med.toLocaleString("ro-RO")} RON/${unit}`);
+      })
+      .catch(() => setPriceHint(null));
+  }, [form.category]);
   // CIP-A: nomenclator ierarhic public (doar noduri vizibile) → chips subcategorii
   const [taxonomy, setTaxonomy] = useState({});
   useEffect(() => {
@@ -121,6 +138,12 @@ export const RequestWizard = ({ property, onClose, onCreated }) => {
               onChange={(raw) => setForm(f => ({ ...f, budget_estimate: raw }))}
               className="mt-1.5 w-full px-4 py-3.5 rounded-2xl border-2 border-slate-200 text-sm font-normal outline-none focus:border-[#34C759]" data-testid="v2-wiz-budget" />
           </label>
+          {priceHint && (
+            <div className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2" data-testid="v2-wiz-price-hint">
+              💡 Preț orientativ piață pentru această categorie: <span className="font-bold text-slate-700">{priceHint}</span>
+              <span className="text-slate-400"> (date preliminare)</span>
+            </div>
+          )}
         </div>
       ),
     },

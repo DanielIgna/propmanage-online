@@ -232,6 +232,204 @@ async def handle_category_visibility(payload: dict) -> dict:
 
 
 # ============================================================================
+# 5. DISPUTE AI TRIAGE (Sprint 2)
+# ============================================================================
+async def handle_dispute_opened(payload: dict) -> dict:
+    from bson import ObjectId
+    from orchestrator.engine import notify_admins
+    steps_log = []
+    dispute_id = payload.get("dispute_id")
+    dispute = await db.disputes.find_one({"_id": ObjectId(dispute_id)}) if dispute_id else None
+    if not dispute and not payload.get("test"):
+        return {"steps": [{"action": "load_dispute", "ok": False, "detail": f"Dispută {dispute_id} negăsită"}],
+                "outcome": "error", "minutes_saved": 0, "escalate": False}
+    req = await db.requests.find_one({"_id": ObjectId(dispute["request_id"])}) if dispute and dispute.get("request_id") else None
+
+    if payload.get("test"):
+        triage = {
+            "category": "quality", "severity": "medium",
+            "summary": "SIMULARE — clientul reclamă calitatea finisajului.",
+            "proposed_resolution": "SIMULARE — refacere parțială de către specialist, escrow eliberat 70/30.",
+            "arguments": ["Simulare argument 1", "Simulare argument 2", "Simulare argument 3"],
+            "suggested_split": {"client_pct": 30, "specialist_pct": 70},
+        }
+        steps_log.append({"action": "ai_classify", "ok": True, "detail": "SIMULARE — clasificare fără apel LLM"})
+    else:
+        try:
+            from orchestrator.llm import claude_json
+            system = (
+                "Ești arbitrul AI al platformei PropManage (marketplace servicii construcții România). "
+                "Primești o dispută client-specialist și răspunzi DOAR cu JSON strict:\n"
+                '{"category": "no_show|quality|price|communication|damage|other", '
+                '"severity": "low|medium|high", "summary": "<1 frază în română>", '
+                '"proposed_resolution": "<propunere concretă în română, 1-2 fraze>", '
+                '"arguments": ["<arg1>", "<arg2>", "<arg3>"], '
+                '"suggested_split": {"client_pct": <0-100>, "specialist_pct": <0-100>}}\n'
+                "suggested_split = cum propui împărțirea sumei din escrow (client_pct = cât se returnează clientului). "
+                "Fii echilibrat și bazează-te strict pe faptele furnizate."
+            )
+            prompt = (
+                f"Lucrare: {(req or {}).get('title', 'necunoscută')} · categoria {(req or {}).get('category', '?')} · "
+                f"buget {(req or {}).get('budget_estimate', '?')} RON · escrow {(req or {}).get('escrow_amount', 0)} RON · "
+                f"status {(req or {}).get('status', '?')}\n"
+                f"Dispută deschisă de: {dispute.get('opened_by_role')}\n"
+                f"Motiv invocat: {dispute.get('reason', '')[:1500]}"
+            )
+            triage = await claude_json(system, prompt, "dispute_triage")
+            steps_log.append({
+                "action": "ai_classify", "ok": True,
+                "detail": f"Categorie: {triage.get('category')} · severitate: {triage.get('severity')} · {str(triage.get('summary', ''))[:120]}",
+            })
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[orchestrator] dispute triage LLM failed: {e}")
+            return {"steps": [{"action": "ai_classify", "ok": False, "detail": str(e)[:200]}],
+                    "outcome": "error", "minutes_saved": 0, "escalate": False}
+
+    triage_doc = {
+        "category": str(triage.get("category", "other"))[:30],
+        "severity": str(triage.get("severity", "medium"))[:10],
+        "summary": str(triage.get("summary", ""))[:400],
+        "proposed_resolution": str(triage.get("proposed_resolution", ""))[:600],
+        "arguments": [str(a)[:250] for a in (triage.get("arguments") or [])][:3],
+        "suggested_split": triage.get("suggested_split") or {},
+        "model": "claude-sonnet-4-5",
+        "ran_at": _now(),
+    }
+    if dispute:
+        await db.disputes.update_one({"_id": dispute["_id"]}, {"$set": {"ai_triage": triage_doc}})
+        steps_log.append({"action": "persist_triage", "ok": True, "detail": "Triage salvat pe dispută — vizibil în panoul admin"})
+    else:
+        steps_log.append({"action": "persist_triage", "ok": True, "detail": "SIMULARE — fără persistență (nicio dispută reală)"})
+
+    n = await notify_admins(
+        f"⚖️ Dispută triată AI: {triage_doc['category']} ({triage_doc['severity']})",
+        f"„{(req or {}).get('title', 'lucrare')}\u201d — {triage_doc['summary']} Propunere: {triage_doc['proposed_resolution'][:150]}",
+        link="/admin",
+    )
+    steps_log.append({"action": "notify_admins_inapp", "ok": True, "detail": f"{n} admini notificați cu propunerea de rezoluție"})
+    return {"steps": steps_log, "outcome": "auto_resolved", "minutes_saved": 15, "escalate": False}
+
+
+# ============================================================================
+# 6. KYC PRE-VALIDATION REPORTER (Sprint 2 — recommendation mode, GDPR-safe)
+# ============================================================================
+async def handle_kyc_prevalidated(payload: dict) -> dict:
+    from orchestrator.engine import notify_admins
+    steps_log = []
+    rec = payload.get("recommendation") or "review"
+    score = payload.get("match_score")
+    flags = payload.get("flags") or []
+    name = payload.get("user_name") or "specialist"
+    steps_log.append({
+        "action": "ai_prevalidate_documents", "ok": True,
+        "detail": f"KYC {name}: scor {score}/100 · flags: {', '.join(flags) or 'niciunul'} → {'RECOMANDAT SPRE APROBARE' if rec == 'approve' else 'NECESITĂ REVIEW MANUAL'}",
+    })
+    if rec == "approve":
+        n = await notify_admins(
+            f"✅ KYC pre-validat AI: {name} — recomandat spre aprobare",
+            f"Scor potrivire {score}/100, fără flag-uri negative. Un click în coada KYC finalizează aprobarea (decizia rămâne umană).",
+            link="/admin",
+        )
+    else:
+        n = await notify_admins(
+            f"🔍 KYC necesită review manual: {name}",
+            f"Scor {score if score is not None else '—'}/100 · flags: {', '.join(flags) or 'analiză incompletă'}. Verifică documentele în coada KYC.",
+            link="/admin",
+        )
+    steps_log.append({"action": "notify_admins_inapp", "ok": True, "detail": f"{n} admini notificați"})
+    return {"steps": steps_log, "outcome": "auto_resolved", "minutes_saved": 8, "escalate": False}
+
+
+# ============================================================================
+# 7. MARKETPLACE MEDIC (Sprint 2 — auto-suspend / auto-reactivate)
+# ============================================================================
+MEDIC_DISPUTE_THRESHOLD = 3
+MEDIC_REACTIVATE_DAYS = 30
+
+
+async def handle_marketplace_medic(payload: dict) -> dict:
+    from bson import ObjectId
+    from orchestrator.engine import notify_admins
+    steps_log = []
+    now = datetime.now(timezone.utc)
+    cutoff30 = (now - timedelta(days=30)).isoformat()
+
+    per_spec: dict = {}
+    async for d in db.disputes.find({"status": "open", "created_at": {"$gte": cutoff30}}, {"request_id": 1}):
+        try:
+            req = await db.requests.find_one({"_id": ObjectId(d["request_id"])}, {"specialist_id": 1})
+        except Exception:  # noqa: BLE001
+            req = None
+        sid = (req or {}).get("specialist_id")
+        if sid:
+            per_spec[sid] = per_spec.get(sid, 0) + 1
+    steps_log.append({
+        "action": "scan_open_disputes_30d", "ok": True,
+        "detail": f"{sum(per_spec.values())} dispute deschise (30d) pe {len(per_spec)} specialiști · prag suspendare: {MEDIC_DISPUTE_THRESHOLD}",
+    })
+
+    suspended, reactivated = [], []
+    if not payload.get("test"):
+        for sid, cnt in per_spec.items():
+            if cnt < MEDIC_DISPUTE_THRESHOLD:
+                continue
+            u = await db.users.find_one({"_id": ObjectId(sid), "medic_suspended": {"$ne": True}})
+            if not u:
+                continue
+            await db.users.update_one(
+                {"_id": u["_id"]},
+                {"$set": {"medic_suspended": True, "medic_suspended_at": _now(), "medic_suspend_reason": f"{cnt} dispute deschise în 30 zile"}},
+            )
+            suspended.append(f"{u.get('name')} ({cnt} dispute)")
+            try:
+                from services import notify
+                await notify(sid, "Cont suspendat temporar din marketplace",
+                             f"Ai {cnt} dispute deschise în ultimele 30 de zile. Profilul tău nu mai primește lucrări noi până la rezolvarea lor.",
+                             type_="medic", link="/specialist")
+            except Exception:  # noqa: BLE001
+                pass
+
+        reactivate_cutoff = (now - timedelta(days=MEDIC_REACTIVATE_DAYS)).isoformat()
+        async for u in db.users.find({"medic_suspended": True}):
+            sid = str(u["_id"])
+            if per_spec.get(sid, 0) == 0 and (u.get("medic_suspended_at") or "") < reactivate_cutoff:
+                await db.users.update_one(
+                    {"_id": u["_id"]},
+                    {"$set": {"medic_suspended": False, "medic_reactivated_at": _now()}},
+                )
+                reactivated.append(u.get("name") or sid)
+                try:
+                    from services import notify
+                    await notify(sid, "Cont reactivat în marketplace",
+                                 f"Felicitări — {MEDIC_REACTIVATE_DAYS} zile fără dispute. Profilul tău primește din nou lucrări.",
+                                 type_="medic", link="/specialist")
+                except Exception:  # noqa: BLE001
+                    pass
+
+    steps_log.append({
+        "action": "apply_medic_actions", "ok": True,
+        "detail": (
+            f"Suspendați: {', '.join(suspended) or 'niciunul'} · Reactivați: {', '.join(reactivated) or 'niciunul'}"
+            + (" (SIMULARE — fără modificări reale)" if payload.get("test") else "")
+        ),
+    })
+    if suspended or reactivated:
+        await notify_admins(
+            "🩺 Marketplace Medic a acționat",
+            f"Suspendați: {', '.join(suspended) or '—'} · Reactivați: {', '.join(reactivated) or '—'}",
+            link="/admin/orchestrator",
+        )
+    actions = len(suspended) + len(reactivated)
+    return {"steps": steps_log, "outcome": "auto_resolved", "minutes_saved": 5 + 12 * actions, "escalate": False}
+
+
+async def marketplace_medic_cron() -> None:
+    """Daily 05:10 — routed through the orchestrator."""
+    from orchestrator.engine import emit_signal
+    await emit_signal("marketplace_medic_scan", {"trigger": "cron_0510"})
+
+
+# ============================================================================
 # REGISTRY — signal kind → playbook
 # ============================================================================
 PLAYBOOKS = {
@@ -258,5 +456,23 @@ PLAYBOOKS = {
         "name": "Category Visibility Gate",
         "description": "CIP-A: recalculează automat vizibilitatea publică a nomenclatorului de construcții (nod vizibil = are ≥1 specialist verificat) la fiecare verificare specialist + zilnic 04:30. Flag-uiește categoriile ascunse cu cerere de la clienți (oportunitate recrutare).",
         "handler": handle_category_visibility,
+    },
+    "dispute_opened": {
+        "id": "dispute_ai_triage",
+        "name": "Dispute AI Triage",
+        "description": "La deschiderea unei dispute: Claude clasifică (categorie + severitate), rezumă cazul și propune o rezoluție cu 3 argumente + împărțire escrow sugerată. Adminul primește cazul pre-lucrat (~15 min/dispută).",
+        "handler": handle_dispute_opened,
+    },
+    "kyc_prevalidated": {
+        "id": "kyc_prevalidation_reporter",
+        "name": "KYC Pre-Validation (mod recomandare)",
+        "description": "GDPR-safe: AI-ul pre-validează documentele KYC și marchează „Recomandat spre aprobare\u201d / „Necesită review\u201d — decizia finală rămâne la admin (1 click). Fără auto-aprobare (~8 min/dosar).",
+        "handler": handle_kyc_prevalidated,
+    },
+    "marketplace_medic_scan": {
+        "id": "marketplace_medic",
+        "name": "Marketplace Medic",
+        "description": f"Zilnic 05:10: suspendă automat specialiștii cu ≥{MEDIC_DISPUTE_THRESHOLD} dispute deschise/30 zile (excluși din matching & marketplace) și îi reactivează după {MEDIC_REACTIVATE_DAYS} zile curate. Menține calitatea marketplace-ului fără intervenție umană.",
+        "handler": handle_marketplace_medic,
     },
 }

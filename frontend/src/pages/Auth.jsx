@@ -177,11 +177,15 @@ export const RegisterPage = () => {
   const { user, register } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
-  const referrerId = new URLSearchParams(window.location.search).get("ref");
+  const _params = new URLSearchParams(window.location.search);
+  const referrerId = _params.get("ref");
+  // Recruitment funnel (CIP-A): /register?role=specialist&category=<legacy>
+  const _inviteCategory = _params.get("category");
+  const _inviteRole = _params.get("role");
   const [form, setForm] = useState({
-    email: "", password: "", name: "", role: "client", phone: "",
-    specialty: "hvac",
-    service_categories: ["hvac"],
+    email: "", password: "", name: "", role: _inviteRole === "specialist" ? "specialist" : "client", phone: "",
+    specialty: _inviteCategory || "hvac",
+    service_categories: [_inviteCategory || "hvac"],
     coverage_zones: ["Bucuresti-Sector1"],
     zone: "Bucuresti-Sector1",
     referrer_id: referrerId || undefined,

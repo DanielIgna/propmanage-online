@@ -19,6 +19,7 @@ async def find_matching_specialists(category: str, user_zone: str, max_results: 
         "coverage_zones": user_zone,
         "service_categories": category,
         "availability_status": {"$ne": "offline"},
+        "medic_suspended": {"$ne": True},
     }).sort([("rating", -1), ("reviews_count", -1)]).limit(max_results).to_list(max_results)
     
     # Fallback: other specialists (out of zone) sorted by rating, marked as fallback
@@ -27,6 +28,7 @@ async def find_matching_specialists(category: str, user_zone: str, max_results: 
             "role": "specialist",
             "service_categories": category,
             "availability_status": {"$ne": "offline"},
+            "medic_suspended": {"$ne": True},
             "coverage_zones": {"$ne": user_zone},
         }
         already_ids = [s["_id"] for s in primary]
