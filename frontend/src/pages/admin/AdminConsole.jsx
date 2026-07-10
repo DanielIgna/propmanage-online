@@ -56,7 +56,16 @@ const TITLES = {
 
 export const AdminDashboard = () => {
   const { user } = useAuth();
-  const [active, setActive] = useState("overview");
+  const [active, setActive] = useState(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    return t && TITLES[t] ? t : "overview";
+  });
+
+  React.useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab")) {
+      window.history.replaceState(null, "", "/admin");
+    }
+  }, []);
 
   // Listen for cross-component navigation events (e.g. heatmap → audit log)
   React.useEffect(() => {

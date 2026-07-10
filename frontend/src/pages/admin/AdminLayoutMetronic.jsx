@@ -95,6 +95,7 @@ const NAV_SECTIONS = [
     zone: "business",
     items: [
       { id: "overview", label: "Dashboard Principal", icon: LayoutDashboard },
+      { id: "control_tower", label: "Control Tower", icon: LayoutDashboard, badge: "NEW", href: "/admin/control-tower" },
       { id: "activity", label: "Activitate Live", icon: Sparkles },
     ],
   },

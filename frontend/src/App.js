@@ -65,6 +65,7 @@ const AISecurityCenterPage = lazy(() => import("./pages/admin/AISecurityCenterPa
 const AutonomyEnginePage = lazy(() => import("./pages/admin/AutonomyEnginePage"));
 const AutonomyOrchestratorPage = lazy(() => import("./pages/admin/AutonomyOrchestratorPage"));
 const ConstructionIntelligencePage = lazy(() => import("./pages/admin/ConstructionIntelligencePage"));
+const ControlTowerPage = lazy(() => import("./pages/admin/ControlTowerPage"));
 const TwinPage = lazy(() => import("./pages/admin/TwinPage"));
 const AdminHouseHealthPage = lazy(() => import("./pages/admin/AdminHouseHealthPage"));
 const ManualTesterPage = lazy(() => import("./pages/admin/ManualTesterPage"));
@@ -1651,6 +1652,7 @@ function App() {
               <Route path="/admin/autonomy" element={<AutonomyEnginePage />} />
               <Route path="/admin/orchestrator" element={<AutonomyOrchestratorPage />} />
               <Route path="/admin/construction" element={<ConstructionIntelligencePage />} />
+              <Route path="/admin/control-tower" element={<ControlTowerPage />} />
               <Route path="/admin/twin" element={<TwinPage />} />
               <Route path="/house-health/:twinId" element={<HouseHealthPage />} />
               <Route path="/house-health/upgrade" element={<HouseHealthUpgradePage />} />
