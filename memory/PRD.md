@@ -2116,3 +2116,17 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 - Creat `/app/memory/PLATFORM_AUDIT_2026.md`: diagnoză completă (113 module API, 185 colecții, ~140 pagini), puncte forte, 17 probleme prioritizate P0-P2, recomandări UX/Product/Arhitectură/DB/AI, roadmap în 5 faze cu impact × complexitate.
 - Diagnostic-cheie: „Featureship > Craftsmanship" — dualitate V1/V2 client, App.js fără lazy-loading, admin-labirint (86 pagini/15 secțiuni), vocabular categorii istoric dual, fișiere-gigant (admin_console 2.745 l.).
 - NEXT propus: Phase 1 „Stabilizare & Viteză" (lazy routes, migrare vocabular categorii, indexuri, api client unic) → Phase 2 „Admin Command Center".
+
+## Update — Iul 2026 · BLUEPRINT v1.1 RATIFICAT + PHASE 1 „STABILIZARE TEHNICĂ" COMPLETĂ (testat iter89: 10/10 backend + 16 rute × 5 roluri PASS)
+### Blueprint v1.1 (documentul oficial al produsului — `/app/memory/PRODUCT_BLUEPRINT.md`)
+- Ratificat de owner 95%→100% cu amendamentele lui: §1.5 Principii Fundamentale (6), §10 Product Constitution (12 articole inviolabile), §11 Living Product (sincronizare la fiecare versiune majoră), §12 Property Knowledge Graph (KG-0 în V2.0: registru `entity_links` logic peste Mongo; KG-1 în V2.5; KG-2 în V3.0).
+- REGULĂ ACTIVĂ: orice feature nou primește fișă de integrare (clasă/versiune/dependențe/impact/KPI + noduri și relații adăugate în graf) și se verifică contra Constituției.
+### Phase 1 (toate TD-urile P0 + quick wins, verificate contra Blueprint Art. 2/5/7/8)
+- **TD-01** ✅ Lazy-loading: 51 pagini default-import + 4 dashboards (Dashboards.jsx split) → React.lazy + un singur Suspense în App.js. Toate rutele verificate pe 5 roluri.
+- **TD-03** ✅ Migrare vocabular categorii istorice (painting→zugravit, carpentry→tamplarie, gardening→amenajari_exterioare, cleaning/appliance_repair→handyman) cu backup în `migration_backups`; requests istorice migrate cu `category_migrated_from`. Script: `/backend/migrations/migrate_category_vocabulary.py`.
+- **TD-05** ✅ `frontend/src/lib/api.js` — client axios unic (interceptor 401→login, apiErr). Obligatoriu pentru cod nou; migrare pagini vechi progresiv (boy-scout).
+- **TD-07** ✅ 22 indexuri Mongo (`/backend/migrations/create_indexes.py`, tolerant la conflicte).
+- **TD-08** ✅ Retenție telemetrie zilnică 03:40 (`/backend/maintenance.py`, praguri per colecție).
+- Rămase din Phase 1 pentru boy-scout continuu: TD-04 (descompunere fișiere-gigant — la atingere), TD-06 (DB_REGISTRY).
+- NEXT: **Phase 2 — Admin Command Center** (Executive Control Tower v1: /api/admin/attention + Attention Layer / Pulse / Autonomy Report + meniu 4 huburi), apoi Phase 3 Specialist Cockpit. Toate cu fișă de integrare conform §11.2.
+- ⚠️ Modificările apar pe propmanage.ro după REDEPLOY.
