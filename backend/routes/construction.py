@@ -193,6 +193,23 @@ async def public_prices(category: Optional[str] = None, city: Optional[str] = No
     }
 
 
+@router.get("/prices/seo-pages")
+async def seo_price_pages_index():
+    """Public — lista paginilor SEO de prețuri (/preturi)."""
+    from construction.price_seo import list_seo_pages
+    return {"items": await list_seo_pages()}
+
+
+@router.get("/prices/seo-pages/{slug}")
+async def seo_price_page_detail(slug: str, city: Optional[str] = None):
+    """Public — datele complete pentru o pagină SEO de prețuri (/preturi/{slug})."""
+    from construction.price_seo import build_seo_page
+    page = await build_seo_page(slug, city)
+    if not page:
+        raise HTTPException(404, "Pagina de prețuri nu există")
+    return page
+
+
 @router.get("/prices")
 async def list_price_observations(
     category: Optional[str] = None,

@@ -102,6 +102,8 @@ const ClientJuniorDashboard = lazy(() => import("./pages/dashboard/ClientJuniorD
 const ClientV2Wireframe = lazy(() => import("./pages/dashboard/ClientV2Wireframe"));
 const ClientDashboardSwitch = lazy(() => import("./pages/clientv2/ClientDashboardSwitch"));
 const ContractPage = lazy(() => import("./pages/ContractPage"));
+const PreturiIndex = lazy(() => import("./pages/PreturiIndex"));
+const PreturiPage = lazy(() => import("./pages/PreturiPage"));
 import { trackPageView } from "@/lib/analytics";
 import { useDynamicSEO } from "@/lib/useDynamicSEO";
 
@@ -1687,6 +1689,8 @@ function App() {
               <Route path="/contracts/:id" element={<ContractPage />} />
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />
               <Route path="/ghiduri" element={<GhiduriIndex />} />
+              <Route path="/preturi" element={<PreturiIndex />} />
+              <Route path="/preturi/:slug" element={<PreturiPage />} />
               <Route path="/ghiduri/:slug" element={<GhidPage />} />
               <Route path="/help/:token" element={<HelpPage />} />
               <Route path="/specialists/:id" element={<SpecialistProfile />} />

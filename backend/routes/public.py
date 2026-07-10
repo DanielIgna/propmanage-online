@@ -396,6 +396,26 @@ async def public_sitemap():
             f"  </url>"
         )
 
+    # Pagini publice de prețuri („Cât costă X în 2026") — trafic organic long-tail
+    from construction.price_seo import PRICE_SEO
+    urls_xml.append(
+        f"  <url>\n"
+        f"    <loc>{_SITE_URL}/preturi</loc>\n"
+        f"    <lastmod>{now_iso}</lastmod>\n"
+        f"    <changefreq>weekly</changefreq>\n"
+        f"    <priority>0.85</priority>\n"
+        f"  </url>"
+    )
+    for pslug in PRICE_SEO:
+        urls_xml.append(
+            f"  <url>\n"
+            f"    <loc>{_SITE_URL}/preturi/{pslug}</loc>\n"
+            f"    <lastmod>{now_iso}</lastmod>\n"
+            f"    <changefreq>weekly</changefreq>\n"
+            f"    <priority>0.8</priority>\n"
+            f"  </url>"
+        )
+
     # SEO category-landing pages (e.g. /marketplace/electrician,
     # /marketplace/electrician-bucuresti) — drives long-tail local search traffic.
     from seo_slugs import all_landing_slugs
