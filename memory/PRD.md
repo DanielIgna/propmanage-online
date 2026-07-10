@@ -2079,3 +2079,6 @@ SMOKE_BASE_URL=https://propmanage.ro /app/scripts/smoke-test.sh
 - **BUG #002 + ENH #001 VERIFICATE de agent** (playwright): 35000 → „35.000" live, caret stabil — ambele Closed în BUGS.md.
 - **Credential fix:** parola admin reală = SEED_ADMIN_PASSWORD din backend/.env (actualizat test_credentials.md).
 - NEXT (conform roadmap aprobat): CIP-A (taxonomie ierarhică + visibility gate ca playbook orchestrator + /admin/construction) → Autonomy Sprint 2 (Dispute AI Triage, KYC Auto-Approve, Marketplace Medic) → CIP-B (Price Observatory).
+
+## Update — Iul 2026 · Orchestrator în Morning Briefing (enhancement aprobat de user)
+- `admin_briefing_digest.py`: secțiune nouă "Autonomy Orchestrator" în payload + email (prima în listă): "X/Y situații rezolvate automat (~Z min salvate)" + escaladări. Tone: ok/idle normal, warn doar la escaladări (nu forțează trimiterea email-ului când totul e ok). Testat: preview API + render HTML PASS.
