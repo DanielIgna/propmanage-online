@@ -24,6 +24,7 @@ import { RequestTimelineModal, ScheduleProposalModal, LastActionBanner } from ".
 import { TierCelebrationBanner } from "../lib/TierCelebrationBanner";
 import { TierToolsPanel } from "../lib/TierToolsPanel";
 import { QuestPanel } from "../lib/QuestPanel";
+import { KpiCard } from "../design-system";
 import { useTier } from "../lib/useTier";
 import {
   PMCard, PMCardPrimary, PMStatCard, PMPillButton, PMChip,
@@ -86,6 +87,10 @@ export const SpecialistDashboard = () => {
     });
   };
   const unreadNotifs = notifs.filter(n => !n.read).length;
+  const now = new Date();
+  const monthlyEarnings = mine
+    .filter(r => r.status === "confirmed" && String(r.confirmed_at || r.updated_at || r.created_at || "").slice(0, 7) === now.toISOString().slice(0, 7))
+    .reduce((s, r) => s + (Number(r.final_price ?? r.price ?? r.budget_estimate) || 0), 0);
 
   const allTabs = [
     { id: "opportunities", label: "Oportunități", icon: Target, badge: open.length, minTier: "ENTRY" },
@@ -159,37 +164,16 @@ export const SpecialistDashboard = () => {
             </PMCardPrimary>
           )}
 
-          {/* Bento stats — VERIFIED+ only */}
-          {tierInfo.canSeeStats && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 pm-fade-in-delay-1">
-            <PMStatCard
-              icon={Wallet}
-              label="Sold lead-uri"
-              value={`${user?.wallet_balance?.toFixed(0) || 0} RON`}
-              testid="spec-stat-wallet"
-            />
-            <PMStatCard
-              icon={Star}
-              label="Rating"
-              value={user?.rating || "—"}
-              trailing={<span className="text-xs text-[var(--pm-text-muted)]">{user?.reviews_count || 0}</span>}
-              testid="spec-stat-rating"
-            />
-            <PMStatCard
-              icon={Briefcase}
-              label="Active"
-              value={mine.filter(r => r.status !== "confirmed").length}
-              testid="spec-stat-active"
-            />
-            <PMStatCard
-              icon={Award}
-              label="Tier"
-              value={user?.tier || "ENTRY"}
-              trailing={user?.verified ? <PMChip variant="success">VERIF</PMChip> : <PMChip variant="warning">PEND</PMChip>}
-              testid="spec-stat-tier"
-            />
+          {/* „Astăzi ai" — sumar de acțiuni (Design System, Hick's Law: max 4 decizii) */}
+          <div className="dark mb-6 pm-fade-in-delay-1" data-testid="spec-today-summary">
+            <h3 className="text-sm font-bold text-stone-300 mb-3">Astăzi ai:</h3>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <KpiCard icon={Target} label="Cereri noi" value={open.length} accent="info" onClick={() => document.querySelector('[data-tour="specialist-leads"]')?.scrollIntoView({ behavior: "smooth" })} testid="spec-today-open" />
+              <KpiCard icon={Briefcase} label="Lucrări în lucru" value={mine.filter(r => r.status !== "confirmed").length} accent="warning" onClick={() => setTab("jobs")} testid="spec-today-active" />
+              <KpiCard icon={Bell} label="Notificări necitite" value={unreadNotifs} accent="neutral" onClick={() => setTab("notifications")} testid="spec-today-notifs" />
+              <KpiCard icon={Wallet} label="Încasări luna aceasta" value={`${monthlyEarnings.toLocaleString("ro")} RON`} accent="success" onClick={() => setTab("jobs")} testid="spec-today-earnings" />
             </div>
-          )}
+          </div>
 
           {/* ENTRY/JUNIOR: friendly intro card for newcomers */}
           {!tierInfo.canSeeStats && (

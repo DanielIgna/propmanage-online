@@ -11,6 +11,7 @@ import {
 
 const API = process.env.REACT_APP_BACKEND_URL;
 const ax = axios.create({ baseURL: API, withCredentials: true });
+import { KpiCard, AIInsightCard } from "../../design-system";
 
 const TIER_META = {
   basic: { label: "Basic", color: "bg-slate-100 text-slate-700 dark:bg-slate-700/40 dark:text-slate-300" },
@@ -323,12 +324,27 @@ const MarketplacePartnersPage = () => {
       </div>
 
       {stats && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          <StatCard icon={Building} label="Parteneri total" value={stats.total_partners} color="text-blue-500" />
-          <StatCard icon={Award} label="Activi" value={stats.by_status?.active || 0} color="text-emerald-500" />
-          <StatCard icon={TrendingUp} label="Lead-uri" value={stats.total_leads} color="text-amber-500" />
-          <StatCard icon={Tag} label="Conversii" value={stats.leads_by_stage?.converted || 0} color="text-violet-500" />
-        </div>
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <KpiCard icon={Building} label="Parteneri total" value={stats.total_partners} accent="info" testid="mkt-kpi-total" />
+            <KpiCard icon={Award} label="Activi" value={stats.by_status?.active || 0} accent="success" testid="mkt-kpi-active" />
+            <KpiCard icon={TrendingUp} label="Lead-uri" value={stats.total_leads} accent="warning" testid="mkt-kpi-leads" />
+            <KpiCard icon={Tag} label="Conversii" value={stats.leads_by_stage?.converted || 0} accent="ai" testid="mkt-kpi-conversions" />
+          </div>
+          <div className="mb-6">
+            <AIInsightCard
+              bullets={[
+                `${stats.by_status?.active || 0} din ${stats.total_partners || 0} parteneri sunt activi${stats.total_partners ? ` (${Math.round((stats.by_status?.active || 0) / stats.total_partners * 100)}%)` : ""}.`,
+                ...(stats.total_leads ? [`${stats.total_leads} lead-uri generate, ${stats.leads_by_stage?.converted || 0} convertite${stats.total_leads ? ` (${Math.round((stats.leads_by_stage?.converted || 0) / stats.total_leads * 100)}% conversie)` : ""}.`] : []),
+                ...(stats.top_categories?.[0] ? [`Categoria cu cei mai mulți parteneri: «${stats.top_categories[0].name}» (${stats.top_categories[0].count}).`] : []),
+              ]}
+              alerts={(stats.by_status?.prospect || 0) > (stats.by_status?.active || 0) ? [`${stats.by_status.prospect} prospecți așteaptă onboarding — mai mulți decât partenerii activi.`] : []}
+              recommendations={["Rulează AI Marketplace Copilot pentru analiza completă a ecosistemului."]}
+              onAction={() => setCopilotOpen(true)} actionLabel="Rulează AI Copilot"
+              testid="mkt-ai-insights"
+            />
+          </div>
+        </>
       )}
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -447,16 +463,6 @@ const MarketplacePartnersPage = () => {
     </div>
   );
 };
-
-const StatCard = ({ icon: Icon, label, value, color }) => (
-  <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-800">
-    <div className="flex items-center justify-between mb-2">
-      <span className="text-xs text-slate-500 dark:text-slate-400">{label}</span>
-      <Icon className={`w-4 h-4 ${color}`} />
-    </div>
-    <div className="text-2xl font-bold text-slate-900 dark:text-white">{value}</div>
-  </div>
-);
 
 export default MarketplacePartnersPage;
 export { MarketplacePartnersPage };
