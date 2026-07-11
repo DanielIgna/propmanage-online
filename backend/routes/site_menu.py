@@ -1,0 +1,137 @@
+"""Meniu de navigare unificat (Desktop + Mobile), administrat din CMS.
+
+Un singur sistem de navigare stocat în DB — colecția `site_menu` (doc key="main").
+Public: GET /api/public/site-menu (doar iteme active; vizibilitatea o filtrează frontend-ul).
+Admin: GET/PUT /api/admin/site-menu + POST reset la structura implicită.
+"""
+import logging
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Body, Depends, HTTPException
+
+from db import db
+from deps import require_role
+
+router = APIRouter(prefix="/api", tags=["site-menu"])
+logger = logging.getLogger("propmanage.site_menu")
+
+# visibility: "all" | "guests" (doar vizitatori) | "auth" (doar autentificați)
+DEFAULT_MENU = [
+    {"id": "acasa", "label": "Acasă", "href": "/", "icon": "Home", "active": True, "visibility": "all", "children": []},
+    {"id": "servicii", "label": "Servicii", "href": "", "icon": "Layers", "active": True, "visibility": "all", "children": [
+        {"id": "imobile_verificate", "label": "Imobile Verificate", "href": "/imobile-verificate", "icon": "BadgeCheck", "active": True, "visibility": "all"},
+        {"id": "digital_twin", "label": "Digital Twin", "href": "/#twin", "icon": "Box", "active": True, "visibility": "all"},
+        {"id": "design_interior", "label": "Design Interior", "href": "/design-interior", "icon": "Palette", "active": True, "visibility": "all"},
+        {"id": "design_exterior", "label": "Design Exterior", "href": "/marketplace?categorie=design-exterior", "icon": "Trees", "active": True, "visibility": "all"},
+        {"id": "arhitectura", "label": "Arhitectură", "href": "/marketplace?categorie=arhitectura", "icon": "Compass", "active": True, "visibility": "all"},
+        {"id": "constructii", "label": "Construcții", "href": "/marketplace?categorie=constructii", "icon": "Hammer", "active": True, "visibility": "all"},
+        {"id": "renovari", "label": "Renovări", "href": "/marketplace?categorie=renovari", "icon": "Paintbrush", "active": True, "visibility": "all"},
+        {"id": "mobilier", "label": "Mobilier la comandă", "href": "/marketplace?categorie=mobilier", "icon": "Armchair", "active": True, "visibility": "all"},
+        {"id": "instalatii", "label": "Instalații", "href": "/marketplace?categorie=instalatii", "icon": "Wrench", "active": True, "visibility": "all"},
+        {"id": "amenajari", "label": "Amenajări", "href": "/marketplace?categorie=amenajari", "icon": "Brush", "active": True, "visibility": "all"},
+        {"id": "specialisti", "label": "Specialiști", "href": "/marketplace", "icon": "Users", "active": True, "visibility": "all"},
+        {"id": "consultanta", "label": "Consultanță", "href": "/marketplace?categorie=consultanta", "icon": "MessageCircle", "active": True, "visibility": "all"},
+    ]},
+    {"id": "proprietari", "label": "Pentru Proprietari", "href": "", "icon": "KeyRound", "active": True, "visibility": "all", "children": [
+        {"id": "cum_functioneaza", "label": "Cum funcționează", "href": "/#journey", "icon": "PlayCircle", "active": True, "visibility": "all"},
+        {"id": "beneficii", "label": "Beneficii", "href": "/de-ce-noi", "icon": "Sparkles", "active": True, "visibility": "all"},
+        {"id": "tarife", "label": "Tarife", "href": "/preturi", "icon": "CircleDollarSign", "active": True, "visibility": "all"},
+        {"id": "faq", "label": "Întrebări frecvente", "href": "/#faq", "icon": "HelpCircle", "active": True, "visibility": "all"},
+    ]},
+    {"id": "companie", "label": "Companie", "href": "", "icon": "Building2", "active": True, "visibility": "all", "children": [
+        {"id": "despre", "label": "Despre noi", "href": "/de-ce-noi", "icon": "Info", "active": True, "visibility": "all"},
+        {"id": "blog", "label": "Blog", "href": "/community", "icon": "BookOpen", "active": True, "visibility": "all"},
+        {"id": "contact", "label": "Contact", "href": "mailto:contact@propmanage.ro", "icon": "Mail", "active": True, "visibility": "all"},
+    ]},
+    {"id": "cont_guest", "label": "Cont", "href": "", "icon": "UserCircle", "active": True, "visibility": "guests", "children": [
+        {"id": "login", "label": "Autentificare", "href": "/login", "icon": "LogIn", "active": True, "visibility": "guests"},
+        {"id": "register", "label": "Creează cont", "href": "/register", "icon": "UserPlus", "active": True, "visibility": "guests"},
+    ]},
+    {"id": "cont_auth", "label": "Contul meu", "href": "", "icon": "UserCircle", "active": True, "visibility": "auth", "children": [
+        {"id": "dashboard", "label": "Dashboard", "href": "/dashboard", "icon": "LayoutDashboard", "active": True, "visibility": "auth"},
+        {"id": "proiecte", "label": "Proiectele mele", "href": "/dashboard#proiecte", "icon": "FolderKanban", "active": True, "visibility": "auth"},
+        {"id": "mesaje", "label": "Mesaje", "href": "/dashboard#mesaje", "icon": "MessageSquare", "active": True, "visibility": "auth"},
+        {"id": "notificari", "label": "Notificări", "href": "/dashboard#notificari", "icon": "Bell", "active": True, "visibility": "auth"},
+        {"id": "setari", "label": "Setări cont", "href": "/dashboard#setari", "icon": "Settings", "active": True, "visibility": "auth"},
+        {"id": "logout", "label": "Logout", "href": "#logout", "icon": "LogOut", "active": True, "visibility": "auth"},
+    ]},
+]
+
+_ALLOWED_KEYS = {"id", "label", "href", "icon", "active", "visibility", "children"}
+_VISIBILITIES = {"all", "guests", "auth"}
+
+
+def _sanitize_items(items: list, depth: int = 0) -> list:
+    if depth > 1:
+        return []
+    out = []
+    for it in items:
+        if not isinstance(it, dict) or not str(it.get("label", "")).strip() or not str(it.get("id", "")).strip():
+            continue
+        clean = {
+            "id": str(it["id"])[:60],
+            "label": str(it["label"])[:80],
+            "href": str(it.get("href") or "")[:300],
+            "icon": str(it.get("icon") or "")[:40],
+            "active": bool(it.get("active", True)),
+            "visibility": it.get("visibility") if it.get("visibility") in _VISIBILITIES else "all",
+            "children": _sanitize_items(it.get("children") or [], depth + 1),
+        }
+        out.append(clean)
+    return out
+
+
+async def _get_menu_doc() -> dict:
+    doc = await db.site_menu.find_one({"key": "main"})
+    if not doc:
+        doc = {"key": "main", "items": DEFAULT_MENU, "updated_at": datetime.now(timezone.utc).isoformat()}
+        await db.site_menu.insert_one(dict(doc))
+    return doc
+
+
+def _public_items(items: list) -> list:
+    out = []
+    for it in items:
+        if not it.get("active", True):
+            continue
+        out.append({
+            "id": it["id"], "label": it["label"], "href": it.get("href", ""),
+            "icon": it.get("icon", ""), "visibility": it.get("visibility", "all"),
+            "children": _public_items(it.get("children") or []),
+        })
+    return out
+
+
+@router.get("/public/site-menu")
+async def public_site_menu():
+    doc = await _get_menu_doc()
+    return {"items": _public_items(doc.get("items") or [])}
+
+
+@router.get("/admin/site-menu")
+async def admin_get_menu(_admin=Depends(require_role("admin"))):
+    doc = await _get_menu_doc()
+    return {"items": doc.get("items") or [], "updated_at": doc.get("updated_at")}
+
+
+@router.put("/admin/site-menu")
+async def admin_put_menu(items: list = Body(..., embed=True), admin=Depends(require_role("admin"))):
+    clean = _sanitize_items(items)
+    if not clean:
+        raise HTTPException(400, "Meniul nu poate fi gol.")
+    await db.site_menu.update_one(
+        {"key": "main"},
+        {"$set": {"items": clean, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": admin.get("email")}},
+        upsert=True,
+    )
+    return {"ok": True, "items": clean}
+
+
+@router.post("/admin/site-menu/reset")
+async def admin_reset_menu(admin=Depends(require_role("admin"))):
+    await db.site_menu.update_one(
+        {"key": "main"},
+        {"$set": {"items": DEFAULT_MENU, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": admin.get("email")}},
+        upsert=True,
+    )
+    return {"ok": True, "items": DEFAULT_MENU}

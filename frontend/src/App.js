@@ -92,6 +92,7 @@ const UserTimelinePage = lazy(() => import("./pages/admin/UserTimelinePage"));
 const AISearchPage = lazy(() => import("./pages/admin/AISearchPage"));
 const InteriorDesignLanding = lazy(() => import("./pages/InteriorDesignLanding"));
 const InteriorDesignAdminPage = lazy(() => import("./pages/admin/InteriorDesignAdminPage"));
+const MenuManagerPage = lazy(() => import("./pages/admin/MenuManagerPage"));
 const BugMemoryAggregatorPage = lazy(() => import("./pages/admin/BugMemoryAggregatorPage"));
 const ArchitectureBoardPage = lazy(() => import("./pages/admin/ArchitectureBoardPage"));
 const AIProductManagerPage = lazy(() => import("./pages/admin/AIProductManagerPage"));
@@ -136,94 +137,10 @@ const AnalyticsRouteTracker = () => {
 };
 import { ImpersonationBanner } from "./components/ImpersonationBanner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import SiteNav from "./components/SiteNav";
 import "./App.css";
 
-// ============= NAV =============
-const Nav = () => {
-  const [scrolled, setScrolled] = useState(false);
-  const { user, logout } = useAuth();
-  const { lang, toggle, t } = useI18n();
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const handleLogout = async () => {
-    try { await logout(); } catch (_) { /* ignore */ }
-    window.location.href = "/";
-  };
-
-  const links = [
-    { href: "#problem", label: t("nav.problem") },
-    { href: "#solution", label: t("nav.solution") },
-    { href: "#journey", label: t("nav.journey") },
-    { href: "#twin", label: t("nav.twin") },
-    { href: "/marketplace", label: "Marketplace", external: true },
-    { href: "/community", label: "Comunitate", external: true },
-    { href: "/imobile-verificate", label: "Imobile Verificate", external: true },
-    { href: "/de-ce-noi", label: "De ce noi?", external: true },
-  ];
-
-  return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? "py-3" : "py-6"}`}>
-      <div className={`max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-2 ${scrolled ? "glass-strong rounded-full sm:mx-6 sm:px-6" : ""}`}>
-        <a href="#top" className="flex items-center gap-2" data-testid="nav-logo">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#d4ff3a] to-[#a8e028] flex items-center justify-center">
-            <Building2 className="w-4 h-4 text-black" strokeWidth={2.5} />
-          </div>
-          <span className="font-serif text-lg sm:text-xl font-semibold tracking-tight">PropManage</span>
-        </a>
-        <div className="hidden lg:flex items-center gap-6 xl:gap-8">
-          {links.map(l => l.external ? (
-            <Link key={l.href} to={l.href} className="text-sm text-stone-400 hover:text-white transition-colors" data-testid={`nav-${l.label}`}>
-              {l.label}
-            </Link>
-          ) : (
-            <a key={l.href} href={l.href} className="text-sm text-stone-400 hover:text-white transition-colors" data-testid={`nav-${l.label}`}>
-              {l.label}
-            </a>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <button onClick={toggle} className="flex items-center gap-1 px-2 sm:px-3 py-1.5 hover:bg-white/5 rounded-full text-xs uppercase tracking-wider text-stone-300" data-testid="lang-toggle">
-            <Languages className="w-3.5 h-3.5" />{lang.toUpperCase()}
-          </button>
-          {user && user !== false && user.role === "admin" && (
-            <Link
-              to="/admin"
-              className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-semibold bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 transition-colors"
-              data-testid="nav-admin"
-              title="Panou Admin"
-            >
-              <ShieldCheck className="w-3.5 h-3.5" /><span className="hidden sm:inline">Admin</span>
-            </Link>
-          )}
-          {user && user !== false ? (
-            <>
-              <Link to={`/${user.role}`} className="btn-accent px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium inline-flex items-center gap-1.5" data-testid="nav-dashboard">
-                <LayoutDashboard className="w-3.5 h-3.5" /><span className="hidden sm:inline">{t("nav.dashboard")}</span>
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium bg-white/5 hover:bg-white/10 text-stone-300 border border-white/10 transition-colors"
-                data-testid="nav-logout"
-                title="Deconectare"
-              >
-                <LogOut className="w-3.5 h-3.5" /><span className="hidden sm:inline">Logout</span>
-              </button>
-            </>
-          ) : (
-            <Link to="/login" className="btn-accent px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium inline-flex items-center gap-1.5" data-testid="nav-login">
-              <LogIn className="w-3.5 h-3.5" /><span className="hidden sm:inline">{t("nav.login")}</span>
-            </Link>
-          )}
-        </div>
-      </div>
-    </nav>
-  );
-};
+const Nav = () => <SiteNav />;
 
 // ============= HERO =============
 const Hero = () => {
@@ -1697,6 +1614,7 @@ function App() {
               <Route path="/admin/design-studio" element={<DesignStudioPage />} />
               <Route path="/admin/design-intelligence" element={<DesignIntelligencePage />} />
               <Route path="/admin/interior-design" element={<InteriorDesignAdminPage />} />
+              <Route path="/admin/menu-manager" element={<MenuManagerPage />} />
               <Route path="/admin/roadmap" element={<PlatformRoadmapPage />} />
               <Route path="/admin/command-center" element={<CommandCenterPage />} />
               <Route path="/admin/business-health" element={<BusinessHealthPage />} />

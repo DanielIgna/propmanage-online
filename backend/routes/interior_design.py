@@ -9,7 +9,9 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+import time
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 
 from db import db
@@ -163,8 +165,24 @@ async def create_lead(payload: LeadIn):
     return {"ok": True, "lead_id": lead["id"], "message": "Mulțumim! Un designer te va contacta în 24-48h."}
 
 
+# Rate limit per IP: max 10 întrebări / 10 minute (protecție quota LLM)
+_ai_hits: dict[str, list[float]] = {}
+AI_RL_MAX = 10
+AI_RL_WINDOW = 600
+
+
+def _check_ai_rate_limit(ip: str):
+    now = time.time()
+    hits = [t for t in _ai_hits.get(ip, []) if now - t < AI_RL_WINDOW]
+    if len(hits) >= AI_RL_MAX:
+        raise HTTPException(429, "Ai atins limita de întrebări. Reîncearcă peste câteva minute sau completează formularul.")
+    hits.append(now)
+    _ai_hits[ip] = hits
+
+
 @router.post("/interior-design/assistant")
-async def design_assistant(question: str = Body(..., embed=True), session_id: str = Body(None, embed=True)):
+async def design_assistant(request: Request, question: str = Body(..., embed=True), session_id: str = Body(None, embed=True)):
+    _check_ai_rate_limit(request.client.host if request.client else "unknown")
     question = question.strip()[:500]
     if not question:
         raise HTTPException(400, "Întrebarea este goală.")
