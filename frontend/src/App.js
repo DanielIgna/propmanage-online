@@ -1669,6 +1669,7 @@ function App() {
               <Route path="/admin/demo-activity" element={<DemoActivityPage />} />
               <Route path="/partner/dashboard" element={<PartnerDashboard />} />
               <Route path="/dashboard/client-junior" element={<ClientJuniorDashboard />} />
+              <Route path="/incepe" element={<ClientJuniorDashboard />} />
               <Route path="/dashboard/client-v2" element={<ClientV2Wireframe />} />
               <Route path="/legal/sign" element={<LegalSignPage />} />
               <Route path="/contracts/:id" element={<ContractPage />} />

@@ -871,3 +871,21 @@ html[data-theme="light"] .bg-rose-500\/15,
 html[data-theme="light"] .bg-red-500\/15 { background-color: rgba(244, 63, 94, 0.13) !important; }
 html[data-theme="light"] .bg-blue-500\/15 { background-color: rgba(59, 130, 246, 0.13) !important; }
 html[data-theme="light"] .bg-violet-500\/15 { background-color: rgba(139, 92, 246, 0.13) !important; }
+
+/* ============================================================
+   CLIENT JUNIOR UX LAB — accent green-700 AA; mapare dark coerentă
+   ============================================================ */
+html:not([data-theme="light"]) .cv2-scope .text-\[\#166534\] { color: #86efac !important; }
+html:not([data-theme="light"]) .cv2-scope .border-\[\#166534\] { border-color: #86efac !important; }
+html:not([data-theme="light"]) .cv2-scope .focus\:border-\[\#166534\]:focus { border-color: #86efac !important; }
+html:not([data-theme="light"]) .cv2-scope .bg-\[\#166534\]\/5 { background-color: rgba(134, 239, 172, 0.08) !important; }
+html:not([data-theme="light"]) .cv2-scope .border-\[\#166534\]\/25 { border-color: rgba(134, 239, 172, 0.3) !important; }
+html:not([data-theme="light"]) .cv2-scope .from-white { --tw-gradient-from: #0a0a0a var(--tw-gradient-from-position) !important; --tw-gradient-to: rgba(10,10,10,0) var(--tw-gradient-to-position) !important; }
+html:not([data-theme="light"]) .cv2-scope .via-white { --tw-gradient-via: #0a0a0a !important; --tw-gradient-stops: var(--tw-gradient-from), #0a0a0a var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+html:not([data-theme="light"]) .cv2-scope .bg-\[\#EDF7EF\] { background-color: #0d1710 !important; }
+/* Client Junior — stagger reveal la landing (reduce overwhelm vizual) */
+.cj-reveal { opacity: 0; animation: cjFadeUp 0.45s ease forwards; }
+@keyframes cjFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .cj-reveal { animation: none; opacity: 1; } }
+.cj-dot-pop { animation: cjPop 0.2s ease-out; }
+@keyframes cjPop { 0% { transform: scale(0.8); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }

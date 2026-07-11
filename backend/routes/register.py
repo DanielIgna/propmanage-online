@@ -135,6 +135,7 @@ from routes.ai_search import router as ai_search_router
 from routes.interior_design import router as interior_design_router
 from routes.site_menu import router as site_menu_router
 from routes.xos import router as xos_router
+from routes.ux_lab import router as ux_lab_router
 from autonomy.self_driving import router as self_driving_router
 from routes.leads import router as leads_router
 from routes.tenants import router as tenants_router, public_router as tenants_public_router
@@ -277,4 +278,5 @@ ALL_ROUTERS = (
     tenants_public_router,
     service_hub_router,
     lead_followup_router,
+    ux_lab_router,
 )

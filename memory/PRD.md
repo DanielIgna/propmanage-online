@@ -2711,3 +2711,17 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - lead_followup refactorizat cu _run_sequence generic; secvența nurture_7d: lead-uri nurture la 7 zile primesc ghidul '5 greșeli scumpe în renovări' (inline în email) + CTA; config nurture_enabled(false)/nurture_delay_hours(168)/nurture_subject; POST /run?sequence=nurture_7d; job orar rulează ambele secvențe
 - AMBELE SECVENȚE STAU PE DISABLED până user rezolvă DNS Resend — activare cu 1 switch
 - BACKLOG: admin UI editare conținut service hub · subdomeniu→tenant la proxy (val 3 final) · Developer Mode (❄️ P3) · activare followup post-DNS
+
+## [2026-07-11] UX LAB FAZA 1 LIVRATĂ ✅ — CLIENT JUNIOR ACQUISITION-READY (scoruri audit: TOATE ≥90, cognitiv 18)
+### Charter Autonomous UX Lab (acceptat de PO)
+- Autonomie ~99% DOAR pe Client Junior + Specialist Entry; interzis: alte roluri, infrastructură critică, financiar, securitate, modificări DB ireversibile; obiectiv business: Client Junior→Premium, Specialist Entry→Verified; KPI: toate scorurile ≥90, cognitive load <25; măsurare permanentă + auto-revert dacă rezultate slabe
+### Client Junior — flux REAL de achiziție (rută publică /incepe + /dashboard/client-junior)
+- Backend routes/ux_lab.py: POST /api/public/client-junior/request (validări, GDPR, dedupe telefon+categorie+zi, număr cerere CJ-XXXXXX) → client_junior_requests + sync unified leads (source=client_junior, LEGACY_SOURCES actualizat, estimated_value per categorie)
+- Telemetrie funnel: POST /api/public/ux-lab/event (events allowlist cj_*/se_*, session anonimă) + GET /api/admin/ux-lab/metrics (views/starts/submits, conversie, drop-off pe pași, time-to-value) — funcțional, testat E2E
+- UI: servicii semnătură #1 Digital Twin & Audit Tehnic + #2 Design Interior (FeaturedCard) + 6 categorii suport; wizard 4 pași (3 întrebări + contact 2 câmpuri obligatorii); step dots clickabili cu micro-labels (Locație/Detalii/Termen/Contact) + editare retroactivă; validare inline aria-live; trust strip; confirmare cu timeline + CTA cont; Escape→home; stagger reveal desktop; contrast AAA green-800/green-300 mapat dark în .cv2-scope; CTA sticky z-60 (fix blocant: bannerul cookie acoperea CTA)
+- Audit design (key=client_junior): mobile 94, desktop 91, unity 96, hick 98, miller 95, fitts 97, jakob 93, nielsen 92, wcag 96, cognitive 18 — TOATE ȚINTELE ATINSE
+- Testare: e2e playwright (flux complet mobil+desktop+dark, back-nav, validare inline, submit real CJ-026E7A), curl (dedupe, GDPR, lead sync, metrics)
+### URMEAZĂ (STOP — așteaptă aprobarea PO)
+- FAZA 2: Specialist Entry — experiență simplificată onboarding + oportunități (același tratament UX Lab)
+- FAZA 3: audit + raport ambele pagini; apoi extindere pe restul rolurilor dacă PO confirmă
+- Backlog anterior neschimbat: admin UI service hub · subdomeniu→tenant · Developer Mode ❄️ · activare followup post-DNS Resend
