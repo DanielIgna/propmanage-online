@@ -2180,3 +2180,13 @@ Orchestratorul are acum 10 playbook-uri. Cele 3 noi (`/app/backend/orchestrator/
 - **Finance Reconciler** (zilnic 04:50): solduri negative, tranzacții orfane 30z (restrâns de la istoric total → semnal acționabil; 12 orfane reale detectate = escaladare corectă), lucrări confirmate fără tranzacție → escaladează la discrepanțe
 - **Roadmap Advisor** (vineri 09:00): Claude analizează ledger 7z + patterns + pulse → top 3 priorități în `roadmap_advice` + notificare. Validat REAL o dată (3 priorități generate). Mod test NU apelează LLM.
 - simulate/{kind} extins pentru toate 3; toggle enable/disable funcțional; cron-uri în server.py
+
+## Update — Iun 2026 · SPRINT E1: UNIFICARE TEME (dark/light + lime peste tot) — COMPLET (iter96: 8/8 PASS + pachet contrast)
+User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLOY.
+- **ThemeContext global rescris**: 2 teme (dark implicit / light), un singur toggle (ThemeSwitcher Sun/Moon) sincronizează data-theme + data-admin-theme + clasa Tailwind `dark`; persistat localStorage `propmanage_theme`. Admin useAdminTheme delegat la tema globală (sursă unică de adevăr).
+- **Unificare culori**: verdele Client V2 #34C759 eliminat total → familia lime brand (#d4ff3a FILL cu text NEGRU pe CTA/FAB; #65a30d/#3f6212 accent TEXT pe alb). Remap CSS pentru clasele arbitrary + GREEN/CJ_GREEN în ui.jsx/components.jsx. Gradient hero client → lime.
+- **Client V2 dark mode**: override-uri CSS pe .cv2-scope (html fără data-theme=light) — fundal #0a0a0a, carduri #171717, texte deschise, inputs dark.
+- **Toggle plasat sus** pe: landing nav, ClientDashboardV2 header, DashShared (specialist/operator), admin topbar (existent, acum global), /preturi, /preturi/:slug.
+- **Pachet contrast light** (cerință user „scrisul nu se vede"): --pm-accent-ink (lime→olive pe light), text-lime/amber/emerald/rose/blue/violet-300/400 → variante -700/-800, slate-400/500 întărite, text-white protejat pe bg colorate, bg/border lime translucide → bază olive. Validat pe specialist + admin light.
+### Rămas din mandatul de design (Sprint E2):
+- Layout-uri DESKTOP per Hick (client desktop nav + poziții CTA per rol journey), audit suprapuneri text pe restul paginilor, Operator workspace pe DS.
