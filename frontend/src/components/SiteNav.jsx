@@ -35,6 +35,7 @@ const filterByAuth = (items, isAuth) =>
 export const SiteNav = () => {
   const [scrolled, setScrolled] = useState(false);
   const [items, setItems] = useState([]);
+  const [hidden, setHidden] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { user, logout } = useAuth();
   const { lang, toggle, t } = useI18n();
@@ -48,6 +49,7 @@ export const SiteNav = () => {
 
   useEffect(() => {
     axios.get(`${API}/api/public/site-menu`).then((r) => setItems(r.data.items || [])).catch(() => {});
+    axios.get(`${API}/api/ui-rules/my`, { withCredentials: true }).then((r) => setHidden(r.data.hidden || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -56,7 +58,10 @@ export const SiteNav = () => {
   }, [drawerOpen]);
 
   const isAuth = Boolean(user && user !== false);
-  const visible = filterByAuth(items, isAuth);
+  const applyRules = (arr) => arr
+    .filter((it) => !hidden.includes(`menu:${it.id}`))
+    .map((it) => ({ ...it, children: applyRules(it.children || []) }));
+  const visible = applyRules(filterByAuth(items, isAuth));
 
   const resolveHref = useCallback(
     (href) => (href || "").replace(/^\/dashboard/, `/${(user && user.role) || "login"}`),
@@ -68,8 +73,11 @@ export const SiteNav = () => {
     window.location.href = "/";
   };
 
-  const go = (href) => {
+  const go = (href, meta) => {
     setDrawerOpen(false);
+    if (meta?.id) {
+      axios.post(`${API}/api/public/site-menu/track`, { item_id: meta.id, label: meta.label, href: href || "" }, { withCredentials: true }).catch(() => {});
+    }
     if (href === "#logout") { handleLogout(); return; }
     const target = resolveHref(href);
     if (!target) return;
@@ -124,7 +132,7 @@ export const SiteNav = () => {
                       {it.children.map((c) => (
                         <button
                           key={c.id}
-                          onClick={() => go(c.href)}
+                          onClick={() => go(c.href, c)}
                           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-stone-300 hover:text-white hover:bg-white/10 transition-colors text-left"
                           data-testid={`nav-sub-${c.id}`}
                         >
@@ -138,7 +146,7 @@ export const SiteNav = () => {
               ) : (
                 <button
                   key={it.id}
-                  onClick={() => go(it.href)}
+                  onClick={() => go(it.href, it)}
                   className="px-3 py-2 text-sm text-stone-400 hover:text-white transition-colors rounded-full hover:bg-white/5"
                   data-testid={`nav-item-${it.id}`}
                 >
@@ -254,7 +262,7 @@ const MobileDrawer = ({ open, onClose, items, go, isAuth }) => {
                             {it.children.map((c) => (
                               <button
                                 key={c.id}
-                                onClick={() => go(c.href)}
+                                onClick={() => go(c.href, c)}
                                 className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-base text-stone-300 hover:bg-white/5 active:bg-white/10 transition-colors text-left"
                                 data-testid={`drawer-sub-${c.id}`}
                               >
@@ -268,7 +276,7 @@ const MobileDrawer = ({ open, onClose, items, go, isAuth }) => {
                     </>
                   ) : (
                     <button
-                      onClick={() => go(it.href)}
+                      onClick={() => go(it.href, it)}
                       className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-lg font-medium text-stone-200 hover:bg-white/5 active:bg-white/10 transition-colors text-left"
                       data-testid={`drawer-item-${it.id}`}
                     >

@@ -93,6 +93,9 @@ const AISearchPage = lazy(() => import("./pages/admin/AISearchPage"));
 const InteriorDesignLanding = lazy(() => import("./pages/InteriorDesignLanding"));
 const InteriorDesignAdminPage = lazy(() => import("./pages/admin/InteriorDesignAdminPage"));
 const MenuManagerPage = lazy(() => import("./pages/admin/MenuManagerPage"));
+const XOSBuilderPage = lazy(() => import("./pages/admin/XOSBuilderPage"));
+const UIRulesPage = lazy(() => import("./pages/admin/UIRulesPage"));
+const ContentManagerPage = lazy(() => import("./pages/admin/ContentManagerPage"));
 const BugMemoryAggregatorPage = lazy(() => import("./pages/admin/BugMemoryAggregatorPage"));
 const ArchitectureBoardPage = lazy(() => import("./pages/admin/ArchitectureBoardPage"));
 const AIProductManagerPage = lazy(() => import("./pages/admin/AIProductManagerPage"));
@@ -138,6 +141,8 @@ const AnalyticsRouteTracker = () => {
 import { ImpersonationBanner } from "./components/ImpersonationBanner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import SiteNav from "./components/SiteNav";
+import AnnouncementBanner from "./components/AnnouncementBanner";
+import { useSiteContent } from "./lib/siteContent";
 import "./App.css";
 
 const Nav = () => <SiteNav />;
@@ -145,6 +150,8 @@ const Nav = () => <SiteNav />;
 // ============= HERO =============
 const Hero = () => {
   const { t } = useI18n();
+  const siteContent = useSiteContent();
+  const heroOv = siteContent?.hero || {};
   const { variant, trackClick } = useABTest("hero_cta1");
   const { variant: variant2, trackClick: trackClick2 } = useABTest("hero_cta2");
   const ctaText = t(`hero.cta1.variant_${variant}`) || t("hero.cta1");
@@ -165,12 +172,12 @@ const Hero = () => {
         <TrustStrip className="mb-8" />
         
         <h1 className="font-serif text-6xl md:text-8xl lg:text-9xl leading-[0.95] tracking-tight mb-8 max-w-5xl" data-testid="hero-title">
-          {t("hero.title1")}<br/>
-          <span className="italic gradient-text">{t("hero.title2")}</span> {t("hero.title3")}
+          {heroOv.title1 || t("hero.title1")}<br/>
+          <span className="italic gradient-text">{heroOv.title2 || t("hero.title2")}</span> {heroOv.title3 || t("hero.title3")}
         </h1>
         
         <p className="text-lg md:text-xl text-stone-400 max-w-2xl mb-10 leading-relaxed">
-          {t("hero.subtitle")}
+          {heroOv.subtitle || t("hero.subtitle")}
         </p>
         
         <div className="flex flex-col sm:flex-row gap-4">
@@ -1510,6 +1517,7 @@ const LandingPage = () => {
         </div>
       )}
       {!isPreview && demoModeDismissed && <PromoBanner />}
+      <AnnouncementBanner />
       <Nav />
       <Hero />
       <Problem />
@@ -1615,6 +1623,9 @@ function App() {
               <Route path="/admin/design-intelligence" element={<DesignIntelligencePage />} />
               <Route path="/admin/interior-design" element={<InteriorDesignAdminPage />} />
               <Route path="/admin/menu-manager" element={<MenuManagerPage />} />
+              <Route path="/admin/xos-builder" element={<XOSBuilderPage />} />
+              <Route path="/admin/ui-rules" element={<UIRulesPage />} />
+              <Route path="/admin/content-manager" element={<ContentManagerPage />} />
               <Route path="/admin/roadmap" element={<PlatformRoadmapPage />} />
               <Route path="/admin/command-center" element={<CommandCenterPage />} />
               <Route path="/admin/business-health" element={<BusinessHealthPage />} />

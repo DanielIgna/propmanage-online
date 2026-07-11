@@ -102,6 +102,29 @@ export default function BusinessHealthPage() {
             })}
           </div>
 
+          <AdminCard testid="bh-menu-clicks" title="📊 Top servicii căutate din meniu (30 zile)">
+            {!menuStats || menuStats.total_clicks === 0 ? (
+              <div className="text-xs text-slate-400 py-3">Încă nu există click-uri înregistrate în meniu. Datele apar pe măsură ce vizitatorii navighează.</div>
+            ) : (
+              <div className="space-y-2">
+                <div className="text-[11px] text-slate-400">{menuStats.total_clicks} click-uri totale în meniu</div>
+                {menuStats.top.slice(0, 10).map((row, i) => {
+                  const max = menuStats.top[0]?.clicks || 1;
+                  return (
+                    <div key={row.item_id} className="flex items-center gap-3" data-testid={`bh-menu-row-${row.item_id}`}>
+                      <span className="text-[10px] font-black text-slate-400 w-5">{i + 1}.</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 w-40 truncate">{row.label || row.item_id}</span>
+                      <div className="flex-1 h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                        <div className="h-full rounded-full bg-lime-400" style={{ width: `${Math.max(6, (row.clicks / max) * 100)}%` }} />
+                      </div>
+                      <span className="text-xs font-black text-slate-900 dark:text-white w-10 text-right">{row.clicks}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </AdminCard>
+
           <div className="text-[10px] text-slate-400">
             Formule: Marketing = creștere useri 30z · Marketplace = fill rate cereri · Escrow = eliberate vs înghețate · Specialiști = verificare + profil complet · Suport = dispute rezolvate · Conversii = plăți finalizate · SEO = media audit pagini publice · Financiar = creștere revenue 30z.
           </div>

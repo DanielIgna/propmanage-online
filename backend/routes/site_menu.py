@@ -7,7 +7,7 @@ Admin: GET/PUT /api/admin/site-menu + POST reset la structura implicită.
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 
 from db import db
 from deps import require_role
@@ -106,6 +106,35 @@ def _public_items(items: list) -> list:
 async def public_site_menu():
     doc = await _get_menu_doc()
     return {"items": _public_items(doc.get("items") or [])}
+
+
+@router.post("/public/site-menu/track")
+async def track_menu_click(request: Request, item_id: str = Body(..., embed=True), label: str = Body("", embed=True), href: str = Body("", embed=True)):
+    await db.menu_clicks.insert_one({
+        "item_id": str(item_id)[:60], "label": str(label)[:80], "href": str(href)[:300],
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "authenticated": bool(request.cookies.get("access_token")),
+    })
+    return {"ok": True}
+
+
+@router.get("/admin/site-menu/analytics")
+async def menu_analytics(days: int = 30, _admin=Depends(require_role("admin"))):
+    from datetime import timedelta
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    pipeline = [
+        {"$match": {"ts": {"$gte": since}}},
+        {"$group": {"_id": {"item_id": "$item_id", "label": "$label"}, "clicks": {"$sum": 1},
+                    "auth_clicks": {"$sum": {"$cond": ["$authenticated", 1, 0]}}}},
+        {"$sort": {"clicks": -1}},
+        {"$limit": 20},
+    ]
+    rows = await db.menu_clicks.aggregate(pipeline).to_list(20)
+    total = await db.menu_clicks.count_documents({"ts": {"$gte": since}})
+    return {"days": days, "total_clicks": total, "top": [
+        {"item_id": r["_id"]["item_id"], "label": r["_id"]["label"], "clicks": r["clicks"], "auth_clicks": r["auth_clicks"]}
+        for r in rows
+    ]}
 
 
 @router.get("/admin/site-menu")

@@ -134,6 +134,7 @@ from routes.user_timeline import router as user_timeline_router
 from routes.ai_search import router as ai_search_router
 from routes.interior_design import router as interior_design_router
 from routes.site_menu import router as site_menu_router
+from routes.xos import router as xos_router
 
 # Registration order matters — kept identical to the original server.py loop.
 ALL_ROUTERS = (
@@ -264,4 +265,5 @@ ALL_ROUTERS = (
     ai_search_router,
     interior_design_router,
     site_menu_router,
+    xos_router,
 )

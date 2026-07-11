@@ -137,6 +137,15 @@ export const HomeSkeleton = () => (
 
 export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, go, actions }) => {
   const navigate = useNavigate();
+  const [layout, setLayout] = useState([
+    { id: "hero", enabled: true }, { id: "quick_actions", enabled: true }, { id: "copilot", enabled: true },
+    { id: "contextual", enabled: true }, { id: "discover", enabled: true },
+  ]);
+  const [hidden, setHidden] = useState([]);
+  useEffect(() => {
+    axios.get(`${API}/xos/layout/client_home`).then(r => { if (r.data.items?.length) setLayout(r.data.items); }).catch(() => {});
+    axios.get(`${API}/ui-rules/my`).then(r => setHidden(r.data.hidden || [])).catch(() => {});
+  }, []);
   const activeReqs = requests.filter(r => r.status !== "confirmed");
   const activeReq = activeReqs[0];
   const confirmedCount = requests.filter(r => r.status === "confirmed").length;
@@ -159,15 +168,17 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
   if (doneReq) contextual.push({ icon: ShieldCheck, text: `«${doneReq.title}» a fost finalizată — confirmă lucrarea`, cta: "Confirmă", onClick: () => actions.confirmRequest(doneReq.id, doneReq), tid: "v2-ctx-confirm" });
   if (contextual.length < 2 && unread[0]) contextual.push({ icon: Bell, text: unread[0].title, cta: "Vezi", onClick: actions.openNotifs, tid: "v2-ctx-notif" });
 
-  return (
-    <>
-      <div className="cv2-fade">
+  // XOS: widget-uri randate în ordinea/vizibilitatea din Layout Builder + UI Rules
+  const widgets = {
+    hero: (
+      <div className="cv2-fade" key="hero">
         {properties.length === 0 ? <HeroA onAddProperty={actions.openPropManager} />
           : activeReq ? <HeroC req={activeReq} offersCount={offersCount} onCta={heroCta} />
           : <HeroB prop={prop} confirmedCount={confirmedCount} onRequest={actions.openWizard} />}
       </div>
-
-      <div className="mx-5 mt-5 grid grid-cols-2 gap-3 cv2-fade cv2-d1" data-testid="v2-actions">
+    ),
+    quick_actions: (
+      <div key="quick_actions" className="mx-5 mt-5 grid grid-cols-2 gap-3 cv2-fade cv2-d1" data-testid="v2-actions">
         {[
           [Plus, "Solicită", "serviciu nou", actions.openWizard, "v2-action-request"],
           [Building2, "Proprietatea", prop ? prop.name : "adaugă prima", () => go("property"), "v2-action-property"],
@@ -184,11 +195,10 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
           </button>
         ))}
       </div>
-
-      <CopilotCard go={go} actions={actions} hasProps={properties.length > 0} />
-
-      {contextual.length > 0 && (
-        <div className="mx-5 mt-6 cv2-fade cv2-d2" data-testid="v2-contextual">
+    ),
+    copilot: <CopilotCard key="copilot" go={go} actions={actions} hasProps={properties.length > 0} />,
+    contextual: contextual.length > 0 ? (
+      <div key="contextual" className="mx-5 mt-6 cv2-fade cv2-d2" data-testid="v2-contextual">
           <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-400 px-1">Noutăți pentru tine</h3>
           <div className="mt-2 space-y-2">
             {contextual.slice(0, 2).map(({ icon: Icon, text, cta, onClick, tid }) => (
@@ -201,9 +211,9 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
             ))}
           </div>
         </div>
-      )}
-
-      <div className="mt-7 pb-8 cv2-fade cv2-d3" data-testid="v2-discover">
+    ) : null,
+    discover: (
+      <div key="discover" className="mt-7 pb-8 cv2-fade cv2-d3" data-testid="v2-discover">
         <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-400 px-6">Descoperă</h3>
         <div className="mt-2 flex gap-3 overflow-x-auto px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {[["Digital Twin", "locuința ta în 3D", Box, actions.openTwin], ["House Health", "scorul casei tale", HeartPulse, actions.openHealth], ["Ghid întreținere", "sfaturi sezoniere", FileText, actions.openAI]].map(([l, s, Icon, onClick]) => (
@@ -215,6 +225,14 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
           ))}
         </div>
       </div>
+    ),
+  };
+
+  return (
+    <>
+      {layout
+        .filter(w => w.enabled && !hidden.includes(`widget:${w.id}`))
+        .map(w => widgets[w.id] || null)}
     </>
   );
 };
