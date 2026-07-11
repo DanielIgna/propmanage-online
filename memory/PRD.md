@@ -2446,3 +2446,27 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - P1 Rate limiting pe /api/interior-design/assistant (protecție quota LLM)
 - P2 Developer Mode în Design Studio
 - P3 Resend DNS custom domain (blocat pe user: DKIM/SPF)
+
+## [2026-06-11] Meniu de Navigare Unificat CMS (Iter 107)
+
+### Livrat concret
+1. **Sistem unic de navigare administrat din CMS** (fundația XOS „Menu Manager")
+   - Colecția `site_menu` (doc key="main") — un singur meniu pentru Desktop + Mobile
+   - Public: GET /api/public/site-menu · Admin: GET/PUT /api/admin/site-menu + POST reset
+   - Structură: Acasă, Servicii (12 sub), Pentru Proprietari (4), Companie (3), Cont vizitatori (login/register), Contul meu autentificați (Dashboard/Proiecte/Mesaje/Notificări/Setări/Logout)
+2. **SiteNav.jsx** — componentă unificată:
+   - Mobil: hamburger stânga-sus → drawer stânga (framer-motion), submeniuri expandabile, font mare touch, închidere swipe-left/tap-outside/X, CTA „Creează cont gratuit"
+   - Desktop: aceleași iteme CMS, orizontal cu dropdown-uri hover
+   - Vizibilitate filtrată pe starea auth; href special /dashboard→rol, #logout→deconectare
+3. **Menu Manager** (/admin/menu-manager, link în sidebar admin): reordonare ↑↓, activ/inactiv, vizibilitate (toți/vizitatori/autentificați), icon, subcategorii, adăugare/ștergere, reset implicit
+4. **Rate limiting AI Assistant Design Interior**: 10 req/10min per IP (X-Forwarded-For aware), mesaj 429 în română
+
+### Testare: iteration_107.json — backend 17/17 (100%), frontend 19/19 flows + regresie (100%)
+
+### Backlog rămas (prioritizat)
+- P0 Experience OS (XOS): Layout Builder + Widget Manager drag&drop per rol/franciză (Menu Manager = primul modul livrat)
+- P1 Dynamic UI Rules & Visibility Engine (ex: ascunde Wallet pt junior)
+- P1 Theme & Content Manager în XOS (texte/bannere din DB)
+- P2 Developer Mode în Design Studio
+- P2 Pagini dedicate servicii (Design Exterior, Arhitectură, Construcții etc. — acum trimit către /marketplace?categorie=X, editabile din Menu Manager)
+- P3 Resend DNS custom domain (blocat pe user: DKIM/SPF)

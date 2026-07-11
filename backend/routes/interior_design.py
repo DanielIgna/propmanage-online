@@ -182,7 +182,9 @@ def _check_ai_rate_limit(ip: str):
 
 @router.post("/interior-design/assistant")
 async def design_assistant(request: Request, question: str = Body(..., embed=True), session_id: str = Body(None, embed=True)):
-    _check_ai_rate_limit(request.client.host if request.client else "unknown")
+    fwd = request.headers.get("x-forwarded-for", "")
+    ip = fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "unknown")
+    _check_ai_rate_limit(ip)
     question = question.strip()[:500]
     if not question:
         raise HTTPException(400, "Întrebarea este goală.")
