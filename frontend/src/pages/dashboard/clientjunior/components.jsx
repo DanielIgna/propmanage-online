@@ -1,5 +1,5 @@
 import React from "react";
-import { Check, Search, Briefcase, Bell, Settings, ChevronRight, ShieldCheck, Clock, BadgeCheck } from "lucide-react";
+import { Check, Search, Briefcase, Bell, Settings, ChevronRight, ShieldCheck, Clock, BadgeCheck, Copy as CopyIcon } from "lucide-react";
 
 // Verde AA-compliant: green-700 pe alb = 4.99:1 (WCAG AA text normal)
 export const CJ_GREEN = "#166534";
@@ -70,17 +70,17 @@ export const StepDots = ({ total, current, labels, shortLabels, onJump }) => (
 );
 
 // ── TextField: câmp cu label vizibil permanent (Nielsen — recunoaștere) ──────
-export const TextField = ({ label, optional, value, onChange, onBlur, error, type = "text", autoComplete, placeholder, testid, inputMode }) => (
+export const TextField = ({ label, optional, required, value, onChange, onBlur, error, type = "text", autoComplete, placeholder, testid, inputMode }) => (
   <label className="block">
     <span className="text-sm font-bold text-slate-900">
-      {label} {optional && <span className="font-medium text-slate-500">(opțional)</span>}
+      {label} {required && <span className="text-rose-600" aria-hidden="true">*</span>}{optional && <span className="font-medium text-slate-500">(opțional)</span>}
     </span>
     <input value={value} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} type={type} inputMode={inputMode}
-      autoComplete={autoComplete} placeholder={placeholder} data-testid={testid} aria-label={label} aria-invalid={!!error}
+      autoComplete={autoComplete} placeholder={placeholder} data-testid={testid} aria-label={label} aria-invalid={!!error} aria-required={!!required}
       className={`mt-1.5 w-full min-h-[52px] px-4 py-3.5 rounded-2xl border-2 bg-white text-base text-slate-900 outline-none transition-colors ${
         error ? "border-rose-400 focus:border-rose-500" : "border-slate-200 focus:border-[#166534]"}`} />
     <span aria-live="polite" className="block min-h-[2px]">
-      {error && <span className="mt-1 block text-xs font-semibold text-rose-600" data-testid={`${testid}-error`}>{error}</span>}
+      {error && <span className="mt-1 block text-xs font-semibold text-rose-600 cj-reveal" data-testid={`${testid}-error`}>{error}</span>}
     </span>
   </label>
 );
@@ -92,15 +92,33 @@ const TRUST = [
   [BadgeCheck, "Gratuit, fără obligații"],
 ];
 
-export const TrustStrip = () => (
+export const TrustStrip = ({ items }) => (
   <div className="px-5 mt-4 flex items-center justify-between gap-2" data-testid="cj-trust-strip">
-    {TRUST.map(([Icon, label]) => (
+    {(items || TRUST).map(([Icon, label]) => (
       <span key={label} className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
         <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: CJ_GREEN }} aria-hidden="true" />{label}
       </span>
     ))}
   </div>
 );
+
+// ── CopyBadge: număr cerere cu copy-to-clipboard + feedback 1.2s ─────────────
+export const CopyBadge = ({ value, testid }) => {
+  const [copied, setCopied] = React.useState(false);
+  const copy = () => {
+    navigator.clipboard?.writeText(value).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  };
+  return (
+    <button onClick={copy} data-testid={testid} aria-label={`Copiază numărul ${value}`}
+      className="inline-flex items-center gap-1.5 font-mono font-bold text-slate-900 min-h-[32px] px-2 py-0.5 rounded-lg hover:bg-black/5 transition-colors">
+      {value}
+      {copied ? <Check className="w-3.5 h-3.5 text-[#166534]" aria-hidden="true" /> : <CopyIcon className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />}
+      <span aria-live="polite" className="sr-only">{copied ? "Copiat în clipboard" : ""}</span>
+    </button>
+  );
+};
 
 // ── BottomNav: max 4 destinații (Hick), target ≥48px (Fitts) ─────────────────
 const NAV_ITEMS = [
@@ -140,7 +158,7 @@ export const CategoryCard = ({ icon: Icon, label, sub, onClick, testid }) => (
 // ── FeaturedCard: serviciile strategice PropManage (Digital Twin, Design) ────
 export const FeaturedCard = ({ icon: Icon, label, sub, badge, onClick, testid }) => (
   <button onClick={onClick} data-testid={testid} aria-label={`Solicită ${label}`}
-    className="w-full min-h-[72px] flex items-center gap-4 rounded-2xl border-2 border-[#166534]/25 bg-white p-4 text-left active:scale-[0.98] transition-transform shadow-sm">
+    className="w-full min-h-[72px] flex items-center gap-4 rounded-2xl border-2 border-[#166534]/25 bg-white p-4 text-left active:scale-[0.98] hover:scale-[1.01] hover:shadow-lg hover:border-[#166534]/50 transition-[transform,box-shadow,border-color] duration-150 shadow-sm">
     <span className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: CJ_GREEN }}>
       <Icon className="w-6 h-6 text-white" aria-hidden="true" />
     </span>

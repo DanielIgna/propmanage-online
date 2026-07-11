@@ -85,6 +85,8 @@ export const TutorialOverlay = () => {
   if (!user || user === false) return null;
   if (user.tutorial_seen === true) return null;
   if (user.tutorial_seen === undefined) return null; // wait until /me returns the flag
+  // UX Lab: specialiștii ENTRY au experiența simplificată — fără tur (apare la JUNIOR+)
+  if (role === "specialist" && (!user.tier || user.tier === "ENTRY") && localStorage.getItem("pm_spec_full") !== "1") return null;
   if (closing) return null;
 
   const finish = async () => {

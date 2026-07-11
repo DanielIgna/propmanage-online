@@ -32,6 +32,7 @@ import {
   PMSectionHeader, PMEmptyState,
 } from "../components/pm";
 import { TierProgressWidget } from "../components/TierProgressWidget";
+import { SpecialistEntryHome } from "./dashboard/SpecialistEntryHome";
 
 export const SpecialistDashboard = () => {
   const { user, refreshUser } = useAuth();
@@ -57,6 +58,8 @@ export const SpecialistDashboard = () => {
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [acceptingReq, setAcceptingReq] = useState(null);  // {id, title} for ScheduleProposalModal
   const [timelineRequestId, setTimelineRequestId] = useState(null);
+  const [entryFull, setEntryFull] = useState(() => localStorage.getItem("pm_spec_full") === "1");
+  const entryMode = tierInfo.tier === "ENTRY" && !entryFull;
 
   const [xosLayout, setXosLayout] = useState(null);
   const [xosHidden, setXosHidden] = useState([]);
@@ -119,7 +122,7 @@ export const SpecialistDashboard = () => {
   return (
     <DashLayout role="specialist" title={title} bottomNav={<BottomNav tabs={tabs} active={tab} onChange={setTab} dataPrefix="spec-tab" />}>
       {/* Zona XOS (specialist_home): widget-uri ordonate/vizibile din Layout Builder + UI Rules */}
-      {tab === "opportunities" && (() => {
+      {!entryMode && tab === "opportunities" && (() => {
         const xosWidgets = {
           today_summary: (
             <div className="mb-6 pm-fade-in" data-testid="spec-today-summary">
@@ -145,10 +148,15 @@ export const SpecialistDashboard = () => {
           .filter(w => w.enabled && !xosHidden.includes(`widget:${w.id}`))
           .map(w => <React.Fragment key={w.id}>{xosWidgets[w.id] || null}</React.Fragment>);
       })()}
-      <WelcomeChecklist />
-      <MaturityCard />
+      {entryMode && tab === "opportunities" && (
+        <SpecialistEntryHome user={user} open={filtered(open)} mine={mine} onAccept={openAccept}
+          onVerify={() => setShowDocs(true)} onGoJobs={() => setTab("jobs")}
+          onSwitchFull={() => { localStorage.setItem("pm_spec_full", "1"); setEntryFull(true); }} />
+      )}
+      {!entryMode && <WelcomeChecklist />}
+      {!entryMode && <MaturityCard />}
       <TierCelebrationBanner />
-      {!user?.verified && (
+      {!entryMode && !user?.verified && (
         <PMCard accent="warning" className="mb-6 !bg-amber-500/5 !border-amber-500/30 pm-fade-in" testid="verify-banner">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
@@ -167,7 +175,7 @@ export const SpecialistDashboard = () => {
         </PMCard>
       )}
 
-      {tab === "opportunities" && (
+      {!entryMode && tab === "opportunities" && (
         <>
           {/* Welcome hero (only ADVANCED+) */}
           {user?.verified && tierInfo.canSeeBentoHero && user?.tier && user.tier !== "ENTRY" && (

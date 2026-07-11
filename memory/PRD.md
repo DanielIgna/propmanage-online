@@ -2725,3 +2725,20 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - FAZA 2: Specialist Entry — experiență simplificată onboarding + oportunități (același tratament UX Lab)
 - FAZA 3: audit + raport ambele pagini; apoi extindere pe restul rolurilor dacă PO confirmă
 - Backlog anterior neschimbat: admin UI service hub · subdomeniu→tenant · Developer Mode ❄️ · activare followup post-DNS Resend
+
+## [2026-07-11] UX LAB FAZA 2 LIVRATĂ ✅ — SPECIALIST ENTRY (scoruri audit: TOATE ≥90 pe ambele experiențe, cognitiv 18)
+### Pagina publică de recrutare /devino-specialist (SpecialistApplyPage.jsx)
+- Wizard 3 pași (experiență → program → contact cu oraș pt. matching), 2 roluri semnătură (Designer/Arhitect, Auditor tehnic — echipa Digital Twin & Design) + 6 meserii în progressive disclosure ('Vezi toate meseriile'), skip-link WCAG, auto-focus prima opțiune, indicator '*' obligatoriu + aria-required, copy-to-clipboard pe număr aplicație (CopyBadge), timeline confirmare cu icoane
+- Backend: POST /api/public/specialist-entry/apply (validări, dedupe telefon+zi, SE-XXXXXX) → specialist_entry_applications + unified leads (source=specialist_entry); metrics generalizat: GET /api/admin/ux-lab/metrics → funnels {client_junior, specialist_entry}
+- Rută /devino-specialist în App.js + link footer 'Devino specialist'
+- Audit key=specialist_entry: mobile 94, desktop 91, unity 96, hick 97, miller 95, fitts 93, jakob 96, nielsen 92, wcag 95, cognitiv 18 — TOATE ≥90 ✅
+### Entry Home simplificat pentru specialiști tier ENTRY (SpecialistEntryHome.jsx)
+- Redare implicită în SpecialistDashboard când tier===ENTRY && !localStorage.pm_spec_full (reversibil 1 click 'Dashboard complet' cu badge AVANSAT + aria-describedby sr-only); tur ghidat (TutorialOverlay) suprimat DOAR pentru ENTRY
+- 3 chunk-uri: checklist 'Primii tăi pași' cu badge X/3 + progressbar (verifică cont→acceptă→finalizează), oportunități max 5 cu UN CTA 'Acceptă' full-size (ScheduleProposalModal existent), aside motivațional; desktop lg: 2 zone (stânga checklist / dreapta oportunități); aria-live pe listă, focus-visible ring, stagger 40ms
+- Audit key=specialist_entry_home: mobile 92, desktop 94, unity 96, hick 95, miller 93, fitts 96, jakob 94, nielsen 91, wcag 94, cognitiv 18 — TOATE ≥90 ✅
+- Lecție evaluator: grid 3 coloane checklist penaliza Fitts constant → rânduri verticale full-width identice mobile/desktop au rezolvat (88→96 fitts, 88→94 desktop)
+### Îmbunătățiri retro pe Client Junior (partajate prin componente)
+- TextField cu required '*' + aria-required; CopyBadge pe număr cerere; hover states FeaturedCard; fade pe erori validare
+### Cont test nou: entry.spec@test.ro / Entry123! (specialist tier ENTRY)
+### URMEAZĂ (STOP — așteaptă aprobarea PO)
+- FAZA 3 propusă: măsurare & auto-optimizare (dashboard admin UX Lab cu funnels live, alerting drop-off) SAU extindere tratament UX Lab pe alte pagini (/preturi din screenshot-ul PO avea cognitive 71) — la alegerea PO

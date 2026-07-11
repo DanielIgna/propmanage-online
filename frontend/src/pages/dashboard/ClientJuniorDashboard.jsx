@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import {
   QuestionCard, OptionRadio, StickyCTA, BottomNav, CategoryCard, FeaturedCard,
-  TextField, TrustStrip, StepDots, CJ_GREEN,
+  TextField, TrustStrip, StepDots, CopyBadge, CJ_GREEN,
 } from "./clientjunior/components";
 import { API } from "../DashShared";
 
@@ -126,10 +126,10 @@ const ContactStep = ({ contact, setContact, touched, setTouched }) => {
       <h2 className="text-2xl font-black text-slate-900 leading-snug">Unde îți trimitem ofertele?</h2>
       <p className="mt-1.5 text-sm text-slate-500">Doar 2 câmpuri obligatorii. Fără spam, promitem.</p>
       <div className="mt-5 space-y-3">
-        <TextField label="Numele tău" value={contact.name} onChange={v => setContact(c => ({ ...c, name: v }))}
+        <TextField label="Numele tău" required value={contact.name} onChange={v => setContact(c => ({ ...c, name: v }))}
           onBlur={() => setTouched(t => ({ ...t, name: true }))} error={nameBad ? "Numele pare prea scurt." : ""}
           autoComplete="name" placeholder="ex: Andrei Popescu" testid="cj-contact-name" />
-        <TextField label="Telefon" value={contact.phone} onChange={v => setContact(c => ({ ...c, phone: v }))}
+        <TextField label="Telefon" required value={contact.phone} onChange={v => setContact(c => ({ ...c, phone: v }))}
           onBlur={() => setTouched(t => ({ ...t, phone: true }))} error={phoneBad ? "Numărul pare incomplet — verifică cifrele." : ""}
           type="tel" inputMode="tel" autoComplete="tel" placeholder="ex: 07xx xxx xxx" testid="cj-contact-phone" />
         <TextField label="Email" optional value={contact.email} onChange={v => setContact(c => ({ ...c, email: v }))}
@@ -236,7 +236,7 @@ const ConfirmView = ({ category, requestNumber, onGoJobs }) => (
         <PartyPopper className="w-9 h-9 text-white" aria-hidden="true" />
       </span>
       <h1 className="text-2xl font-black text-slate-900 leading-snug">Cererea ta a fost trimisă!</h1>
-      <p className="mt-2 text-sm text-slate-600">{category.label} · Nr. <span className="font-mono font-bold text-slate-900" data-testid="cj-request-number">{requestNumber}</span></p>
+      <p className="mt-2 text-sm text-slate-600 flex items-center justify-center gap-1 flex-wrap">{category.label} · Nr. <CopyBadge value={requestNumber} testid="cj-request-number" /></p>
       <div className="mt-6 w-full max-w-sm rounded-2xl bg-white border border-slate-100 p-5 text-left shadow-sm">
         <h2 className="text-sm font-black text-slate-900">Ce urmează</h2>
         <ol className="mt-3">

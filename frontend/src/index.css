@@ -889,3 +889,10 @@ html:not([data-theme="light"]) .cv2-scope .bg-\[\#EDF7EF\] { background-color: #
 @media (prefers-reduced-motion: reduce) { .cj-reveal { animation: none; opacity: 1; } }
 .cj-dot-pop { animation: cjPop 0.2s ease-out; }
 @keyframes cjPop { 0% { transform: scale(0.8); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+/* Specialist Entry Home — focus vizibil pe toate CTA-urile (WCAG 2.4.7) */
+[data-testid="spec-entry-home"] button:focus-visible,
+[data-testid="spec-entry-home"] a:focus-visible {
+  outline: 2px solid var(--pm-primary);
+  outline-offset: 2px;
+  border-radius: 9999px;
+}

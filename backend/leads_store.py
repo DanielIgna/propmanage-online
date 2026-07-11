@@ -93,6 +93,7 @@ LEGACY_SOURCES = {
     "partner": "partner_leads",
     "franchise_application": "franchise_applications",
     "client_junior": "client_junior_requests",
+    "specialist_entry": "specialist_entry_applications",
 }
 
 
