@@ -2212,3 +2212,10 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - **Bugfix**: /api/admin/bi/specialist-performance 500 (rating=None la unii specialiști) — coalescing `(u.get("rating") or 0)` în bi_moe.py; verificat 200 cu 372 specialiști evaluați.
 - **test_credentials.md corectat**: admin seed = SEED_ADMIN_PASSWORD env (1!nasov01ADMIN), owner super admin danieligna1@gmail.com/0108 adăugat.
 ### Rămase în backlog: AI Insights v2 pe restul modulelor · Operator Dashboard pe DS (P2) · CIP-C · Faza 5 Marketplace Intelligence & Autonomy 2.0 · DNS Resend (blocat pe user) · Redeploy producție
+
+## Update — Iul 2026 · DATE LEGALE + AI INSIGHTS v2 (Control/Governance) + OPERATOR DS + FAZA 5 v1 — COMPLET (iter100: 9/9 backend + frontend 100% PASS)
+- **Date legale firmă**: brandul PropManage e operat de VINTAGE FURNITURE S.R.L. (CUI 35250247 · J12/3534/2015 · Aleea Negoiu 8D, Ap. 25, Cluj-Napoca, 400676). Actualizat în: footer landing (footer-legal + linkuri ANPC SAL/SOL), /terms, /privacy, footere Ghiduri/Marketplace, email footer, contract servicii PDF, backend/.env (COMPANY_LEGAL_NAME/ADDRESS/REGISTRY → GDPR docs/ROPA).
+- **AI Insights v2 — Control Center & Governance**: module noi "ai_control" și "governance" în /api/admin/insights/rule + /llm; AIInsightCard montat pe /admin/ai-control și /admin/ai-governance cu buton Claude.
+- **Operator Dashboard pe DS**: migrare completă de la dark glass la slate DS (CARD, EmptyState, DSBadge) + card AI Insights (op-ai-insights) cu bullets din date reale (twins/DT Pro/logs) — backlog-ul P2 din DESIGN_SYSTEM.md închis.
+- **Faza 5 v1**: (a) Market Pulse public — GET /api/construction/prices/seo-pages/{slug}/pulse + strip „Piața acum" pe /preturi/{slug} (cereri 30z, specialiști activi, cereri deschise — SEO + social proof); (b) Pattern Hunter 2.0 — detectoare noi supply_gap (categorii cu cerere dar 0 specialiști) și churn_risk (specialiști VERIFIED/PREMIUM inactivi 21z+).
+### Rămase în backlog: Faza 5 extins (Observatory public dashboard, demand trends istorice) · Module AI pe DS complet (P3) · CIP-C · DNS Resend (blocat pe user) · REDEPLOY producție (toate schimbările sunt doar în preview)
