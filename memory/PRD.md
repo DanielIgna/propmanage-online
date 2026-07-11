@@ -2219,3 +2219,64 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - **Operator Dashboard pe DS**: migrare completă de la dark glass la slate DS (CARD, EmptyState, DSBadge) + card AI Insights (op-ai-insights) cu bullets din date reale (twins/DT Pro/logs) — backlog-ul P2 din DESIGN_SYSTEM.md închis.
 - **Faza 5 v1**: (a) Market Pulse public — GET /api/construction/prices/seo-pages/{slug}/pulse + strip „Piața acum" pe /preturi/{slug} (cereri 30z, specialiști activi, cereri deschise — SEO + social proof); (b) Pattern Hunter 2.0 — detectoare noi supply_gap (categorii cu cerere dar 0 specialiști) și churn_risk (specialiști VERIFIED/PREMIUM inactivi 21z+).
 ### Rămase în backlog: Faza 5 extins (Observatory public dashboard, demand trends istorice) · Module AI pe DS complet (P3) · CIP-C · DNS Resend (blocat pe user) · REDEPLOY producție (toate schimbările sunt doar în preview)
+
+
+## [2026-02-11] Design Studio + Design Audit (Iter 102)
+
+### Ce e nou
+1. **Design Studio** (Admin → AI & Engineering Lab → Design Studio · UI Control)
+   - Live Theme Editor: color pickers pentru 20 tokens de culoare (primary, surface, text, semantic × light/dark)
+   - Typography, radii, shadows, spacing, component styles (button/input/card/table/sidebar/header/badge/chart/kpi)
+   - 6 preseturi built-in: PropManage Default, Corporate Slate, Minimal Dark, Warm Linen, Neon Lab, Material You
+   - Salvare preseturi custom; Aplicare instant prin CSS variables (fără redeploy)
+   - Tab Componente: registry cu 17 componente și tokens folosite
+   - Tab UX Validator: link direct la Design Audit
+   - Tab Design Lock: 8 reguli obligatorii + toggle
+   - Tab Roadmap Builder: Page/Menu/Button/Form/Table/Dashboard builders + Developer Mode (placeholder cu status/ETA)
+
+2. **Design Audit** (Admin → AI & Engineering Lab → Design Audit · UX Score)
+   - 13 pagini catalogate (public, client, specialist, operator, admin)
+   - Analiză Claude LLM: mobile score, desktop score, unity, Hick's Law + 3-5 recomandări prioritate P0-P2
+   - Cache 12h per pagină, summary agregat, worst 3 mobile / worst 3 desktop
+   - Fallback rule-based când LLM indisponibil
+
+3. **Reparație culori globale (unitate light/dark)**
+   - QuestPanel (client dashboard): eliminare bg-[#0e0e10] hardcoded → theme-aware
+   - ClientTwinViewer: butonul mov Solicită → lime brand
+   - AdminOverview: chart blue/violet → emerald/lime; bars ranking + progress → lime
+   - Design System tokens.js: AI/NEW badges violet → lime; primary button blue → lime
+   - AdminCard: reactive la ThemeContext (elimină mismatch dark/light)
+   - AIInsightCard: violet → lime consistent
+
+### Endpoints noi
+- `GET /api/admin/design-studio/tokens` (public read pentru Provider)
+- `PUT /api/admin/design-studio/tokens` (admin)
+- `POST /api/admin/design-studio/reset`
+- `GET/POST/DELETE /api/admin/design-studio/presets*`
+- `POST /api/admin/design-studio/presets/apply`
+- `GET/PUT /api/admin/design-studio/lock`
+- `GET /api/admin/design-studio/components`
+- `GET /api/admin/design-studio/builder-status`
+- `GET /api/admin/design-audit/pages`
+- `GET /api/admin/design-audit/analyze?key={page}`
+- `GET /api/admin/design-audit/summary`
+
+### DB collections noi
+- `design_tokens` (single doc `{_id: "active"}`)
+- `design_presets` (6 built-in + custom)
+- `design_lock` (policy doc)
+- `design_audit_cache` (per-page LLM cache, TTL 12h logic)
+
+### Arhitectură
+- `DesignTokensProvider` (context nou) — fetches `/api/admin/design-studio/tokens` la mount + reactively pe eveniment `pm:tokens-updated`
+- Injectează CSS variables la `document.documentElement.style` — orice regulă `var(--pm-*)` din index.css primește noile valori instant
+- Providers order: `ThemeProvider > DesignTokensProvider > I18nProvider > AuthProvider`
+
+### Backlog Design Studio (P1/P2/P3)
+- P1 Menu Manager: NAV_SECTIONS în DB, editabile drag&drop
+- P2 Page Builder: layout drag&drop cu widget picker per rol
+- P2 Form Builder: schema-driven JSON forms
+- P2 Table Builder: config coloane/filtre/sortare per tabel
+- P2 Button Manager: registry butoane per pagină + vizibilitate pe rol
+- P2 Dashboard Builder: widget picker + grid per rol
+- P3 Developer Mode: inspect component + tokens folosite

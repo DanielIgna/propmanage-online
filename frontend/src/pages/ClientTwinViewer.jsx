@@ -299,31 +299,31 @@ export const DesignersBrowse = ({ onSelect }) => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {designers.slice(0, 6).map(d => (
             <div key={d.id}
-              className="bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-500/40 rounded-2xl p-4 transition-all group flex flex-col"
+              className="bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 border border-stone-200 dark:border-stone-800 hover:border-lime-500/50 rounded-2xl p-4 transition-all group flex flex-col"
               data-testid={`designer-card-${d.id}`}>
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-500/30 to-pink-500/30 border border-white/10 flex items-center justify-center font-serif text-lg text-purple-200 shrink-0 overflow-hidden">
+                <div className="w-11 h-11 rounded-2xl bg-lime-500/15 border border-lime-500/30 flex items-center justify-center font-serif text-lg text-lime-700 dark:text-lime-300 shrink-0 overflow-hidden">
                   {d.avatar || d.picture ? <img src={d.avatar || d.picture} alt={d.name} className="w-full h-full object-cover" /> : (d.name || "?").charAt(0)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="font-medium text-sm truncate flex items-center gap-1.5">
+                  <div className="font-medium text-sm truncate flex items-center gap-1.5 text-stone-900 dark:text-white">
                     {d.name}
-                    {d.verified && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                    {d.verified && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-stone-400">
-                    <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                    <span className="text-amber-300">{d.rating?.toFixed(1) || "—"}</span>
+                  <div className="flex items-center gap-1 text-xs text-stone-500 dark:text-stone-400">
+                    <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                    <span className="text-amber-600 dark:text-amber-300">{d.rating?.toFixed(1) || "—"}</span>
                     <span className="text-stone-500">· {d.reviews_count || 0} recenzii</span>
                   </div>
                 </div>
                 {d.tier && (
-                  <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d4ff3a]/15 text-[#d4ff3a] border border-[#d4ff3a]/30 shrink-0">{d.tier}</span>
+                  <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-lime-500/15 text-lime-700 dark:text-lime-300 border border-lime-500/40 shrink-0">{d.tier}</span>
                 )}
               </div>
               {(d.service_categories && d.service_categories.length > 0) && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {d.service_categories.slice(0, 3).map(c => (
-                    <span key={c} className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5 text-stone-400 border border-white/5">{c.replace("_", " ")}</span>
+                    <span key={c} className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 border border-stone-200 dark:border-stone-700">{c.replace("_", " ")}</span>
                   ))}
                 </div>
               )}
@@ -331,17 +331,17 @@ export const DesignersBrowse = ({ onSelect }) => {
                 {d.availability_status === "available" ? "✓ Disponibil" : (d.availability_status || "")}
                 {d.coverage_zones && d.coverage_zones.length > 0 && ` · ${d.coverage_zones.length} zone`}
               </div>
-              <div className="flex gap-2 mt-3 pt-3 border-t border-white/5">
+              <div className="flex gap-2 mt-3 pt-3 border-t border-stone-200 dark:border-stone-800">
                 <button
                   onClick={() => navigate(`/specialists/${d.id}`)}
-                  className="flex-1 text-xs px-3 py-2 rounded-full bg-white/5 hover:bg-white/10 text-stone-300 border border-white/10 transition flex items-center justify-center gap-1"
+                  className="flex-1 text-xs px-3 py-2 rounded-full bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 border border-stone-200 dark:border-stone-700 transition flex items-center justify-center gap-1"
                   data-testid={`designer-view-profile-${d.id}`}
                 >
                   Vezi profil
                 </button>
                 <button
                   onClick={() => onSelect && onSelect(d)}
-                  className="flex-1 text-xs px-3 py-2 rounded-full bg-purple-500/15 hover:bg-purple-500/25 text-purple-200 border border-purple-500/40 transition flex items-center justify-center gap-1"
+                  className="flex-1 text-xs px-3 py-2 rounded-full bg-lime-400 hover:bg-lime-500 text-stone-900 font-semibold border border-lime-500 transition flex items-center justify-center gap-1 shadow-sm"
                   data-testid={`designer-request-${d.id}`}
                 >
                   <Sparkles className="w-3 h-3" />Solicită

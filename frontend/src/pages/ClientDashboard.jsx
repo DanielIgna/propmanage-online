@@ -718,7 +718,7 @@ const JobsZone = ({ requests, searchQ, setSearchQ, filterCat, setFilterCat, filt
             )}
             {r.category === "interior_design" && (
               <button onClick={() => setDesignPhasesFor(r)}
-                className="mt-2 w-full bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 py-2 rounded-full text-xs flex items-center justify-center gap-1"
+                className="mt-2 w-full bg-lime-500/15 hover:bg-lime-500/25 text-lime-700 dark:text-lime-300 border border-lime-500/40 py-2 rounded-full text-xs flex items-center justify-center gap-1"
                 data-testid={`phases-${r.id}`}>
                 <Palette className="w-3 h-3" />Faze design ({(r.phases || []).length})
               </button>

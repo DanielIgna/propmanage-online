@@ -74,9 +74,9 @@ export const AdminOverview = () => {
             {(analytics?.series || []).map((s, i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
                 <div className="w-full flex flex-col gap-0.5 items-stretch" style={{ height: "200px", justifyContent: "flex-end" }}>
-                  <div className="bg-blue-500 dark:bg-blue-400 rounded-t transition-all hover:opacity-80"
+                  <div className="bg-emerald-500 dark:bg-emerald-400 rounded-t transition-all hover:opacity-80"
                     style={{ height: `${(s.jobs_created / maxJobs) * 100}%`, minHeight: "2px" }} title={`${s.jobs_created} cereri`} />
-                  <div className="bg-emerald-500 dark:bg-emerald-400 rounded-t opacity-70"
+                  <div className="bg-lime-400 dark:bg-lime-300 rounded-t opacity-80"
                     style={{ height: `${(s.jobs_confirmed / maxJobs) * 100}%`, minHeight: "2px" }} title={`${s.jobs_confirmed} confirmate`} />
                 </div>
                 <div className="text-[9px] text-slate-500 dark:text-slate-500 -rotate-45 origin-top-left whitespace-nowrap mt-1">{s.date}</div>
@@ -84,8 +84,8 @@ export const AdminOverview = () => {
             ))}
           </div>
           <div className="flex gap-4 mt-4 text-xs text-slate-600 dark:text-slate-400">
-            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-blue-500" /> Cereri create</div>
-            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-emerald-500" /> Confirmate</div>
+            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-emerald-500" /> Cereri create</div>
+            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-lime-400" /> Confirmate</div>
           </div>
         </AdminCard>
 
@@ -93,7 +93,7 @@ export const AdminOverview = () => {
           <div className="space-y-3">
             {(analytics?.top_specialists || []).slice(0, 5).map((s, i) => (
               <div key={s.id} className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-white text-sm font-bold">{i + 1}</div>
+                <div className="w-8 h-8 rounded-full bg-lime-400 flex items-center justify-center text-stone-900 text-sm font-bold">{i + 1}</div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{s.name}</div>
                   <div className="text-[11px] text-slate-500">{s.jobs} joburi · {Number(s.revenue).toLocaleString("ro")} RON</div>
@@ -143,7 +143,7 @@ export const AdminOverview = () => {
                     <span className="text-slate-500">{c.value} ({pct.toFixed(0)}%)</span>
                   </div>
                   <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-blue-500 to-violet-500" style={{ width: `${pct}%` }} />
+                    <div className="h-full bg-lime-400" style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               );

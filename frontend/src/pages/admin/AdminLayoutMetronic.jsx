@@ -7,7 +7,7 @@ import {
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
   LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, ChevronRight, Sparkles, Bot, Zap, Inbox,
   UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb, Bug, Compass, Layers, BookOpenCheck, GraduationCap, Gamepad2, Trophy, BarChart3, Eye, Heart,
-  Star, Clock, Command, Network, Megaphone, Brain, Rocket, Activity, KeyRound, Server
+  Star, Clock, Command, Network, Megaphone, Brain, Rocket, Activity, KeyRound, Server, Palette
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { useTheme as useGlobalTheme } from "../../contexts/ThemeContext";
@@ -253,6 +253,8 @@ const NAV_SECTIONS = [
       { id: "orchestrator", label: "Autonomy Orchestrator", icon: Zap, badge: "SPRINT 1", href: "/admin/orchestrator" },
       { id: "twin", label: "Twin Orchestrator", icon: Bot, badge: "AI", href: "/admin/twin" },
       { id: "architecture_board", label: "Architecture Review Board", icon: Compass, badge: "NEW", href: "/admin/architecture-board" },
+      { id: "design_audit", label: "Design Audit · UX Score", icon: Palette, badge: "NEW", href: "/admin/design-audit" },
+      { id: "design_studio", label: "Design Studio · UI Control", icon: Palette, badge: "NEW", href: "/admin/design-studio" },
     ],
   },
   {
@@ -1001,8 +1003,8 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
 
 // Helper: card wrapper
 export const AdminCard = ({ children, className = "", title, action, testid }) => {
-  const theme = document.documentElement.getAttribute("data-admin-theme") || "light";
-  const dark = theme === "dark";
+  const { isDark } = useGlobalTheme();
+  const dark = isDark;
   return (
     <div className={`rounded-2xl border ${dark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"} ${className}`} data-testid={testid}>
       {(title || action) && (

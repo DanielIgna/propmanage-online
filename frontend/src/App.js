@@ -10,6 +10,7 @@ import {
 import { AuthProvider, useAuth } from "./auth";
 import { I18nProvider, useI18n } from "./i18n";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { DesignTokensProvider } from "./contexts/DesignTokensProvider";
 import { useABTest } from "./ab";
 import { LoginPage, RegisterPage } from "./pages/Auth";
 import { EmailVerifyPage } from "./pages/EmailVerifyPage";
@@ -76,6 +77,8 @@ const ExperienceSpacesPage = lazy(() => import("./pages/admin/ExperienceSpacesPa
 const FutureIdeasVault = lazy(() => import("./pages/admin/FutureIdeasVault"));
 const FounderGatePage = lazy(() => import("./pages/admin/FounderGatePage"));
 const AIGovernancePage = lazy(() => import("./pages/admin/AIGovernancePage"));
+const DesignAuditPage = lazy(() => import("./pages/admin/DesignAuditPage"));
+const DesignStudioPage = lazy(() => import("./pages/admin/DesignStudioPage"));
 const BugMemoryAggregatorPage = lazy(() => import("./pages/admin/BugMemoryAggregatorPage"));
 const ArchitectureBoardPage = lazy(() => import("./pages/admin/ArchitectureBoardPage"));
 const AIProductManagerPage = lazy(() => import("./pages/admin/AIProductManagerPage"));
@@ -1619,6 +1622,7 @@ function App() {
   return (
     <div className="App">
       <ThemeProvider>
+      <DesignTokensProvider>
       <I18nProvider>
         <AuthProvider>
           <BrowserRouter>
@@ -1674,6 +1678,8 @@ function App() {
               <Route path="/admin/future-ideas" element={<FutureIdeasVault />} />
               <Route path="/admin/founder-gate" element={<FounderGatePage />} />
               <Route path="/admin/ai-governance" element={<AIGovernancePage />} />
+              <Route path="/admin/design-audit" element={<DesignAuditPage />} />
+              <Route path="/admin/design-studio" element={<DesignStudioPage />} />
               <Route path="/admin/bug-memory" element={<BugMemoryAggregatorPage />} />
               <Route path="/admin/architecture-board" element={<ArchitectureBoardPage />} />
               <Route path="/admin/ai-pm" element={<AIProductManagerPage />} />
@@ -1727,6 +1733,7 @@ function App() {
           </BrowserRouter>
         </AuthProvider>
       </I18nProvider>
+      </DesignTokensProvider>
       </ThemeProvider>
     </div>
   );

@@ -118,6 +118,8 @@ from routes.control_tower import router as control_tower_router
 from routes.specialist_cockpit import router as specialist_cockpit_router
 from routes.ai_insights import router as ai_insights_router
 from routes.client_copilot import router as client_copilot_router
+from routes.design_audit import router as design_audit_router
+from routes.design_studio import router as design_studio_router
 
 # Registration order matters — kept identical to the original server.py loop.
 ALL_ROUTERS = (
@@ -232,4 +234,6 @@ ALL_ROUTERS = (
     specialist_cockpit_router,
     ai_insights_router,
     client_copilot_router,
+    design_audit_router,
+    design_studio_router,
 )

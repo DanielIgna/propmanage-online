@@ -87,16 +87,16 @@ export const AIInsightCard = ({ bullets = [], alerts = [], recommendations = [],
   const showRecs = llm && !llm.error ? llm.recommendations : recommendations;
 
   return (
-  <div className={`${CARD} border-violet-200 dark:border-violet-500/30 p-4`} data-testid={testid}>
+  <div className={`${CARD} border-lime-200 dark:border-lime-500/30 p-4`} data-testid={testid}>
     <div className="flex items-center gap-2 flex-wrap">
-      <span className="w-7 h-7 rounded-lg flex items-center justify-center bg-violet-50 dark:bg-violet-500/15">
-        <Brain className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+      <span className="w-7 h-7 rounded-lg flex items-center justify-center bg-lime-50 dark:bg-lime-500/15">
+        <Brain className="w-4 h-4 text-lime-700 dark:text-lime-300" />
       </span>
       <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm">AI Insights</h3>
       <DSBadge type={llm && !llm.error ? "LIVE" : "AI"}>{llm && !llm.error ? "CLAUDE" : "AI"}</DSBadge>
       {llmModule && (
         <button onClick={runLlm} disabled={llmBusy} data-testid={`${testid}-llm-btn`}
-          className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-violet-50 dark:bg-violet-500/15 text-violet-600 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-500/25 disabled:opacity-50 transition-colors">
+          className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-lime-50 dark:bg-lime-500/15 text-lime-700 dark:text-lime-300 hover:bg-lime-100 dark:hover:bg-lime-500/25 disabled:opacity-50 transition-colors">
           <Brain className={`w-3.5 h-3.5 ${llmBusy ? "animate-pulse" : ""}`} />
           {llmBusy ? "Analizează..." : llm && !llm.error ? "Reanalizează" : "Analiză AI (Claude)"}
         </button>
@@ -114,11 +114,11 @@ export const AIInsightCard = ({ bullets = [], alerts = [], recommendations = [],
         ))}
         {showBullets.map((b, i) => (
           <li key={i} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
-            <span className="w-1 h-1 rounded-full bg-violet-400 mt-2 shrink-0" /> {b}
+            <span className="w-1 h-1 rounded-full bg-lime-500 mt-2 shrink-0" /> {b}
           </li>
         ))}
         {llm && !llm.error && showRecs.map((r, i) => (
-          <li key={`r${i}`} className="flex items-start gap-2 text-sm font-medium text-violet-700 dark:text-violet-300">
+          <li key={`r${i}`} className="flex items-start gap-2 text-sm font-medium text-lime-700 dark:text-lime-300">
             <ArrowRight className="w-3.5 h-3.5 mt-0.5 shrink-0" /> {r}
           </li>
         ))}
@@ -129,7 +129,7 @@ export const AIInsightCard = ({ bullets = [], alerts = [], recommendations = [],
       <button
         onClick={onAction}
         data-testid={`${testid}-action`}
-        className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-violet-600 dark:text-violet-400 hover:gap-2 transition-all"
+        className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-lime-700 dark:text-lime-300 hover:gap-2 transition-all"
       >
         {actionLabel} <ArrowRight className="w-3.5 h-3.5" />
       </button>
@@ -191,7 +191,7 @@ export const ActionBar = ({ periods = [["day", "Azi"], ["week", "7 zile"], ["mon
     {extra}
     {onPeriod && periods.map(([id, label]) => (
       <button key={id} onClick={() => onPeriod(id)} data-testid={`${testidPrefix}-period-${id}`}
-        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${period === id ? "bg-blue-600 text-white" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"}`}>
+        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${period === id ? "bg-lime-400 text-slate-900" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"}`}>
         {label}
       </button>
     ))}
