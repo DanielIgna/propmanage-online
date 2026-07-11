@@ -2544,3 +2544,20 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - Livrat: /app/docs/DECISION_BOARD.md — D1-D7 extinse complet: problemă, context, conflict, variante, avantaje/dezavantaje, impact pe 10 dimensiuni (Blueprint/Business/XOS/Marketplace/Franchise/UX/AI/KG/Scalabilitate/Mentenanță), complexitate, risc, cost, recomandare AI + alternativă conservatoare + tabel comparativ + formular de decizie.
 - User a anunțat direcția: CONSOLIDARE (nu Quick Wins) prin „Platform Core Initiative" împărțită în 5 sprinturi: (1) Experience OS Foundation, (2) Consolidare Config/Content/AI/Leads, (3) Tenant Foundation, (4) Knowledge Graph + Platform Governance, (5) Experience Configuration Center.
 - REGULĂ: nimic nu se implementează până când ownerul completează formularul de decizie D1-D7. După fiecare etapă de sprint: raport + STOP + așteaptă aprobarea. Fără modificări ireversibile, fără ștergeri, fără migrări DB neaprobate.
+
+## [2026-06-11] DECIZII RATIFICATE + Sprint 1 · Etapa 1.1 (Widget Registry)
+### Decizii owner (DECISION_BOARD.md): D1:A · D2:A · D3:A · D4:B · D5:C · D6:A · D7:B+C
+- REGULI ACTIVE PERMANENT: Blueprint Compatibility Gate · D2 gate (tokens pe pagini noi) · D5-C (tenant_id:"main" pe colecții NOI + plan migrare) · D6 (widget nou = intrare în registru) · raport+STOP după fiecare etapă de sprint.
+
+### Sprint 1 — Experience OS Foundation · Etapa 1.1 LIVRATĂ ✅
+- Colecția `xos_widget_registry` (seed idempotent din cele 5 widget-uri client_home) — sursa unică de adevăr
+- xos.py refactorizat: layout engine citește din registru (doar status=active apar în Layout Builder/public)
+- CRUD registru: GET/POST /api/admin/xos/registry, PATCH /{surface}/{widget_id} (class/status/roles/label) — FĂRĂ delete (legacy = ascundere, conform „nu șterge componente")
+- UI: XOSRegistryPanel în /admin/xos-builder — listă, editare class/status inline, badge renderer/fără renderer, formular înregistrare widget nou
+- Testat curl: add (house_health/experimental), legacy scoate din layout public, restore OK; UI verificat vizual (6 rânduri)
+- NOTĂ: xos_widget_registry NU are tenant_id (creat înainte de ratificarea D5-C în aceeași zi) — de adăugat la Etapa 1.2
+
+### Etape rămase Sprint 1 (AȘTEAPTĂ APROBARE OWNER între etape)
+- Etapa 1.2: Multi-surface Layout Engine (specialist_home + selector suprafață în builder) + tenant_id pe colecțiile XOS noi
+- Etapa 1.3: Role Experience Manager (experience_profiles per rol: layout+theme+entry route)
+- Sprint 2: Consolidare (Config/Content/AI-chat/Leads) · Sprint 3: Tenant Foundation · Sprint 4: KG+Governance · Sprint 5: Experience Configuration Center

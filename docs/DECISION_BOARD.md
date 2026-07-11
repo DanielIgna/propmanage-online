@@ -290,15 +290,15 @@ Sprint 5 · Experience Configuration Center → editorul vizual (doar după 1-4)
 ```
 
 ---
-# FORMULAR DE DECIZIE (de completat de Product Owner)
+# FORMULAR DE DECIZIE (completat de Product Owner — 11 Iunie 2026)
 | ID | Decizia mea (A/B/C) | Observații |
 |---|---|---|
-| D1 | ☐ | |
-| D2 | ☐ | |
-| D3 | ☐ | |
-| D4 | ☐ | |
-| D5 | ☐ | |
-| D6 | ☐ | |
-| D7 | ☐ | |
+| D1 | ✅ A | Consolidare admin în hub-uri, eșalonat |
+| D2 | ✅ A | Design System gate imediat + sweep tokens la consolidare |
+| D3 | ✅ A | Cash întâi (Faza B), apoi Date (Faza C) — cu convenția property_id activă |
+| D4 | ✅ B | Autonomie prin volum, nu prin miză; whitelist doar reversibile |
+| D5 | ✅ C | A-light: tenant_id pe inserturi noi + plan; migrare la primul contract |
+| D6 | ✅ A | XOS Widget Registry obligatoriu, cu excepții documentate pt. admin pur |
+| D7 | ✅ B+C | Tokens: îngheț (re-eval la 1.000 useri) · Community: ascundere via Menu Manager |
 
-**Nimic nu se implementează până la completarea acestui formular.**
+**Status: DECIZIILE SUNT RATIFICATE. Implementarea începe cu Sprint 1 — Experience OS Foundation.**

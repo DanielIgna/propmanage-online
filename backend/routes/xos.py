@@ -16,35 +16,54 @@ from deps import get_current_user, require_role
 router = APIRouter(prefix="/api", tags=["xos"])
 logger = logging.getLogger("propmanage.xos")
 
-# ── Widget registry per suprafață ─────────────────────────────────────────────
-SURFACES = {
-    "client_home": {
-        "label": "Dashboard Client · Acasă",
-        "widgets": [
-            {"id": "hero", "label": "Hero adaptiv", "desc": "Cardul principal contextual (proprietate / cerere activă / solicită)"},
-            {"id": "quick_actions", "label": "Acțiuni rapide", "desc": "Grid 4: Solicită, Proprietatea, Lucrări, Întreabă AI"},
-            {"id": "copilot", "label": "AI Copilot", "desc": "Asistent AI cu sumar și acțiuni recomandate"},
-            {"id": "contextual", "label": "Noutăți pentru tine", "desc": "Carduri contextuale: oferte, plăți, confirmări"},
-            {"id": "discover", "label": "Descoperă", "desc": "Carusel: Digital Twin, House Health, Ghid întreținere"},
-        ],
-    },
+# ── Widget Registry (Etapa 1.1 — Experience OS Foundation) ───────────────────
+# Sursa de adevăr pentru widget-uri e DB (xos_widget_registry), nu codul.
+# D6:A — orice widget nou de dashboard intră prin registru.
+SURFACE_META = {
+    "client_home": {"label": "Dashboard Client · Acasă"},
 }
 
+WIDGET_CLASSES = {"CORE", "AI", "AUTONOMY", "BUSINESS", "PREMIUM", "GROWTH", "INFRASTRUCTURE", "EXPERIMENTAL", "LEGACY"}
+WIDGET_STATUSES = {"active", "experimental", "legacy"}
 
-def _default_layout(surface: str) -> list:
-    return [{"id": w["id"], "enabled": True} for w in SURFACES[surface]["widgets"]]
+DEFAULT_REGISTRY = [
+    {"id": "hero", "surface": "client_home", "label": "Hero adaptiv", "desc": "Cardul principal contextual (proprietate / cerere activă / solicită)", "class": "CORE", "status": "active", "roles": ["client"], "implemented": True},
+    {"id": "quick_actions", "surface": "client_home", "label": "Acțiuni rapide", "desc": "Grid 4: Solicită, Proprietatea, Lucrări, Întreabă AI", "class": "CORE", "status": "active", "roles": ["client"], "implemented": True},
+    {"id": "copilot", "surface": "client_home", "label": "AI Copilot", "desc": "Asistent AI cu sumar și acțiuni recomandate", "class": "AI", "status": "active", "roles": ["client"], "implemented": True},
+    {"id": "contextual", "surface": "client_home", "label": "Noutăți pentru tine", "desc": "Carduri contextuale: oferte, plăți, confirmări", "class": "CORE", "status": "active", "roles": ["client"], "implemented": True},
+    {"id": "discover", "surface": "client_home", "label": "Descoperă", "desc": "Carusel: Digital Twin, House Health, Ghid întreținere", "class": "GROWTH", "status": "active", "roles": ["client"], "implemented": True},
+]
+
+
+async def _ensure_registry_seed() -> None:
+    if await db.xos_widget_registry.count_documents({}) == 0:
+        now = datetime.now(timezone.utc).isoformat()
+        await db.xos_widget_registry.insert_many([{**w, "registered_at": now, "registered_by": "seed"} for w in DEFAULT_REGISTRY])
+
+
+async def _registry_widgets(surface: str, only_active: bool = False) -> list:
+    await _ensure_registry_seed()
+    q = {"surface": surface}
+    if only_active:
+        q["status"] = "active"
+    return await db.xos_widget_registry.find(q, {"_id": 0}).to_list(200)
+
+
+def _default_layout_from(widgets: list) -> list:
+    return [{"id": w["id"], "enabled": True} for w in widgets]
 
 
 async def _get_layout(surface: str) -> list:
-    if surface not in SURFACES:
+    if surface not in SURFACE_META:
         raise HTTPException(404, "Suprafață necunoscută.")
+    widgets = await _registry_widgets(surface, only_active=True)
+    valid_ids = {w["id"] for w in widgets}
     doc = await db.xos_layouts.find_one({"surface": surface})
     if not doc:
-        return _default_layout(surface)
-    valid_ids = {w["id"] for w in SURFACES[surface]["widgets"]}
+        return _default_layout_from(widgets)
     items = [i for i in (doc.get("items") or []) if i.get("id") in valid_ids]
     saved_ids = {i["id"] for i in items}
-    items += [{"id": w["id"], "enabled": True} for w in SURFACES[surface]["widgets"] if w["id"] not in saved_ids]
+    items += [{"id": w["id"], "enabled": True} for w in widgets if w["id"] not in saved_ids]
     return items
 
 
@@ -55,17 +74,19 @@ async def public_layout(surface: str):
 
 @router.get("/admin/xos/surfaces")
 async def admin_surfaces(_admin=Depends(require_role("admin"))):
-    return {"surfaces": [
-        {"surface": k, "label": v["label"], "widgets": v["widgets"], "items": await _get_layout(k)}
-        for k, v in SURFACES.items()
-    ]}
+    out = []
+    for k, meta in SURFACE_META.items():
+        widgets = await _registry_widgets(k, only_active=True)
+        out.append({"surface": k, "label": meta["label"], "widgets": widgets, "items": await _get_layout(k)})
+    return {"surfaces": out}
 
 
 @router.put("/admin/xos/layout/{surface}")
 async def admin_put_layout(surface: str, items: list = Body(..., embed=True), admin=Depends(require_role("admin"))):
-    if surface not in SURFACES:
+    if surface not in SURFACE_META:
         raise HTTPException(404, "Suprafață necunoscută.")
-    valid_ids = {w["id"] for w in SURFACES[surface]["widgets"]}
+    widgets = await _registry_widgets(surface, only_active=True)
+    valid_ids = {w["id"] for w in widgets}
     clean = [{"id": i["id"], "enabled": bool(i.get("enabled", True))} for i in items if isinstance(i, dict) and i.get("id") in valid_ids]
     if not clean:
         raise HTTPException(400, "Layout gol.")
@@ -79,10 +100,63 @@ async def admin_put_layout(surface: str, items: list = Body(..., embed=True), ad
 
 @router.post("/admin/xos/layout/{surface}/reset")
 async def admin_reset_layout(surface: str, _admin=Depends(require_role("admin"))):
-    if surface not in SURFACES:
+    if surface not in SURFACE_META:
         raise HTTPException(404, "Suprafață necunoscută.")
     await db.xos_layouts.delete_one({"surface": surface})
-    return {"ok": True, "items": _default_layout(surface)}
+    return {"ok": True, "items": _default_layout_from(await _registry_widgets(surface, only_active=True))}
+
+
+# ── Widget Registry CRUD (D6:A — nu se șterge, se marchează legacy) ───────────
+@router.get("/admin/xos/registry")
+async def admin_get_registry(_admin=Depends(require_role("admin"))):
+    await _ensure_registry_seed()
+    entries = await db.xos_widget_registry.find({}, {"_id": 0}).sort("surface", 1).to_list(500)
+    return {"entries": entries, "surfaces": SURFACE_META, "classes": sorted(WIDGET_CLASSES), "statuses": sorted(WIDGET_STATUSES)}
+
+
+@router.post("/admin/xos/registry")
+async def admin_add_registry(payload: dict = Body(...), admin=Depends(require_role("admin"))):
+    wid = str(payload.get("id", "")).strip().lower().replace(" ", "_")[:50]
+    surface = payload.get("surface")
+    if not wid or surface not in SURFACE_META:
+        raise HTTPException(400, "id și surface valide sunt obligatorii.")
+    if await db.xos_widget_registry.find_one({"id": wid, "surface": surface}):
+        raise HTTPException(409, "Widget-ul există deja în registru.")
+    entry = {
+        "id": wid, "surface": surface,
+        "label": str(payload.get("label") or wid)[:80],
+        "desc": str(payload.get("desc") or "")[:300],
+        "class": payload.get("class") if payload.get("class") in WIDGET_CLASSES else "EXPERIMENTAL",
+        "status": payload.get("status") if payload.get("status") in WIDGET_STATUSES else "experimental",
+        "roles": [str(r)[:30] for r in (payload.get("roles") or [])][:10],
+        "implemented": False,
+        "registered_at": datetime.now(timezone.utc).isoformat(),
+        "registered_by": admin.get("email"),
+    }
+    await db.xos_widget_registry.insert_one(dict(entry))
+    return {"ok": True, "entry": entry}
+
+
+@router.patch("/admin/xos/registry/{surface}/{widget_id}")
+async def admin_patch_registry(surface: str, widget_id: str, payload: dict = Body(...), admin=Depends(require_role("admin"))):
+    updates = {}
+    if payload.get("class") in WIDGET_CLASSES:
+        updates["class"] = payload["class"]
+    if payload.get("status") in WIDGET_STATUSES:
+        updates["status"] = payload["status"]
+    for k in ("label", "desc"):
+        if isinstance(payload.get(k), str):
+            updates[k] = payload[k][:300]
+    if isinstance(payload.get("roles"), list):
+        updates["roles"] = [str(r)[:30] for r in payload["roles"]][:10]
+    if not updates:
+        raise HTTPException(400, "Nimic de actualizat.")
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    updates["updated_by"] = admin.get("email")
+    r = await db.xos_widget_registry.update_one({"id": widget_id, "surface": surface}, {"$set": updates})
+    if r.matched_count == 0:
+        raise HTTPException(404, "Widget inexistent în registru.")
+    return {"ok": True}
 
 
 # ── Dynamic UI Rules ──────────────────────────────────────────────────────────

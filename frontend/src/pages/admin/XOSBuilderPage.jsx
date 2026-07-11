@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Reorder, useDragControls } from "framer-motion";
 import { GripVertical, Eye, EyeOff, Save, RotateCcw, LayoutDashboard, Smartphone } from "lucide-react";
 import { AdminLayoutMetronic } from "./AdminLayoutMetronic";
+import XOSRegistryPanel from "./XOSRegistryPanel";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -98,6 +99,8 @@ export default function XOSBuilderPage() {
           <LayoutDashboard className="w-4 h-4" />
           Trage de mâner pentru reordonare · comută Vizibil/Ascuns · widget-urile ascunse prin UI Rules au prioritate peste layout.
         </div>
+
+        <XOSRegistryPanel onChanged={() => window.location.reload()} />
       </div>
     </AdminLayoutMetronic>
   );
