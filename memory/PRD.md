@@ -2197,3 +2197,9 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - **Operator „Astăzi:"**: 4 KpiCard DS clickabile (Twins de validat, DT Pro, Logs, Notificări) → rezolvare în 2 clickuri; etichete dock scurtate (Twins, DT Pro); contrast card DT Pro fixat cu pm-accent-ink
 - **DS TabBar mărit** (px-4 py-2.5, iconuri 18px); KpiCard truncate pe helper text (fix clipping mobil)
 - User NU a făcut încă redeploy — totul e în preview.
+
+## Update — Iun 2026 · SPRINT F: 1-TAP REPAIR + SPECIALIST COCKPIT + AI INSIGHTS v2 LLM — COMPLET (iter98: 9/9 backend + 8/8 frontend PASS)
+- **„Repară automat" (Blueprint §8, prima execuție 1-tap)**: POST /api/admin/control-tower/actions/reconcile-orphans — arhivează tranzacții orfane cu marcaj reconciliation.status=archived_orphan + intrare ledger; AttentionCard suportă acțiuni de tip api (nu doar route). Cele 12 orfane reale au fost reparate; Finance Reconciler acum CURAT.
+- **Specialist Cockpit v1 (Faza 3 Blueprint)**: GET /api/specialist/cockpit — pipeline (leads pe categoria lui, active, finalizate luna asta), bani (luna curentă vs trecută + trend, medie/lucrare), benchmark Observatory (media pieței mid/expert pe categoria lui), Business Assistant v1 rule-based (max 4 next-best-actions: leads/kyc/reviews/pricing/momentum). Frontend: SpecialistCockpit.jsx montat în opportunities sub „Astăzi ai".
+- **AI Insights v2 LLM**: GET /api/admin/insights/llm?module={analytics|finance|marketplace|overview|control_tower} — Claude analizează contextul modulului → {bullets, alerts, recommendations}; cache 6h în ai_insights_cache (control cost); buton „Analiză AI (Claude)" în AIInsightCard (prop llmModule) pe toate cele 5 module.
+### Rămase în backlog: Faza 4 Client Copilot · DS P2 (Utilizatori/Cereri, BI MoE) · CIP-C · Faza 5 · DNS Resend
