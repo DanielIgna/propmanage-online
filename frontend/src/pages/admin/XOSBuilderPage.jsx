@@ -76,11 +76,11 @@ const LivePreview = ({ items, widgetMap, surfaceLabel }) => {
   );
 };
 
-const HistoryPanel = ({ surface, onRestored }) => {
+const HistoryPanel = ({ surface, refreshKey, onRestored }) => {
   const [versions, setVersions] = useState(null);
   const load = () => axios.get(`${API}/api/admin/xos/layout/${surface}/history`, { withCredentials: true })
     .then((r) => setVersions(r.data.versions)).catch(() => setVersions([]));
-  useEffect(() => { load(); }, [surface]);
+  useEffect(() => { load(); }, [surface, refreshKey]);
 
   const rollback = async (vid) => {
     try {
@@ -160,6 +160,7 @@ export default function XOSBuilderPage() {
   const [surface, setSurface] = useState("client_home");
   const [items, setItems] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [historyKey, setHistoryKey] = useState(0);
 
   useEffect(() => {
     axios.get(`${API}/api/admin/xos/surfaces`, { withCredentials: true })
@@ -185,6 +186,7 @@ export default function XOSBuilderPage() {
     try {
       await axios.put(`${API}/api/admin/xos/layout/${surface}`, { items }, { withCredentials: true });
       toast.success("Layout publicat — utilizatorii văd instant noua ordine.");
+      setHistoryKey((k) => k + 1);
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Eroare la salvare.");
     } finally {
@@ -193,9 +195,13 @@ export default function XOSBuilderPage() {
   };
 
   const reset = async () => {
-    const r = await axios.post(`${API}/api/admin/xos/layout/${surface}/reset`, {}, { withCredentials: true });
-    setItems(r.data.items);
-    toast.success("Layout resetat la implicit.");
+    try {
+      const r = await axios.post(`${API}/api/admin/xos/layout/${surface}/reset`, {}, { withCredentials: true });
+      setItems(r.data.items);
+      toast.success("Layout resetat la implicit.");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Eroare la resetare.");
+    }
   };
 
   return (
@@ -252,7 +258,7 @@ export default function XOSBuilderPage() {
               Trage de mâner pentru reordonare · comută Vizibil/Ascuns · preview-ul din dreapta se actualizează live, publici doar când ești mulțumit.
             </div>
 
-            <HistoryPanel surface={surface} onRestored={setItems} />
+            <HistoryPanel surface={surface} refreshKey={historyKey} onRestored={setItems} />
           </div>
         )}
 

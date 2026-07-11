@@ -2643,3 +2643,12 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - Pagină-hub unică cu ancore: 17 etape în 5 faze (Descoperire/Digitalizare/Proiectare/Implementare/Viață lungă), secțiune Digital Twin (11 elemente), Audit (8), Implementare (10), 12 stiluri (Warm Minimalism→Eclectic), Ecosistem (11 link-uri), FAQ 8, articol SEO 10×H2, JSON-LD ProfessionalService+FAQPage
 - Poziționare națională + focus Cluj-Napoca/Transilvania; meniu site: "Design Interior"→"Interior Intelligence"
 - Note tester (backlog minor): triage buget pe token 'peste' (nu range numeric); form styles derivat din content.styles (nu styles_showcase)
+
+## [2026-06-11] Sprint 5 — EXPERIENCE CONFIGURATION CENTER LIVRAT ✅ (iteration_113: backend 16/16, frontend 100%, zero bugs)
+- /admin/xos-builder transformat în centru vizual XOS cu 4 tab-uri: Layout & Preview / Registru widget-uri / Profiluri roluri / Reguli UI (sumar + link)
+- PREVIEW LIVE în ramă de telefon: se actualizează instant la reorder/toggle, înainte de publicare
+- Versionare layout: snapshot automat pre-save/pre-rollback în xos_layout_history (cap 20/suprafață, dedup snapshot identic), GET /history + POST /rollback/{version_id} — testat E2E
+- Meniu admin: "XOS · Layout Builder" → "Experience Center"; xos_layout_history clasificat T2 (regula G3)
+- Fixuri post-test aplicate: refresh istoric după publicare (refreshKey), try/catch la reset, dedup snapshot
+- PLATFORM CORE INITIATIVE: Sprint 1 ✅ · Sprint 2 ✅ · Sprint 3 (val 0+1) ✅ · Sprint 4 ✅ · Sprint 5 ✅ — TOATE SPRINT-URILE COMPLETE
+- URMEAZĂ (backlog P1/P2): Theme Manager vizual, pagini servicii noi (Exterior/Arhitectură pe modelul Interior Intelligence), Tenant val 2 (filtrare pe tenant în citiri), Developer Mode

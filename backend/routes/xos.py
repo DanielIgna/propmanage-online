@@ -117,6 +117,9 @@ async def _snapshot_layout(surface: str, who: str, reason: str = "pre-save") -> 
     current = await db.xos_layouts.find_one({"surface": surface})
     if not current or not current.get("items"):
         return
+    last = await db.xos_layout_history.find_one({"surface": surface}, sort=[("saved_at", -1)])
+    if last and last.get("items") == current["items"]:
+        return  # dedup: nu consumăm sloturi cu snapshot identic
     await db.xos_layout_history.insert_one({
         "version_id": uuid.uuid4().hex[:10], "surface": surface, "tenant_id": TENANT,
         "items": current["items"], "reason": reason,
