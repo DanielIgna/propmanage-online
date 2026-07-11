@@ -118,6 +118,17 @@ async def ensure_main_tenant() -> None:
     await db.tenants.create_index("slug", unique=True)
 
 
+async def backfill_user_tenants() -> int:
+    """Val 1, idempotent: orice user fără tenant_id primește 'main' (rulează la startup)."""
+    r = await db.users.update_many(
+        {"tenant_id": {"$exists": False}},
+        {"$set": {"tenant_id": DEFAULT_TENANT}},
+    )
+    if r.modified_count:
+        logger.info(f"[tenancy] backfill users tenant_id=main: {r.modified_count}")
+    return r.modified_count
+
+
 async def get_tenant(slug: str) -> dict | None:
     return await db.tenants.find_one({"slug": slug}, {"_id": 0})
 

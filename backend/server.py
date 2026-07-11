@@ -132,8 +132,11 @@ scheduler = AsyncIOScheduler(timezone=pytz.timezone(BUCHAREST_TZ_NAME))
 async def startup():
     await seed()
     try:
-        from tenancy import ensure_main_tenant
+        from tenancy import ensure_main_tenant, backfill_user_tenants
         await ensure_main_tenant()
+        await backfill_user_tenants()
+        from kg.registry import seed_registry
+        await seed_registry()
     except Exception as e:
         logger.warning(f"Tenant seed failed: {e}")
     try:

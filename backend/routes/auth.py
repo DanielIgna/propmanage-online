@@ -113,11 +113,14 @@ async def register(data: RegisterIn, request: Request, response: Response):
     now_iso = datetime.now(timezone.utc).isoformat()
     verif_token = _gen_email_verification_token()
     verif_expires = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+    from tenancy import resolve_tenant_slug
+    tenant_id = await resolve_tenant_slug(request)
     user = {
         "email": email,
         "password_hash": hash_password(data.password),
         "name": data.name,
         "role": data.role,
+        "tenant_id": tenant_id,
         "phone": phone_digits,
         "wallet_balance": 500.0 if data.role == "specialist" else 0.0,
         "tokens": 0,
@@ -1169,6 +1172,7 @@ async def google_session_exchange(request: Request, response: Response):
             "email": email,
             "name": name,
             "picture": picture,
+            "tenant_id": "main",
             "avatar": picture or None,
             "avatar_source": "google" if picture else None,
             "role": "client",
