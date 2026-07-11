@@ -307,10 +307,11 @@ async def me(user: dict = Depends(get_current_user)):
             "dual_role_enabled": 1, "active_view": 1,
             "avatar": 1, "avatar_source": 1, "picture": 1,
             "experience_tier": 1, "experience_tier_locked": 1,
-            "admin_scope": 1, "admin_seniority": 1,
+            "admin_scope": 1, "admin_seniority": 1, "tenant_id": 1,
         },
     )
     user["tutorial_seen"] = bool((doc or {}).get("tutorial_seen", False))
+    user["tenant_id"] = (doc or {}).get("tenant_id") or "main"
     user["ai_admin_tour_seen"] = bool((doc or {}).get("ai_admin_tour_seen", False))
     user["dashboard_tour_completed"] = bool((doc or {}).get("dashboard_tour_completed", False))
     # `has_password` lets frontend show "Backup password" button only for Google-only accounts

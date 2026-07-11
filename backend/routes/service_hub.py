@@ -8,7 +8,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 
 from db import db
@@ -57,15 +57,17 @@ class LeadIn(BaseModel):
 
 
 @router.post("/services/{slug}/leads")
-async def create_lead(slug: str, payload: LeadIn):
+async def create_lead(slug: str, payload: LeadIn, request: Request):
     if slug not in SERVICES:
         raise HTTPException(404, "Serviciu necunoscut.")
+    from tenancy import resolve_tenant_slug
+    tenant_id = await resolve_tenant_slug(request)
     lead = {
         "id": uuid.uuid4().hex, "service": slug,
         "name": payload.name.strip()[:120], "email": payload.email.lower(),
         "phone": (payload.phone or "").strip()[:30], "city": (payload.city or "")[:60],
         "budget": (payload.budget or "")[:60], "message": (payload.message or "")[:2000],
-        "status": "new", "tenant_id": "main",
+        "status": "new", "tenant_id": tenant_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.service_leads.insert_one(dict(lead))

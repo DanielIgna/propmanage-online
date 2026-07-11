@@ -326,6 +326,7 @@ DEFAULT_PROFILES = {
     "client": {"entry_route": "/client", "default_theme": "system", "layout_surface": "client_home"},
     "specialist": {"entry_route": "/specialist", "default_theme": "system", "layout_surface": "specialist_home"},
     "admin": {"entry_route": "/admin", "default_theme": "system", "layout_surface": ""},
+    "franchise_admin": {"entry_route": "/franciza", "default_theme": "system", "layout_surface": ""},
 }
 _THEMES = {"system", "dark", "light"}
 

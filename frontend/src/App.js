@@ -95,6 +95,7 @@ const InteriorDesignAdminPage = lazy(() => import("./pages/admin/InteriorDesignA
 const MenuManagerPage = lazy(() => import("./pages/admin/MenuManagerPage"));
 const XOSBuilderPage = lazy(() => import("./pages/admin/XOSBuilderPage"));
 const ServiceHubLanding = lazy(() => import("./pages/ServiceHubLanding"));
+const FranchiseDashboard = lazy(() => import("./pages/FranchiseDashboard"));
 const UIRulesPage = lazy(() => import("./pages/admin/UIRulesPage"));
 const ContentManagerPage = lazy(() => import("./pages/admin/ContentManagerPage"));
 const BugMemoryAggregatorPage = lazy(() => import("./pages/admin/BugMemoryAggregatorPage"));
@@ -1576,6 +1577,8 @@ function App() {
               <Route path="/design-interior" element={<InteriorDesignLanding />} />
               <Route path="/design-exterior" element={<ServiceHubLanding slug="design-exterior" />} />
               <Route path="/arhitectura" element={<ServiceHubLanding slug="arhitectura" />} />
+              <Route path="/franciza" element={<FranchiseDashboard />} />
+              <Route path="/franchise_admin" element={<FranchiseDashboard />} />
               <Route path="/servicii/design-interior" element={<Navigate to="/design-interior" replace />} />
               <Route path="/demo" element={<PublicDemoPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />

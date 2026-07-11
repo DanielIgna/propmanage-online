@@ -75,7 +75,8 @@ async def sync_lead(source: str, legacy_doc: dict) -> None:
             {"source": source, "meta.legacy_id": legacy_id},
             {"$set": {
                 **root, "source": source, "stage": STAGE_MAP.get(raw_stage, "new"), "stage_raw": raw_stage,
-                "score": score, "segment": segment, "meta": meta, "tenant_id": TENANT,
+                "score": score, "segment": segment, "meta": meta,
+                "tenant_id": legacy_doc.get("tenant_id") or TENANT,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }, "$setOnInsert": {"created_at": legacy_doc.get("created_at") or datetime.now(timezone.utc).isoformat()}},
             upsert=True,
@@ -104,7 +105,8 @@ async def migrate_all() -> dict:
     return out
 
 
-async def list_leads(source: str = None, stage: str = None, segment: str = None, limit: int = 200) -> list:
+async def list_leads(source: str = None, stage: str = None, segment: str = None, limit: int = 200,
+                     tenant: str = None) -> list:
     q = {}
     if source:
         q["source"] = source
@@ -112,18 +114,23 @@ async def list_leads(source: str = None, stage: str = None, segment: str = None,
         q["stage"] = stage
     if segment:
         q["segment"] = segment
+    if tenant:
+        q["tenant_id"] = tenant
     return await db.leads.find(q, {"_id": 0}).sort("created_at", -1).to_list(limit)
 
 
-async def summary(days: int = 7) -> dict:
+async def summary(days: int = 7, tenant: str = None) -> dict:
     from datetime import timedelta
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    match = {"created_at": {"$gte": cutoff}}
+    if tenant:
+        match["tenant_id"] = tenant
     pipeline = [
-        {"$match": {"created_at": {"$gte": cutoff}}},
+        {"$match": match},
         {"$group": {"_id": {"source": "$source", "segment": "$segment"}, "n": {"$sum": 1}}},
     ]
     rows = await db.leads.aggregate(pipeline).to_list(100)
-    total = await db.leads.count_documents({"created_at": {"$gte": cutoff}})
+    total = await db.leads.count_documents(match)
     hot = sum(r["n"] for r in rows if r["_id"]["segment"] == "hot")
     by_source = {}
     for r in rows:

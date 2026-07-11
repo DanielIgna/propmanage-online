@@ -3,7 +3,7 @@ from fastapi import APIRouter, Body, Depends
 
 from db import db
 from deps import require_role
-from lead_followup import get_config, run_followup_scan, update_config
+from lead_followup import get_config, run_followup_scan, run_nurture_scan, update_config
 
 router = APIRouter(prefix="/api/admin/leads/followup", tags=["lead-followup"])
 
@@ -19,8 +19,10 @@ async def followup_config_update(patch: dict = Body(...), admin=Depends(require_
 
 
 @router.post("/run")
-async def followup_run(dry_run: bool = True, _admin=Depends(require_role("admin"))):
-    """Rulare manuală. Default dry_run=true (nu trimite emailuri, doar raportează candidații)."""
+async def followup_run(dry_run: bool = True, sequence: str = "warm_48h", _admin=Depends(require_role("admin"))):
+    """Rulare manuală. Default dry_run=true. sequence: warm_48h | nurture_7d."""
+    if sequence == "nurture_7d":
+        return await run_nurture_scan(manual=True, dry_run=dry_run)
     return await run_followup_scan(manual=True, dry_run=dry_run)
 
 

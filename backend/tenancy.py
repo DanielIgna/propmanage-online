@@ -178,6 +178,13 @@ async def get_tenant_id(request: Request) -> str:
     return await resolve_tenant_slug(request, user)
 
 
+def tenant_scope_for(user: dict) -> str | None:
+    """Val 3: None = acces global (HQ admin); altfel tenantul userului (franchise_admin etc.)."""
+    if (user or {}).get("role") == "admin":
+        return None
+    return (user or {}).get("tenant_id") or DEFAULT_TENANT
+
+
 # ── Raport de acoperire (guvernanță) ─────────────────────────────────────────
 async def coverage_report() -> dict:
     """Analiză live: acoperirea tenant_id pe colecțiile T1/T2 + colecții neclasificate."""

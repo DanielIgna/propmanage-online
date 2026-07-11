@@ -82,6 +82,45 @@ async def tenant_backfill(force: bool = False, user: dict = Depends(require_role
     return await backfill_tier1_tenant_data(force=force)
 
 
+# ── Val 3: administratori de franciză ────────────────────────────────────────
+class FranchiseAdminIn(BaseModel):
+    email: str = Field(min_length=5, max_length=120)
+    password: str = Field(min_length=8, max_length=72)
+    name: str = Field(min_length=2, max_length=120)
+
+
+@router.get("/{slug}/admins")
+async def list_franchise_admins(slug: str, user: dict = Depends(require_role("admin"))):
+    if not await db.tenants.find_one({"slug": slug}):
+        raise HTTPException(404, "Tenant inexistent")
+    items = await db.users.find({"role": "franchise_admin", "tenant_id": slug},
+                                {"_id": 0, "email": 1, "name": 1, "created_at": 1}).to_list(50)
+    return {"items": items, "total": len(items)}
+
+
+@router.post("/{slug}/admins", status_code=201)
+async def create_franchise_admin(slug: str, body: FranchiseAdminIn, user: dict = Depends(require_role("admin"))):
+    tenant = await db.tenants.find_one({"slug": slug})
+    if not tenant:
+        raise HTTPException(404, "Tenant inexistent")
+    if slug == DEFAULT_TENANT:
+        raise HTTPException(400, "HQ 'main' folosește rolul admin, nu franchise_admin")
+    email = body.email.strip().lower()
+    if "@" not in email:
+        raise HTTPException(400, "Email invalid")
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(409, "Există deja un utilizator cu acest email")
+    from core_utils import hash_password
+    now = datetime.now(timezone.utc).isoformat()
+    await db.users.insert_one({
+        "email": email, "password_hash": hash_password(body.password), "name": body.name.strip(),
+        "role": "franchise_admin", "tenant_id": slug, "verified": True, "email_verified": True,
+        "terms_accepted": True, "privacy_policy_accepted": True, "created_at": now,
+        "created_by": str(user.get("email")),
+    })
+    return {"ok": True, "email": email, "role": "franchise_admin", "tenant_id": slug}
+
+
 @public_router.get("/tenant-context")
 async def tenant_context(request: Request):
     """Tenantul rezolvat pentru requestul curent (consumat de frontend în val 2)."""

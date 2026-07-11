@@ -227,6 +227,7 @@ async def seed():
 | Specialist (Plumbing, verified) | specialist2@propmanage.io | Spec123! |
 | Admin | admin@propmanage.io | {admin_pw} |
 | Operator | operator@propmanage.io | Op123! |
+| Franchise Admin (tenant: cluj) | franciza.cluj@propmanage.io | Franciza123! |
 
 ## Auth Endpoints
 - POST /api/auth/login - Body: {{email, password}}
