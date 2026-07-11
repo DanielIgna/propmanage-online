@@ -2618,3 +2618,12 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - Fixuri post-test: except silențios în app_settings.py → logger.warning; test_credentials.md re-corectat (parola admin = SEED_ADMIN_PASSWORD, a 4-a recurență a driftului)
 - Note tester (backlog): /api/interior-design/assistant e neautentificat/fără rate-limit (consum credite LLM) — de gardat; Resend domain neverificat (blocat pe DNS user)
 - URMEAZĂ: Sprint 3 — Tenant Foundation (analiză + infrastructură tenant_id, FĂRĂ migrare date) — AȘTEAPTĂ APROBARE OWNER
+
+## [2026-06-11] Sprint 3 — TENANT FOUNDATION LIVRAT ✅ (val 0: infrastructură, FĂRĂ migrare date, self-tested curl E2E)
+- `tenancy.py`: DEFAULT_TENANT="main", rezolvare tenant (header X-Tenant-ID validat → user.tenant_id → main), clasificare 211 colecții în T1 (76, tenant-scoped) / T2 (31, platform config) / T3 (104, system/ops globale) / 0 neclasificate, coverage_report() live
+- Registru `tenants` (slug unic, plan hq/franchise, status draft/active/suspended, branding, regions) + seed idempotent HQ "main" la startup (neștergibil/nedezactivabil)
+- API: GET/POST /api/admin/tenants, PATCH /{slug}, GET /coverage (guvernanță) + GET /api/public/tenant-context (public)
+- Store-urile Sprint 2 (leads/settings/ai_session) importă acum DEFAULT_TENANT din tenancy (sursă unică)
+- Testat curl: CRUD complet, protecție main, dup slug 409, slug invalid 400, rezolvare header activ/necunoscut, coverage, regresie demo-request OK
+- Doc: /app/docs/TENANT_FOUNDATION_PLAN.md — valuri de migrare 1-3 + decizii D-T1..D-T4 de ratificat
+- URMEAZĂ (aprobare owner): ratificare D-T1..D-T4 → val 1 (users.tenant_id, atinge auth = playbook integrare) SAU Sprint 4 (Knowledge Graph + Governance)

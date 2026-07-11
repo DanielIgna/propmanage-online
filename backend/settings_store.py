@@ -9,8 +9,9 @@ from datetime import datetime, timezone
 
 from db import db
 
+from tenancy import DEFAULT_TENANT as TENANT
+
 logger = logging.getLogger("propmanage.settings_store")
-TENANT = "main"
 
 # namespace → (colecție legacy, filtru, extractor, writer)
 _LEGACY = {

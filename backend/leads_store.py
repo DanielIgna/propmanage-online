@@ -8,10 +8,10 @@ import logging
 from datetime import datetime, timezone
 
 from db import db
+from tenancy import DEFAULT_TENANT as TENANT
 
 logger = logging.getLogger("propmanage.leads_store")
 
-TENANT = "main"
 STAGE_MAP = {
     "new": "new", "contacted": "contacted", "introduced": "contacted", "scheduled": "contacted",
     "qualified": "qualified", "negotiation": "qualified",

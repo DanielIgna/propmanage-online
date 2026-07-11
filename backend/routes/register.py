@@ -137,6 +137,7 @@ from routes.site_menu import router as site_menu_router
 from routes.xos import router as xos_router
 from autonomy.self_driving import router as self_driving_router
 from routes.leads import router as leads_router
+from routes.tenants import router as tenants_router, public_router as tenants_public_router
 
 # Registration order matters — kept identical to the original server.py loop.
 ALL_ROUTERS = (
@@ -270,4 +271,6 @@ ALL_ROUTERS = (
     xos_router,
     self_driving_router,
     leads_router,
+    tenants_router,
+    tenants_public_router,
 )

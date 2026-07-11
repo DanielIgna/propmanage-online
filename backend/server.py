@@ -132,6 +132,11 @@ scheduler = AsyncIOScheduler(timezone=pytz.timezone(BUCHAREST_TZ_NAME))
 async def startup():
     await seed()
     try:
+        from tenancy import ensure_main_tenant
+        await ensure_main_tenant()
+    except Exception as e:
+        logger.warning(f"Tenant seed failed: {e}")
+    try:
         await hh_seed_default_plans()
     except Exception as e:
         logger.warning(f"House Health plans seed failed: {e}")

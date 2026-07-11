@@ -10,8 +10,9 @@ from datetime import datetime, timezone
 
 from db import db
 
+from tenancy import DEFAULT_TENANT as TENANT
+
 logger = logging.getLogger("propmanage.ai_session_store")
-TENANT = "main"
 
 
 async def _upsert_session(agent: str, session_id: str, messages: list, user_id: str = None, created_at: str = None) -> None:
