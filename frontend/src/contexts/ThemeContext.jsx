@@ -29,10 +29,19 @@ export const ThemeProvider = ({ children }) => {
     } catch (_e) { /* ignore */ }
   }, [theme]);
 
-  const toggleTheme = () => setTheme((t) => (t === "light" ? "dark" : "light"));
+  const toggleTheme = () => {
+    try { localStorage.setItem("pm_theme_source", "user"); } catch (_e) { /* ignore */ }
+    setTheme((t) => (t === "light" ? "dark" : "light"));
+  };
+
+  // Theme Manager (XOS): aplică tema implicită a rolului DOAR dacă userul nu a ales manual
+  const applyRoleTheme = (t) => {
+    try { if (localStorage.getItem("pm_theme_source") === "user") return; } catch (_e) { /* ignore */ }
+    if (t === "light" || t === "dark") setTheme(t);
+  };
 
   return (
-    <ThemeContext.Provider value={{ theme: normalize(theme), setTheme, toggleTheme, isDark: normalize(theme) === "dark" }}>
+    <ThemeContext.Provider value={{ theme: normalize(theme), setTheme, toggleTheme, applyRoleTheme, isDark: normalize(theme) === "dark" }}>
       {children}
     </ThemeContext.Provider>
   );

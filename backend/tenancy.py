@@ -29,7 +29,7 @@ TIER1_TENANT_SCOPED = {
     # leads & parteneri (unified `leads` DEJA are tenant_id)
     "leads", "demo_leads", "city_partner_leads", "city_partners",
     "city_partner_nudges", "marketplace_leads", "marketplace_partners",
-    "marketplace_presentations", "interior_design_leads",
+    "marketplace_presentations", "interior_design_leads", "service_leads",
     # AI & conversații (unified `ai_sessions` DEJA are tenant_id)
     "ai_sessions", "concierge_messages", "marketing_chat_sessions",
     "interior_assistant_sessions", "twin_conversations", "ai_messages",

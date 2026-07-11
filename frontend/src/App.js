@@ -94,6 +94,7 @@ const InteriorDesignLanding = lazy(() => import("./pages/InteriorDesignLanding")
 const InteriorDesignAdminPage = lazy(() => import("./pages/admin/InteriorDesignAdminPage"));
 const MenuManagerPage = lazy(() => import("./pages/admin/MenuManagerPage"));
 const XOSBuilderPage = lazy(() => import("./pages/admin/XOSBuilderPage"));
+const ServiceHubLanding = lazy(() => import("./pages/ServiceHubLanding"));
 const UIRulesPage = lazy(() => import("./pages/admin/UIRulesPage"));
 const ContentManagerPage = lazy(() => import("./pages/admin/ContentManagerPage"));
 const BugMemoryAggregatorPage = lazy(() => import("./pages/admin/BugMemoryAggregatorPage"));
@@ -139,6 +140,7 @@ const AnalyticsRouteTracker = () => {
   return null;
 };
 import { ImpersonationBanner } from "./components/ImpersonationBanner";
+import { RoleThemeApplier } from "./components/RoleThemeApplier";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import SiteNav from "./components/SiteNav";
 import AnnouncementBanner from "./components/AnnouncementBanner";
@@ -1566,11 +1568,14 @@ function App() {
           <BrowserRouter>
             <ErrorBoundary>
               <ImpersonationBanner />
+              <RoleThemeApplier />
               <AnalyticsRouteTracker />
               <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
               <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/design-interior" element={<InteriorDesignLanding />} />
+              <Route path="/design-exterior" element={<ServiceHubLanding slug="design-exterior" />} />
+              <Route path="/arhitectura" element={<ServiceHubLanding slug="arhitectura" />} />
               <Route path="/servicii/design-interior" element={<Navigate to="/design-interior" replace />} />
               <Route path="/demo" element={<PublicDemoPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
