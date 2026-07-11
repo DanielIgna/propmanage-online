@@ -2532,3 +2532,10 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - P1 XOS Faza 2: suprafețe noi Layout Builder + widget-uri noi
 - P2 Pagini dedicate servicii + Developer Mode Design Studio
 - P3 Resend DNS (blocat pe user)
+
+## [2026-06-11] MASTER PRODUCT AUDIT v2.0 (audit-only, zero cod)
+- Livrat: /app/docs/MASTER_PRODUCT_AUDIT_v2.md — 12 faze complete (coerență 82, arhitectură 71, franciză 34%, XOS 55%, KG 25%)
+- 7 conflicte de produs documentate (C1-C7) cu opțiuni A/B — decizia la administrator (Decision Log D1-D8)
+- Top 25 recomandări prioritizate + Quick Wins + Roadmap restructurat (Faze A-D pe deblocări)
+- REGULĂ PERMANENTĂ ADOPTATĂ (D8): Blueprint Compatibility Gate — orice feature nou trece checklist-ul de 6 întrebări (viziune/duplicări/UX/franciză/DS/buclă de date) contra PRODUCT_BLUEPRINT.md înainte de implementare. OBLIGATORIU pentru toate sesiunile viitoare.
+- Recomandările Self-Driving suplimentare (Autonomy Weekly Scorecard) amânate de user pentru mai târziu.
