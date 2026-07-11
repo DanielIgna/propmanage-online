@@ -2280,3 +2280,35 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - P2 Button Manager: registry butoane per pagină + vizibilitate pe rol
 - P2 Dashboard Builder: widget picker + grid per rol
 - P3 Developer Mode: inspect component + tokens folosite
+
+## [2026-02-11] Palette Cascade + UX Inspector 7 (Iter 102)
+
+### Livrat concret
+1. **Palette Cascade** (tab în Design Studio)
+   - Input 5 hex codes: primary, accent, neutral, surface_light, surface_dark
+   - Backend derivă determinist toate cele 20 tokens de culoare (primary_dim, on_primary via luminance WCAG, accent_ink, border light/dark, text_muted light/dark, dark variants pentru surface)
+   - Endpoint POST /api/admin/design-studio/palette-cascade cu opțiune `apply:true|false` (dry-run vs live)
+   - Semantice (success/warning/danger/info) rămân universale
+   - Live preview cu swatch + hex pentru fiecare token derivat
+
+2. **UX Inspector AI** — extindere Design Audit cu 7 principii + Cognitive Load
+   - Prompt LLM extins să calculeze: hicks_law, millers_law, fitts_law, jakobs_law, nielsen, wcag, cognitive_load
+   - UI: 6 scoruri suplimentare (Miller, Fitts, Jakob, Nielsen, WCAG, Cognitiv=100-cognitive_load)
+   - Panel special Cognitive Load Score cu verdict (Ușor <30, Moderat <60, Ridicat <80, Copleșitor ≥80) + bar chart colorat
+
+3. **Fix ultimele issues unitate** (raportate în iter101 minor):
+   - Badge "Super Admin · SENIOR" din topbar admin: violet → lime
+   - Badge "NEW" gradient blue→purple din sidebar admin → lime solid
+   - Icon-header "Designerii noștri" ClientTwinViewer: purple/pink gradient → lime solid
+
+### Roadmap Design Intelligence Engine (P1-P3 — sesiuni viitoare)
+- **P1 Layout Optimizer AI** — integrare Microsoft Clarity API + heatmap analysis + propunere de mutare widget-uri (schema `layout_recommendations` collection + endpoint `/api/admin/dse/layout-optimizer`)
+- **P1 Component Optimizer** — AST parser (`@babel/parser`) pentru scanare `<Card>`/`<Button>`/`<Modal>` duplicate + LLM refactor recommendations
+- **P2 AI Designer** — LLM generează componente noi în respect strict al Design System (endpoint /api/admin/dse/generate-component)
+- **P2 UX Self-Healing Engine** — 3 nivele (Observe/Propose/Auto-apply low-risk): spacing, sizes, padding, order, text — schemă `dse_actions` collection cu approval gate
+- **P2 UX Simulator** — persona-driven Playwright simulation (65y, new user, investor) cu blocage detection
+- **P3 Evolution Engine** — cronjob nightly: Clarity + Analytics + Nielsen + Hick → UX Evolution Report cu admin approval + rollback
+- **P3 Safety pipeline** — Observe → Propose → A/B Test → Apply cu audit log complet + rollback
+
+### Endpoints noi (iter 102)
+- POST /api/admin/design-studio/palette-cascade

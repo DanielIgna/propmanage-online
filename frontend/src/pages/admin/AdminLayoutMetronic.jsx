@@ -24,7 +24,7 @@ import { CommandPalette } from "../../components/CommandPalette";
 
 // Scope-color tones for the topbar badge
 const SCOPE_TONES = {
-  general:  { bg: "bg-violet-100  dark:bg-violet-500/15",  text: "text-violet-700  dark:text-violet-300",  label: "Super Admin" },
+  general:  { bg: "bg-lime-100 dark:bg-lime-500/15",  text: "text-lime-700 dark:text-lime-300",  label: "Super Admin" },
   testing:  { bg: "bg-cyan-100    dark:bg-cyan-500/15",    text: "text-cyan-700    dark:text-cyan-300",    label: "Testing" },
   frontend: { bg: "bg-pink-100    dark:bg-pink-500/15",    text: "text-pink-700    dark:text-pink-300",    label: "Frontend" },
   backend:  { bg: "bg-blue-100    dark:bg-blue-500/15",    text: "text-blue-700    dark:text-blue-300",    label: "Backend" },
@@ -816,7 +816,7 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
           <ActiveIcon className="w-4 h-4 shrink-0" />
           <span className="truncate flex-1 text-left">{it.label}</span>
           {it.badge && (
-            <span className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white">{it.badge}</span>
+            <span className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-full bg-lime-400 text-slate-900">{it.badge}</span>
           )}
         </button>
         <button

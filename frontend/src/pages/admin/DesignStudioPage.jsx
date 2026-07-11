@@ -21,12 +21,103 @@ const ax = axios.create({ baseURL: API, withCredentials: true });
 
 const TABS = [
   { id: "tokens",    label: "Design Tokens", icon: Palette },
+  { id: "cascade",   label: "Palette Cascade", icon: Sparkles },
   { id: "presets",   label: "Presets",       icon: Sparkles },
   { id: "components",label: "Componente",    icon: Puzzle },
   { id: "validator", label: "UX Validator",  icon: CheckCircle2 },
   { id: "lock",      label: "Design Lock",   icon: Lock },
   { id: "roadmap",   label: "Roadmap Builder", icon: Layout },
 ];
+
+// ── Palette Cascade sub-panel ────────────────────────────────────────────
+const PaletteCascade = ({ onApplied, ax, flash }) => {
+  const [primary, setPrimary]         = useState("#d4ff3a");
+  const [accent, setAccent]           = useState("#a3e635");
+  const [neutral, setNeutral]         = useState("#1c1917");
+  const [surfaceLight, setSurfaceLight] = useState("#fafaf9");
+  const [surfaceDark, setSurfaceDark]   = useState("#0a0d0c");
+  const [preview, setPreview]         = useState(null);
+  const [busy, setBusy]               = useState(false);
+
+  const dry = async () => {
+    setBusy(true);
+    try {
+      const r = await ax.post("/admin/design-studio/palette-cascade", {
+        primary, accent, neutral, surface_light: surfaceLight, surface_dark: surfaceDark, apply: false,
+      });
+      setPreview(r.data.colors);
+    } catch (e) { flash("Cascade dry-run eșuat.", "err"); }
+    setBusy(false);
+  };
+
+  const apply = async () => {
+    setBusy(true);
+    try {
+      const r = await ax.post("/admin/design-studio/palette-cascade", {
+        primary, accent, neutral, surface_light: surfaceLight, surface_dark: surfaceDark, apply: true,
+      });
+      setPreview(r.data.colors);
+      onApplied?.(r.data.tokens);
+      flash("Paleta aplicată live pe întreaga platformă.");
+    } catch (e) { flash("Cascade apply eșuat.", "err"); }
+    setBusy(false);
+  };
+
+  return (
+    <div className="grid lg:grid-cols-3 gap-4">
+      <div className="lg:col-span-2 space-y-3" data-testid="ds-cascade-inputs">
+        <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+          <div className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">Introdu 5 hex-uri și platforma se pictează singură</div>
+          <p className="text-xs text-slate-500 mb-3">Sistemul derivă automat cele 20 de culori (bg, surface, text, muted, borders, on-primary contrast) pentru light & dark. Fără să atingi butoanele/cardurile.</p>
+          <div className="grid sm:grid-cols-2 gap-2">
+            <ColorField label="Primary (brand)"     value={primary}     onChange={setPrimary}     testid="pc-primary" />
+            <ColorField label="Accent (secundar)"   value={accent}      onChange={setAccent}      testid="pc-accent" />
+            <ColorField label="Neutral (ink text)"  value={neutral}     onChange={setNeutral}     testid="pc-neutral" />
+            <ColorField label="Surface Light"       value={surfaceLight} onChange={setSurfaceLight} testid="pc-surface-light" />
+            <ColorField label="Surface Dark"        value={surfaceDark}  onChange={setSurfaceDark}  testid="pc-surface-dark" />
+          </div>
+          <div className="flex gap-2 mt-4">
+            <DSButton variant="ghost" onClick={dry} disabled={busy} data-testid="pc-preview-btn">Doar Preview</DSButton>
+            <DSButton variant="primary" icon={Sparkles} onClick={apply} disabled={busy} data-testid="pc-apply-btn">
+              {busy ? "Derivare..." : "Cascadează pe toate ecranele"}
+            </DSButton>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Cum funcționează derivarea</div>
+          <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-1">
+            <li>• <b>primary_dim</b> = primary mixat 15% cu negru</li>
+            <li>• <b>on_primary</b> = alb sau negru automat prin luminance WCAG (contrast maxim)</li>
+            <li>• <b>accent_ink</b> = accent amestecat 35% cu neutral (text lizibil)</li>
+            <li>• <b>surface_high / border / text_muted</b> = derivate din neutral & surface prin mixaje calibrate</li>
+            <li>• <b>text_dark & muted_dark</b> = auto-generate din surface_dark pentru dark mode</li>
+            <li>• <b>success/warning/danger/info</b> = semantice universale (verde/portocaliu/roșu/cyan)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="lg:col-span-1">
+        <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800" data-testid="ds-cascade-preview">
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Preview derivare</div>
+          {!preview ? (
+            <div className="text-xs text-slate-400">Apasă „Doar Preview" ca să vezi cele 20 culori derivate deterministc.</div>
+          ) : (
+            <div className="space-y-1.5">
+              {Object.entries(preview).map(([k, v]) => (
+                <div key={k} className="flex items-center gap-2 text-[11px]">
+                  <span className="w-6 h-6 rounded border border-slate-200 dark:border-slate-700 shrink-0" style={{ background: v }} />
+                  <span className="font-mono text-slate-500 dark:text-slate-400 min-w-[110px] truncate">{k}</span>
+                  <span className="font-mono text-slate-700 dark:text-slate-200">{v}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ── Small color swatch input with hex text ─────────────────────────────────
 const ColorField = ({ label, value, onChange, testid }) => (
@@ -283,6 +374,14 @@ export default function DesignStudioPage() {
                 </div>
               </div>
             </div>
+          )}
+
+          {tab === "cascade" && (
+            <PaletteCascade
+              ax={ax}
+              flash={flash}
+              onApplied={(t) => { setTokens(t); setInitial(JSON.parse(JSON.stringify(t))); dispatchTokensUpdated(); reloadGlobal(); }}
+            />
           )}
 
           {tab === "presets" && (

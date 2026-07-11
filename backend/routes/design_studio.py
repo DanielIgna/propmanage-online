@@ -161,6 +161,81 @@ class TokensPayload(BaseModel):
     layout: dict[str, Any] | None = None
 
 
+class CascadePayload(BaseModel):
+    primary: str = Field(default="#d4ff3a", description="Culoare principală (brand) — hex")
+    accent: str = Field(default="#a3e635", description="Culoare accent secundară — hex")
+    neutral: str = Field(default="#1c1917", description="Neutral ink (text pe light) — hex")
+    surface_light: str = Field(default="#fafaf9", description="Fundal light — hex")
+    surface_dark: str = Field(default="#0a0d0c", description="Fundal dark — hex")
+    apply: bool = Field(default=False, description="Dacă true, aplică imediat pe tokens active")
+
+
+def _hex_to_rgb(h: str) -> tuple[int, int, int]:
+    h = h.lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+
+def _rgb_to_hex(r: int, g: int, b: int) -> str:
+    return "#{:02x}{:02x}{:02x}".format(max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b)))
+
+
+def _mix(a: str, b: str, t: float) -> str:
+    r1, g1, b1 = _hex_to_rgb(a); r2, g2, b2 = _hex_to_rgb(b)
+    return _rgb_to_hex(int(r1 + (r2 - r1) * t), int(g1 + (g2 - g1) * t), int(b1 + (b2 - b1) * t))
+
+
+def _luminance(h: str) -> float:
+    r, g, b = [c / 255 for c in _hex_to_rgb(h)]
+    def _lin(c: float) -> float: return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    return 0.2126 * _lin(r) + 0.7152 * _lin(g) + 0.0722 * _lin(b)
+
+
+def _contrast_ink(bg: str) -> str:
+    """Return black or white ink for best contrast on background."""
+    return "#0a0d0c" if _luminance(bg) > 0.5 else "#f5f5f4"
+
+
+def _cascade(primary: str, accent: str, neutral: str, surface_light: str, surface_dark: str) -> dict[str, Any]:
+    """Deterministically derive the full color token set from 3-5 base hexes."""
+    # Derive complementary shades
+    primary_dim = _mix(primary, "#000000", 0.15)         # darker primary
+    accent_ink  = _mix(accent, neutral, 0.35)             # accent as text (readable)
+    on_primary  = _contrast_ink(primary)
+    surface_high_light = _mix(surface_light, neutral, 0.05)
+    surface_high_dark  = _mix(surface_dark, "#ffffff", 0.08)
+    border_light = _mix(surface_light, neutral, 0.12)
+    border_dark  = _mix(surface_dark, "#ffffff", 0.14)
+    text_light = neutral
+    text_dark  = _mix(surface_dark, "#ffffff", 0.94)
+    text_muted_light = _mix(neutral, surface_light, 0.4)
+    text_muted_dark  = _mix(text_dark, surface_dark, 0.5)
+    return {
+        "primary":      primary,
+        "primary_dim":  primary_dim,
+        "on_primary":   on_primary,
+        "accent_ink":   accent_ink,
+        "bg":           surface_light,
+        "bg_dark":      surface_dark,
+        "surface":      "#ffffff" if _luminance(surface_light) > 0.9 else surface_light,
+        "surface_dark": surface_dark,
+        "surface_high": surface_high_light,
+        "surface_high_dark": surface_high_dark,
+        "border":       border_light,
+        "border_dark":  border_dark,
+        "text":         text_light,
+        "text_dark":    text_dark,
+        "text_muted":   text_muted_light,
+        "text_muted_dark": text_muted_dark,
+        # Semantic — keep universal (verde/portocaliu/roșu/cyan)
+        "success":  "#10b981",
+        "warning":  "#f59e0b",
+        "danger":   "#f43f5e",
+        "info":     "#06b6d4",
+    }
+
+
 class PresetSavePayload(BaseModel):
     name: str = Field(min_length=2, max_length=60)
     description: str = ""
@@ -358,3 +433,22 @@ BUILDER_MODULES_STATUS = {
 @router.get("/builder-status")
 async def builder_status(_admin=Depends(require_role("admin"))):
     return {"modules": BUILDER_MODULES_STATUS}
+
+
+# ── PALETTE CASCADE — derive full 20-color token set from 3-5 base hexes ─────
+@router.post("/palette-cascade")
+async def palette_cascade(payload: CascadePayload, _admin=Depends(require_role("admin"))):
+    """Given 3-5 base hex codes, deterministically derive the full color palette
+    (light+dark, borders, muted text, on-primary contrast ink, semantic accents)
+    and optionally apply it to the active tokens.
+    """
+    derived = _cascade(payload.primary, payload.accent, payload.neutral, payload.surface_light, payload.surface_dark)
+    active = await _get_active()
+    new_tokens = {**active["tokens"], "colors": derived}
+    if payload.apply:
+        await db.design_tokens.update_one(
+            {"_id": "active"},
+            {"$set": {"tokens": new_tokens, "preset_id": "custom", "updated_at": datetime.now(timezone.utc).isoformat()}},
+            upsert=True,
+        )
+    return {"colors": derived, "tokens": new_tokens, "applied": payload.apply}

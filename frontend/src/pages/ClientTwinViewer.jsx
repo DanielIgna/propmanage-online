@@ -220,7 +220,7 @@ export const DesignersBrowse = ({ onSelect }) => {
       className="glass-strong rounded-3xl p-5 sm:p-6 mt-4" data-testid="designers-browse">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-purple-500/30 to-pink-500/20 border border-purple-500/40 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-2xl bg-lime-500/15 border border-lime-500/40 flex items-center justify-center">
             <Users className="w-4 h-4 text-purple-300" />
           </div>
           <div>

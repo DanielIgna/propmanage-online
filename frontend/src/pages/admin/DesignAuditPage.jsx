@@ -5,6 +5,7 @@ import axios from "axios";
 import {
   Palette, Smartphone, Monitor, Sparkles, RefreshCw,
   CheckCircle2, AlertTriangle, ArrowRight, Layers, Compass,
+  Users, MousePointer2, Eye, Accessibility, Brain,
 } from "lucide-react";
 import { AdminLayoutMetronic, AdminCard } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
@@ -198,6 +199,35 @@ export default function DesignAuditPage() {
                     <ScoreDial value={result.unity_score}    label="Unitate"  icon={Layers}     testid="da-score-unity" />
                     <ScoreDial value={result.hicks_law_score} label="Hick's Law" icon={Compass} testid="da-score-hicks" />
                   </div>
+
+                  {/* Extended UX Inspector — 7 principii */}
+                  <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                    <ScoreDial value={result.millers_law_score} label="Miller" icon={Layers}    testid="da-score-miller" />
+                    <ScoreDial value={result.fitts_law_score}   label="Fitts"  icon={MousePointer2} testid="da-score-fitts" />
+                    <ScoreDial value={result.jakobs_law_score}  label="Jakob"  icon={Users}     testid="da-score-jakob" />
+                    <ScoreDial value={result.nielsen_score}     label="Nielsen" icon={Eye}      testid="da-score-nielsen" />
+                    <ScoreDial value={result.wcag_score}        label="WCAG AA" icon={Accessibility} testid="da-score-wcag" />
+                    <ScoreDial value={100 - (result.cognitive_load || 0)} label="Cognitiv" icon={Brain} testid="da-score-cognitive" />
+                  </div>
+                  {typeof result.cognitive_load === "number" && (
+                    <div className="p-3 rounded-xl bg-lime-50 dark:bg-lime-500/10 border border-lime-200 dark:border-lime-500/30">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-lime-800 dark:text-lime-200 mb-1">
+                        <Brain className="w-3.5 h-3.5" /> Cognitive Load Score
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-3xl font-black text-lime-700 dark:text-lime-300">{result.cognitive_load}</div>
+                        <div className="text-xs text-slate-600 dark:text-slate-300 flex-1">
+                          {result.cognitive_load < 30 && "Ușor — pagina e clară, decizii puține."}
+                          {result.cognitive_load >= 30 && result.cognitive_load < 60 && "Moderat — echilibru între conținut și acțiuni."}
+                          {result.cognitive_load >= 60 && result.cognitive_load < 80 && "Ridicat — considera simplificare / progressive disclosure."}
+                          {result.cognitive_load >= 80 && "Copleșitor — recomand refactor major."}
+                        </div>
+                        <div className="w-24 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div className={`h-full ${result.cognitive_load < 30 ? "bg-emerald-500" : result.cognitive_load < 60 ? "bg-lime-400" : result.cognitive_load < 80 ? "bg-amber-500" : "bg-rose-500"}`} style={{ width: `${result.cognitive_load}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid md:grid-cols-2 gap-3">
                     <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30">

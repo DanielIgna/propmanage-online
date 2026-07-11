@@ -82,11 +82,17 @@ def _rule_based_score(page: dict[str, Any]) -> dict[str, Any]:
         "desktop_score": b["desktop"],
         "unity_score": b["unity"],
         "hicks_law_score": 78,
+        "millers_law_score": 76,
+        "fitts_law_score": 80,
+        "jakobs_law_score": 82,
+        "nielsen_score": 78,
+        "wcag_score": 84,
+        "cognitive_load": 38,
         "findings": [
             f"Analiză rule-based fallback pentru {page['label']} — activează LLM pentru evaluare detaliată.",
         ],
         "recommendations": [
-            "Rulează analiza AI pentru findings specifice paginii.",
+            "P1: Rulează analiza AI pentru findings specifice paginii.",
         ],
         "mobile_impact": "Mediu — analiză completă necesită LLM.",
         "desktop_impact": "Bun — layout desktop respectă gridul 12-col.",
@@ -138,15 +144,25 @@ async def analyze_page(key: str, force: bool = False, _admin=Depends(require_rol
             "Regula: pe temă LIGHT toate suprafețele sunt albe/gri deschis; pe DARK toate slate-800/900. "
             "IMPORTANT: entitatea legală CORECTĂ este 'VINTAGE FURNITURE S.R.L.' (CUI 35250247, J12/3534/2015, "
             "Cluj-Napoca) — brand-ul public 'PropManage' este marca comercială. Nu marcă aceasta ca problemă. "
-            "Evaluezi respectarea legii lui Hick (limitare opțiuni), unitatea vizuală (culori, spacing, tipografie), "
-            "contrastul (WCAG AA), și impactul UX distinct pe MOBILE (touch targets ≥44px, bottom nav, thumb zone) "
-            "vs DESKTOP (grid 12-col, hover states, dense info). Răspunde STRICT JSON: "
+            "\n\nEvaluezi 7 principii UX bine cunoscute + criterii mobile/desktop:"
+            "\n  1. Legea lui HICK — reducerea alegerilor simultane (max 5-7 CTAs vizibile)"
+            "\n  2. Legea lui MILLER — chunking (max 7±2 elemente vizuale grupate)"
+            "\n  3. Legea lui FITTS — target-uri touch/click accesibile (dimensiune × distanță)"
+            "\n  4. Legea lui JAKOB — conformitate cu convenții cunoscute (butoane, iconuri, layout)"
+            "\n  5. Euristici NIELSEN — 10 heuristici (vizibilitate stare, match cu lumea reală, control user, consistență, prevenire erori, recunoaștere > recall, flexibilitate, minimalism, mesaje eroare clare, help)"
+            "\n  6. WCAG AA — contrast text ≥4.5:1, focus vizibil, alt-text, ARIA labels"
+            "\n  7. MOBILE-FIRST — touch targets ≥44px, bottom nav thumb zone, viewport fluid"
+            "\n\nÎn plus, calculezi COGNITIVE LOAD (0-100, unde 100=copleșitor): numărul de decizii × culori distincte × densitate informație × lungime text × opțiuni meniu."
+            "\n\nRăspunde STRICT JSON: "
             "{\"mobile_score\": 0-100, \"desktop_score\": 0-100, \"unity_score\": 0-100, "
-            "\"hicks_law_score\": 0-100, \"findings\": [3-5 constatări factuale scurte, string-uri simple], "
-            "\"recommendations\": [3-5 acțiuni concrete — string-uri simple, poți începe cu 'P0:', 'P1:' pentru prioritate], "
+            "\"hicks_law_score\": 0-100, \"millers_law_score\": 0-100, \"fitts_law_score\": 0-100, "
+            "\"jakobs_law_score\": 0-100, \"nielsen_score\": 0-100, \"wcag_score\": 0-100, "
+            "\"cognitive_load\": 0-100, "
+            "\"findings\": [3-5 constatări factuale scurte, string-uri], "
+            "\"recommendations\": [3-5 acțiuni concrete cu prefix 'P0:', 'P1:', 'P2:' pentru prioritate — string-uri], "
             "\"mobile_impact\": \"scurt verdict impact pe mobil\", "
             "\"desktop_impact\": \"scurt verdict impact pe desktop\"}. "
-            "Fii concret și critic — dai note reale, nu inflatate. Recomandările sunt string-uri, nu obiecte."
+            "Fii concret și critic — dai note reale, nu inflatate. Recomandările sunt string-uri simple, nu obiecte."
         )
         prompt = (
             f"Auditez pagina: {page['label']} ({page['path']}, zonă={page['zone']}).\n\n"
@@ -165,6 +181,12 @@ async def analyze_page(key: str, force: bool = False, _admin=Depends(require_rol
             "desktop_score": int(result.get("desktop_score", 0)),
             "unity_score": int(result.get("unity_score", 0)),
             "hicks_law_score": int(result.get("hicks_law_score", 0)),
+            "millers_law_score": int(result.get("millers_law_score", 0)),
+            "fitts_law_score": int(result.get("fitts_law_score", 0)),
+            "jakobs_law_score": int(result.get("jakobs_law_score", 0)),
+            "nielsen_score": int(result.get("nielsen_score", 0)),
+            "wcag_score": int(result.get("wcag_score", 0)),
+            "cognitive_load": int(result.get("cognitive_load", 0)),
             "findings": (result.get("findings") or [])[:5],
             "recommendations": (result.get("recommendations") or [])[:5],
             "mobile_impact": result.get("mobile_impact") or "",
