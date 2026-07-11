@@ -58,10 +58,10 @@ Backend pattern: endpoint `/admin/<modul>/insights` → `{bullets, alerts, recom
 | Admin Overview / Console | ✅ (iter93) | — |
 | Marketplace Partners | ✅ (iter93) | — |
 | Financiar / Escrow | ✅ (iter93) | — |
-| Utilizatori / Cereri (AdminUsers, AdminApprovals) | 🟡 | P2 |
+| Utilizatori / Cereri (AdminUsers, AdminApprovals) | ✅ AdminUsers (iter99) · 🟡 AdminApprovals | P2 |
 | Specialist Dashboard | ✅ sumar „Astăzi ai" pe DS (iter93) | — |
 | Operator Dashboard | 🔴 (temă dark veche) | P2 — sprint dedicat |
-| BI MoE / Construction Intelligence | 🟡 | P2 |
+| BI MoE / Construction Intelligence | ✅ BI MoE (iter99) · 🟡 Construction | P2 |
 | Module AI (Control Center, Governance etc.) | 🟡 | P3 |
 
 *Regulă: nu se dezvoltă pagini individuale. Se refolosesc componentele. Orice PR care introduce un buton/tabel/badge custom în zona Business = respins.*
