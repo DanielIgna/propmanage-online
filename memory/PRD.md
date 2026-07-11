@@ -2584,3 +2584,13 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - Ordine propusă: 2.1 Leads → 2.2 Config → 2.3 AI Chat → 2.4 Content, fiecare cu raport+STOP
 - Strategie: façade + migrare idempotentă + legacy intact (rollback natural), endpointuri publice neschimbate
 - STATUS: AȘTEAPTĂ aprobarea ordinii + start 2.1
+
+## [2026-06-11] Sprint 2 · Pasul 2.1 — LEADS 5→1 LIVRAT ✅ (self-tested complet, backend-only)
+- `leads_store.py`: sync_lead (upsert idempotent pe source+meta.legacy_id, id app-level primează peste _id), triage universal, stage mapping (introduced→contacted, converted→won), migrate_all, list, summary
+- Colecția unificată `leads` (tenant_id=main): 21 docs migrate din 4 surse; legacy INTACT (rollback natural)
+- Dual-write (strangler): hooks în city_partners (3), marketplace_partners (3), public demo-request (2), strategic_partners (1), interior_design (1) — citirile legacy neatinse
+- API nou: GET /api/admin/leads (+filtre source/stage/segment), GET /summary, POST /migrate (idempotent)
+- weekly_lead_report (Self-Driving) → raportează TOATE sursele
+- Bug fixat în timpul testării: duplicate la re-migrare (id vs _id) — legacy_id preferă acum `id` app-level
+- Testat: migrare+idempotență+dual-write interior/demo/city+summary+weekly report; zero schimbări frontend
+- URMEAZĂ (aprobare owner): 2.2 Config 4→1 (settings namespaces + façade fallback)

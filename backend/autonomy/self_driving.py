@@ -181,16 +181,16 @@ async def weekly_lead_report_job() -> dict:
     if not s["lead_triage"]:
         return {"status": "skipped"}
     from orchestrator.engine import notify_admins
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
-    leads = await db.interior_design_leads.find({"created_at": {"$gte": cutoff}}).to_list(500)
-    total = len(leads)
-    hot = sum(1 for x in leads if x.get("segment") == "hot")
+    import leads_store
+    s7 = await leads_store.summary(days=7)
+    leads = await db.interior_design_leads.find({"created_at": {"$gte": (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()}}).to_list(500)
     contacted = sum(1 for x in leads if x.get("status") in ("contacted", "won"))
-    body = (f"Săptămâna trecută: {total} lead-uri Design Interior ({hot} HOT 🔥). "
-            f"{contacted} contactate. Triage-ul AI a rulat automat pe fiecare lead — vezi panoul admin.")
-    n = await notify_admins("📋 Raport săptămânal lead-uri Design Interior", body, link="/admin/interior-design")
-    await _log_run("weekly_lead_report", "applied", {"total": total, "hot": hot, "contacted": contacted, "admins_notified": n})
-    return {"status": "ok", "total": total, "hot": hot}
+    src_txt = " · ".join(f"{k}: {v}" for k, v in s7.get("by_source", {}).items()) or "fără lead-uri noi"
+    body = (f"Săptămâna trecută: {s7['total']} lead-uri TOTAL pe platformă ({s7['hot']} HOT 🔥) — {src_txt}. "
+            f"Design Interior: {contacted} contactate. Triage-ul AI rulează automat pe toate sursele.")
+    n = await notify_admins("📋 Raport săptămânal lead-uri (toate sursele)", body, link="/admin/interior-design")
+    await _log_run("weekly_lead_report", "applied", {**s7, "admins_notified": n})
+    return {"status": "ok", **s7}
 
 
 # ── API ───────────────────────────────────────────────────────────────────────

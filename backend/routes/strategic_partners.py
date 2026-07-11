@@ -223,6 +223,10 @@ async def cross_reference(lead_id: str, user=Depends(get_current_user)):
         {"_id": oid},
         {"$set": {"cross_ref_done": True, "cross_ref_at": out["generated_at"]}},
     )
+    _synced = await db.city_partner_leads.find_one({"_id": oid})
+    if _synced:
+        from leads_store import sync_lead
+        await sync_lead("city_partner", _synced)
     await db.strategic_cross_refs.insert_one({**out, "generated_by": user.get("email")})
     return out
 

@@ -174,6 +174,11 @@ async def create_lead(payload: LeadIn):
     }
     await db.interior_design_leads.insert_one({**lead})
     try:
+        from leads_store import sync_lead
+        await sync_lead("interior_design", lead)
+    except Exception:  # noqa: BLE001
+        pass
+    try:
         from orchestrator.engine import notify_admins
         if segment == "hot":
             await notify_admins(

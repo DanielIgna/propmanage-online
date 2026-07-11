@@ -46,8 +46,12 @@ async def demo_request(payload: dict = Body(...)):
     existing = await db.demo_leads.find_one({"email": email, "created_at": {"$regex": f"^{day}"}})
     if existing:
         await db.demo_leads.update_one({"_id": existing["_id"]}, {"$set": {"name": name, "company": company, "message": message, "role": role, "whatsapp": whatsapp, "updated_at": doc["created_at"]}})
+        from leads_store import sync_lead
+        await sync_lead("demo", {**existing, "name": name, "company": company, "message": message})
         return {"ok": True, "deduped": True}
-    await db.demo_leads.insert_one(doc)
+    ins = await db.demo_leads.insert_one(doc)
+    from leads_store import sync_lead
+    await sync_lead("demo", {**doc, "_id": ins.inserted_id})
 
     # Notify admins via existing email service (console fallback when key missing).
     try:

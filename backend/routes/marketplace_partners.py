@@ -456,6 +456,8 @@ async def create_lead(partner_id: str, payload: LeadCreate, user=Depends(get_cur
     }
     res = await db.marketplace_leads.insert_one(doc)
     doc["_id"] = res.inserted_id
+    from leads_store import sync_lead
+    await sync_lead("marketplace_partner", doc)
     return _serialize_lead(doc)
 
 
@@ -473,6 +475,8 @@ async def patch_lead(lead_id: str, payload: LeadPatch, user=Depends(get_current_
     res = await db.marketplace_leads.find_one_and_update({"_id": oid}, {"$set": update}, return_document=True)
     if not res:
         raise HTTPException(404, "Lead inexistent.")
+    from leads_store import sync_lead
+    await sync_lead("marketplace_partner", res)
     return _serialize_lead(res)
 
 
@@ -662,6 +666,8 @@ async def add_my_lead(payload: LeadCreate, user=Depends(get_current_user)):
     }
     res = await db.marketplace_leads.insert_one(doc)
     doc["_id"] = res.inserted_id
+    from leads_store import sync_lead
+    await sync_lead("marketplace_partner", doc)
     return _serialize_lead(doc)
 
 
