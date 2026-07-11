@@ -66,33 +66,66 @@ export const KpiCard = ({ icon: Icon, label, value, trend = null, accent = "info
 };
 
 // ── AI Insight Card: obligatoriu după KPI pe orice pagină Business ───────────
-export const AIInsightCard = ({ bullets = [], alerts = [], recommendations = [], onAction, actionLabel = "Vezi recomandări", loading = false, testid = "ai-insight-card" }) => (
+// llmModule (opțional): activează „Analiză AI (Claude)" → /api/admin/insights/llm?module=X (cache 6h)
+export const AIInsightCard = ({ bullets = [], alerts = [], recommendations = [], onAction, actionLabel = "Vezi recomandări", loading = false, llmModule, testid = "ai-insight-card" }) => {
+  const [llm, setLlm] = useState(null);
+  const [llmBusy, setLlmBusy] = useState(false);
+
+  const runLlm = async () => {
+    setLlmBusy(true);
+    try {
+      const base = process.env.REACT_APP_BACKEND_URL;
+      const res = await fetch(`${base}/api/admin/insights/llm?module=${llmModule}`, { credentials: "include" });
+      if (!res.ok) throw new Error();
+      setLlm(await res.json());
+    } catch { setLlm({ error: true }); }
+    setLlmBusy(false);
+  };
+
+  const showBullets = llm && !llm.error ? llm.bullets : bullets;
+  const showAlerts = llm && !llm.error ? llm.alerts : alerts;
+  const showRecs = llm && !llm.error ? llm.recommendations : recommendations;
+
+  return (
   <div className={`${CARD} border-violet-200 dark:border-violet-500/30 p-4`} data-testid={testid}>
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 flex-wrap">
       <span className="w-7 h-7 rounded-lg flex items-center justify-center bg-violet-50 dark:bg-violet-500/15">
         <Brain className="w-4 h-4 text-violet-600 dark:text-violet-400" />
       </span>
       <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm">AI Insights</h3>
-      <DSBadge type="AI" />
+      <DSBadge type={llm && !llm.error ? "LIVE" : "AI"}>{llm && !llm.error ? "CLAUDE" : "AI"}</DSBadge>
+      {llmModule && (
+        <button onClick={runLlm} disabled={llmBusy} data-testid={`${testid}-llm-btn`}
+          className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-violet-50 dark:bg-violet-500/15 text-violet-600 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-500/25 disabled:opacity-50 transition-colors">
+          <Brain className={`w-3.5 h-3.5 ${llmBusy ? "animate-pulse" : ""}`} />
+          {llmBusy ? "Analizează..." : llm && !llm.error ? "Reanalizează" : "Analiză AI (Claude)"}
+        </button>
+      )}
     </div>
-    {loading ? (
+    {llm?.error && <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">Analiza AI e temporar indisponibilă — se afișează insights-urile standard.</p>}
+    {loading || llmBusy ? (
       <div className="mt-3 space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-3 rounded bg-slate-100 dark:bg-slate-700 animate-pulse" style={{ width: `${90 - i * 15}%` }} />)}</div>
     ) : (
       <ul className="mt-3 space-y-1.5">
-        {alerts.map((a, i) => (
+        {showAlerts.map((a, i) => (
           <li key={`a${i}`} className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300">
             <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" /> {a}
           </li>
         ))}
-        {bullets.map((b, i) => (
+        {showBullets.map((b, i) => (
           <li key={i} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
             <span className="w-1 h-1 rounded-full bg-violet-400 mt-2 shrink-0" /> {b}
           </li>
         ))}
-        {!alerts.length && !bullets.length && <li className="text-sm text-slate-400">Colectăm date — insights-urile apar după primele sesiuni.</li>}
+        {llm && !llm.error && showRecs.map((r, i) => (
+          <li key={`r${i}`} className="flex items-start gap-2 text-sm font-medium text-violet-700 dark:text-violet-300">
+            <ArrowRight className="w-3.5 h-3.5 mt-0.5 shrink-0" /> {r}
+          </li>
+        ))}
+        {!showAlerts.length && !showBullets.length && <li className="text-sm text-slate-400">Colectăm date — insights-urile apar după primele sesiuni.</li>}
       </ul>
     )}
-    {(recommendations.length > 0 || onAction) && (
+    {(!llm || llm.error) && (recommendations.length > 0 || onAction) && (
       <button
         onClick={onAction}
         data-testid={`${testid}-action`}
@@ -102,7 +135,8 @@ export const AIInsightCard = ({ bullets = [], alerts = [], recommendations = [],
       </button>
     )}
   </div>
-);
+  );
+};
 
 // ── ChartCard: container standard pentru orice grafic ───────────────────────
 export const ChartCard = ({ title, subtitle, actions, children, className = "", testid }) => (

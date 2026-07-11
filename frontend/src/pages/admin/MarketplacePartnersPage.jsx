@@ -341,7 +341,7 @@ const MarketplacePartnersPage = () => {
               alerts={(stats.by_status?.prospect || 0) > (stats.by_status?.active || 0) ? [`${stats.by_status.prospect} prospecți așteaptă onboarding — mai mulți decât partenerii activi.`] : []}
               recommendations={["Rulează AI Marketplace Copilot pentru analiza completă a ecosistemului."]}
               onAction={() => setCopilotOpen(true)} actionLabel="Rulează AI Copilot"
-              testid="mkt-ai-insights"
+              llmModule="marketplace" testid="mkt-ai-insights"
             />
           </div>
         </>

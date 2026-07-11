@@ -101,6 +101,27 @@ async def handle_pattern_scan(payload: dict) -> dict:
     return {"steps": steps_log, "outcome": "auto_resolved", "minutes_saved": 20 if findings else 5, "escalate": False}
 
 
+async def count_orphan_transactions(days: int = 30) -> list:
+    """Tranzacții recente cu request_id către cereri inexistente. Returnează listă de _id-uri."""
+    from bson import ObjectId
+    orphan_ids = []
+    async for t in db.transactions.find(
+        {"request_id": {"$nin": [None, ""]}, "created_at": {"$gte": _days_ago(days)},
+         "reconciliation.status": {"$exists": False}},
+        {"request_id": 1},
+    ).sort("_id", -1).limit(500):
+        rid = t["request_id"]
+        found = await db.requests.count_documents({"id": rid}, limit=1)
+        if not found:
+            try:
+                found = await db.requests.count_documents({"_id": ObjectId(rid)}, limit=1)
+            except Exception:  # noqa: BLE001
+                found = 0
+        if not found:
+            orphan_ids.append(t["_id"])
+    return orphan_ids
+
+
 # ============================================================================
 # 9. FINANCE RECONCILER — reconciliere zilnică
 # ============================================================================
@@ -116,20 +137,7 @@ async def handle_finance_reconcile(payload: dict) -> dict:
     steps_log.append({"action": "check_negative_balances", "ok": neg == 0, "detail": f"{neg} solduri negative"})
 
     # b) Tranzacții recente orfane (30z, request_id către cereri inexistente)
-    from bson import ObjectId
-    orphans = 0
-    async for t in db.transactions.find(
-        {"request_id": {"$nin": [None, ""]}, "created_at": {"$gte": _days_ago(30)}}, {"request_id": 1}
-    ).sort("_id", -1).limit(500):
-        rid = t["request_id"]
-        found = await db.requests.count_documents({"id": rid}, limit=1)
-        if not found:
-            try:
-                found = await db.requests.count_documents({"_id": ObjectId(rid)}, limit=1)
-            except Exception:  # noqa: BLE001
-                found = 0
-        if not found:
-            orphans += 1
+    orphans = len(await count_orphan_transactions(30))
     if orphans:
         issues.append(f"{orphans} tranzacții orfane (cereri inexistente) în ultimele 30 zile")
     steps_log.append({"action": "check_orphan_transactions", "ok": orphans == 0, "detail": f"{orphans} tranzacții orfane (30z)"})

@@ -132,7 +132,7 @@ export default function AnalyticsGrowthPage() {
               bullets={insights?.bullets || []} alerts={insights?.alerts || []}
               recommendations={insights?.recommendations || []}
               onAction={() => insights?.recommendations?.length && toast.info(insights.recommendations.join(" · "), { duration: 8000 })}
-              loading={loading} testid="ag-ai-insights"
+              loading={loading} llmModule="analytics" testid="ag-ai-insights"
             />
 
             {/* 5. Grafice standard */}

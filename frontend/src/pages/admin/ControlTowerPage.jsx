@@ -14,7 +14,7 @@ import { KpiCard, AIInsightCard, DSButton, DSBadge, DataTable, DSSkeleton, Empty
 
 const SEV_BADGE = { critical: "ERROR", warning: "WARNING", info: "NEW" };
 
-const AttentionCard = ({ item, onGo }) => (
+const AttentionCard = ({ item, onGo, onApi, busy }) => (
   <div className={`${CARD} p-4 ${item.severity === "critical" ? "border-rose-200 dark:border-rose-500/30" : "border-amber-200 dark:border-amber-500/30"}`}
     data-testid={`ct-attention-${item.id}`}>
     <div className="flex items-start gap-3">
@@ -29,9 +29,15 @@ const AttentionCard = ({ item, onGo }) => (
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{item.propunere}</p>
         <p className="mt-1 text-xs text-slate-400">Impact: {item.impact_estimat} · Sursă: {item.sursa_semnalului}</p>
       </div>
-      <DSButton variant="primary" onClick={() => onGo(item.actiune_1tap.route)} data-testid={`ct-action-${item.id}`}>
-        {item.actiune_1tap.label} <ArrowRight className="w-3.5 h-3.5" />
-      </DSButton>
+      {item.actiune_1tap.api ? (
+        <DSButton variant="success" disabled={busy} onClick={() => onApi(item.actiune_1tap)} data-testid={`ct-action-${item.id}`}>
+          {busy ? "Se repară..." : item.actiune_1tap.label} <ArrowRight className="w-3.5 h-3.5" />
+        </DSButton>
+      ) : (
+        <DSButton variant="primary" onClick={() => onGo(item.actiune_1tap.route)} data-testid={`ct-action-${item.id}`}>
+          {item.actiune_1tap.label} <ArrowRight className="w-3.5 h-3.5" />
+        </DSButton>
+      )}
     </div>
   </div>
 );
@@ -42,6 +48,17 @@ export default function ControlTowerPage() {
   const [kg, setKg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [backfilling, setBackfilling] = useState(false);
+  const [apiBusy, setApiBusy] = useState(false);
+
+  const runApiAction = async (action) => {
+    setApiBusy(true);
+    try {
+      const { data: res } = await axios.post(`${API}${action.api.replace(/^\/admin/, "/admin")}`);
+      toast.success(res.message || "Acțiune executată");
+      await load();
+    } catch { toast.error("Acțiunea a eșuat"); }
+    setApiBusy(false);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -89,7 +106,7 @@ export default function ControlTowerPage() {
                 Attention Layer — decizii care cer om azi ({data?.attention?.length || 0})
               </h2>
               <div className="space-y-4" data-testid="ct-attention-list">
-                {(data?.attention || []).map(item => <AttentionCard key={item.id} item={item} onGo={navigate} />)}
+                {(data?.attention || []).map(item => <AttentionCard key={item.id} item={item} onGo={navigate} onApi={runApiAction} busy={apiBusy} />)}
                 {!data?.attention?.length && (
                   <EmptyState icon={ShieldCheck} title="Nicio decizie critică azi." hint="Platforma gestionează totul autonom. Verifică Autonomy Report mai jos." testid="ct-attention-empty" />
                 )}
@@ -98,7 +115,7 @@ export default function ControlTowerPage() {
 
             {/* 3. Autonomy Report */}
             <AIInsightCard
-              testid="ct-autonomy-report"
+              testid="ct-autonomy-report" llmModule="control_tower"
               bullets={ar ? [
                 `Platforma a rezolvat singură ${ar.auto_resolved_7d} situații în ultimele 7 zile (~${ar.hours_saved_7d}h economisite).`,
                 ...(ar.escalated_7d ? [`${ar.escalated_7d} situații au fost escaladate către om.`] : []),

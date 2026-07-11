@@ -118,6 +118,20 @@ async def control_tower(user=Depends(require_role("admin"))):
             "count": retry_failed,
         })
 
+    # 5b. Tranzacții orfane (Finance Reconciler) — prima acțiune „propunere → execuție 1-tap" (Blueprint §8)
+    from orchestrator.playbooks_sprint3 import count_orphan_transactions
+    orphan_ids = await count_orphan_transactions(30)
+    if orphan_ids:
+        attention.append({
+            "id": "orphan_transactions", "severity": "warning",
+            "situatie": f"{len(orphan_ids)} tranzacții orfane (30z) — cereri asociate inexistente",
+            "propunere": "Arhivează-le automat cu marcaj de reconciliere (rămân în istoric, ies din alertele zilnice)",
+            "impact_estimat": "Reconciliere financiară curată — Finance Reconciler nu mai escaladează",
+            "actiune_1tap": {"label": "Repară automat", "api": "/admin/control-tower/actions/reconcile-orphans", "method": "POST"},
+            "sursa_semnalului": "Finance Reconciler (playbook 9)",
+            "count": len(orphan_ids),
+        })
+
     severity_rank = {"critical": 0, "warning": 1, "info": 2}
     attention.sort(key=lambda a: (severity_rank.get(a["severity"], 3), -a["count"]))
 
@@ -150,3 +164,26 @@ async def control_tower(user=Depends(require_role("admin"))):
     }
 
     return {"attention": attention[:5], "pulse": pulse, "autonomy_report": autonomy_report}
+
+
+@router.post("/actions/reconcile-orphans")
+async def reconcile_orphan_transactions(user=Depends(require_role("admin"))):
+    """Execuție 1-tap (Blueprint §8): arhivează tranzacțiile orfane cu marcaj de reconciliere."""
+    import uuid
+    from orchestrator.playbooks_sprint3 import count_orphan_transactions
+    orphan_ids = await count_orphan_transactions(30)
+    if not orphan_ids:
+        return {"repaired": 0, "message": "Nicio tranzacție orfană de reparat."}
+    now = datetime.now(timezone.utc).isoformat()
+    res = await db.transactions.update_many(
+        {"_id": {"$in": orphan_ids}},
+        {"$set": {"reconciliation": {"status": "archived_orphan", "ts": now, "by": user.get("email"), "reason": "Cerere asociată inexistentă — arhivat 1-tap din Control Tower"}}},
+    )
+    await db.orchestrator_ledger.insert_one({
+        "id": uuid.uuid4().hex, "ts": now, "playbook_name": "Finance Reconciler",
+        "signal_kind": "finance_reconcile", "outcome": "auto_resolved", "escalated": False,
+        "minutes_saved": max(5, len(orphan_ids)), "test": False,
+        "steps": [{"action": "reconcile_orphans_1tap", "ok": True,
+                   "detail": f"{res.modified_count} tranzacții orfane arhivate de {user.get('email')} din Control Tower"}],
+    })
+    return {"repaired": res.modified_count, "message": f"{res.modified_count} tranzacții orfane arhivate cu marcaj de reconciliere."}

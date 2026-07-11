@@ -65,7 +65,7 @@ export const AdminOverview = () => {
 
       {/* 2. AI Insights — obligatoriu după KPI */}
       <AIInsightCard bullets={insights.bullets} alerts={insights.alerts} recommendations={insights.recommendations}
-        loading={!analytics} testid="admin-ai-insights" />
+        loading={!analytics} llmModule="overview" testid="admin-ai-insights" />
 
       {/* 3. Grafice */}
       <div className="grid lg:grid-cols-3 gap-4">

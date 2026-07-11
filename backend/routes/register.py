@@ -115,6 +115,8 @@ from routes.orchestrator import router as orchestrator_router
 from routes.construction import router as construction_router
 from routes.kg import router as kg_router
 from routes.control_tower import router as control_tower_router
+from routes.specialist_cockpit import router as specialist_cockpit_router
+from routes.ai_insights import router as ai_insights_router
 
 # Registration order matters — kept identical to the original server.py loop.
 ALL_ROUTERS = (
@@ -226,4 +228,6 @@ ALL_ROUTERS = (
     demo_activity_router,
     kg_router,
     control_tower_router,
+    specialist_cockpit_router,
+    ai_insights_router,
 )

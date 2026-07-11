@@ -303,7 +303,7 @@ export const AdminFinance = () => {
       </div>
 
       <AIInsightCard bullets={insights.bullets} alerts={insights.alerts} recommendations={insights.recommendations}
-        loading={!data} testid="finance-ai-insights" />
+        loading={!data} llmModule="finance" testid="finance-ai-insights" />
 
       <DataTable
         title="Top 10 Wallets"

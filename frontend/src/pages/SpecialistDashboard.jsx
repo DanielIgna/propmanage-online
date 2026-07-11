@@ -25,6 +25,7 @@ import { TierCelebrationBanner } from "../lib/TierCelebrationBanner";
 import { TierToolsPanel } from "../lib/TierToolsPanel";
 import { QuestPanel } from "../lib/QuestPanel";
 import { KpiCard } from "../design-system";
+import { SpecialistCockpit } from "./SpecialistCockpit";
 import { useTier } from "../lib/useTier";
 import {
   PMCard, PMCardPrimary, PMStatCard, PMPillButton, PMChip,
@@ -121,6 +122,9 @@ export const SpecialistDashboard = () => {
             <KpiCard icon={Wallet} label="Încasări luna aceasta" value={`${monthlyEarnings.toLocaleString("ro")} RON`} accent="success" onClick={() => setTab("jobs")} testid="spec-today-earnings" />
           </div>
         </div>
+      )}
+      {tab === "opportunities" && (
+        <SpecialistCockpit onGo={(dest) => (dest === "opportunities" ? window.scrollTo({ top: 0 }) : setTab(dest))} />
       )}
       <WelcomeChecklist />
       <MaturityCard />
