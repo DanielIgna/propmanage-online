@@ -198,8 +198,8 @@ async def update_settings(body: AppSettingsUpdate, user: dict = Depends(require_
     try:
         from settings_store import put_settings
         await put_settings("app", {k: v for k, v in doc.items() if k != "_id"}, who=update["updated_by"])
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger("propmanage.app_settings").warning(f"settings_store sync fail: {e}")
     return serialize_doc(doc)
 
 

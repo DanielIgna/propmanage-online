@@ -2611,3 +2611,10 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - cms_content: 0 docs, DORMANT — retragere UI propusă la consolidarea admin (D1), nimic șters
 ### Legacy: TOATE colecțiile vechi intacte (rollback natural). Zero schimbări frontend.
 ### SPRINT 2 COMPLET (val 1). Următorul: Sprint 3 — Tenant Foundation (plan, fără migrare date) — AȘTEAPTĂ APROBARE.
+
+## [2026-06-11] Sprint 2 — VERIFICAT cu testing_agent (iteration_110) ✅ FINALIZAT
+- Backend 17/17 PASS: auth (3 roluri), settings façade dual-write E2E (PUT → settings + app_settings legacy sincron), demo-request → unified `leads` cu triage AI (score/segment/legacy_id), AI chat interior-design cu session_id, XOS registry + experience profiles (3 roluri)
+- Frontend 100% PASS: landing + SiteNav CMS-driven, admin XOS Builder (ambele panouri), client dashboard, demo-request E2E cu dialog «Mulțumim!»
+- Fixuri post-test: except silențios în app_settings.py → logger.warning; test_credentials.md re-corectat (parola admin = SEED_ADMIN_PASSWORD, a 4-a recurență a driftului)
+- Note tester (backlog): /api/interior-design/assistant e neautentificat/fără rate-limit (consum credite LLM) — de gardat; Resend domain neverificat (blocat pe DNS user)
+- URMEAZĂ: Sprint 3 — Tenant Foundation (analiză + infrastructură tenant_id, FĂRĂ migrare date) — AȘTEAPTĂ APROBARE OWNER
