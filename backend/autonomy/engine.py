@@ -15,11 +15,12 @@ logger = logging.getLogger("propmanage.autonomy")
 # Default weights (can be overridden via `autonomy_targets` doc)
 # ============================================================================
 DEFAULT_WEIGHTS = {
-    "operational": 0.30,
-    "technical": 0.25,
-    "security": 0.20,
-    "dev": 0.10,
-    "ai": 0.15,
+    "operational": 0.27,
+    "technical": 0.22,
+    "security": 0.18,
+    "dev": 0.09,
+    "ai": 0.13,
+    "human": 0.11,
 }
 
 DEFAULT_TARGETS = {
@@ -29,6 +30,7 @@ DEFAULT_TARGETS = {
     "security": 90,
     "dev": 75,
     "ai": 80,
+    "human": 80,
 }
 
 
@@ -373,6 +375,17 @@ def _recommendations(scores: dict, breakdown: dict, targets: dict) -> list:
     """Generate prioritized recommendations to close gaps to target."""
     recs = []
 
+    # Human Dependency gaps (HDI — a 5-a axă)
+    hd = breakdown.get("human", {}).get("signals", {})
+    if hd and scores.get("human", 100) < targets.get("human", 80):
+        pending = hd.get("human_interventions_pending", 0)
+        recs.append({
+            "area": "human",
+            "priority": "high" if scores.get("human", 100) < 50 else "medium",
+            "action": f"Human Dependency Index: {pending} intervenții umane pendinte ({hd.get('open_disputes', 0)} dispute, {hd.get('escrow_held_unconfirmed', 0)} escrow, {hd.get('automation_rules_disabled', 0)} reguli oprite). Activează regulile din Automation Center și triază disputele.",
+            "impact_points": round((targets.get("human", 80) - scores.get("human", 0)) * 0.11, 1),
+        })
+
     # Operational gaps
     op = breakdown["operational"]["signals"]
     if op["auto_matched_requests_pct"] < 80:
@@ -460,6 +473,55 @@ def _recommendations(scores: dict, breakdown: dict, targets: dict) -> list:
 # ============================================================================
 # MAIN: compute_autonomy_scores
 # ============================================================================
+# ============================================================================
+# Sub-score: HUMAN DEPENDENCY (HDI — a 5-a axă, CAO Roadmap §4)
+# ============================================================================
+async def _score_human_dependency() -> dict:
+    """100 = platforma nu are nevoie de om. Fiecare intervenție umană pendinte scade scorul."""
+    now = datetime.now(timezone.utc)
+    h48 = (now - timedelta(hours=48)).isoformat()
+
+    waiting_48h = await db.requests.count_documents({"status": {"$in": ["open", "pending"]}, "created_at": {"$lt": h48}})
+    escrow_held = await db.requests.count_documents({"escrow_status": "held"})
+    open_disputes = await db.disputes.count_documents({"status": {"$in": ["open", "pending", "in_review"]}})
+    rules_disabled = await db.automation_rules.count_documents({"enabled": False})
+
+    recos_pending = 0
+    recos_doc = await db.command_center_recos.find_one({"_id": "latest"})
+    if recos_doc:
+        recos_pending = sum(1 for r in recos_doc.get("recommendations", []) if not r.get("done"))
+
+    anomalies_open = await db.audit_anomalies.count_documents({"resolved": False})
+
+    # Fiecare item pendinte = dependență de om. Penalizări ponderate pe cost uman.
+    penalty = (
+        waiting_48h * 1.5
+        + escrow_held * 0.4
+        + open_disputes * 3.0
+        + rules_disabled * 6.0
+        + recos_pending * 2.0
+        + anomalies_open * 4.0
+    ) * 0.5
+    score = _clamp(100.0 - penalty)
+    interventions_week = waiting_48h + escrow_held + open_disputes + rules_disabled + recos_pending + anomalies_open
+
+    return {
+        "score": round(score, 1),
+        "signals": {
+            "human_interventions_pending": interventions_week,
+            "requests_waiting_48h": waiting_48h,
+            "escrow_held_unconfirmed": escrow_held,
+            "open_disputes": open_disputes,
+            "automation_rules_disabled": rules_disabled,
+            "ai_recommendations_pending": recos_pending,
+            "audit_anomalies_open": anomalies_open,
+            "raw": {
+                "formula": "100 - (waiting48h×1.5 + escrow×0.4 + dispute×3 + reguli_oprite×6 + recomandări×2 + anomalii×4)",
+            },
+        },
+    }
+
+
 async def compute_autonomy_scores(weights: Optional[dict] = None, targets: Optional[dict] = None) -> dict:
     """Public entrypoint — returns full autonomy report."""
     w = {**DEFAULT_WEIGHTS, **(weights or {})}
@@ -471,10 +533,13 @@ async def compute_autonomy_scores(weights: Optional[dict] = None, targets: Optio
         "security": await _score_security(),
         "dev": await _score_dev(),
         "ai": await _score_ai(),
+        "human": await _score_human_dependency(),
     }
 
     scores = {k: breakdown[k]["score"] for k in breakdown}
-    general = sum(scores[k] * w[k] for k in w)
+    w = {k: v for k, v in w.items() if k in breakdown}
+    total_w = sum(w.values()) or 1.0
+    general = sum(scores[k] * w[k] for k in w) / total_w
     scores["general"] = round(general, 1)
 
     # Determine tier

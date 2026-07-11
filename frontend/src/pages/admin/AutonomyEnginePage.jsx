@@ -4,7 +4,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import {
-  Gauge, Activity, Cpu, ShieldCheck, Wrench, Brain, RefreshCcw,
+  Gauge, Activity, Cpu, ShieldCheck, Wrench, Brain, RefreshCcw, Users,
   Loader2, TrendingUp, AlertTriangle, CheckCircle2, ChevronRight, Target, Zap, Sparkles,
 } from "lucide-react";
 
@@ -24,6 +24,7 @@ const SUB_META = {
   security:    { icon: ShieldCheck,label: "Security",     hint: "OAuth, findings critice, GDPR" },
   dev:         { icon: Wrench,     label: "Dev",          hint: "Quality gates, QA findings, stabilitate" },
   ai:          { icon: Brain,      label: "AI",           hint: "Findings închise, memorie, knowledge base" },
+  human:       { icon: Users,      label: "Human (HDI)",  hint: "Intervenții umane pendinte — 100 = platforma merge singură" },
 };
 
 const PRIORITY_META = {
@@ -622,7 +623,7 @@ export const AutonomyEnginePage = () => {
 
         {/* SUB-SCORES */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mt-6">
-          {["operational", "technical", "security", "dev", "ai"].map(k => (
+          {["operational", "technical", "security", "dev", "ai", "human"].map(k => (
             <SubScoreCard
               key={k}
               k={k}

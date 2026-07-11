@@ -25,18 +25,21 @@ RULE_TEMPLATES: list[dict[str, Any]] = [
         "if_label": "Cerere fără specialist de peste {param} ore",
         "then_label": "Notifică adminii in-app cu lista cererilor blocate",
         "param_label": "ore", "param_default": 24, "param_min": 1, "param_max": 168,
+        "run_interval_hours": 24,
     },
     {
         "key": "fast_response_badge",
         "if_label": "Specialist a acceptat o cerere în sub {param} minute",
         "then_label": "Acordă badge ⚡ Fast Response pe profil",
         "param_label": "minute", "param_default": 5, "param_min": 1, "param_max": 60,
+        "run_interval_hours": 24,
     },
     {
         "key": "client_reactivation",
         "if_label": "Client inactiv de peste {param} zile",
         "then_label": "Programează email de reactivare (coadă)",
         "param_label": "zile", "param_default": 30, "param_min": 7, "param_max": 180,
+        "run_interval_hours": 24,
     },
 ]
 
@@ -118,6 +121,38 @@ EXECUTORS = {
     "fast_response_badge": _run_fast_response_badge,
     "client_reactivation": _run_client_reactivation,
 }
+
+
+async def run_due_rules() -> dict[str, Any]:
+    """APScheduler callable (hourly) — rulează regulile active al căror interval a expirat.
+    Acesta este pasul care face Automation Center autonom (Autonomy Level 3)."""
+    await _seed_rules()
+    ran = []
+    now = datetime.now(timezone.utc)
+    async for rule in db.automation_rules.find({"enabled": True}):
+        interval = rule.get("run_interval_hours", 24)
+        last = rule.get("last_run_at")
+        if last:
+            try:
+                if (now - datetime.fromisoformat(last)).total_seconds() < interval * 3600:
+                    continue
+            except (ValueError, TypeError):
+                pass
+        try:
+            result = await EXECUTORS[rule["key"]](rule["param"])
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"[automation-scheduler] {rule['key']} failed: {e}")
+            continue
+        await db.automation_rules.update_one({"key": rule["key"]}, {"$set": {"last_run_at": _now()}, "$inc": {"runs_count": 1}})
+        await db.automation_executions.insert_one({
+            "id": uuid.uuid4().hex[:12], "rule_key": rule["key"], "param": rule["param"],
+            "matched": result["matched"], "actions": result["actions"],
+            "run_by": "scheduler", "ran_at": _now(),
+        })
+        ran.append({"rule": rule["key"], **result})
+    if ran:
+        logger.info(f"[automation-scheduler] ran {len(ran)} rules: {[r['rule'] for r in ran]}")
+    return {"ran": ran, "count": len(ran)}
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────

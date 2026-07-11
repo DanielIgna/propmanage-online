@@ -629,3 +629,83 @@ if (hasFeature("bulk_operations")) { ... }
 ---
 
 *Manual versiune 1.1 — Feb 26, 2026. Re-citește când platforma evoluează semnificativ.*
+
+---
+
+# PARTEA II — Modulele din Iunie 2026 (Command Center, Autonomie, Design)
+
+> ⚠️ **CONFIDENȚIAL — doar pentru owner (danieligna1@gmail.com).** Din 11 Iunie 2026 acest manual este vizibil DOAR pentru tine. Ceilalți admini primesc 403.
+
+## 14. 🧠 AI Command Center (`/admin/command-center`)
+**Ce face**: centrul tău de comandă zilnic. Feed cu cifrele de azi + alerte (cereri >48h, escrow neconfirmat, specialiști incompleți, dispute) + Top 5 recomandări AI generate de Claude pe datele reale.
+**Cum operezi**: dimineața primești automat EMAIL cu digestul (cron 07:00). În pagină: apasă «Generează» pentru recomandări proaspete → fiecare are buton «Deschide» (te duce direct la modul) și cerc de bifare «rezolvat». Alertele HEALTH vin automat din Business Health (departament ROȘU = alertă aici).
+**Dacă greșești**: nimic ireversibil — recomandările se regenerează, bifările se pot debifa.
+
+## 15. 📊 Business Health (`/admin/business-health`)
+**Ce face**: 8 scoruri pe departamente (Marketing/Marketplace/Escrow/Specialiști/Suport/Conversii/SEO/Financiar), VERDE ≥80 / GALBEN ≥60 / ROȘU <60, formule deterministe pe datele din DB.
+**Cum operezi**: doar citești. Snapshot-ul se salvează singur zilnic → sparkline-urile arată trendul. Roșu = apare automat în Command Center + Notification Center.
+
+## 16. 🗺 Roadmap · Evoluție (`/admin/roadmap`)
+**Ce face**: board-ul tău de evoluție — 21+ module cu «✓ construit / ○ de construit», ROȘU urgent / GALBEN prioritar / VERDE îmbunătățire, progres %.
+**Cum operezi**: expandează un modul → poți schimba prioritatea/statusul/progresul cu butoanele. «Analizează cu AI» → Claude îți spune ce să construiești săptămâna asta. Board-ul e sursa de adevăr — eu (agentul) îl actualizez după fiecare sesiune.
+
+## 17. 📡 Marketplace Intelligence (`/admin/marketplace-intel`)
+**Ce face**: cerere vs capacitate per categorie (capacitate = specialiști × 4 lucrări/lună) cu % DEFICIT/SUPRAOFERTĂ + City Analytics pe județe + Radar trenduri ±% 30 zile.
+**Cum operezi**: «Recomandă» → AI îți spune unde recrutezi și unde promovezi. Categoriile 🔥 hot (creștere ≥30%) sunt oportunități de campanie.
+
+## 18. 💰 Financial Cockpit (`/admin/financial-cockpit`)
+**Ce face**: Revenue 30z cu growth, Escrow complet (blocat/înghețat/eliberat), MRR/ARR din abonamente, TVA estimat 21%, Cash Flow 30 zile, AI Insights financiare.
+**Cum operezi**: citești + «Generează insights» pentru analiza AI a cifrelor.
+
+## 19. ⚙️ Automation Center (`/admin/automation`)
+**Ce face**: reguli Dacă→Atunci cu executor REAL: reminder cereri blocate (notifică adminii), badge ⚡ Fast Response, reactivare clienți inactivi (coadă email).
+**Cum operezi**: activează regula cu switch-ul → **scheduler-ul le rulează SINGUR** (orar, max 1×/interval — implicit 24h). Poți schimba parametrul (ore/minute/zile) direct în card. «Rulează acum» = execuție manuală imediată. Istoricul execuțiilor e jos.
+**⚠️ Important**: regulă DEZACTIVATĂ = dependență de om = scade scorul HDI (vezi §22).
+
+## 20. 👑 CEO Dashboard (`/admin/ceo`) — DOAR TU
+**Ce face**: vederea ta strategică: Business Score, Revenue ▲%, Cash Flow OK/ATENȚIE, Escrow, MRR/ARR, «AI spune: prioritățile tale azi» (top 3 nerezolvate), puls departamente.
+**Acces**: doar super-admin general. Sub-adminii scoped primesc 403.
+
+## 21. 🔔 Notification Center (`/admin/notification-center`)
+**Ce face**: «Ai N lucruri importante» — TOT ce cere atenție, într-un singur loc: alerte operaționale + Business Health roșu + recomandări AI nerezolvate + anomalii Audit Sentinel. Sortate pe severitate, cu buton «Rezolvă» (link direct).
+**Cum operezi**: bifezi cercul = ascuns până mâine (ack per zi). Item-ele se regenerează zilnic.
+
+## 22. 🤖 Human Dependency Index — a 5-a axă Autonomy Engine (`/admin` → AI Lab → Autonomy)
+**Ce face**: O SINGURĂ CIFRĂ care îți arată cât de aproape e platforma de a funcționa singură. 100 = zero intervenții umane pendinte. Formula: penalizează cereri blocate >48h, escrow neconfirmat, dispute deschise, reguli de automatizare OPRITE, recomandări AI nebifate, anomalii de audit.
+**Cum îl crești**: activează regulile din Automation, triază disputele, confirmă escrow-urile, bifează recomandările rezolvate.
+
+## 23. 🔍 AI Search (`/admin/ai-search`)
+**Ce face**: vorbești cu datele. Exemple: «cereri peste 20.000 lei», «specialiști fără portofoliu», «cereri din Cluj», «plăți peste 500 lei». Claude traduce în filtre sigure (doar câmpuri whitelisted) → tabel cu rezultate.
+
+## 24. 🕐 User Timeline (`/admin/user-timeline`)
+**Ce face**: cronologia completă a oricărui utilizator: cont → verificare → cereri → asignări → escrow → plăți → review-uri. Cauți după email/nume, selectezi, vezi tot.
+
+## 25. 🛡 Audit Sentinel (rulează singur, orar)
+**Ce face**: detectează anomalii în loguri: >200 request-uri/oră per user, ≥10 erori 4xx în fereastră scurtă, ≥5 acțiuni admin refuzate/oră (tentative out-of-scope). Anomaliile noi → notificare in-app + apar în Notification Center.
+**Cum operezi**: nimic — e autonom. Verifici anomaliile în Notification Center; se pot rezolva via API sau se rezolvă natural (dedupe pe zi).
+
+## 26. 🎨 Design Studio + Design Intelligence (`/admin/design-studio`, `/admin/design-intelligence`)
+**Ce face**: Design Studio = tokens, teme, presets, Palette Cascade (5 culori → 20 tokens). Design Intelligence = Layout/Component Optimizer AI cu Impact Score per propunere + Evolution Engine (Propus→Testare→Aprobat→Aplicat LIVE, cu rollback).
+**Regula de aur**: NIMIC nu se aplică pe platformă fără aprobarea ta. Orice aplicare de tokens are snapshot → «Rollback» readuce exact starea anterioară.
+
+## 27. ⏰ Ce rulează SINGUR (cron-uri relevante pentru tine)
+| Când | Ce | Efect |
+|---|---|---|
+| 07:00 zilnic | Command Center morning | Feed + recomandări regenerate + **EMAIL către tine** + semnal orchestrator (alerte HEALTH) |
+| Orar (min :12) | Automation rules tick | Rulează regulile ACTIVE al căror interval a expirat |
+| Orar (min :40) | Audit Sentinel scan | Detectează anomalii în loguri |
+| 03:15 zilnic | Autonomy snapshot | Istoric scoruri (inclusiv HDI) |
+| La primul GET/zi | Business Health snapshot | Alimentează sparkline-urile |
+| 05:10 zilnic | Marketplace Medic | Suspendă specialiști cu ≥dispute prag |
+| Luni 09:30 | Founder Digest | Email KPI săptămânal |
+
+## 28. 🏛 Viziunea XOS (Experience OS) — pe board, de construit
+Direcția aprobată: «platforma care construiește alte platforme» — Layout Builder, Widget Manager, Role Experience, Franchise/White-Label per oraș, Visibility Engine, Content Manager. Stadiul real: Design Tokens ✓, Theme Manager ✓, Component Library ✓, AI Experience Optimizer ✓ (= Design Intelligence). Restul sunt pe `/admin/roadmap` grupate sub «Experience OS».
+
+## 29. 🆘 Cheat-sheet rapid
+- **«Ce fac azi?»** → CEO Dashboard sau emailul de la 07:00.
+- **«De ce a scăzut scorul general de autonomie?»** → Autonomy Engine → axa Human — vezi exact ce așteaptă om.
+- **«Vreau să găsesc ceva în date»** → AI Search, scrii în română.
+- **«Ce s-a întâmplat cu utilizatorul X?»** → User Timeline.
+- **«Ce a făcut platforma singură?»** → Orchestrator → Ledger + Automation → Istoric execuții.
+- **«Vreau altă culoare/temă»** → Design Studio (nu cere cod).

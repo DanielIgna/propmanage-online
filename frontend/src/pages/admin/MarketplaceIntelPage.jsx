@@ -28,20 +28,23 @@ const Bar = ({ label, value, max, cls }) => (
 export default function MarketplaceIntelPage() {
   const [data, setData] = useState(null);
   const [counties, setCounties] = useState([]);
+  const [radar, setRadar] = useState([]);
   const [recos, setRecos] = useState(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [d, r, c] = await Promise.all([
+      const [d, r, c, rd] = await Promise.all([
         ax.get("/admin/marketplace-intel/supply-demand"),
         ax.get("/admin/marketplace-intel/recommend/latest"),
         ax.get("/admin/marketplace-intel/by-county"),
+        ax.get("/admin/marketplace-intel/radar"),
       ]);
       setData(d.data);
       setRecos(r.data.recommendations ? r.data : null);
       setCounties(c.data.counties || []);
+      setRadar(rd.data.trends || []);
     } catch (e) { /* silent */ }
     setLoading(false);
   }, []);
@@ -122,6 +125,26 @@ export default function MarketplaceIntelPage() {
               )}
             </AdminCard>
           </div>
+
+          <AdminCard
+            title={<span className="flex items-center gap-2"><Radar className="w-4 h-4 text-lime-500" /> Marketplace Radar — trenduri 30 zile ({radar.filter((t) => t.hot).length} 🔥 hot)</span>}
+            testid="mi-radar"
+          >
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {radar.map((t) => (
+                <div key={t.key} className={`p-3 rounded-xl border ${t.hot ? "border-lime-300 dark:border-lime-500/40 bg-lime-50 dark:bg-lime-500/10" : "border-slate-200 dark:border-slate-700"}`} data-testid={`mi-radar-${t.key}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-bold text-slate-900 dark:text-white">{t.hot ? "🔥 " : ""}{t.label}</span>
+                    <span className={`text-sm font-black ${t.direction === "up" ? "text-emerald-600 dark:text-emerald-300" : t.direction === "down" ? "text-rose-600 dark:text-rose-300" : "text-slate-400"}`}>
+                      {t.trend_pct > 0 ? "+" : ""}{t.trend_pct}%
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-500">{t.current_30d} cereri (30z) vs {t.previous_30d} anterior</div>
+                </div>
+              ))}
+              {!radar.length && <div className="text-xs text-slate-400 col-span-full">Fără date de trend încă.</div>}
+            </div>
+          </AdminCard>
 
           <AdminCard
             title={<span className="flex items-center gap-2"><Radar className="w-4 h-4 text-lime-500" /> City Analytics — cerere vs capacitate pe județe (90 zile)</span>}

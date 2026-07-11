@@ -429,10 +429,45 @@ async def marketplace_medic_cron() -> None:
     await emit_signal("marketplace_medic_scan", {"trigger": "cron_0510"})
 
 
+async def handle_business_alert(payload: dict) -> dict:
+    """CAO Roadmap 2.2 — alertele business devin semnale, nu doar UI.
+    Primește digestul zilnic de la Command Center cron și notifică adminii
+    o singură dată, agregat. Escaladează doar dacă există ≥5 urgențe."""
+    from orchestrator.engine import notify_admins
+    high = payload.get("high_warnings") or []
+    total = payload.get("warnings_total", 0)
+    health = payload.get("health_overall")
+    steps = [{"action": "aggregate_business_alerts", "ok": True,
+              "detail": f"{len(high)} urgente / {total} alerte · Business Health {health}"}]
+    if high:
+        lines = "\n".join(f"• {w.get('label')}" for w in high[:8])
+        notified = await notify_admins(
+            f"🚨 Command Center: {len(high)} urgențe azi (Health {health})",
+            lines,
+            link="/admin/command-center",
+        )
+        steps.append({"action": "notify_admins", "ok": True, "detail": f"{notified} admini notificați in-app"})
+    return {
+        "steps": steps,
+        "outcome": "alerted" if high else "all_clear",
+        "minutes_saved": 10 if high else 5,
+        "escalate": len(high) >= 5,
+        "escalation_title": f"🚨 {len(high)} urgențe business simultan — necesită om",
+        "escalation_body": f"Business Health {health}. Vezi /admin/command-center.",
+        "escalation_link": "/admin/command-center",
+    }
+
+
 # ============================================================================
 # REGISTRY — signal kind → playbook
 # ============================================================================
 PLAYBOOKS = {
+    "business_alert": {
+        "id": "business_alert_router",
+        "name": "Business Alert Router",
+        "description": "Zilnic 07:00: alertele high-severity din Command Center (incl. departamentele Business Health în ROȘU) devin semnal orchestrator → notificare agregată adminilor + ledger. Escaladează cu email doar la ≥5 urgențe simultane (~10 min/zi).",
+        "handler": handle_business_alert,
+    },
     "smoke_fail": {
         "id": "smoke_fail_to_qa",
         "name": "Smoke-Fail → Auto QA Session",

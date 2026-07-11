@@ -5,6 +5,7 @@ Feed = today's stats + warnings (requests >48h, escrow held/frozen, incomplete
 specialist profiles, open disputes). Claude turns the snapshot into 5 actions.
 """
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -137,8 +138,8 @@ async def command_feed(_admin=Depends(require_role("admin"))):
     return await _build_feed()
 
 
-@router.post("/recommendations")
-async def generate_recommendations(_admin=Depends(require_role("admin"))):
+async def _generate_recos() -> dict[str, Any]:
+    """Core logic — folosit de endpoint și de cron-ul de dimineață."""
     feed = await _build_feed()
     raw = feed["raw"]
     try:
@@ -186,7 +187,65 @@ async def generate_recommendations(_admin=Depends(require_role("admin"))):
 
     doc = {"generated_at": _iso(_now()), "recommendations": [{**r, "idx": i, "link": _module_link(r.get("module")), "done": False} for i, r in enumerate(recos)], "ai_generated": ai_generated, "snapshot": raw}
     await db.command_center_recos.update_one({"_id": "latest"}, {"$set": doc}, upsert=True)
-    return doc
+    return {**doc, "warnings": feed["warnings"], "stats": feed["stats"]}
+
+
+@router.post("/recommendations")
+async def generate_recommendations(_admin=Depends(require_role("admin"))):
+    return await _generate_recos()
+
+
+async def morning_command_center() -> dict[str, Any]:
+    """APScheduler callable — 07:00 Bucharest, zilnic (CAO Roadmap 2.1 + 2.2).
+    1. Regenerează feed + Top 5 recomandări AI.
+    2. Emite semnal orchestrator cu alertele high-severity → playbook business_alert_router.
+    3. Trimite email digest super-adminilor (fondator).
+    """
+    result = await _generate_recos()
+    warnings = result.get("warnings", [])
+    high = [w for w in warnings if w.get("severity") == "high"]
+
+    # 2. Semnal orchestrator (o dată pe zi, agregat)
+    try:
+        from orchestrator.engine import emit_signal
+        await emit_signal("business_alert", {
+            "date": _iso(_now())[:10],
+            "high_warnings": [{"key": w["key"], "label": w["label"]} for w in high],
+            "warnings_total": len(warnings),
+            "health_overall": result.get("snapshot", {}).get("health_overall"),
+        })
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[command-center-cron] emit_signal fail: {e}")
+
+    # 3. Email digest fondator
+    sent = 0
+    try:
+        from autonomy.founder_digest import _get_super_admins
+        from services import send_email
+        admins = await _get_super_admins()
+        recos = result.get("recommendations", [])
+        stats_html = "".join(f"<li>{s['label']}: <b>{s['value']}</b></li>" for s in result.get("stats", []))
+        warn_html = "".join(f"<li>⚠ {w['label']}</li>" for w in warnings[:8]) or "<li>Zero alerte — totul sub control.</li>"
+        reco_html = "".join(f"<li><b>{r['action']}</b><br/><small>{r['why']}</small></li>" for r in recos) or "<li>—</li>"
+        html = (
+            f"<h2>🧠 AI Command Center — {_iso(_now())[:10]}</h2>"
+            f"<h3>Astăzi</h3><ul>{stats_html}</ul>"
+            f"<h3>Alerte ({len(warnings)})</h3><ul>{warn_html}</ul>"
+            f"<h3>Top {len(recos)} recomandări AI</h3><ol>{reco_html}</ol>"
+            f"<p><a href='{os.environ.get('PUBLIC_APP_URL', '')}/admin/command-center'>Deschide Command Center →</a></p>"
+        )
+        subject = f"🧠 Command Center: {len(high)} urgente · {len(recos)} recomandări AI azi"
+        for adm in admins:
+            try:
+                await send_email(adm["email"], subject, html)
+                sent += 1
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[command-center-cron] email fail {adm['email']}: {e}")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[command-center-cron] digest fail: {e}")
+
+    logger.info(f"[command-center-cron] done: {len(high)} high warnings, {sent} emails")
+    return {"high_warnings": len(high), "emails_sent": sent, "recommendations": len(result.get('recommendations', []))}
 
 
 @router.post("/recommendations/toggle")

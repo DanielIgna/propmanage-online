@@ -182,3 +182,41 @@ async def by_county(_admin=Depends(require_role("admin"))):
         counties.append({"county": county, "demand": d, "supply": s, "capacity": capacity, "status": status, "pct": pct})
     counties.sort(key=lambda c: (-1 if c["status"] == "deficit" else 1, -c["pct"], -c["demand"]))
     return {"counties": counties, "window": "90 zile", "generated_at": now.isoformat()}
+
+
+@router.get("/radar")
+async def marketplace_radar(_admin=Depends(require_role("admin"))):
+    """Marketplace Radar (modulul 8) — trenduri ±% pe 30 zile vs 30 anterioare, per categorie."""
+    now = datetime.now(timezone.utc)
+    d30 = (now - timedelta(days=30)).isoformat()
+    d60 = (now - timedelta(days=60)).isoformat()
+
+    cur: dict[str, int] = {}
+    prev: dict[str, int] = {}
+    async for r in db.requests.find({"created_at": {"$gte": d60}}, {"category": 1, "created_at": 1}):
+        c = _canon(r.get("category"))
+        if not c:
+            continue
+        if r["created_at"] >= d30:
+            cur[c] = cur.get(c, 0) + 1
+        else:
+            prev[c] = prev.get(c, 0) + 1
+
+    trends = []
+    for cat in sorted(set(cur) | set(prev)):
+        c_now, c_prev = cur.get(cat, 0), prev.get(cat, 0)
+        if c_prev:
+            pct = round((c_now - c_prev) / c_prev * 100)
+        else:
+            pct = 100 if c_now else 0
+        trends.append({
+            "key": cat,
+            "label": CATEGORY_LABELS.get(cat, cat.replace("_", " ").title()),
+            "current_30d": c_now,
+            "previous_30d": c_prev,
+            "trend_pct": pct,
+            "direction": "up" if pct > 5 else "down" if pct < -5 else "flat",
+            "hot": pct >= 30 and c_now >= 3,
+        })
+    trends.sort(key=lambda t: -t["trend_pct"])
+    return {"trends": trends, "hot_count": sum(1 for t in trends if t["hot"]), "generated_at": now.isoformat()}

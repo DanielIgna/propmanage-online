@@ -129,6 +129,9 @@ from routes.financial_cockpit import router as financial_cockpit_router
 from routes.automation_center import router as automation_center_router
 from routes.ceo_dashboard import router as ceo_dashboard_router
 from routes.notification_center import router as notification_center_router
+from routes.audit_sentinel import router as audit_sentinel_router
+from routes.user_timeline import router as user_timeline_router
+from routes.ai_search import router as ai_search_router
 
 # Registration order matters — kept identical to the original server.py loop.
 ALL_ROUTERS = (
@@ -254,4 +257,7 @@ ALL_ROUTERS = (
     automation_center_router,
     ceo_dashboard_router,
     notification_center_router,
+    audit_sentinel_router,
+    user_timeline_router,
+    ai_search_router,
 )

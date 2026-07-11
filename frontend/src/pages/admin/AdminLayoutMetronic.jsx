@@ -102,6 +102,7 @@ const NAV_SECTIONS = [
       { id: "business_health", label: "Business Health", icon: Activity, badge: "8 SCORURI", href: "/admin/business-health" },
       { id: "automation_center", label: "Automation Center", icon: Zap, badge: "DACĂ→ATUNCI", href: "/admin/automation" },
       { id: "roadmap", label: "Roadmap · Evoluție", icon: Map, badge: "LIVE", href: "/admin/roadmap" },
+      { id: "ai_search", label: "AI Search", icon: Search, badge: "NLP", href: "/admin/ai-search" },
       { id: "control_tower", label: "Control Tower", icon: LayoutDashboard, badge: "NEW", href: "/admin/control-tower" },
       { id: "activity", label: "Activitate Live", icon: Sparkles },
     ],
@@ -113,6 +114,7 @@ const NAV_SECTIONS = [
     zone: "business",
     items: [
       { id: "users", label: "Toți userii", icon: Users },
+      { id: "user_timeline", label: "User Timeline", icon: Clock, badge: "NEW", href: "/admin/user-timeline" },
       { id: "verification", label: "Verificare specialiști", icon: ShieldCheck },
       { id: "kyc", label: "KYC Identitate", icon: ShieldCheck, badge: "NEW" },
       { id: "beta_testers", label: "Beta Testers", icon: Sparkles, badge: "NEW" },
@@ -174,7 +176,7 @@ const NAV_SECTIONS = [
       { id: "cms", label: "Texte (CMS)", icon: FileText },
       { id: "emails", label: "Template-uri Email", icon: Mail },
       { id: "zones", label: "Zone Acoperire", icon: MapPin },
-      { id: "operating_manual", label: "Manual de Operare", icon: BookOpenCheck, badge: "START AICI", href: "/admin/operating-manual" },
+      { id: "operating_manual", label: "Manual de Operare", icon: BookOpenCheck, badge: "OWNER", href: "/admin/operating-manual", ownerOnly: true },
       { id: "docs_train", label: "Documentație & Training", icon: FileText, badge: "NEW", href: "/admin/documentation" },
     ],
   },
@@ -695,6 +697,12 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
   if (!isSuperAdmin) {
     visibleSections = visibleSections.filter(s => !s.superAdminOnly);
     visibleSections = visibleSections.map(s => ({ ...s, items: s.items.filter(it => !it.superAdminOnly) }));
+  }
+  // ownerOnly items: vizibile DOAR fondatorului (email owner), nu tuturor adminilor
+  const OWNER_EMAILS = ["danieligna1@gmail.com"];
+  const isOwner = OWNER_EMAILS.includes((user?.email || "").toLowerCase());
+  if (!isOwner) {
+    visibleSections = visibleSections.map(s => ({ ...s, items: s.items.filter(it => !it.ownerOnly) }));
   }
 
   // ── Active admin zone: "business" | "infrastructure" (persisted) ──────────

@@ -88,6 +88,8 @@ const FinancialCockpitPage = lazy(() => import("./pages/admin/FinancialCockpitPa
 const AutomationCenterPage = lazy(() => import("./pages/admin/AutomationCenterPage"));
 const CEODashboardPage = lazy(() => import("./pages/admin/CEODashboardPage"));
 const NotificationCenterPage = lazy(() => import("./pages/admin/NotificationCenterPage"));
+const UserTimelinePage = lazy(() => import("./pages/admin/UserTimelinePage"));
+const AISearchPage = lazy(() => import("./pages/admin/AISearchPage"));
 const BugMemoryAggregatorPage = lazy(() => import("./pages/admin/BugMemoryAggregatorPage"));
 const ArchitectureBoardPage = lazy(() => import("./pages/admin/ArchitectureBoardPage"));
 const AIProductManagerPage = lazy(() => import("./pages/admin/AIProductManagerPage"));
@@ -1698,6 +1700,8 @@ function App() {
               <Route path="/admin/automation" element={<AutomationCenterPage />} />
               <Route path="/admin/ceo" element={<CEODashboardPage />} />
               <Route path="/admin/notification-center" element={<NotificationCenterPage />} />
+              <Route path="/admin/user-timeline" element={<UserTimelinePage />} />
+              <Route path="/admin/ai-search" element={<AISearchPage />} />
               <Route path="/admin/bug-memory" element={<BugMemoryAggregatorPage />} />
               <Route path="/admin/architecture-board" element={<ArchitectureBoardPage />} />
               <Route path="/admin/ai-pm" element={<AIProductManagerPage />} />

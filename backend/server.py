@@ -288,6 +288,30 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=7200,
         )
+        from routes.automation_center import run_due_rules
+        scheduler.add_job(
+            run_due_rules,
+            CronTrigger(minute=12, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="automation_rules_tick",
+            replace_existing=True,
+            misfire_grace_time=1800,
+        )
+        from routes.command_center import morning_command_center
+        scheduler.add_job(
+            morning_command_center,
+            CronTrigger(hour=7, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="morning_command_center",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+        from routes.audit_sentinel import run_sentinel_scan
+        scheduler.add_job(
+            run_sentinel_scan,
+            CronTrigger(minute=40, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="audit_sentinel_hourly",
+            replace_existing=True,
+            misfire_grace_time=1800,
+        )
         scheduler.add_job(
             auto_release_warranty_holds,
             CronTrigger(hour=6, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),

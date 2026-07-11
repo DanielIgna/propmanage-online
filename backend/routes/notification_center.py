@@ -51,6 +51,15 @@ async def notification_center(admin=Depends(require_role("admin"))):
                 "source": "ai_recommendation",
             })
 
+    async for a in db.audit_anomalies.find({"resolved": False}, {"_id": 0}).sort("ts", -1).limit(10):
+        items.append({
+            "key": f"anomaly_{a['id']}",
+            "label": f"🛡 Audit Sentinel: {a['type']} — {a['email']} ({a['detail']})",
+            "severity": "high",
+            "link": "/admin/command-center",
+            "source": "security",
+        })
+
     # Ack-uri per admin, per zi (item-ele se regenerează zilnic)
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     ack_doc = await db.notification_center_acks.find_one({"admin": admin.get("email"), "date": today})
