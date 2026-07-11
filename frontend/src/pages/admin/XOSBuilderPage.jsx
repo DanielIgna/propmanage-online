@@ -113,6 +113,8 @@ export default function XOSBuilderPage() {
         </div>
 
         <XOSRegistryPanel onChanged={() => window.location.reload()} />
+
+        <ExperienceProfilesPanel />
       </div>
     </AdminLayoutMetronic>
   );

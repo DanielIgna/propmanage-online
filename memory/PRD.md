@@ -2561,3 +2561,19 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - Etapa 1.2: Multi-surface Layout Engine (specialist_home + selector suprafață în builder) + tenant_id pe colecțiile XOS noi
 - Etapa 1.3: Role Experience Manager (experience_profiles per rol: layout+theme+entry route)
 - Sprint 2: Consolidare (Config/Content/AI-chat/Leads) · Sprint 3: Tenant Foundation · Sprint 4: KG+Governance · Sprint 5: Experience Configuration Center
+
+## [2026-06-11] Sprint 1 · Etapele 1.2 + 1.3 LIVRATE ✅ (iteration_109: backend 17/17, frontend 8/8 după fix)
+### Etapa 1.2 — Multi-surface Layout Engine
+- Suprafață nouă `specialist_home` (5 widget-uri: today_summary, cockpit, quests, tier_tools, tier_progress) în registru
+- SpecialistDashboard (tab oportunități) refactorizat: zona XOS randează widget-urile din layout + UI Rules (tier gating păstrat independent)
+- Selector de suprafață în /admin/xos-builder (drag&drop/toggle/save/reset per suprafață)
+- D5-C aplicat: tenant_id="main" pe toate colecțiile XOS (migrare one-off + toate inserturile noi)
+### Etapa 1.3 — Role Experience Manager
+- `experience_profiles` per rol: entry_route, default_theme, layout_surface (defaults + override DB)
+- API: GET /api/experience/profile/{role} (public) · admin GET/PUT /api/admin/experience-profiles/{role}
+- UI: ExperienceProfilesPanel în XOS Builder (editare + salvare per rol, testat vizual)
+- Consumer: SiteNav folosește entry_route pentru maparea /dashboard
+- UI Rules: dropdown-ul de widget-uri citește acum din registru (include specialist)
+### Bug fixat post-testing: <ExperienceProfilesPanel /> nerandat în XOSBuilderPage (import fără render) — re-aplicat + verificat vizual cu save/restore
+### ATENȚIE RECURENT: /app/memory/test_credentials.md revine la parola STALE Admin123! (a 3-a oară) — parola corectă e SEED_ADMIN_PASSWORD=1!nasov01ADMIN din backend/.env. Re-corectat.
+### Sprint 1 COMPLET (1.1+1.2+1.3). Următorul: Sprint 2 — Consolidare (Config/Content/AI-chat/Leads) — AȘTEAPTĂ APROBARE OWNER.
