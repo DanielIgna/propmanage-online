@@ -103,12 +103,51 @@ async def admin_put_layout(surface: str, items: list = Body(..., embed=True), ad
     clean = [{"id": i["id"], "enabled": bool(i.get("enabled", True))} for i in items if isinstance(i, dict) and i.get("id") in valid_ids]
     if not clean:
         raise HTTPException(400, "Layout gol.")
+    await _snapshot_layout(surface, admin.get("email"), reason="pre-save")
     await db.xos_layouts.update_one(
         {"surface": surface},
         {"$set": {"items": clean, "tenant_id": TENANT, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": admin.get("email")}},
         upsert=True,
     )
     return {"ok": True, "items": clean}
+
+
+async def _snapshot_layout(surface: str, who: str, reason: str = "pre-save") -> None:
+    """Sprint 5: istoric versiuni layout (cap 20 per suprafață)."""
+    current = await db.xos_layouts.find_one({"surface": surface})
+    if not current or not current.get("items"):
+        return
+    await db.xos_layout_history.insert_one({
+        "version_id": uuid.uuid4().hex[:10], "surface": surface, "tenant_id": TENANT,
+        "items": current["items"], "reason": reason,
+        "saved_at": datetime.now(timezone.utc).isoformat(), "saved_by": who,
+    })
+    ids = [d["_id"] async for d in db.xos_layout_history.find({"surface": surface}, {"_id": 1}).sort("saved_at", -1).skip(20)]
+    if ids:
+        await db.xos_layout_history.delete_many({"_id": {"$in": ids}})
+
+
+@router.get("/admin/xos/layout/{surface}/history")
+async def admin_layout_history(surface: str, _admin=Depends(require_role("admin"))):
+    if surface not in SURFACE_META:
+        raise HTTPException(404, "Suprafață necunoscută.")
+    versions = await db.xos_layout_history.find({"surface": surface}, {"_id": 0}).sort("saved_at", -1).to_list(20)
+    return {"surface": surface, "versions": versions}
+
+
+@router.post("/admin/xos/layout/{surface}/rollback/{version_id}")
+async def admin_layout_rollback(surface: str, version_id: str, admin=Depends(require_role("admin"))):
+    v = await db.xos_layout_history.find_one({"surface": surface, "version_id": version_id})
+    if not v:
+        raise HTTPException(404, "Versiune inexistentă.")
+    await _snapshot_layout(surface, admin.get("email"), reason="pre-rollback")
+    await db.xos_layouts.update_one(
+        {"surface": surface},
+        {"$set": {"items": v["items"], "tenant_id": TENANT, "updated_at": datetime.now(timezone.utc).isoformat(),
+                  "updated_by": admin.get("email"), "restored_from": version_id}},
+        upsert=True,
+    )
+    return {"ok": True, "items": await _get_layout(surface)}
 
 
 @router.post("/admin/xos/layout/{surface}/reset")

@@ -105,7 +105,7 @@ const NAV_SECTIONS = [
       { id: "ai_search", label: "AI Search", icon: Search, badge: "NLP", href: "/admin/ai-search" },
       { id: "interior_design", label: "Design Interior · Serviciu", icon: Palette, badge: "LEADS", href: "/admin/interior-design" },
       { id: "menu_manager", label: "Menu Manager", icon: Map, badge: "CMS", href: "/admin/menu-manager" },
-      { id: "xos_builder", label: "XOS · Layout Builder", icon: LayoutDashboard, badge: "XOS", href: "/admin/xos-builder" },
+      { id: "xos_builder", label: "Experience Center", icon: LayoutDashboard, badge: "XOS", href: "/admin/xos-builder" },
       { id: "ui_rules", label: "XOS · UI Rules", icon: ShieldCheck, badge: "XOS", href: "/admin/ui-rules" },
       { id: "content_manager", label: "XOS · Content Manager", icon: Sparkles, badge: "XOS", href: "/admin/content-manager" },
       { id: "control_tower", label: "Control Tower", icon: LayoutDashboard, badge: "NEW", href: "/admin/control-tower" },

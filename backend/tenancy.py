@@ -59,7 +59,7 @@ TIER2_PLATFORM_CONFIG = {
     "platform_settings", "site_menu", "site_content", "service_pages",
     "cms_content", "landing_presets", "design_tokens", "design_presets",
     "email_templates", "feature_config", "fee_configs", "fee_configs_history",
-    "xos_widget_registry", "xos_layouts", "experience_profiles", "ui_rules",
+    "xos_widget_registry", "xos_layouts", "xos_layout_history", "experience_profiles", "ui_rules",
     "construction_taxonomy", "regions", "zones_custom", "zones_disabled",
     "concierge_settings", "automation_rules", "hh_scoring_config",
     "analytics_settings", "self_driving_settings", "interior_design_content",
