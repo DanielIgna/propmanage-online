@@ -2418,3 +2418,31 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 
 ### Endpoints noi (iter 102)
 - POST /api/admin/design-studio/palette-cascade
+
+## [2026-06-11] Design Interior — Serviciu Independent LIVE (Iter 106)
+
+### Livrat concret
+1. **Landing page publică `/design-interior`** — 100% decuplată de Digital Twin/abonamente
+   - Hero premium cu imagini generate (Nano Banana), benefits, pași, portofoliu, recenzii, FAQ, articol SEO 2500+ cuvinte
+   - Formular lead-uri (3 tipuri CTA: Solicită proiect / Cere ofertă / Consultanță designer)
+   - AI Assistant (Claude, răspunde în română) pe pagină
+   - SEO: title/description/canonical/keywords din DB, prezent în sitemap
+2. **Backend `/app/backend/routes/interior_design.py`**
+   - Public: GET /api/interior-design/content, POST /api/interior-design/leads, POST /api/interior-design/assistant
+   - Admin: GET/PUT content, GET leads, PATCH leads/{id} (status pipeline)
+3. **Admin panel `/admin/interior-design`** — KPI lead-uri, listă lead-uri, editor conținut
+
+### Bug-uri fixate (iter 106)
+- SyntaxError Python: ghilimele românești „..." închise cu " ASCII spărgeau string-urile (interior_design.py) — backend nu pornea
+- Ruta /admin/interior-design lipsea din App.js (import existent, Route absent) — adăugată de testing agent
+- /app/memory/test_credentials.md corectat: parola admin reală = SEED_ADMIN_PASSWORD din .env (1!nasov01ADMIN), nu Admin123!
+
+### Testare: iteration_106.json — backend 15/15 (100%), frontend 4/4 flows (100%)
+
+### Backlog rămas (prioritizat)
+- P0 Experience OS (XOS): Layout Builder + Widget Manager drag&drop per rol/franciză
+- P1 Dynamic UI Rules & Visibility Engine (ex: ascunde Wallet pt junior)
+- P1 Theme & Content Manager în XOS (texte/bannere din DB)
+- P1 Rate limiting pe /api/interior-design/assistant (protecție quota LLM)
+- P2 Developer Mode în Design Studio
+- P3 Resend DNS custom domain (blocat pe user: DKIM/SPF)
