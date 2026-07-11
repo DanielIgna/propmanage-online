@@ -1,5 +1,29 @@
 ## 📋 Roadmap & Backlog (prioritizat)
 
+## 🔴 4 Module URGENTE construite — Command Center, Business Health, Marketplace Intel, Financial Cockpit (Iun 11, 2026, Part 2)
+
+**Scop**: User a aprobat construirea tuturor celor 4 urgențe roșii de pe board într-o singură sesiune.
+
+**1. AI Command Center** (`routes/command_center.py`, `/admin/command-center`):
+- `GET /feed` — stats 24h (cereri noi, useri noi, finalizate, trend marketplace 7z vs 7z) + warnings cu severitate (cereri >48h, escrow neconfirmat 21.150 lei, escrow înghețat, dispute, specialiști incompleți, plăți nefinalizate).
+- `POST /recommendations` — Claude → Top 5 acțiuni pentru AZI {action, why, severity, module}, cache `command_center_recos`. Sidebar: Dashboard Business, badge TOP 5.
+
+**2. Business Health** (`routes/business_health.py`, `/admin/business-health`):
+- 8 scoruri deterministe pe date reale: Marketing (creștere useri 30z), Marketplace (fill rate), Escrow (eliberate vs înghețate), Specialiști (verificați+profil), Suport (dispute rezolvate), Conversii (plăți paid), SEO (media audit pagini publice), Financiar (creștere revenue).
+- Culori: VERDE ≥80 / GALBEN ≥60 / ROȘU <60 + scor general cu ring SVG. Stare actuală: overall 52 (CRITIC) — realist pe datele demo.
+
+**3. Marketplace Intelligence** (`routes/marketplace_intel.py`, `/admin/marketplace-intel`):
+- Cerere (cereri 30z, fallback 90z) vs Capacitate (specialiști × 4 lucrări/lună) per categorie, cu normalizare aliasuri (electrical→electric etc.).
+- Status DEFICIT/SUPRAOFERTĂ/ECHILIBRAT cu %, bare vizuale. `POST /recommend` — Claude: unde recrutezi vs unde promovezi. Notă: breakdown per județ blocat — cererile nu au câmp county.
+
+**4. Financial Cockpit** (`routes/financial_cockpit.py`, `/admin/financial-cockpit`):
+- Revenue (total/30z/growth/pending), Escrow complet (held 21.150/frozen 9.050/released 5.450 lei), MRR 393 RON + ARR din hh_subscriptions × preț plan, TVA estimat 21% (RO 2026), comision estimat 10% din escrow eliberat, Cash Flow 30 zile chart.
+
+**Board update**: progres actualizat live pe /admin/roadmap: ai_command_center 75%, business_health 80%, marketplace_intelligence 75%, financial_cockpit 70% (cu built/remaining actualizate onest).
+
+**Tests**: `iteration_103.json` → **17/17 backend pytest PASS** (inclusiv 4 Claude roundtrips reale) + frontend 100% pe toate 4 pagini + RBAC 403 client + regression iter102 OK. Test file: `/app/backend/tests/test_iter103_urgent_modules.py`.
+
+
 > ⚡ De la Iun 2026, roadmap-ul LIVE se gestionează în aplicație: `/admin/roadmap` (21 module, cod culoare roșu/galben/verde, AI Analyzer). Secțiunile de mai jos rămân ca istoric.
 
 ## 🧠 Design Intelligence Engine (P1a/b/c) + Platform Roadmap Board (Iun 11, 2026)
