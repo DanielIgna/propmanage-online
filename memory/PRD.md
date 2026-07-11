@@ -2662,3 +2662,13 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - Frontend: ServiceHubLanding.jsx generic (sh-* testids) — rute /design-exterior + /arhitectura; JSON-LD + FAQPage; cross-links ecosistem (Interior↔Exterior↔Arhitectură)
 - Meniu site: Servicii > Design Exterior → /design-exterior, Arhitectură → /arhitectura (și DEFAULT_MENU sincronizat post-test)
 - BACKLOG rămas: Tenant val 2 (filtrare citiri pe tenant) · Developer Mode · admin UI vizual pentru editarea conținutului service hub
+
+## [2026-06-11] P2 LIVRAT ✅ — Tenant Val 2 + Follow-up automat lead-uri warm (iteration_115: backend 22/22 PASS)
+### Tenant Val 2
+- Backfill idempotent tenant_id='main' pe toate 78 colecții T1: 96.135 docs = 100% acoperire; index tenant_id/colecție; marker tenant_migrations wave 2; POST /api/admin/tenants/backfill?force=; self-healing nocturn (job 04:15) + fix stamping demo_leads (routes/public.py)
+### Follow-up lead-uri warm (PREGĂTIT PENTRU RESEND — enabled:false până user fixează DNS)
+- lead_followup.py: scan warm+stage=new+48h+fără followup → email RO personalizat pe serviciu (Interior/Exterior/Arhitectură); retry max 3 cu last_error; log în lead_followup_log
+- Config în settings ns leads_followup (enabled/delay_hours/segments/max_attempts/subject); rute admin GET/PUT config, POST /run?dry_run (default true), GET /log; job APScheduler orar (min 25) respectă enabled=false
+- E2E verificat: dry-run găsește candidați; run real eșuează cu eroarea Resend de domeniu AȘTEPTATĂ + retry înregistrat → se activează cu 1 switch (PUT enabled:true) după fix DNS
+### Developer Mode: NU implementat — marcat ❄️ înghețat în MASTER_PRODUCT_AUDIT_v2 (sub valoarea consolidării); rămâne în backlog P3
+- BACKLOG: Tenant val 3 (filtrare citiri + primul francizat real + rol franchise_admin) · admin UI editare conținut service hub · activare followup după DNS

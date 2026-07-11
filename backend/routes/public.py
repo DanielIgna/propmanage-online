@@ -37,6 +37,7 @@ async def demo_request(payload: dict = Body(...)):
         "role": role,
         "message": message,
         "whatsapp": whatsapp,
+        "tenant_id": "main",
         "status": "new",  # new, contacted, scheduled, closed_won, closed_lost
         "created_at": datetime.now(timezone.utc).isoformat(),
         "source": "landing_book_demo",

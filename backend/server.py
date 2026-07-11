@@ -133,6 +133,12 @@ async def _lead_followup_tick():
     await run_followup_scan()
 
 
+async def _tenant_selfheal_tick():
+    # Val 2 self-healing: orice insert T1 rămas fără tenant_id primește 'main' noaptea
+    from tenancy import backfill_tier1_tenant_data
+    await backfill_tier1_tenant_data(force=True)
+
+
 @app.on_event("startup")
 async def startup():
     await seed()
@@ -203,6 +209,13 @@ async def startup():
             id="lead_followup_hourly",
             replace_existing=True,
             misfire_grace_time=1800,
+        )
+        scheduler.add_job(
+            _tenant_selfheal_tick,
+            CronTrigger(hour=4, minute=15, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="tenant_selfheal_nightly",
+            replace_existing=True,
+            misfire_grace_time=3600,
         )
         scheduler.add_job(
             run_daily_digests,
