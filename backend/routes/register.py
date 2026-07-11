@@ -132,6 +132,7 @@ from routes.notification_center import router as notification_center_router
 from routes.audit_sentinel import router as audit_sentinel_router
 from routes.user_timeline import router as user_timeline_router
 from routes.ai_search import router as ai_search_router
+from routes.interior_design import router as interior_design_router
 
 # Registration order matters — kept identical to the original server.py loop.
 ALL_ROUTERS = (
@@ -260,4 +261,5 @@ ALL_ROUTERS = (
     audit_sentinel_router,
     user_timeline_router,
     ai_search_router,
+    interior_design_router,
 )

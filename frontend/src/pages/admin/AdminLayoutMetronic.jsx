@@ -103,6 +103,7 @@ const NAV_SECTIONS = [
       { id: "automation_center", label: "Automation Center", icon: Zap, badge: "DACĂ→ATUNCI", href: "/admin/automation" },
       { id: "roadmap", label: "Roadmap · Evoluție", icon: Map, badge: "LIVE", href: "/admin/roadmap" },
       { id: "ai_search", label: "AI Search", icon: Search, badge: "NLP", href: "/admin/ai-search" },
+      { id: "interior_design", label: "Design Interior · Serviciu", icon: Palette, badge: "LEADS", href: "/admin/interior-design" },
       { id: "control_tower", label: "Control Tower", icon: LayoutDashboard, badge: "NEW", href: "/admin/control-tower" },
       { id: "activity", label: "Activitate Live", icon: Sparkles },
     ],

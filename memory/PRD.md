@@ -1,5 +1,31 @@
 ## 📋 Roadmap & Backlog (prioritizat)
 
+## 🤖 HDI + CAO Top 3 + Galbenele finale + Audit Sentinel + Manual Owner-Only (Iun 11, 2026, Part 4)
+
+**A. Human Dependency Index (HDI) — a 5-a axă Autonomy Engine** (`autonomy/engine.py`):
+- `_score_human_dependency()`: 100 - penalizări×0.5 (cereri >48h ×1.5, escrow held ×0.4, dispute ×3, reguli automation OPRITE ×6, recomandări AI nebifate ×2, anomalii audit ×4). Scor actual onest: **36.5** → general 94.4→86.9 (tier autonomous). Ponderi renormalizate pe 6 axe (human 0.11), target 80, recomandare dedicată în `_recommendations`. UI: card „Human (HDI)" în AutonomyEnginePage.
+
+**B. CAO Roadmap Top 3 implementate**:
+- **Scheduler Automation Center**: `run_due_rules()` + job APScheduler orar (:12) — rulează regulile enabled dacă `run_interval_hours` (24h) a expirat, log `run_by='scheduler'`. **Autonomy Level 3 REAL**.
+- **Command Center morning cron** (07:00 Bucharest): `morning_command_center()` — regenerează feed+recos, emite semnal orchestrator, trimite EMAIL digest super-adminilor (Resend, `PUBLIC_APP_URL` opțional în .env pentru link).
+- **Alerte → semnale**: playbook NOU `business_alert_router` în `orchestrator/playbooks.py` — agregă urgențele zilei → notificare in-app admini + ledger; escaladează la ≥5 urgențe simultane.
+
+**C. Galbenele finale**:
+- **User Timeline** (`routes/user_timeline.py`, `/admin/user-timeline`): căutare user + cronologie completă (cont→verificare→cereri→match→escrow→plăți→review, 323 evenimente pt clientul demo). DONE 100%.
+- **AI Search** (`routes/ai_search.py`, `/admin/ai-search`): NL română → Claude → filtre STRICT whitelisted (requests/users/payment_transactions) → tabel; fallback determinist regex. DONE 90%.
+- **Marketplace Radar**: `GET /marketplace-intel/radar` — trenduri ±% 30z vs 30z anterioare per categorie, flag 🔥 hot ≥30% (HVAC +1000% azi). Card Radar în MarketplaceIntelPage. DONE 90%.
+
+**D. Audit Sentinel** (`routes/audit_sentinel.py`, P0 vechi din PRD): scan orar (:40) pe demo_activity_logs + admin_actions_log — rate_spike >200/h, error_burst ≥10 4xx, scope_probe ≥5 refuzuri/h. Dedupe per (email,tip,zi), notificare admini, item-e `anomaly_*` în Notification Center, alimentează HDI. Endpoints: POST /scan, GET /anomalies, POST /anomalies/{id}/resolve.
+
+**E. Manual de Operare — OWNER ONLY**: `OWNER_EMAIL=danieligna1@gmail.com` în backend/.env; `_require_owner` pe ambele endpoints operating-manual (403 pentru ORICE alt admin, verificat). Sidebar: item `ownerOnly` filtrat client-side. Manual actualizat: **PARTEA II** (§14-29) documentează toate modulele Iun 2026 + cron-uri + cheat-sheet. Cont danieligna1@gmail.com există în DB ca admin.
+
+**F. Board**: +9 module noi: 7×XOS (Experience OS — viziunea „platforma care construiește alte platforme"; xos_tokens_themes și xos_ai_optimizer marcate DONE ca echivalente Design Studio/Intelligence) + cao_autonomy_p1 (urgent, 55%) + cao_autonomy_p3. Actualizate: user_timeline 100%, ai_search 90%, marketplace_radar 90%, autonomy_levels 65%, ai_command_center 95%, notification_center 90%. Total ~30 module pe board.
+
+**Tests**: `iteration_105.json` → **27/27 backend PASS + frontend 100%**. Test file: `/app/backend/tests/test_iter105_hdi_cao_batch.py`. Cron jobs active: automation_rules_tick (:12), morning_command_center (07:00), audit_sentinel_hourly (:40).
+
+**Docs**: `/app/docs/AUTONOMOUS_EVOLUTION_ROADMAP.md` (analiza CAO, 21 propuneri) + `/app/docs/OPERATING_MANUAL.md` extins (owner-only).
+
+
 ## 🔗 Interconectare + 4 module galbene (Iun 11, 2026, Part 3)
 
 **A. Interconectare Command Center ↔ Business Health (primul pas Autonomy Level 3)**:

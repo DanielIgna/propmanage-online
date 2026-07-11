@@ -353,6 +353,7 @@ async def public_sitemap():
 
     static_pages = [
         ("/",                "1.0", "weekly"),
+        ("/design-interior", "0.95", "weekly"),
         ("/marketplace",     "0.9", "daily"),
         ("/ghiduri",         "0.85", "weekly"),
         ("/digital-twin",    "0.7", "monthly"),

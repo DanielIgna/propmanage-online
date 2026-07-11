@@ -90,6 +90,8 @@ const CEODashboardPage = lazy(() => import("./pages/admin/CEODashboardPage"));
 const NotificationCenterPage = lazy(() => import("./pages/admin/NotificationCenterPage"));
 const UserTimelinePage = lazy(() => import("./pages/admin/UserTimelinePage"));
 const AISearchPage = lazy(() => import("./pages/admin/AISearchPage"));
+const InteriorDesignLanding = lazy(() => import("./pages/InteriorDesignLanding"));
+const InteriorDesignAdminPage = lazy(() => import("./pages/admin/InteriorDesignAdminPage"));
 const BugMemoryAggregatorPage = lazy(() => import("./pages/admin/BugMemoryAggregatorPage"));
 const ArchitectureBoardPage = lazy(() => import("./pages/admin/ArchitectureBoardPage"));
 const AIProductManagerPage = lazy(() => import("./pages/admin/AIProductManagerPage"));
@@ -1643,6 +1645,8 @@ function App() {
               <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
               <Routes>
               <Route path="/" element={<LandingPage />} />
+              <Route path="/design-interior" element={<InteriorDesignLanding />} />
+              <Route path="/servicii/design-interior" element={<Navigate to="/design-interior" replace />} />
               <Route path="/demo" element={<PublicDemoPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/privacy/notices" element={<PrivacyNoticesPage />} />
@@ -1692,6 +1696,7 @@ function App() {
               <Route path="/admin/design-audit" element={<DesignAuditPage />} />
               <Route path="/admin/design-studio" element={<DesignStudioPage />} />
               <Route path="/admin/design-intelligence" element={<DesignIntelligencePage />} />
+              <Route path="/admin/interior-design" element={<InteriorDesignAdminPage />} />
               <Route path="/admin/roadmap" element={<PlatformRoadmapPage />} />
               <Route path="/admin/command-center" element={<CommandCenterPage />} />
               <Route path="/admin/business-health" element={<BusinessHealthPage />} />

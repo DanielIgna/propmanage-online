@@ -9,7 +9,7 @@ import { DSButton, EmptyState, DSSkeleton } from "../../design-system";
 const ax = axios.create({ baseURL: API, withCredentials: true });
 
 const EXAMPLES = [
-  "cereri peste 20.000 lei",
+  "cereri peste 5.000 lei",
   "specialiști fără portofoliu",
   "cereri din Cluj",
   "plăți peste 500 lei",
