@@ -96,6 +96,7 @@ const MenuManagerPage = lazy(() => import("./pages/admin/MenuManagerPage"));
 const XOSBuilderPage = lazy(() => import("./pages/admin/XOSBuilderPage"));
 const ServiceHubLanding = lazy(() => import("./pages/ServiceHubLanding"));
 const FranchiseDashboard = lazy(() => import("./pages/FranchiseDashboard"));
+const FranchiseApplyPage = lazy(() => import("./pages/FranchiseApplyPage"));
 const UIRulesPage = lazy(() => import("./pages/admin/UIRulesPage"));
 const ContentManagerPage = lazy(() => import("./pages/admin/ContentManagerPage"));
 const BugMemoryAggregatorPage = lazy(() => import("./pages/admin/BugMemoryAggregatorPage"));
@@ -1421,6 +1422,7 @@ const Footer = () => {
             <Link to="/privacy" className="hover:text-white transition-colors" data-testid="footer-privacy">Confidențialitate</Link>
             <Link to="/cookies" className="hover:text-white transition-colors" data-testid="footer-cookies">Cookies</Link>
             <Link to="/trust" className="hover:text-white transition-colors" data-testid="footer-trust">Trust Center</Link>
+            <Link to="/devino-francizat" className="hover:text-[#d4ff3a] transition-colors" data-testid="footer-franchise">Devino francizat</Link>
             <Link to="/status" className="hover:text-white transition-colors inline-flex items-center gap-1" data-testid="footer-status">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Status
             </Link>
@@ -1578,6 +1580,7 @@ function App() {
               <Route path="/design-exterior" element={<ServiceHubLanding slug="design-exterior" />} />
               <Route path="/arhitectura" element={<ServiceHubLanding slug="arhitectura" />} />
               <Route path="/franciza" element={<FranchiseDashboard />} />
+              <Route path="/devino-francizat" element={<FranchiseApplyPage />} />
               <Route path="/franchise_admin" element={<FranchiseDashboard />} />
               <Route path="/servicii/design-interior" element={<Navigate to="/design-interior" replace />} />
               <Route path="/demo" element={<PublicDemoPage />} />

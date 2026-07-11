@@ -1,5 +1,32 @@
 ## 📋 Roadmap & Backlog (prioritizat)
 
+## 🏢 Public Franchise Application "Devino francizat PropManage" (Iul 11, 2026)
+
+**Goal**: Primul canal public de achiziție francizați, integrat direct în unified leads.
+
+**Backend** (`routes/public.py`):
+- `POST /api/public/franchise-application` (no-auth): validează name/email/phone/city/consent GDPR + tier investiție → salvează în `franchise_applications` + sync în `leads` prin `sync_lead()`
+- Triage automat via `_triage`: capacitate investiție (25-50k → estimated_value 35000) → score `warm` (65). Bugete 100k+ vor genera `hot` (score ≥70).
+- Idempotență (email + zi) → dedupe pe click accidental.
+- Notificare admins HQ via email (Resend fallback console) cu tabel structurat + WhatsApp deep-link.
+- Adăugat `franchise_application` în `leads_store.LEGACY_SOURCES` — admin poate filtra sursa din UI Unified Leads.
+- Sitemap actualizat cu `/devino-francizat` priority 0.9.
+
+**Frontend** (`pages/FranchiseApplyPage.jsx` + route `/devino-francizat`):
+- Design cohesive cu PropManage (dark bg, serif titles, accent lime #d4ff3a, glass-strong cards).
+- 5 secțiuni: Hero + stats · Beneficii (6 carduri) · Proces în 5 pași · Formular · FAQ · Footer CTA.
+- Formular structurat: name/email/phone/city obligatorii, occupation/experience/message opționale, radio-tier investiție (10-25k, 25-50k, 50-100k, 100k+), consent GDPR obligatoriu.
+- Success screen full-page cu next-steps + email confirmare.
+- Link în footer principal `/devino-francizat` (verde lime) alături de Trust/Status.
+
+**Tests validated (curl)**:
+- ✅ Submit valid → `{ok:true, deduped:false}`, apare în unified leads cu source=franchise_application, segment=warm, score=65
+- ✅ Dedupe same-day → `{ok:true, deduped:true}`
+- ✅ Missing consent → 400 "Consimțământul GDPR este obligatoriu"
+- ✅ Screenshot pagina publică: hero + form afișate corect
+
+
+
 ## 🤖 HDI + CAO Top 3 + Galbenele finale + Audit Sentinel + Manual Owner-Only (Iun 11, 2026, Part 4)
 
 **A. Human Dependency Index (HDI) — a 5-a axă Autonomy Engine** (`autonomy/engine.py`):

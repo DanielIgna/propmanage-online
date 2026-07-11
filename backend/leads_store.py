@@ -91,6 +91,7 @@ LEGACY_SOURCES = {
     "interior_design": "interior_design_leads",
     "demo": "demo_leads",
     "partner": "partner_leads",
+    "franchise_application": "franchise_applications",
 }
 
 

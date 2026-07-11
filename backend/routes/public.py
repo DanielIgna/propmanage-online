@@ -93,6 +93,120 @@ async def demo_request(payload: dict = Body(...)):
     return {"ok": True, "deduped": False}
 
 
+# ============================================================================
+# FRANCHISE APPLICATION — canal public de achiziție franchisees
+# ============================================================================
+# POST /api/public/franchise-application — capturează aplicația din pagina
+# "Devino francizat PropManage" și o sincronizează în leads unificate cu
+# source=franchise_application, segment triaged pe capacitate investițională.
+INVESTMENT_TIERS = {
+    "10-25k":  15000,
+    "25-50k":  35000,
+    "50-100k": 75000,
+    "100k+":   150000,
+}
+
+
+@router.post("/public/franchise-application")
+async def franchise_application(payload: dict = Body(...)):
+    """Public — no auth. Aplicație francizat → franchise_applications + unified leads."""
+    name = (payload.get("name") or "").strip()[:120]
+    email = (payload.get("email") or "").strip().lower()[:160]
+    phone = (payload.get("phone") or "").strip()[:32]
+    city = (payload.get("city") or "").strip()[:80]
+    occupation = (payload.get("occupation") or "").strip()[:160]
+    investment = (payload.get("investment") or "").strip()[:32]  # tier key
+    experience = (payload.get("experience") or "").strip()[:1200]
+    message = (payload.get("message") or "").strip()[:1500]
+    consent = bool(payload.get("consent"))
+
+    if not name or not EMAIL_RX.match(email):
+        raise HTTPException(400, "Nume și email valid sunt obligatorii.")
+    if not phone or len(re.sub(r"\D", "", phone)) < 9:
+        raise HTTPException(400, "Număr de telefon valid este obligatoriu.")
+    if not city:
+        raise HTTPException(400, "Orașul de interes este obligatoriu.")
+    if not consent:
+        raise HTTPException(400, "Consimțământul GDPR este obligatoriu.")
+
+    estimated_value = INVESTMENT_TIERS.get(investment, 5000)
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "name": name,
+        "email": email,
+        "phone": phone,
+        "city": city,
+        "occupation": occupation,
+        "investment_tier": investment or "unknown",
+        "estimated_value": estimated_value,
+        "experience": experience,
+        "message": message,
+        "consent": consent,
+        "status": "new",
+        "tenant_id": "main",  # HQ owns franchisee acquisition
+        "created_at": now_iso,
+        "source": "franchise_application",
+    }
+
+    # Idempotent on (email + day)
+    day = now_iso[:10]
+    existing = await db.franchise_applications.find_one(
+        {"email": email, "created_at": {"$regex": f"^{day}"}}
+    )
+    if existing:
+        await db.franchise_applications.update_one(
+            {"_id": existing["_id"]},
+            {"$set": {**{k: v for k, v in doc.items() if k not in ("created_at",)},
+                      "updated_at": now_iso}},
+        )
+        from leads_store import sync_lead
+        await sync_lead("franchise_application", {**existing, **doc, "id": str(existing["_id"])})
+        return {"ok": True, "deduped": True}
+
+    ins = await db.franchise_applications.insert_one(doc)
+    from leads_store import sync_lead
+    await sync_lead("franchise_application", {**doc, "id": str(ins.inserted_id)})
+
+    # Notify HQ admins
+    try:
+        from email_service import _layout, send_email as _send_email  # type: ignore
+        admin_emails = []
+        async for u in db.users.find({"role": "admin"}, {"email": 1}):
+            if u.get("email"):
+                admin_emails.append(u["email"])
+        if not admin_emails:
+            admin_emails = [os.environ.get("ADMIN_EMAIL", "admin@propmanage.io")]
+        wa_html = ""
+        digits = re.sub(r"\D", "", phone)
+        if len(digits) >= 9:
+            wa_html = f'<tr><td><b>WhatsApp:</b></td><td><a href="https://wa.me/{digits}" style="color:#25d366;">{phone} →</a></td></tr>'
+        html = _layout(
+            title="🏢 Aplicație nouă de francizat",
+            preheader=f"{name} din {city} vrea să deschidă o franciză PropManage",
+            body_html=f"""
+              <p>O nouă aplicație pentru francizare PropManage a fost primită:</p>
+              <table style="width:100%; background:#1a1a1f; border-radius:12px; padding:14px; margin:12px 0; color:#fff;">
+                <tr><td><b>Nume:</b></td><td>{name}</td></tr>
+                <tr><td><b>Email:</b></td><td><a href="mailto:{email}" style="color:#d4ff3a;">{email}</a></td></tr>
+                <tr><td><b>Telefon:</b></td><td>{phone}</td></tr>
+                {wa_html}
+                <tr><td><b>Oraș:</b></td><td>{city}</td></tr>
+                <tr><td><b>Ocupație curentă:</b></td><td>{occupation or '—'}</td></tr>
+                <tr><td><b>Buget investiție:</b></td><td>{investment or '—'} EUR</td></tr>
+                <tr><td valign="top"><b>Experiență:</b></td><td>{(experience or '—').replace(chr(10), '<br/>')}</td></tr>
+                <tr><td valign="top"><b>Mesaj:</b></td><td>{(message or '—').replace(chr(10), '<br/>')}</td></tr>
+              </table>
+              <p style="color:#a8a8b0; font-size:13px;">Lead-ul apare automat în <b>Admin → Unified Leads</b> cu segment auto (hot/warm/nurture).</p>
+            """,
+        )
+        await _send_email(admin_emails, f"[PropManage · Franciză] {name} din {city}", html)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[FranchiseApp] notify failed: {e}")
+
+    return {"ok": True, "deduped": False}
+
+
 @router.get("/health")
 async def health_check():
     """Lightweight readiness probe. Returns 200 with details even if some services degraded."""
@@ -359,6 +473,7 @@ async def public_sitemap():
     static_pages = [
         ("/",                "1.0", "weekly"),
         ("/design-interior", "0.95", "weekly"),
+        ("/devino-francizat", "0.9", "weekly"),
         ("/marketplace",     "0.9", "daily"),
         ("/ghiduri",         "0.85", "weekly"),
         ("/digital-twin",    "0.7", "monthly"),
