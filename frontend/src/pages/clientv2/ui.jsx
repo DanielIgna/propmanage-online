@@ -1,8 +1,9 @@
 import React, { useRef, useLayoutEffect } from "react";
 import { X } from "lucide-react";
 
-export const GREEN = "#34C759";
-export const GREEN_SOFT = "#E9F9EE";
+export const GREEN = "#65a30d";        // lime-600 — accent lizibil pe alb (text, iconițe, borduri)
+export const GREEN_SOFT = "#f0fbd1";   // container lime deschis
+export const LIME = "#d4ff3a";         // lime brand — FILL pentru CTA-uri (text negru obligatoriu)
 
 // ---- AmountInput: input de sumă cu formatare live (separator mii ro-RO)
 // State-ul din parent stochează DOAR cifrele raw (string, ex: "35000").
@@ -56,8 +57,8 @@ AmountInput.displayName = "AmountInput";
 export const CTA = ({ children, onClick, testid, disabled, subtle }) => (
   <button onClick={onClick} disabled={disabled} data-testid={testid}
     className={`w-full py-3.5 rounded-full text-sm font-bold transition-transform active:scale-[0.98] disabled:opacity-50 ${
-      subtle ? "bg-white text-slate-900 border border-slate-200" : "text-white shadow-lg shadow-[#34C759]/25"}`}
-    style={subtle ? {} : { background: GREEN }}>
+      subtle ? "bg-white text-slate-900 border border-slate-200" : "text-black shadow-lg shadow-[#d4ff3a]/30"}`}
+    style={subtle ? {} : { background: LIME }}>
     {children}
   </button>
 );

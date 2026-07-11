@@ -734,3 +734,48 @@ html, body, [class*="bg-"], [class*="text-"], [class*="border-"] {
 .cv2-d1 { animation-delay: .06s; } .cv2-d2 { animation-delay: .14s; } .cv2-d3 { animation-delay: .22s; }
 @keyframes cv2Shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
 .cv2-skeleton { background: linear-gradient(90deg, #f1f5f9 25%, #e8edf3 37%, #f1f5f9 63%); background-size: 400px 100%; animation: cv2Shimmer 1.3s infinite linear; }
+
+/* ============================================================
+   UNIFICARE CULORI — verdele #34C759 (Client V2 legacy) → familia lime brand
+   (cerință user: „aceleași culori peste tot, nu haos")
+   ============================================================ */
+.border-\[\#34C759\] { border-color: #65a30d !important; }
+.border-\[\#34C759\]\/40 { border-color: rgba(101, 163, 13, 0.4) !important; }
+.bg-\[\#34C759\]\/5 { background-color: rgba(212, 255, 58, 0.12) !important; }
+.bg-\[\#34C759\]\/10 { background-color: rgba(212, 255, 58, 0.2) !important; }
+.focus\:border-\[\#34C759\]:focus { border-color: #65a30d !important; }
+.shadow-\[\#34C759\]\/25, .shadow-\[\#34C759\]\/30 { --tw-shadow-color: rgba(212, 255, 58, 0.35) !important; }
+.text-\[\#34C759\] { color: #65a30d !important; }
+
+/* ============================================================
+   CLIENT V2 — TEMA ÎNTUNECATĂ (.cv2-scope, activă când tema globală e dark)
+   Suprafețe negre + același accent lime; textul rămâne lizibil.
+   ============================================================ */
+html:not([data-theme="light"]) .cv2-scope { background-color: #0a0a0a !important; }
+html:not([data-theme="light"]) .cv2-scope .bg-\[\#FAFBFA\] { background-color: #0a0a0a !important; }
+html:not([data-theme="light"]) .cv2-scope .bg-white { background-color: #171717 !important; }
+html:not([data-theme="light"]) .cv2-scope .bg-slate-50 { background-color: #131313 !important; }
+html:not([data-theme="light"]) .cv2-scope .bg-slate-100 { background-color: #262626 !important; }
+html:not([data-theme="light"]) .cv2-scope .text-slate-900 { color: #f8fafc !important; }
+html:not([data-theme="light"]) .cv2-scope .text-slate-800 { color: #e2e8f0 !important; }
+html:not([data-theme="light"]) .cv2-scope .text-slate-700,
+html:not([data-theme="light"]) .cv2-scope .text-slate-600 { color: #cbd5e1 !important; }
+html:not([data-theme="light"]) .cv2-scope .text-slate-500 { color: #94a3b8 !important; }
+html:not([data-theme="light"]) .cv2-scope .border-slate-100,
+html:not([data-theme="light"]) .cv2-scope .border-slate-200 { border-color: #262626 !important; }
+html:not([data-theme="light"]) .cv2-scope .border-white { border-color: #171717 !important; }
+html:not([data-theme="light"]) .cv2-scope input,
+html:not([data-theme="light"]) .cv2-scope textarea,
+html:not([data-theme="light"]) .cv2-scope select {
+  color: #f8fafc; background-color: #171717; caret-color: #f8fafc;
+}
+html:not([data-theme="light"]) .cv2-scope input::placeholder,
+html:not([data-theme="light"]) .cv2-scope textarea::placeholder { color: #64748b; }
+html:not([data-theme="light"]) .cv2-scope select option { color: #f8fafc; background-color: #171717; }
+html:not([data-theme="light"]) .cv2-scope .cv2-skeleton {
+  background: linear-gradient(90deg, #1c1c1c 25%, #262626 37%, #1c1c1c 63%);
+  background-size: 400px 100%;
+}
+
+/* Butoane pline #34C759 (client junior legacy) → lime brand cu text negru */
+.bg-\[\#34C759\] { background-color: #d4ff3a !important; color: #000 !important; }

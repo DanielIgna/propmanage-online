@@ -1,7 +1,7 @@
 import React from "react";
 import { Check, Search, Briefcase, Bell, Settings } from "lucide-react";
 
-export const CJ_GREEN = "#34C759";
+export const CJ_GREEN = "#65a30d";
 
 // ── QuestionCard: o singură întrebare pe ecran (Hick's Law) ──────────────────
 export const QuestionCard = ({ question, hint, children }) => (

@@ -4,6 +4,7 @@ import { Home, Plus, Wrench, Building2, Settings, Bell, ChevronDown, Shield, Lay
 import { useAuth, formatApiError } from "../../auth";
 import { API } from "../DashShared";
 import { GREEN, Sheet } from "./ui";
+import { ThemeSwitcher } from "../../components/ThemeSwitcher";
 import { HomeV2, HomeSkeleton } from "./HomeV2";
 import { JobsV2 } from "./JobsV2";
 import { PropertyHubV2, WalletSheet } from "./PropertyHubV2";
@@ -152,6 +153,7 @@ export default function ClientDashboardV2() {
             <Bell style={{ width: 18, height: 18 }} className="text-slate-600" />
             {unread > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full text-white text-[9px] font-black flex items-center justify-center" style={{ background: GREEN }} data-testid="v2-bell-badge">{unread}</span>}
           </button>
+          <ThemeSwitcher />
         </div>
         {TITLES[tab] && <h1 className="px-5 pb-3 text-xl font-black text-slate-900">{TITLES[tab]}</h1>}
 
@@ -190,8 +192,8 @@ export default function ClientDashboardV2() {
             {NAV.map(([Icon, label, id]) => (
               <button key={id} onClick={() => { window.scrollTo({ top: 0 }); (id === "request" ? actions.openWizard() : setTab(id)); }} data-testid={`v2-nav-${id}`} className="flex flex-col items-center gap-0.5 py-2.5">
                 {id === "request" ? (
-                  <span className="w-12 h-12 -mt-6 rounded-full flex items-center justify-center border-4 border-white shadow-lg shadow-[#34C759]/30" style={{ background: GREEN }}>
-                    <Icon className="w-5 h-5 text-white" strokeWidth={2.5} />
+                  <span className="w-12 h-12 -mt-6 rounded-full flex items-center justify-center border-4 border-white shadow-lg shadow-[#d4ff3a]/40" style={{ background: "#d4ff3a" }}>
+                    <Icon className="w-5 h-5 text-black" strokeWidth={2.5} />
                   </span>
                 ) : (
                   <Icon className="w-5 h-5" style={{ color: tab === id ? GREEN : "#CBD5E1" }} strokeWidth={tab === id ? 2.5 : 2} />

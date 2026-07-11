@@ -10,6 +10,7 @@ import {
   Star, Clock, Command, Network, Megaphone, Brain, Rocket, Activity, KeyRound, Server
 } from "lucide-react";
 import { useAuth } from "../../auth";
+import { useTheme as useGlobalTheme } from "../../contexts/ThemeContext";
 import { API } from "../DashShared";
 import { ADMIN_ZONES, getStoredZone, setStoredZone } from "../../config/adminZones";
 import { HealthScoreBadge } from "./HealthScoreBadge";
@@ -286,12 +287,9 @@ const NAV_SECTIONS = [
 ];
 
 export const useAdminTheme = () => {
-  const [theme, setTheme] = useState(() => localStorage.getItem("pm_admin_theme") || "light");
-  useEffect(() => {
-    document.documentElement.setAttribute("data-admin-theme", theme);
-    localStorage.setItem("pm_admin_theme", theme);
-  }, [theme]);
-  return [theme, () => setTheme(t => t === "light" ? "dark" : "light")];
+  // Delegat la tema globală (un singur toggle alb/negru pe toată platforma)
+  const { theme, toggleTheme } = useGlobalTheme();
+  return [theme, toggleTheme];
 };
 
 // ── Favorites & Recents (localStorage, per-browser) ─────────────────────────

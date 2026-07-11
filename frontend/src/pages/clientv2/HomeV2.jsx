@@ -8,7 +8,7 @@ import { GREEN, GREEN_SOFT, CTA, Steps, stepForStatus, Skeleton } from "./ui";
 
 // Hero A — fără proprietate
 const HeroA = ({ onAddProperty }) => (
-  <div className="mx-5 rounded-3xl p-5 text-white shadow-xl shadow-emerald-900/10" style={{ background: "linear-gradient(135deg, #10B981 0%, #34C759 100%)" }} data-testid="v2-hero-a">
+  <div className="mx-5 rounded-3xl p-5 text-black shadow-xl shadow-lime-900/10" style={{ background: "linear-gradient(135deg, #a3e635 0%, #d4ff3a 100%)" }} data-testid="v2-hero-a">
     <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-white/80"><Sparkles className="w-3.5 h-3.5" /> Pasul 1 din 3 · 2 minute</div>
     <h1 className="mt-2 text-[22px] font-black leading-snug">Hai să pornim: adaugă prima ta proprietate</h1>
     <div className="mt-3 h-1.5 rounded-full bg-white/25"><div className="h-full w-1/3 rounded-full bg-white" /></div>

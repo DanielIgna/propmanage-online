@@ -112,8 +112,8 @@ export const SpecialistDashboard = () => {
     <DashLayout role="specialist" title={title} bottomNav={<BottomNav tabs={tabs} active={tab} onChange={setTab} dataPrefix="spec-tab" />}>
       {/* „Astăzi ai" — PRIMUL element (Hick's Law: răspunde imediat la „ce fac azi?") */}
       {tab === "opportunities" && (
-        <div className="dark mb-6 pm-fade-in" data-testid="spec-today-summary">
-          <h3 className="text-sm font-bold text-stone-300 mb-3">Astăzi ai:</h3>
+        <div className="mb-6 pm-fade-in" data-testid="spec-today-summary">
+          <h3 className="text-sm font-bold mb-3" style={{ color: "var(--pm-text-variant)" }}>Astăzi ai:</h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard icon={Target} label="Cereri noi" value={open.length} accent="info" onClick={() => document.querySelector('[data-tour="specialist-leads"]')?.scrollIntoView({ behavior: "smooth" })} testid="spec-today-open" />
             <KpiCard icon={Briefcase} label="Lucrări în lucru" value={mine.filter(r => r.status !== "confirmed").length} accent="warning" onClick={() => setTab("jobs")} testid="spec-today-active" />

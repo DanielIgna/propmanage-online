@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Building2, ArrowRight, ShieldCheck, Info, ChevronDown } from "lucide-react";
 import { useSEO } from "../hooks/useSEO";
+import { ThemeSwitcher } from "../components/ThemeSwitcher";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 const SITE_URL = "https://propmanage.ro";
@@ -69,6 +70,8 @@ export default function PreturiPage() {
             <span className="font-serif text-lg font-semibold">PropManage</span>
           </Link>
           <Link to="/preturi" className="text-xs text-stone-400 hover:text-white">Toate prețurile</Link>
+          <span className="mx-1" />
+          <ThemeSwitcher />
         </div>
       </header>
 

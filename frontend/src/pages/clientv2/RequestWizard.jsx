@@ -62,8 +62,8 @@ export const RequestWizard = ({ property, onClose, onCreated }) => {
     return (
       <div className="fixed inset-0 z-50 flex flex-col" style={{ background: GREEN_SOFT }} data-testid="v2-wizard-done">
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-          <span className="w-20 h-20 rounded-full flex items-center justify-center mb-5" style={{ background: GREEN }}>
-            <PartyPopper className="w-9 h-9 text-white" />
+          <span className="w-20 h-20 rounded-full flex items-center justify-center mb-5" style={{ background: "#d4ff3a" }}>
+            <PartyPopper className="w-9 h-9 text-black" />
           </span>
           <h1 className="text-2xl font-black text-slate-900">Am primit cererea ta!</h1>
           <p className="mt-2 text-sm text-slate-600 max-w-xs">Specialiștii verificați vor trimite oferte. Te anunțăm imediat ce apar.</p>

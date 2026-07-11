@@ -1,32 +1,38 @@
-// Theme context — persists selection in localStorage, applies data-theme on <html>.
+// Theme context — 2 teme: dark (default) și light, comutabile de utilizator.
+// Sincronizează: data-theme (tokens pm-* + override-uri landing), data-admin-theme (consolă admin),
+// clasa Tailwind `dark` (variantele dark: din Design System).
 import React, { createContext, useContext, useEffect, useState } from "react";
-
-const THEMES = [
-  { id: "default", label: "Dark Pro", emoji: "🌙" },
-  { id: "warm-linen", label: "Warm Linen 2026", emoji: "🌾" },
-  { id: "tech-build", label: "Tech Build 2026", emoji: "🏗" },
-];
 
 const ThemeContext = createContext(null);
 
+const normalize = (v) => (v === "light" ? "light" : "dark");
+
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(() => {
-    try { return localStorage.getItem("propmanage_theme") || "default"; }
-    catch (_e) { return "default"; }
+    try {
+      const stored = localStorage.getItem("propmanage_theme");
+      if (stored === "light" || stored === "warm-linen") return "light";
+      return "dark";
+    } catch (_e) { return "dark"; }
   });
 
   useEffect(() => {
+    const t = normalize(theme);
     const root = document.documentElement;
-    if (theme && theme !== "default") {
-      root.setAttribute("data-theme", theme);
-    } else {
-      root.removeAttribute("data-theme");
-    }
-    try { localStorage.setItem("propmanage_theme", theme); } catch (_e) { /* ignore */ }
+    if (t === "light") root.setAttribute("data-theme", "light");
+    else root.removeAttribute("data-theme");
+    root.setAttribute("data-admin-theme", t);
+    root.classList.toggle("dark", t === "dark");
+    try {
+      localStorage.setItem("propmanage_theme", t);
+      localStorage.setItem("pm_admin_theme", t);
+    } catch (_e) { /* ignore */ }
   }, [theme]);
 
+  const toggleTheme = () => setTheme((t) => (t === "light" ? "dark" : "light"));
+
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, themes: THEMES }}>
+    <ThemeContext.Provider value={{ theme: normalize(theme), setTheme, toggleTheme, isDark: normalize(theme) === "dark" }}>
       {children}
     </ThemeContext.Provider>
   );

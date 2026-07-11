@@ -170,6 +170,7 @@ const Nav = () => {
           ))}
         </div>
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <button onClick={toggle} className="flex items-center gap-1 px-2 sm:px-3 py-1.5 hover:bg-white/5 rounded-full text-xs uppercase tracking-wider text-stone-300" data-testid="lang-toggle">
             <Languages className="w-3.5 h-3.5" />{lang.toUpperCase()}
           </button>

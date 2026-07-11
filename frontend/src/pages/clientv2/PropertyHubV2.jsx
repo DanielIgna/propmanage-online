@@ -18,7 +18,7 @@ export const WalletSheet = ({ user, onClose }) => {
   };
   return (
     <Sheet title="Plăți & Portofel" onClose={onClose} testid="v2-wallet-sheet">
-      <div className="rounded-3xl p-5 text-white" style={{ background: "linear-gradient(135deg, #10B981 0%, #34C759 100%)" }}>
+      <div className="rounded-3xl p-5 text-black" style={{ background: "linear-gradient(135deg, #a3e635 0%, #d4ff3a 100%)" }}>
         <div className="text-[10px] font-bold uppercase tracking-wider text-white/80">Sold disponibil</div>
         <div className="mt-1 text-3xl font-black" data-testid="v2-wallet-balance">{(user?.wallet_balance ?? 0).toFixed(2)} RON</div>
         {user?.tokens != null && <div className="mt-1 text-[11px] text-white/80">{user.tokens} tokeni</div>}
@@ -34,7 +34,7 @@ export const WalletSheet = ({ user, onClose }) => {
         <AmountInput value={amount} onChange={setAmount} placeholder="Altă sumă (RON)"
           className="flex-1 px-4 py-3 rounded-full border-2 border-slate-200 text-sm outline-none focus:border-[#34C759]" data-testid="v2-topup-custom" />
         <button onClick={() => topup()} disabled={busy || !amount} data-testid="v2-topup-custom-btn"
-          className="px-5 rounded-full text-sm font-bold text-white disabled:opacity-50" style={{ background: GREEN }}>
+          className="px-5 rounded-full text-sm font-bold text-black disabled:opacity-50" style={{ background: "#d4ff3a" }}>
           {busy ? "…" : "Plătește"}
         </button>
       </div>
