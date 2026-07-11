@@ -5,7 +5,8 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import {
   Sofa, Sparkles, ArrowRight, Check, Star, ChevronDown, MessageCircle,
-  Send, Ruler, Palette, Wallet, Home, X,
+  Send, Ruler, Palette, Wallet, Home, X, Scan, ClipboardCheck, Network,
+  ShieldCheck, MapPin, Layers, Wrench,
 } from "lucide-react";
 import { API } from "./DashShared";
 import { useDynamicSEO } from "../lib/useDynamicSEO";
@@ -150,10 +151,22 @@ const LeadForm = ({ content }) => {
   );
 };
 
+const ANCHORS = [
+  { id: "proces", label: "Proces" },
+  { id: "digital-twin", label: "Digital Twin" },
+  { id: "audit", label: "Audit" },
+  { id: "implementare", label: "Implementare" },
+  { id: "stiluri", label: "Stiluri" },
+  { id: "ecosistem", label: "Ecosistem" },
+  { id: "faq", label: "FAQ" },
+];
+
+const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+
 export default function InteriorDesignLanding() {
   const [content, setContent] = useState(null);
   useDynamicSEO("interior_design", {
-    title: content?.seo?.title || "Design Interior România | PropManage",
+    title: content?.seo?.title || "Interior Intelligence by PropManage — Design Interior & Arhitectură | România",
     description: content?.seo?.description,
   });
 
@@ -169,11 +182,15 @@ export default function InteriorDesignLanding() {
     ld.text = JSON.stringify({
       "@context": "https://schema.org",
       "@graph": [
-        { "@type": "Service", "name": "Design Interior", "provider": { "@type": "Organization", "name": "PropManage" },
-          "areaServed": content.local_cities, "description": content.seo?.description },
+        { "@type": "ProfessionalService", "name": "Interior Intelligence by PropManage",
+          "alternateName": "Design Interior, Arhitectură de Interior & Implementare",
+          "provider": { "@type": "Organization", "name": "PropManage" },
+          "areaServed": ["România", ...(content.local_cities || [])],
+          "description": content.seo?.description,
+          "serviceType": ["Design interior", "Arhitectură de interior", "Audit locuință", "Scanare 3D / Digital Twin", "Management proiect renovare"] },
         { "@type": "BreadcrumbList", "itemListElement": [
           { "@type": "ListItem", "position": 1, "name": "Acasă", "item": window.location.origin + "/" },
-          { "@type": "ListItem", "position": 2, "name": "Design Interior", "item": window.location.origin + "/design-interior" }]},
+          { "@type": "ListItem", "position": 2, "name": "Interior Intelligence", "item": window.location.origin + "/design-interior" }]},
         { "@type": "FAQPage", "mainEntity": (content.faq || []).map((f) => ({ "@type": "Question", "name": f.q, "acceptedAnswer": { "@type": "Answer", "text": f.a } })) },
       ],
     });
@@ -186,18 +203,30 @@ export default function InteriorDesignLanding() {
 
   if (!content) return <div className="min-h-screen bg-white flex items-center justify-center text-stone-400">Se încarcă…</div>;
 
-  const scrollToForm = () => document.getElementById("formular")?.scrollIntoView({ behavior: "smooth" });
+  const brand = content.brand || { name: "Interior Intelligence", suffix: "by PropManage", tagline: "" };
+  const phases = content.process_phases || [];
+  const twin = content.digital_twin || {};
+  const audit = content.audit || {};
+  const impl = content.implementation || {};
+  const stylesSec = content.styles_showcase || {};
+  const eco = content.ecosystem || {};
+  const scrollToForm = () => scrollTo("formular");
 
   return (
     <div className="min-h-screen bg-white text-stone-800" data-testid="interior-design-root" style={{ fontFamily: "inherit" }}>
       {/* Header propriu, temă luminoasă */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-stone-100">
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 font-black text-stone-900" data-testid="id-nav-home"><Home className="w-5 h-5 text-emerald-700" /> PropManage</Link>
-          <nav aria-label="breadcrumb" className="hidden sm:block text-xs text-stone-400">
-            <Link to="/" className="hover:text-emerald-700">Acasă</Link> <span className="mx-1">/</span> <span className="text-stone-700 font-semibold">Design Interior</span>
+        <div className="max-w-6xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between gap-4">
+          <Link to="/" className="flex items-center gap-2 shrink-0" data-testid="id-nav-home">
+            <Home className="w-5 h-5 text-emerald-700" />
+            <span className="font-black text-stone-900 leading-none">{brand.name}<span className="block text-[10px] font-semibold text-stone-400 tracking-wide">{brand.suffix}</span></span>
+          </Link>
+          <nav className="hidden lg:flex items-center gap-1" data-testid="id-anchor-nav" aria-label="Secțiuni">
+            {ANCHORS.map((a) => (
+              <button key={a.id} onClick={() => scrollTo(a.id)} className="px-3 py-1.5 rounded-full text-xs font-bold text-stone-500 hover:text-emerald-800 hover:bg-emerald-50 transition-colors" data-testid={`id-anchor-${a.id}`}>{a.label}</button>
+            ))}
           </nav>
-          <button onClick={scrollToForm} className="px-5 py-2.5 rounded-full bg-emerald-700 text-white text-sm font-bold hover:bg-emerald-800 transition-colors" data-testid="id-nav-cta">Cere ofertă</button>
+          <button onClick={scrollToForm} className="px-5 py-2.5 rounded-full bg-emerald-700 text-white text-sm font-bold hover:bg-emerald-800 transition-colors shrink-0" data-testid="id-nav-cta">Cere ofertă</button>
         </div>
       </header>
 
@@ -205,9 +234,19 @@ export default function InteriorDesignLanding() {
       <Section className="pt-12 sm:pt-16 pb-10">
         <div className="grid lg:grid-cols-2 gap-10 items-center">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold mb-5"><Sofa className="w-3.5 h-3.5" /> Serviciu independent · acces liber, fără condiții</div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold mb-5" data-testid="id-hero-brand">
+              <Sparkles className="w-3.5 h-3.5" /> {brand.name} {brand.suffix} · {brand.tagline}
+            </div>
             <h1 className="text-4xl sm:text-5xl font-black text-stone-900 leading-[1.1] tracking-tight">{content.hero.h1}</h1>
             <p className="mt-5 text-stone-600 text-base leading-relaxed max-w-lg">{content.hero.subtitle}</p>
+            <div className="mt-6 flex flex-wrap items-center gap-1.5" data-testid="id-journey">
+              {(content.journey || []).map((j, i) => (
+                <React.Fragment key={j}>
+                  <span className="px-2.5 py-1 rounded-full bg-stone-100 text-stone-700 text-[11px] font-bold">{j}</span>
+                  {i < content.journey.length - 1 && <ArrowRight className="w-3 h-3 text-emerald-600" />}
+                </React.Fragment>
+              ))}
+            </div>
             <div className="mt-7 flex flex-wrap gap-3">
               <button onClick={scrollToForm} className="px-6 py-3.5 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors" data-testid="id-cta-primary">{content.hero.cta_primary}</button>
               <button onClick={scrollToForm} className="px-6 py-3.5 rounded-full border-2 border-stone-200 text-stone-700 font-bold hover:border-emerald-600 hover:text-emerald-800 transition-colors" data-testid="id-cta-secondary">{content.hero.cta_secondary}</button>
@@ -218,13 +257,30 @@ export default function InteriorDesignLanding() {
         </div>
       </Section>
 
+      {/* POZIȚIONARE — național + Cluj/Transilvania */}
+      {content.positioning && (
+        <Section className="py-8">
+          <div className="rounded-3xl bg-stone-50 border border-stone-100 p-6 sm:p-8 flex flex-col lg:flex-row lg:items-center gap-6" data-testid="id-positioning">
+            <div className="flex-1">
+              <h2 className="text-lg font-black text-stone-900 flex items-center gap-2"><MapPin className="w-5 h-5 text-emerald-700" /> {content.positioning.title}</h2>
+              <p className="mt-2 text-sm text-stone-600 leading-relaxed">{content.positioning.text}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(content.positioning.badges || []).map((b, i) => (
+                <span key={i} className="px-3 py-1.5 rounded-full bg-white border border-emerald-200 text-emerald-800 text-xs font-bold" data-testid={`id-pos-badge-${i}`}>{b}</span>
+              ))}
+            </div>
+          </div>
+        </Section>
+      )}
+
       {/* BENEFICII */}
       <Section className="py-14">
-        <h2 className="text-2xl sm:text-3xl font-black text-stone-900 mb-8">De ce prin PropManage</h2>
+        <h2 className="text-2xl sm:text-3xl font-black text-stone-900 mb-8">De ce Interior Intelligence, nu un studio clasic</h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {content.benefits.map((b, i) => (
             <div key={i} className="p-6 rounded-3xl bg-stone-50 border border-stone-100 hover:border-emerald-200 transition-colors" data-testid={`id-benefit-${i}`}>
-              <div className="w-10 h-10 rounded-2xl bg-emerald-700 text-white flex items-center justify-center mb-3">{[<Check />, <Palette />, <Wallet />, <Star />, <Ruler />, <MessageCircle />][i % 6]}</div>
+              <div className="w-10 h-10 rounded-2xl bg-emerald-700 text-white flex items-center justify-center mb-3">{[<Network />, <Scan />, <ShieldCheck />, <Wallet />, <Palette />, <ClipboardCheck />][i % 6]}</div>
               <h3 className="font-bold text-stone-900 mb-1">{b.title}</h3>
               <p className="text-sm text-stone-600">{b.text}</p>
             </div>
@@ -232,15 +288,77 @@ export default function InteriorDesignLanding() {
         </div>
       </Section>
 
-      {/* ETAPE */}
-      <Section className="py-14">
-        <h2 className="text-2xl sm:text-3xl font-black text-stone-900 mb-8">Cum decurge colaborarea</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {content.steps.map((s, i) => (
-            <div key={i} className="p-5 rounded-3xl border border-stone-100 bg-white shadow-sm" data-testid={`id-step-${i}`}>
-              <div className="text-3xl font-black text-emerald-700/20 mb-2">0{i + 1}</div>
-              <h3 className="font-bold text-stone-900 text-sm mb-1">{s.title}</h3>
-              <p className="text-xs text-stone-500">{s.text}</p>
+      {/* PROCESUL — 17 etape, 5 faze */}
+      <Section id="proces" className="py-14">
+        <h2 className="text-2xl sm:text-3xl font-black text-stone-900 mb-2">Un singur proces. 17 etape. Zero improvizație.</h2>
+        <p className="text-sm text-stone-500 mb-10 max-w-2xl">Toate serviciile — de la consultanță la House Health — sunt etape ale aceluiași proces integrat. Poți alege module separate, dar puterea reală e în întreg.</p>
+        <div className="space-y-10">
+          {phases.map((ph, pi) => (
+            <div key={pi} data-testid={`id-phase-${pi}`}>
+              <div className="flex items-baseline gap-3 mb-4">
+                <span className="text-xs font-black uppercase tracking-widest text-emerald-700">Faza {pi + 1}</span>
+                <h3 className="text-lg font-black text-stone-900">{ph.phase}</h3>
+                <span className="hidden sm:inline text-xs text-stone-400">{ph.intro}</span>
+              </div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                {ph.steps.map((s) => (
+                  <div key={s.n} className="p-5 rounded-3xl border border-stone-100 bg-white shadow-sm hover:border-emerald-200 transition-colors" data-testid={`id-step-${s.n}`}>
+                    <div className="text-3xl font-black text-emerald-700/20 mb-2">{String(s.n).padStart(2, "0")}</div>
+                    <h4 className="font-bold text-stone-900 text-sm mb-1">{s.title}</h4>
+                    <p className="text-xs text-stone-500">{s.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      {/* DIGITAL TWIN */}
+      <Section id="digital-twin" className="py-14">
+        <div className="rounded-[2rem] bg-stone-900 text-white p-8 sm:p-12" data-testid="id-twin-section">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 text-xs font-bold mb-5"><Scan className="w-3.5 h-3.5" /> Tehnologia din spatele procesului</div>
+          <h2 className="text-2xl sm:text-3xl font-black leading-tight max-w-2xl">{twin.title}</h2>
+          <p className="mt-4 text-stone-300 text-sm leading-relaxed max-w-2xl">{twin.intro}</p>
+          <div className="mt-7 flex flex-wrap gap-2">
+            {(twin.contains || []).map((c, i) => (
+              <span key={i} className="px-3.5 py-2 rounded-full bg-white/5 border border-white/10 text-stone-200 text-xs font-semibold" data-testid={`id-twin-item-${i}`}>{c}</span>
+            ))}
+          </div>
+          <p className="mt-7 text-emerald-300/90 text-sm font-semibold max-w-2xl">{twin.outro}</p>
+        </div>
+      </Section>
+
+      {/* AUDIT */}
+      <Section id="audit" className="py-14">
+        <div className="grid lg:grid-cols-2 gap-10 items-start">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold mb-5"><ClipboardCheck className="w-3.5 h-3.5" /> Pasul zero al oricărui proiect</div>
+            <h2 className="text-2xl sm:text-3xl font-black text-stone-900 leading-tight">{audit.title}</h2>
+            <p className="mt-4 text-sm text-stone-600 leading-relaxed">{audit.intro}</p>
+            <p className="mt-4 text-sm text-stone-700 font-semibold">{audit.outro}</p>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {(audit.points || []).map((p, i) => (
+              <div key={i} className="flex items-start gap-2.5 p-4 rounded-2xl bg-stone-50 border border-stone-100" data-testid={`id-audit-point-${i}`}>
+                <Check className="w-4 h-4 text-emerald-700 mt-0.5 shrink-0" />
+                <span className="text-sm text-stone-700">{p}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Section>
+
+      {/* STILURI */}
+      <Section id="stiluri" className="py-14">
+        <h2 className="text-2xl sm:text-3xl font-black text-stone-900 mb-2">{stylesSec.title || "Putem lucra în orice stil"}</h2>
+        <p className="text-sm text-stone-500 mb-8 max-w-2xl">{stylesSec.intro}</p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {(stylesSec.items || []).map((s, i) => (
+            <div key={i} className="p-5 rounded-3xl border border-stone-100 bg-white hover:border-emerald-200 hover:shadow-md transition-all" data-testid={`id-style-${i}`}>
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center mb-3"><Palette className="w-4 h-4" /></div>
+              <h3 className="font-bold text-stone-900 text-sm">{s.name}</h3>
+              <p className="text-xs text-stone-500 mt-1">{s.desc}</p>
             </div>
           ))}
         </div>
@@ -262,6 +380,38 @@ export default function InteriorDesignLanding() {
         </div>
       </Section>
 
+      {/* IMPLEMENTARE */}
+      <Section id="implementare" className="py-14">
+        <div className="rounded-[2rem] bg-emerald-50 border border-emerald-100 p-8 sm:p-12" data-testid="id-impl-section">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white text-emerald-800 text-xs font-bold mb-5"><Wrench className="w-3.5 h-3.5" /> De la PDF la realitate</div>
+          <h2 className="text-2xl sm:text-3xl font-black text-stone-900 leading-tight max-w-2xl">{impl.title}</h2>
+          <p className="mt-4 text-sm text-stone-600 leading-relaxed max-w-2xl">{impl.intro}</p>
+          <div className="mt-7 grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            {(impl.points || []).map((p, i) => (
+              <div key={i} className="flex items-start gap-2 p-3.5 rounded-2xl bg-white border border-emerald-100" data-testid={`id-impl-point-${i}`}>
+                <Check className="w-3.5 h-3.5 text-emerald-700 mt-0.5 shrink-0" />
+                <span className="text-xs font-semibold text-stone-700">{p}</span>
+              </div>
+            ))}
+          </div>
+          <button onClick={scrollToForm} className="mt-8 px-6 py-3.5 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors" data-testid="id-impl-cta">Pornește procesul →</button>
+        </div>
+      </Section>
+
+      {/* ECOSISTEM */}
+      <Section id="ecosistem" className="py-14">
+        <h2 className="text-2xl sm:text-3xl font-black text-stone-900 mb-2">{eco.title || "Parte dintr-un ecosistem complet"}</h2>
+        <p className="text-sm text-stone-500 mb-8 max-w-2xl">{eco.intro}</p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {(eco.links || []).map((s, i) => (
+            <Link key={i} to={s.href} className="p-5 rounded-3xl border border-stone-100 hover:border-emerald-300 hover:shadow-lg transition-all group" data-testid={`id-eco-${i}`}>
+              <h3 className="font-bold text-stone-900 text-sm group-hover:text-emerald-800">{s.title} →</h3>
+              <p className="text-xs text-stone-500 mt-1">{s.text}</p>
+            </Link>
+          ))}
+        </div>
+      </Section>
+
       {/* RECENZII */}
       <Section className="py-14">
         <h2 className="text-2xl sm:text-3xl font-black text-stone-900 mb-8">Ce spun clienții</h2>
@@ -279,14 +429,14 @@ export default function InteriorDesignLanding() {
       {/* FORMULAR */}
       <Section id="formular" className="py-14">
         <div className="rounded-[2rem] bg-stone-50 border border-stone-100 p-6 sm:p-10">
-          <h2 className="text-2xl sm:text-3xl font-black text-stone-900 mb-2">Cere ofertă gratuită</h2>
-          <p className="text-sm text-stone-500 mb-7">Completezi în 2 minute · primești oferte de la designeri verificați în 24-48h.</p>
+          <h2 className="text-2xl sm:text-3xl font-black text-stone-900 mb-2">Programează consultanța gratuită</h2>
+          <p className="text-sm text-stone-500 mb-7">Completezi în 2 minute · primești răspuns în 24-48h · fără nicio obligație.</p>
           <LeadForm content={content} />
         </div>
       </Section>
 
       {/* FAQ */}
-      <Section className="py-14" >
+      <Section id="faq" className="py-14">
         <h2 className="text-2xl sm:text-3xl font-black text-stone-900 mb-6">Întrebări frecvente</h2>
         <div itemScope itemType="https://schema.org/FAQPage">
           {content.faq.map((f, i) => <FAQItem key={i} q={f.q} a={f.a} idx={i} />)}
@@ -311,21 +461,8 @@ export default function InteriorDesignLanding() {
         </article>
       </Section>
 
-      {/* SERVICII CONEXE */}
-      <Section className="py-14 pb-24">
-        <h2 className="text-2xl sm:text-3xl font-black text-stone-900 mb-8">Servicii conexe</h2>
-        <div className="grid sm:grid-cols-3 gap-5">
-          {content.related_services.map((s, i) => (
-            <Link key={i} to={s.href} className="p-6 rounded-3xl border border-stone-100 hover:border-emerald-300 hover:shadow-lg transition-all group" data-testid={`id-related-${i}`}>
-              <h3 className="font-bold text-stone-900 group-hover:text-emerald-800">{s.title} →</h3>
-              <p className="text-sm text-stone-500 mt-1">{s.text}</p>
-            </Link>
-          ))}
-        </div>
-      </Section>
-
       <footer className="border-t border-stone-100 py-8 text-center text-xs text-stone-400">
-        © {new Date().getFullYear()} PropManage · VINTAGE FURNITURE S.R.L. · <Link to="/" className="hover:text-emerald-700">propmanage.io</Link>
+        {brand.name} {brand.suffix} · © {new Date().getFullYear()} PropManage · VINTAGE FURNITURE S.R.L. · <Link to="/" className="hover:text-emerald-700">propmanage.io</Link>
       </footer>
 
       <AssistantWidget />
