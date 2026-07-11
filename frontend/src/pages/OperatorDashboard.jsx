@@ -43,8 +43,8 @@ export const OperatorDashboard = () => {
   const unreadNotifs = notifs.filter(n => !n.read).length;
 
   const tabs = [
-    { id: "twins", label: "Digital Twins", icon: Building, badge: pendingTwins.length },
-    { id: "dt_pro", label: "DT Pro 3D", icon: Box, badge: (dtCounters.needs_setup || 0) + (dtCounters.in_progress || 0) },
+    { id: "twins", label: "Twins", icon: Building, badge: pendingTwins.length },
+    { id: "dt_pro", label: "DT Pro", icon: Box, badge: (dtCounters.needs_setup || 0) + (dtCounters.in_progress || 0) },
     { id: "logs", label: "Logs", icon: FileCheck, badge: queue.length },
     { id: "notifications", label: "Notificări", icon: Bell, badge: unreadNotifs },
     { id: "settings", label: "Setări", icon: SettingsIcon, badge: 0 },
@@ -85,14 +85,14 @@ export const OperatorDashboard = () => {
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-300 font-semibold">Digital Twin Pro · Modulul 3D</div>
+                  <div className="text-[10px] uppercase tracking-[0.16em] font-semibold" style={{ color: "var(--pm-accent-ink)" }}>Digital Twin Pro · Modulul 3D</div>
                   {(dtCounters.needs_setup || 0) > 0 && (
                     <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold">
                       {dtCounters.needs_setup} setup necesar
                     </span>
                   )}
                 </div>
-                <div className="font-serif text-lg text-white mt-0.5">Clienți cu acces 3D</div>
+                <div className="font-serif text-lg mt-0.5" style={{ color: "var(--pm-text)" }}>Clienți cu acces 3D</div>
                 <div className="text-xs text-stone-400 mt-1">
                   {dtCounters.total === 0
                     ? "Niciun client cu DT Pro încă. Click pentru a acorda primul acces."

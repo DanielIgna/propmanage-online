@@ -2190,3 +2190,10 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - **Pachet contrast light** (cerință user „scrisul nu se vede"): --pm-accent-ink (lime→olive pe light), text-lime/amber/emerald/rose/blue/violet-300/400 → variante -700/-800, slate-400/500 întărite, text-white protejat pe bg colorate, bg/border lime translucide → bază olive. Validat pe specialist + admin light.
 ### Rămas din mandatul de design (Sprint E2):
 - Layout-uri DESKTOP per Hick (client desktop nav + poziții CTA per rol journey), audit suprapuneri text pe restul paginilor, Operator workspace pe DS.
+
+## Update — Iun 2026 · SPRINT E2: DESKTOP + NAV-URI MARI (Hick) — COMPLET (iter97: 8/8 PASS + 3 fixuri cosmetice)
+- **BottomNav rescris** (specialist/operator/admin): mobil — iconuri 22px + etichete 11px + pastilă lime activă; desktop (lg+) — dock plutitor centrat cu pill-uri mari icon+etichetă (activ = lime bg + text negru), badge-uri, whitespace-nowrap
+- **Client V2 desktop**: taburi mari sus (v2-desktop-nav) + CTA lime proeminent „Solicită ofertă" (v2-desktop-cta, deschide wizard); bottom nav ascuns pe lg; conținut lărgit max-w-2xl; FAB mobil 52px
+- **Operator „Astăzi:"**: 4 KpiCard DS clickabile (Twins de validat, DT Pro, Logs, Notificări) → rezolvare în 2 clickuri; etichete dock scurtate (Twins, DT Pro); contrast card DT Pro fixat cu pm-accent-ink
+- **DS TabBar mărit** (px-4 py-2.5, iconuri 18px); KpiCard truncate pe helper text (fix clipping mobil)
+- User NU a făcut încă redeploy — totul e în preview.

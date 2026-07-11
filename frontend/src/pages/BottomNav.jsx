@@ -58,7 +58,7 @@ export const BottomNav = ({ tabs, active, onChange, dataPrefix = "tab" }) => {
             <button
               key={tab.id}
               onClick={() => go(tab.id)}
-              className={`relative flex items-center gap-2.5 px-5 py-3 rounded-full text-sm font-bold transition-colors ${isActive ? "text-black" : ""}`}
+              className={`relative flex items-center gap-2.5 px-5 py-3 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${isActive ? "text-black" : ""}`}
               style={isActive ? { background: "#d4ff3a" } : { color: "var(--pm-text-variant)" }}
               data-testid={`${dataPrefix}-desktop-${tab.id}`}
             >

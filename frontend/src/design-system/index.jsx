@@ -48,17 +48,17 @@ export const KpiCard = ({ icon: Icon, label, value, trend = null, accent = "info
         <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</span>
       </div>
       <div className="mt-2 text-3xl font-black text-slate-900 dark:text-white leading-none">{value}</div>
-      <div className="mt-2 flex items-center gap-1 text-[11px]">
+      <div className="mt-2 flex items-center gap-1 text-[11px] min-w-0">
         {hasTrend ? (
           <>
-            <TrendIcon className={`w-3.5 h-3.5 ${good ? "text-emerald-500" : "text-rose-500"}`} />
+            <TrendIcon className={`w-3.5 h-3.5 shrink-0 ${good ? "text-emerald-500" : "text-rose-500"}`} />
             <span className={`font-bold ${good ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
               {trend > 0 ? "+" : ""}{trend}%
             </span>
-            <span className="text-slate-400">vs perioada trecută</span>
+            <span className="text-slate-400 truncate">vs perioada trecută</span>
           </>
         ) : (
-          <span className="text-slate-400">— fără istoric comparabil</span>
+          <span className="text-slate-400 truncate">— fără istoric comparabil</span>
         )}
       </div>
     </div>
