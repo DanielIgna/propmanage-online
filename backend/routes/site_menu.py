@@ -114,6 +114,7 @@ async def track_menu_click(request: Request, item_id: str = Body(..., embed=True
         "item_id": str(item_id)[:60], "label": str(label)[:80], "href": str(href)[:300],
         "ts": datetime.now(timezone.utc).isoformat(),
         "authenticated": bool(request.cookies.get("access_token")),
+        "tenant_id": "main",
     })
     return {"ok": True}
 

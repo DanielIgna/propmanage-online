@@ -5,6 +5,7 @@ import { Reorder, useDragControls } from "framer-motion";
 import { GripVertical, Eye, EyeOff, Save, RotateCcw, LayoutDashboard, Smartphone } from "lucide-react";
 import { AdminLayoutMetronic } from "./AdminLayoutMetronic";
 import XOSRegistryPanel from "./XOSRegistryPanel";
+import ExperienceProfilesPanel from "./ExperienceProfilesPanel";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -32,9 +33,9 @@ const WidgetRow = ({ item, widget, onToggle }) => {
 
 export default function XOSBuilderPage() {
   const [surfaces, setSurfaces] = useState(null);
+  const [surface, setSurface] = useState("client_home");
   const [items, setItems] = useState([]);
   const [saving, setSaving] = useState(false);
-  const surface = "client_home";
 
   useEffect(() => {
     axios.get(`${API}/api/admin/xos/surfaces`, { withCredentials: true })
@@ -45,6 +46,12 @@ export default function XOSBuilderPage() {
       })
       .catch(() => toast.error("Nu am putut încărca layout-urile."));
   }, []);
+
+  const switchSurface = (key) => {
+    setSurface(key);
+    const s = surfaces?.find((x) => x.surface === key);
+    if (s) setItems(s.items);
+  };
 
   const meta = surfaces?.find((x) => x.surface === surface);
   const widgetMap = Object.fromEntries((meta?.widgets || []).map((w) => [w.id, w]));
@@ -72,7 +79,12 @@ export default function XOSBuilderPage() {
       <div className="max-w-3xl mx-auto space-y-6 p-4 sm:p-6" data-testid="xos-builder-page">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-            <Smartphone className="w-4 h-4 text-lime-600" /> {meta?.label || "Dashboard Client · Acasă"}
+            <Smartphone className="w-4 h-4 text-lime-600" />
+            <select value={surface} onChange={(e) => switchSurface(e.target.value)}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-sm font-bold"
+              data-testid="xos-surface-select">
+              {(surfaces || []).map((s) => <option key={s.surface} value={s.surface}>{s.label}</option>)}
+            </select>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={reset} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800" data-testid="xos-reset">

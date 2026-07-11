@@ -58,6 +58,13 @@ export const SpecialistDashboard = () => {
   const [acceptingReq, setAcceptingReq] = useState(null);  // {id, title} for ScheduleProposalModal
   const [timelineRequestId, setTimelineRequestId] = useState(null);
 
+  const [xosLayout, setXosLayout] = useState(null);
+  const [xosHidden, setXosHidden] = useState([]);
+  useEffect(() => {
+    axios.get(`${API}/xos/layout/specialist_home`).then(r => setXosLayout(r.data.items || null)).catch(() => {});
+    axios.get(`${API}/ui-rules/my`).then(r => setXosHidden(r.data.hidden || [])).catch(() => {});
+  }, []);
+
   const load = () => axios.get(`${API}/requests`).then(r => setRequests(r.data)).catch(() => {});
   const loadNotifs = () => axios.get(`${API}/notifications`).then(r => setNotifs(r.data)).catch(() => {});
   useEffect(() => {
@@ -111,21 +118,33 @@ export const SpecialistDashboard = () => {
 
   return (
     <DashLayout role="specialist" title={title} bottomNav={<BottomNav tabs={tabs} active={tab} onChange={setTab} dataPrefix="spec-tab" />}>
-      {/* „Astăzi ai" — PRIMUL element (Hick's Law: răspunde imediat la „ce fac azi?") */}
-      {tab === "opportunities" && (
-        <div className="mb-6 pm-fade-in" data-testid="spec-today-summary">
-          <h3 className="text-sm font-bold mb-3" style={{ color: "var(--pm-text-variant)" }}>Astăzi ai:</h3>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard icon={Target} label="Cereri noi" value={open.length} accent="info" onClick={() => document.querySelector('[data-tour="specialist-leads"]')?.scrollIntoView({ behavior: "smooth" })} testid="spec-today-open" />
-            <KpiCard icon={Briefcase} label="Lucrări în lucru" value={mine.filter(r => r.status !== "confirmed").length} accent="warning" onClick={() => setTab("jobs")} testid="spec-today-active" />
-            <KpiCard icon={Bell} label="Notificări necitite" value={unreadNotifs} accent="neutral" onClick={() => setTab("notifications")} testid="spec-today-notifs" />
-            <KpiCard icon={Wallet} label="Încasări luna aceasta" value={`${monthlyEarnings.toLocaleString("ro")} RON`} accent="success" onClick={() => setTab("jobs")} testid="spec-today-earnings" />
-          </div>
-        </div>
-      )}
-      {tab === "opportunities" && (
-        <SpecialistCockpit onGo={(dest) => (dest === "opportunities" ? window.scrollTo({ top: 0 }) : setTab(dest))} />
-      )}
+      {/* Zona XOS (specialist_home): widget-uri ordonate/vizibile din Layout Builder + UI Rules */}
+      {tab === "opportunities" && (() => {
+        const xosWidgets = {
+          today_summary: (
+            <div className="mb-6 pm-fade-in" data-testid="spec-today-summary">
+              <h3 className="text-sm font-bold mb-3" style={{ color: "var(--pm-text-variant)" }}>Astăzi ai:</h3>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <KpiCard icon={Target} label="Cereri noi" value={open.length} accent="info" onClick={() => document.querySelector('[data-tour="specialist-leads"]')?.scrollIntoView({ behavior: "smooth" })} testid="spec-today-open" />
+                <KpiCard icon={Briefcase} label="Lucrări în lucru" value={mine.filter(r => r.status !== "confirmed").length} accent="warning" onClick={() => setTab("jobs")} testid="spec-today-active" />
+                <KpiCard icon={Bell} label="Notificări necitite" value={unreadNotifs} accent="neutral" onClick={() => setTab("notifications")} testid="spec-today-notifs" />
+                <KpiCard icon={Wallet} label="Încasări luna aceasta" value={`${monthlyEarnings.toLocaleString("ro")} RON`} accent="success" onClick={() => setTab("jobs")} testid="spec-today-earnings" />
+              </div>
+            </div>
+          ),
+          cockpit: <SpecialistCockpit onGo={(dest) => (dest === "opportunities" ? window.scrollTo({ top: 0 }) : setTab(dest))} />,
+          quests: tierInfo.canSeeQuests ? <QuestPanel /> : null,
+          tier_tools: tierInfo.canSeeStats ? <TierToolsPanel role="specialist" /> : null,
+          tier_progress: <TierProgressWidget className="mb-4" />,
+        };
+        const order = xosLayout || [
+          { id: "today_summary", enabled: true }, { id: "cockpit", enabled: true },
+          { id: "quests", enabled: true }, { id: "tier_tools", enabled: true }, { id: "tier_progress", enabled: true },
+        ];
+        return order
+          .filter(w => w.enabled && !xosHidden.includes(`widget:${w.id}`))
+          .map(w => <React.Fragment key={w.id}>{xosWidgets[w.id] || null}</React.Fragment>);
+      })()}
       <WelcomeChecklist />
       <MaturityCard />
       <TierCelebrationBanner />
@@ -148,12 +167,8 @@ export const SpecialistDashboard = () => {
         </PMCard>
       )}
 
-      {tab === "opportunities" && tierInfo.canSeeQuests && <QuestPanel />}
-      {tab === "opportunities" && tierInfo.canSeeStats && <TierToolsPanel role="specialist" />}
       {tab === "opportunities" && (
         <>
-          {/* Tier progression widget — shows for all tiers (auto-hides at TOP) */}
-          <TierProgressWidget className="mb-4" />
           {/* Welcome hero (only ADVANCED+) */}
           {user?.verified && tierInfo.canSeeBentoHero && user?.tier && user.tier !== "ENTRY" && (
             <PMCardPrimary className="mb-6 pm-fade-in">

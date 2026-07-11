@@ -36,6 +36,7 @@ export const SiteNav = () => {
   const [scrolled, setScrolled] = useState(false);
   const [items, setItems] = useState([]);
   const [hidden, setHidden] = useState([]);
+  const [entryRoute, setEntryRoute] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { user, logout } = useAuth();
   const { lang, toggle, t } = useI18n();
@@ -57,6 +58,12 @@ export const SiteNav = () => {
     return () => { document.body.style.overflow = ""; };
   }, [drawerOpen]);
 
+  useEffect(() => {
+    if (user && user.role) {
+      axios.get(`${API}/api/experience/profile/${user.role}`).then((r) => setEntryRoute(r.data.entry_route)).catch(() => {});
+    }
+  }, [user]);
+
   const isAuth = Boolean(user && user !== false);
   const applyRules = (arr) => arr
     .filter((it) => !hidden.includes(`menu:${it.id}`))
@@ -64,8 +71,8 @@ export const SiteNav = () => {
   const visible = applyRules(filterByAuth(items, isAuth));
 
   const resolveHref = useCallback(
-    (href) => (href || "").replace(/^\/dashboard/, `/${(user && user.role) || "login"}`),
-    [user]
+    (href) => (href || "").replace(/^\/dashboard/, entryRoute || `/${(user && user.role) || "login"}`),
+    [user, entryRoute]
   );
 
   const handleLogout = async () => {
@@ -168,7 +175,7 @@ export const SiteNav = () => {
             )}
             {isAuth ? (
               <>
-                <Link to={`/${user.role}`} className="btn-accent px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium inline-flex items-center gap-1.5" data-testid="nav-dashboard">
+                <Link to={entryRoute || `/${user.role}`} className="btn-accent px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium inline-flex items-center gap-1.5" data-testid="nav-dashboard">
                   <LayoutDashboard className="w-3.5 h-3.5" /><span className="hidden sm:inline">{t("nav.dashboard")}</span>
                 </Link>
                 <button onClick={handleLogout} className="hidden sm:inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium bg-white/5 hover:bg-white/10 text-stone-300 border border-white/10 transition-colors" data-testid="nav-logout" title="Deconectare">

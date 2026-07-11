@@ -21,7 +21,10 @@ logger = logging.getLogger("propmanage.xos")
 # D6:A — orice widget nou de dashboard intră prin registru.
 SURFACE_META = {
     "client_home": {"label": "Dashboard Client · Acasă"},
+    "specialist_home": {"label": "Dashboard Specialist · Oportunități"},
 }
+
+TENANT = "main"  # D5-C: convenție tenant pe toate colecțiile XOS (migrare completă la primul contract de franciză)
 
 WIDGET_CLASSES = {"CORE", "AI", "AUTONOMY", "BUSINESS", "PREMIUM", "GROWTH", "INFRASTRUCTURE", "EXPERIMENTAL", "LEGACY"}
 WIDGET_STATUSES = {"active", "experimental", "legacy"}
@@ -32,13 +35,23 @@ DEFAULT_REGISTRY = [
     {"id": "copilot", "surface": "client_home", "label": "AI Copilot", "desc": "Asistent AI cu sumar și acțiuni recomandate", "class": "AI", "status": "active", "roles": ["client"], "implemented": True},
     {"id": "contextual", "surface": "client_home", "label": "Noutăți pentru tine", "desc": "Carduri contextuale: oferte, plăți, confirmări", "class": "CORE", "status": "active", "roles": ["client"], "implemented": True},
     {"id": "discover", "surface": "client_home", "label": "Descoperă", "desc": "Carusel: Digital Twin, House Health, Ghid întreținere", "class": "GROWTH", "status": "active", "roles": ["client"], "implemented": True},
+    {"id": "today_summary", "surface": "specialist_home", "label": "Astăzi ai (KPI)", "desc": "Cereri noi, lucrări în lucru, notificări, încasări luna aceasta", "class": "CORE", "status": "active", "roles": ["specialist"], "implemented": True},
+    {"id": "cockpit", "surface": "specialist_home", "label": "Cockpit AI", "desc": "SpecialistCockpit: prioritățile zilei generate de AI", "class": "AI", "status": "active", "roles": ["specialist"], "implemented": True},
+    {"id": "quests", "surface": "specialist_home", "label": "Quest-uri", "desc": "Misiuni gamificate (vizibil doar la tier-urile cu quests)", "class": "GROWTH", "status": "active", "roles": ["specialist"], "implemented": True},
+    {"id": "tier_tools", "surface": "specialist_home", "label": "Unelte de tier", "desc": "TierToolsPanel: statistici și unelte deblocate de tier", "class": "PREMIUM", "status": "active", "roles": ["specialist"], "implemented": True},
+    {"id": "tier_progress", "surface": "specialist_home", "label": "Progres tier", "desc": "Bara de progres către următorul tier", "class": "GROWTH", "status": "active", "roles": ["specialist"], "implemented": True},
 ]
 
 
 async def _ensure_registry_seed() -> None:
-    if await db.xos_widget_registry.count_documents({}) == 0:
-        now = datetime.now(timezone.utc).isoformat()
-        await db.xos_widget_registry.insert_many([{**w, "registered_at": now, "registered_by": "seed"} for w in DEFAULT_REGISTRY])
+    now = datetime.now(timezone.utc).isoformat()
+    for surface in SURFACE_META:
+        if await db.xos_widget_registry.count_documents({"surface": surface}) == 0:
+            defaults = [w for w in DEFAULT_REGISTRY if w["surface"] == surface]
+            if defaults:
+                await db.xos_widget_registry.insert_many(
+                    [{**w, "tenant_id": TENANT, "registered_at": now, "registered_by": "seed"} for w in defaults]
+                )
 
 
 async def _registry_widgets(surface: str, only_active: bool = False) -> list:
@@ -92,7 +105,7 @@ async def admin_put_layout(surface: str, items: list = Body(..., embed=True), ad
         raise HTTPException(400, "Layout gol.")
     await db.xos_layouts.update_one(
         {"surface": surface},
-        {"$set": {"items": clean, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": admin.get("email")}},
+        {"$set": {"items": clean, "tenant_id": TENANT, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": admin.get("email")}},
         upsert=True,
     )
     return {"ok": True, "items": clean}
@@ -130,6 +143,7 @@ async def admin_add_registry(payload: dict = Body(...), admin=Depends(require_ro
         "status": payload.get("status") if payload.get("status") in WIDGET_STATUSES else "experimental",
         "roles": [str(r)[:30] for r in (payload.get("roles") or [])][:10],
         "implemented": False,
+        "tenant_id": TENANT,
         "registered_at": datetime.now(timezone.utc).isoformat(),
         "registered_by": admin.get("email"),
     }
@@ -263,6 +277,54 @@ async def admin_put_rules(rules: list = Body(..., embed=True), admin=Depends(req
         upsert=True,
     )
     return {"ok": True, "rules": clean}
+
+
+# ── Role Experience Manager (Etapa 1.3) ───────────────────────────────────────
+DEFAULT_PROFILES = {
+    "client": {"entry_route": "/client", "default_theme": "system", "layout_surface": "client_home"},
+    "specialist": {"entry_route": "/specialist", "default_theme": "system", "layout_surface": "specialist_home"},
+    "admin": {"entry_route": "/admin", "default_theme": "system", "layout_surface": ""},
+}
+_THEMES = {"system", "dark", "light"}
+
+
+async def _get_profile(role: str) -> dict:
+    base = DEFAULT_PROFILES.get(role)
+    if base is None:
+        raise HTTPException(404, "Rol necunoscut.")
+    doc = await db.experience_profiles.find_one({"role": role}, {"_id": 0}) or {}
+    return {"role": role, **base, **{k: doc[k] for k in ("entry_route", "default_theme", "layout_surface") if k in doc}}
+
+
+@router.get("/experience/profile/{role}")
+async def public_experience_profile(role: str):
+    return await _get_profile(role)
+
+
+@router.get("/admin/experience-profiles")
+async def admin_get_profiles(_admin=Depends(require_role("admin"))):
+    return {"profiles": [await _get_profile(r) for r in DEFAULT_PROFILES], "themes": sorted(_THEMES), "surfaces": list(SURFACE_META.keys())}
+
+
+@router.put("/admin/experience-profiles/{role}")
+async def admin_put_profile(role: str, payload: dict = Body(...), admin=Depends(require_role("admin"))):
+    if role not in DEFAULT_PROFILES:
+        raise HTTPException(404, "Rol necunoscut.")
+    updates = {}
+    if isinstance(payload.get("entry_route"), str) and payload["entry_route"].startswith("/"):
+        updates["entry_route"] = payload["entry_route"][:100]
+    if payload.get("default_theme") in _THEMES:
+        updates["default_theme"] = payload["default_theme"]
+    if payload.get("layout_surface") in SURFACE_META or payload.get("layout_surface") == "":
+        updates["layout_surface"] = payload.get("layout_surface")
+    if not updates:
+        raise HTTPException(400, "Nimic valid de actualizat.")
+    await db.experience_profiles.update_one(
+        {"role": role},
+        {"$set": {**updates, "tenant_id": TENANT, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": admin.get("email")}},
+        upsert=True,
+    )
+    return {"ok": True, "profile": await _get_profile(role)}
 
 
 # ── Theme & Content Manager ───────────────────────────────────────────────────

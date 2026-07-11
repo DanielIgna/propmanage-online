@@ -18,7 +18,7 @@ const OPS = [
   { value: "gte", label: "≥" },
   { value: "lte", label: "≤" },
 ];
-const WIDGETS = ["hero", "quick_actions", "copilot", "contextual", "discover"];
+const WIDGETS_FALLBACK = ["hero", "quick_actions", "copilot", "contextual", "discover"];
 
 const newRule = () => ({
   id: `r_${Date.now().toString(36)}`,
@@ -33,10 +33,14 @@ const newRule = () => ({
 export default function UIRulesPage() {
   const [rules, setRules] = useState(null);
   const [menuIds, setMenuIds] = useState([]);
+  const [widgetIds, setWidgetIds] = useState(WIDGETS_FALLBACK);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     axios.get(`${API}/api/admin/ui-rules`, { withCredentials: true }).then((r) => setRules(r.data.rules || [])).catch(() => toast.error("Nu am putut încărca regulile."));
+    axios.get(`${API}/api/admin/xos/registry`, { withCredentials: true })
+      .then((r) => setWidgetIds([...new Set((r.data.entries || []).map((e) => e.id))]))
+      .catch(() => {});
     axios.get(`${API}/api/public/site-menu`).then((r) => {
       const ids = [];
       (r.data.items || []).forEach((it) => { ids.push(it.id); (it.children || []).forEach((c) => ids.push(c.id)); });
@@ -130,7 +134,7 @@ export default function UIRulesPage() {
               <select value={r.target_id} onChange={(e) => upd(i, { target_id: e.target.value })}
                 className="rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-1.5 text-xs min-w-[140px]" data-testid={`ui-rule-tid-${r.id}`}>
                 <option value="">— alege —</option>
-                {(r.target_type === "menu" ? menuIds : WIDGETS).map((id) => <option key={id} value={id}>{id}</option>)}
+                {(r.target_type === "menu" ? menuIds : widgetIds).map((id) => <option key={id} value={id}>{id}</option>)}
               </select>
             </div>
           </div>
