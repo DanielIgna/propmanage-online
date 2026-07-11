@@ -195,8 +195,10 @@ async def admin_get_content(_admin=Depends(require_role("admin"))):
 
 @router.put("/admin/interior-design/content")
 async def admin_update_content(patch: dict = Body(...), _admin=Depends(require_role("admin"))):
-    allowed = {"active", "show_on_homepage", "menu_order", "seo", "hero", "benefits", "steps",
-               "portfolio", "reviews", "faq", "styles", "budgets", "local_cities", "related_services", "seo_article"}
+    allowed = {"active", "show_on_homepage", "menu_order", "seo", "hero", "benefits",
+               "portfolio", "reviews", "faq", "styles", "budgets", "local_cities", "seo_article",
+               "brand", "positioning", "journey", "process_phases", "digital_twin", "audit",
+               "implementation", "styles_showcase", "ecosystem"}
     clean = {k: v for k, v in patch.items() if k in allowed}
     if not clean:
         raise HTTPException(400, "Nimic valid de actualizat.")

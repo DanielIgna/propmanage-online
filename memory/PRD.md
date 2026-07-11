@@ -2627,3 +2627,19 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - Testat curl: CRUD complet, protecție main, dup slug 409, slug invalid 400, rezolvare header activ/necunoscut, coverage, regresie demo-request OK
 - Doc: /app/docs/TENANT_FOUNDATION_PLAN.md — valuri de migrare 1-3 + decizii D-T1..D-T4 de ratificat
 - URMEAZĂ (aprobare owner): ratificare D-T1..D-T4 → val 1 (users.tenant_id, atinge auth = playbook integrare) SAU Sprint 4 (Knowledge Graph + Governance)
+
+## [2026-06-11] Tenant Val 1 + Sprint 4 KG-1 LIVRATE ✅ (iteration_111: backend 25/25, frontend smoke PASS)
+### Tenant Val 1
+- users.tenant_id: stamping la register (resolve_tenant_slug) + Google OAuth + backfill idempotent la startup (1207/1207 useri = main)
+### Sprint 4 — Knowledge Graph Foundation & Governance (KG-1)
+- kg/registry.py: kg_entity_registry cu 27 entități core (seed idempotent la startup), tier auto din tenancy
+- API: GET/PATCH /api/admin/kg/registry (+seed), GET /api/admin/kg/governance (entități + T1 neînregistrate + graf 1625 links + tenancy totals + reguli G1-G3)
+- KG-0: NODE_TYPES hardcodat → citire dinamică din registru; 211/211 colecții clasificate (0 unclassified)
+### Fix recurent REZOLVAT LA SURSĂ: seed.py rescria test_credentials.md cu parola veche la fiecare startup → acum scrie SEED_ADMIN_PASSWORD real din env
+
+## [2026-06-11] INTERIOR INTELLIGENCE by PropManage — reproiectare /design-interior LIVRATĂ ✅ (iteration_112: backend 21/21, frontend 100%, zero bugs)
+- Poziționare aleasă de user: brand premium "Interior Intelligence by PropManage" + subtitlu SEO "Design, Arhitectură de Interior & Implementare" · tagline "Transformarea completă a locuinței"
+- Conținut v2 CMS-driven: /app/backend/service_content_design.py (content_version=2) + migrare automată v1→v2 în _get_content; PUT admin extins cu cheile v2 (brand/positioning/journey/process_phases/digital_twin/audit/implementation/styles_showcase/ecosystem) — verificat E2E
+- Pagină-hub unică cu ancore: 17 etape în 5 faze (Descoperire/Digitalizare/Proiectare/Implementare/Viață lungă), secțiune Digital Twin (11 elemente), Audit (8), Implementare (10), 12 stiluri (Warm Minimalism→Eclectic), Ecosistem (11 link-uri), FAQ 8, articol SEO 10×H2, JSON-LD ProfessionalService+FAQPage
+- Poziționare națională + focus Cluj-Napoca/Transilvania; meniu site: "Design Interior"→"Interior Intelligence"
+- Note tester (backlog minor): triage buget pe token 'peste' (nu range numeric); form styles derivat din content.styles (nu styles_showcase)
