@@ -78,11 +78,31 @@ const ItemRow = ({ item, onChange, onMove, onDelete, isChild }) => (
 export default function MenuManagerPage() {
   const [items, setItems] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [autoReorder, setAutoReorder] = useState(true);
+  const [running, setRunning] = useState(false);
 
   const load = () =>
     axios.get(`${API}/api/admin/site-menu`, { withCredentials: true })
-      .then((r) => setItems(r.data.items || []))
+      .then((r) => { setItems(r.data.items || []); setAutoReorder(r.data.auto_reorder !== false); })
       .catch(() => toast.error("Nu am putut încărca meniul."));
+
+  const toggleAutoReorder = async () => {
+    const next = !autoReorder;
+    setAutoReorder(next);
+    try {
+      await axios.post(`${API}/api/admin/site-menu/auto-reorder`, { enabled: next }, { withCredentials: true });
+      toast.success(next ? "Autonomy activ: serviciile populare urcă automat primele (zilnic 04:30)." : "Auto-ordonare dezactivată.");
+    } catch { setAutoReorder(!next); toast.error("Eroare la salvare."); }
+  };
+
+  const runReorderNow = async () => {
+    setRunning(true);
+    try {
+      const r = await axios.post(`${API}/api/admin/site-menu/auto-reorder/run`, {}, { withCredentials: true });
+      toast.success(r.data.status === "applied" ? "Meniu reordonat după popularitate!" : "Ordinea e deja optimă — nicio schimbare.");
+      load();
+    } catch { toast.error("Eroare la rulare."); } finally { setRunning(false); }
+  };
 
   useEffect(() => { load(); }, []);
 
@@ -134,6 +154,23 @@ export default function MenuManagerPage() {
             <Save className="w-4 h-4" /> {saving ? "Se salvează..." : "Salvează meniul"}
           </button>
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-lime-300/40 bg-lime-50 dark:bg-lime-900/10 dark:border-lime-700/40 p-4 flex flex-wrap items-center gap-3" data-testid="auto-reorder-panel">
+        <div className="flex-1 min-w-[240px]">
+          <div className="text-sm font-bold text-slate-900 dark:text-white">🤖 Auto-ordonare după popularitate (Autonomy)</div>
+          <p className="text-xs text-slate-500 mt-0.5">Serviciile cele mai căutate din meniu (click-uri 30 zile) urcă automat primele în „Servicii" — rulare zilnică la 04:30.</p>
+        </div>
+        <button onClick={toggleAutoReorder}
+          className={`px-4 py-2 rounded-full text-xs font-black border ${autoReorder ? "bg-lime-400 text-black border-lime-500" : "bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-600"}`}
+          data-testid="auto-reorder-toggle">
+          {autoReorder ? "ACTIV" : "INACTIV"}
+        </button>
+        <button onClick={runReorderNow} disabled={running}
+          className="px-4 py-2 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-600 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-50"
+          data-testid="auto-reorder-run">
+          {running ? "Rulează..." : "Rulează acum"}
+        </button>
       </div>
 
       <div className="space-y-4">

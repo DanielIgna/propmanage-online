@@ -2490,3 +2490,25 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - P2 Developer Mode în Design Studio
 - P2 Pagini dedicate servicii (Design Exterior, Arhitectură etc.)
 - P3 Resend DNS custom domain (blocat pe user: DKIM/SPF)
+
+## [2026-06-11] Autonomy Menu Optimizer + Light Mode Fix Admin (Iter 109)
+
+### Livrat concret
+1. **Autonomy: Auto-ordonare meniu după popularitate** — playbook `menu_popularity_optimizer`:
+   - Cron zilnic 04:30 (menu_popularity_reorder_tick în site_menu.py): copiii din „Servicii" reordonați după click-uri 30z (sort stabil)
+   - Loghează în `playbook_executions`, updated_by="autonomy:menu_optimizer"
+   - Toggle „ACTIV/INACTIV" + „Rulează acum" în Menu Manager (POST /api/admin/site-menu/auto-reorder + /run)
+   - Verificat: Design Interior (4 click-uri) a urcat primul
+2. **Fix ecrane negre ilizibile în admin (light mode)** — extins secțiunea `html[data-theme="light"]` din index.css:
+   - Cardurile dark hardcodate (bg-[#0e0e10], #111210, #0f0f11, #141416) → albe cu umbră subtilă
+   - bg-stone-800/900 fracții + bg-black/20-40 → gri deschis; gradient-text → gradient închis lizibil; divider-line adaptat
+   - Acoperă toate cele ~21 pagini admin standalone (Autonomy Engine, Control Administrare, AI pages etc.)
+   - Dark mode neschimbat (override-uri scoped) — „la alegere" via ThemeSwitcher existent
+   - Verificat vizual: /admin/autonomy + /admin/settings-control în light + regresie dark OK
+
+### NOTĂ PRODUCȚIE: userul are deploy live pe https://propmanage.ro — modificările sunt în preview, necesită REDEPLOY.
+
+### Backlog rămas
+- P1 XOS Faza 2: suprafețe noi Layout Builder (specialist, homepage) + widget-uri noi
+- P2 Pagini dedicate servicii + Developer Mode Design Studio
+- P3 Resend DNS (blocat pe user)

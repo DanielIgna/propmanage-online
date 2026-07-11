@@ -137,10 +137,65 @@ async def menu_analytics(days: int = 30, _admin=Depends(require_role("admin"))):
     ]}
 
 
+@router.post("/admin/site-menu/auto-reorder")
+async def set_auto_reorder(enabled: bool = Body(..., embed=True), admin=Depends(require_role("admin"))):
+    await db.site_menu.update_one(
+        {"key": "main"},
+        {"$set": {"auto_reorder": bool(enabled), "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": admin.get("email")}},
+        upsert=True,
+    )
+    return {"ok": True, "auto_reorder": bool(enabled)}
+
+
+@router.post("/admin/site-menu/auto-reorder/run")
+async def run_auto_reorder_now(_admin=Depends(require_role("admin"))):
+    result = await menu_popularity_reorder_tick(force=True)
+    return {"ok": True, **result}
+
+
+async def menu_popularity_reorder_tick(force: bool = False) -> dict:
+    """Autonomy: reordonează sub-serviciile din grupul «Servicii» după popularitate (click-uri 30z)."""
+    from datetime import timedelta
+    doc = await db.site_menu.find_one({"key": "main"})
+    if not doc:
+        return {"status": "skipped", "reason": "no menu"}
+    if not force and not doc.get("auto_reorder", True):
+        return {"status": "skipped", "reason": "auto_reorder disabled"}
+    since = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    rows = await db.menu_clicks.aggregate([
+        {"$match": {"ts": {"$gte": since}}},
+        {"$group": {"_id": "$item_id", "clicks": {"$sum": 1}}},
+    ]).to_list(500)
+    clicks = {r["_id"]: r["clicks"] for r in rows}
+    items = doc.get("items") or []
+    changed = False
+    for group in items:
+        if group.get("id") != "servicii" or not group.get("children"):
+            continue
+        old_order = [c["id"] for c in group["children"]]
+        group["children"] = sorted(group["children"], key=lambda c: -clicks.get(c["id"], 0))
+        new_order = [c["id"] for c in group["children"]]
+        changed = old_order != new_order
+    if changed:
+        await db.site_menu.update_one(
+            {"key": "main"},
+            {"$set": {"items": items, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": "autonomy:menu_optimizer"}},
+        )
+    await db.playbook_executions.insert_one({
+        "playbook_id": "menu_popularity_optimizer",
+        "status": "applied" if changed else "no_change",
+        "human_needed": False,
+        "detail": {"clicks_30d": clicks, "reordered": changed},
+        "ts": datetime.now(timezone.utc).isoformat(),
+    })
+    logger.info(f"[site-menu] popularity reorder: changed={changed}")
+    return {"status": "applied" if changed else "no_change", "clicks_30d": clicks}
+
+
 @router.get("/admin/site-menu")
 async def admin_get_menu(_admin=Depends(require_role("admin"))):
     doc = await _get_menu_doc()
-    return {"items": doc.get("items") or [], "updated_at": doc.get("updated_at")}
+    return {"items": doc.get("items") or [], "updated_at": doc.get("updated_at"), "auto_reorder": doc.get("auto_reorder", True)}
 
 
 @router.put("/admin/site-menu")

@@ -52,6 +52,7 @@ from routes.tier_milestones import cron_check_all_users
 from routes.it_digest import run_weekly_it_sprint_digest, _get_settings as _it_digest_get_settings
 from routes.legal import seed_default_legal_documents
 from routes.demo_activity import schedule_log as _schedule_demo_log
+from routes.site_menu import menu_popularity_reorder_tick
 from middleware_scope import admin_scope_middleware
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
@@ -187,6 +188,13 @@ async def startup():
             take_auto_snapshot,
             CronTrigger(hour=4, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="settings_snapshot_daily",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        scheduler.add_job(
+            menu_popularity_reorder_tick,
+            CronTrigger(hour=4, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="menu_popularity_reorder_daily",
             replace_existing=True,
             misfire_grace_time=3600,
         )
