@@ -15,7 +15,36 @@ router = APIRouter(prefix="/api/admin/insights", tags=["ai-insights"])
 logger = logging.getLogger("propmanage.ai_insights")
 
 CACHE_HOURS = 6
-MODULES = {"analytics", "finance", "marketplace", "overview", "control_tower"}
+MODULES = {"analytics", "finance", "marketplace", "overview", "control_tower", "users", "bi"}
+
+
+async def _users_stats() -> dict:
+    by_role = {}
+    async for row in db.users.aggregate([{"$group": {"_id": "$role", "n": {"$sum": 1}}}]):
+        by_role[row["_id"] or "—"] = row["n"]
+    total = sum(by_role.values())
+    since7 = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    return {
+        "total": total,
+        "by_role": by_role,
+        "new_7d": await db.users.count_documents({"created_at": {"$gte": since7}}),
+        "email_verified": await db.users.count_documents({"email_verified": True}),
+        "banned": await db.users.count_documents({"banned": True}),
+    }
+
+
+async def _bi_stats() -> dict:
+    since30 = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    new_30d = await db.requests.count_documents({"created_at": {"$gte": since30}})
+    done_30d = await db.requests.count_documents({"status": {"$in": ["completed", "confirmed"]}, "created_at": {"$gte": since30}})
+    return {
+        "open_requests": await db.requests.count_documents({"status": "open"}),
+        "active_jobs": await db.requests.count_documents({"status": {"$in": ["accepted", "in_progress"]}}),
+        "new_requests_30d": new_30d,
+        "completed_30d": done_30d,
+        "completion_rate_pct": round(done_30d / new_30d * 100, 1) if new_30d else 0,
+        "disputes_open": await db.disputes.count_documents({"status": "open"}),
+    }
 
 
 async def _context_for(module: str, user: dict) -> dict:
@@ -59,7 +88,51 @@ async def _context_for(module: str, user: dict) -> dict:
             },
             "playbook_activity_7d": by_pb,
         }
+    if module == "users":
+        return await _users_stats()
+    if module == "bi":
+        return await _bi_stats()
     return {}
+
+
+@router.get("/rule")
+async def rule_insights(module: str, user=Depends(require_role("admin"))):
+    """Insights rule-based (fără LLM) pentru modulele Users și BI — instant, cost zero."""
+    if module == "users":
+        s = await _users_stats()
+        rate = round(s["email_verified"] / s["total"] * 100) if s["total"] else 0
+        bullets = [
+            f"{s['total']} utilizatori: {s['by_role'].get('client', 0)} clienți · {s['by_role'].get('specialist', 0)} specialiști · {s['by_role'].get('operator', 0)} operatori · {s['by_role'].get('admin', 0)} admini.",
+            f"{s['new_7d']} utilizatori noi în ultimele 7 zile.",
+            f"{rate}% dintre conturi au emailul verificat.",
+        ]
+        alerts = []
+        if s["total"] and rate < 50:
+            alerts.append(f"Rata de verificare email e sub 50% ({rate}%) — mulți useri nu primesc notificări.")
+        if s["banned"]:
+            bullets.append(f"{s['banned']} conturi banate.")
+        recommendations = []
+        if s["new_7d"] == 0:
+            recommendations.append("Zero useri noi săptămâna asta — verifică funnel-ul de achiziție în Analytics & Growth.")
+        if rate < 70 and s["total"]:
+            recommendations.append("Trimite o campanie de re-verificare email către conturile neverificate.")
+        return {"bullets": bullets, "alerts": alerts, "recommendations": recommendations}
+    if module == "bi":
+        s = await _bi_stats()
+        bullets = [
+            f"{s['new_requests_30d']} cereri noi în 30 zile, {s['completed_30d']} finalizate ({s['completion_rate_pct']}% completion rate).",
+            f"{s['open_requests']} cereri deschise · {s['active_jobs']} lucrări active acum.",
+        ]
+        alerts = []
+        if s["disputes_open"]:
+            alerts.append(f"{s['disputes_open']} dispute deschise — necesită mediere.")
+        if s["new_requests_30d"] >= 5 and s["completion_rate_pct"] < 30:
+            alerts.append(f"Completion rate scăzut ({s['completion_rate_pct']}%) — multe cereri rămân nefinalizate.")
+        recommendations = []
+        if s["open_requests"] > s["active_jobs"] * 2 and s["open_requests"] > 5:
+            recommendations.append("Cereri deschise mult peste lucrările active — verifică oferta de specialiști pe categoriile cerute (tab Demand Index).")
+        return {"bullets": bullets, "alerts": alerts, "recommendations": recommendations}
+    raise HTTPException(400, "Modul necunoscut. Valide: users, bi")
 
 
 @router.get("/llm")

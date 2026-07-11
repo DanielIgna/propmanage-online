@@ -1,10 +1,78 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import {
   Plus, Building2, Wrench, MessageCircle, Sparkles, ShieldCheck, ChevronRight,
-  Box, HeartPulse, FileText, CreditCard, Star, Bell,
+  Box, HeartPulse, FileText, CreditCard, Star, Bell, Brain,
 } from "lucide-react";
 import { GREEN, GREEN_SOFT, CTA, Steps, stepForStatus, Skeleton } from "./ui";
+import { API } from "../DashShared";
+
+// Copilot — „Care e următoarea acțiune pentru casa ta?" (Blueprint Faza 4)
+const CopilotCard = ({ go, actions, hasProps }) => {
+  const [data, setData] = useState(null);
+  const [summary, setSummary] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    axios.get(`${API}/client/copilot`).then(r => setData(r.data)).catch(() => {});
+  }, []);
+
+  const run = (a) => {
+    if (a.cta === "jobs") go("jobs");
+    else if (a.cta === "property") (hasProps ? go("property") : actions.openPropManager());
+    else if (a.cta === "request") actions.openWizard();
+  };
+
+  const askAI = async () => {
+    setBusy(true);
+    try {
+      const { data: d } = await axios.get(`${API}/client/copilot/summary`);
+      setSummary(d.summary);
+    } catch {
+      setSummary("Rezumatul AI e temporar indisponibil — reîncearcă în câteva minute.");
+    }
+    setBusy(false);
+  };
+
+  if (!data?.actions?.length) return null;
+  return (
+    <div className="mx-5 mt-6 cv2-fade cv2-d2" data-testid="v2-copilot-card">
+      <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: GREEN_SOFT }}>
+            <Sparkles className="w-4.5 h-4.5" style={{ color: GREEN, width: 18, height: 18 }} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-black text-slate-900 leading-none">Copilot</div>
+            <div className="text-[10px] text-slate-400 mt-0.5">următoarea acțiune pentru casa ta</div>
+          </div>
+          <button onClick={askAI} disabled={busy} data-testid="v2-copilot-ai-btn"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black disabled:opacity-50"
+            style={{ background: GREEN_SOFT, color: GREEN }}>
+            <Brain className={`w-3.5 h-3.5 ${busy ? "animate-pulse" : ""}`} />
+            {busy ? "Gândește..." : "Rezumat AI"}
+          </button>
+        </div>
+        {summary && (
+          <p className="mt-3 text-xs leading-relaxed text-slate-600 rounded-2xl p-3" style={{ background: GREEN_SOFT }} data-testid="v2-copilot-summary">
+            {summary}
+          </p>
+        )}
+        <div className="mt-3 space-y-2">
+          {data.actions.map((a) => (
+            <button key={a.kind} onClick={() => run(a)} data-testid={`v2-copilot-action-${a.kind}`}
+              className="w-full flex items-center gap-2.5 rounded-2xl border border-slate-100 bg-slate-50/60 p-3 text-left active:scale-[0.98] transition-transform">
+              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: GREEN }} />
+              <span className="text-xs font-semibold text-slate-700 flex-1 leading-snug">{a.text}</span>
+              <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // Hero A — fără proprietate
 const HeroA = ({ onAddProperty }) => (
@@ -116,6 +184,8 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
           </button>
         ))}
       </div>
+
+      <CopilotCard go={go} actions={actions} hasProps={properties.length > 0} />
 
       {contextual.length > 0 && (
         <div className="mx-5 mt-6 cv2-fade cv2-d2" data-testid="v2-contextual">
