@@ -7,7 +7,7 @@ import {
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
   LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, ChevronRight, Sparkles, Bot, Zap, Inbox,
   UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb, Bug, Compass, Layers, BookOpenCheck, GraduationCap, Gamepad2, Trophy, BarChart3, Eye, Heart,
-  Star, Clock, Command, Network, Megaphone, Brain, Rocket, Activity, KeyRound, Server, Palette
+  Star, Clock, Command, Network, Megaphone, Brain, Rocket, Activity, KeyRound, Server, Palette, Map
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { useTheme as useGlobalTheme } from "../../contexts/ThemeContext";
@@ -96,6 +96,7 @@ const NAV_SECTIONS = [
     zone: "business",
     items: [
       { id: "overview", label: "Dashboard Principal", icon: LayoutDashboard },
+      { id: "roadmap", label: "Roadmap · Evoluție", icon: Map, badge: "LIVE", href: "/admin/roadmap" },
       { id: "control_tower", label: "Control Tower", icon: LayoutDashboard, badge: "NEW", href: "/admin/control-tower" },
       { id: "activity", label: "Activitate Live", icon: Sparkles },
     ],
@@ -255,6 +256,7 @@ const NAV_SECTIONS = [
       { id: "architecture_board", label: "Architecture Review Board", icon: Compass, badge: "NEW", href: "/admin/architecture-board" },
       { id: "design_audit", label: "Design Audit · UX Score", icon: Palette, badge: "NEW", href: "/admin/design-audit" },
       { id: "design_studio", label: "Design Studio · UI Control", icon: Palette, badge: "NEW", href: "/admin/design-studio" },
+      { id: "design_intelligence", label: "Design Intelligence · AI", icon: Palette, badge: "IMPACT", href: "/admin/design-intelligence" },
     ],
   },
   {

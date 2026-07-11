@@ -79,6 +79,8 @@ const FounderGatePage = lazy(() => import("./pages/admin/FounderGatePage"));
 const AIGovernancePage = lazy(() => import("./pages/admin/AIGovernancePage"));
 const DesignAuditPage = lazy(() => import("./pages/admin/DesignAuditPage"));
 const DesignStudioPage = lazy(() => import("./pages/admin/DesignStudioPage"));
+const DesignIntelligencePage = lazy(() => import("./pages/admin/DesignIntelligencePage"));
+const PlatformRoadmapPage = lazy(() => import("./pages/admin/PlatformRoadmapPage"));
 const BugMemoryAggregatorPage = lazy(() => import("./pages/admin/BugMemoryAggregatorPage"));
 const ArchitectureBoardPage = lazy(() => import("./pages/admin/ArchitectureBoardPage"));
 const AIProductManagerPage = lazy(() => import("./pages/admin/AIProductManagerPage"));
@@ -1680,6 +1682,8 @@ function App() {
               <Route path="/admin/ai-governance" element={<AIGovernancePage />} />
               <Route path="/admin/design-audit" element={<DesignAuditPage />} />
               <Route path="/admin/design-studio" element={<DesignStudioPage />} />
+              <Route path="/admin/design-intelligence" element={<DesignIntelligencePage />} />
+              <Route path="/admin/roadmap" element={<PlatformRoadmapPage />} />
               <Route path="/admin/bug-memory" element={<BugMemoryAggregatorPage />} />
               <Route path="/admin/architecture-board" element={<ArchitectureBoardPage />} />
               <Route path="/admin/ai-pm" element={<AIProductManagerPage />} />
