@@ -2539,3 +2539,8 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - Top 25 recomandări prioritizate + Quick Wins + Roadmap restructurat (Faze A-D pe deblocări)
 - REGULĂ PERMANENTĂ ADOPTATĂ (D8): Blueprint Compatibility Gate — orice feature nou trece checklist-ul de 6 întrebări (viziune/duplicări/UX/franciză/DS/buclă de date) contra PRODUCT_BLUEPRINT.md înainte de implementare. OBLIGATORIU pentru toate sesiunile viitoare.
 - Recomandările Self-Driving suplimentare (Autonomy Weekly Scorecard) amânate de user pentru mai târziu.
+
+## [2026-06-11] DECISION_BOARD.md (document-only, zero cod)
+- Livrat: /app/docs/DECISION_BOARD.md — D1-D7 extinse complet: problemă, context, conflict, variante, avantaje/dezavantaje, impact pe 10 dimensiuni (Blueprint/Business/XOS/Marketplace/Franchise/UX/AI/KG/Scalabilitate/Mentenanță), complexitate, risc, cost, recomandare AI + alternativă conservatoare + tabel comparativ + formular de decizie.
+- User a anunțat direcția: CONSOLIDARE (nu Quick Wins) prin „Platform Core Initiative" împărțită în 5 sprinturi: (1) Experience OS Foundation, (2) Consolidare Config/Content/AI/Leads, (3) Tenant Foundation, (4) Knowledge Graph + Platform Governance, (5) Experience Configuration Center.
+- REGULĂ: nimic nu se implementează până când ownerul completează formularul de decizie D1-D7. După fiecare etapă de sprint: raport + STOP + așteaptă aprobarea. Fără modificări ireversibile, fără ștergeri, fără migrări DB neaprobate.
