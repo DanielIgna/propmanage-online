@@ -2652,3 +2652,13 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - Fixuri post-test aplicate: refresh istoric după publicare (refreshKey), try/catch la reset, dedup snapshot
 - PLATFORM CORE INITIATIVE: Sprint 1 ✅ · Sprint 2 ✅ · Sprint 3 (val 0+1) ✅ · Sprint 4 ✅ · Sprint 5 ✅ — TOATE SPRINT-URILE COMPLETE
 - URMEAZĂ (backlog P1/P2): Theme Manager vizual, pagini servicii noi (Exterior/Arhitectură pe modelul Interior Intelligence), Tenant val 2 (filtrare pe tenant în citiri), Developer Mode
+
+## [2026-06-11] P1 LIVRAT ✅ — Theme Manager + pagini Design Exterior & Arhitectură (iteration_114: backend 18/18, frontend 100%, zero bugs)
+### Theme Manager (XOS)
+- ThemeContext: applyRoleTheme + flag pm_theme_source=user (alegerea manuală nu e suprascrisă); RoleThemeApplier montat în App.js — la login aplică default_theme din experience_profiles per rol; testat E2E (light auto la client, toggle manual persistă)
+### Service Hub generic (modelul Interior Intelligence)
+- Backend: routes/service_hub.py generic pe slug (SERVICES registry) — GET content (seed lazy în service_pages), POST leads (service_leads + dual-write unified leads cu triage AI), admin GET/PUT cu allowlist, admin GET leads
+- Conținut: service_content_exterior.py (Exterior Design by PropManage, 9 pași/3 faze) + service_content_arhitectura.py (Arhitectură by PropManage, 10 pași/3 faze — DTAC, fezabilitate, urmărire șantier)
+- Frontend: ServiceHubLanding.jsx generic (sh-* testids) — rute /design-exterior + /arhitectura; JSON-LD + FAQPage; cross-links ecosistem (Interior↔Exterior↔Arhitectură)
+- Meniu site: Servicii > Design Exterior → /design-exterior, Arhitectură → /arhitectura (și DEFAULT_MENU sincronizat post-test)
+- BACKLOG rămas: Tenant val 2 (filtrare citiri pe tenant) · Developer Mode · admin UI vizual pentru editarea conținutului service hub
