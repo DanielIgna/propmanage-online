@@ -1,5 +1,28 @@
 ## 📋 Roadmap & Backlog (prioritizat)
 
+## 🔗 Interconectare + 4 module galbene (Iun 11, 2026, Part 3)
+
+**A. Interconectare Command Center ↔ Business Health (primul pas Autonomy Level 3)**:
+- `business_health.py`: `compute_health()` reutilizabil + snapshot zilnic automat în `business_health_history` (max 1/zi) + `GET /history?days=30`.
+- `command_center.py::_build_feed`: departamentele ROȘII devin alerte `health_*` (severity=high, link /admin/business-health); `raw.red_departments` injectat în promptul Claude → AI prioritizează fix-urile lor în Top 5.
+
+**B. Rămășițele celor 4 module urgente**:
+- Recomandările AI au acum `idx` + `link` (MODULE_LINKS: Escrow→/admin/financial-cockpit etc.) + `done` toggle (`POST /recommendations/toggle {idx}`). UI: buton «Deschide» + cerc bifare cu strikethrough.
+- Business Health: sparkline istoric per departament + overall (`Sparkline` component, min 2 snapshot-uri).
+- County: `RequestIn.county` (models.py) + fallback din property la creare; backfill determinist (hash-based) pe 192 cereri + 372 specialiști (Cluj/București/Ilfov/Brașov/Timiș/Iași/Constanța). `GET /marketplace-intel/by-county` (90z, capacitate=supply×4×3) + card „City Analytics" în UI.
+- Financial Cockpit: `POST /insights` (Claude pe cifre reale → severity positive/neutral/warning) + panou AI Insights în UI.
+
+**C. Modulele galbene noi**:
+- **Automation Center** (`routes/automation_center.py`, `/admin/automation`): 3 reguli Dacă→Atunci cu executor REAL — `request_reminder` (notifică adminii in-app despre cereri blocate >Xh), `fast_response_badge` (setează `fast_response_badge` pe user la acceptare <Xmin), `client_reactivation` (coadă `automation_emails` idempotentă). PATCH param cu clamping + toggle + `automation_executions` log. UI cu carduri Dacă→Atunci + input param editabil.
+- **CEO Dashboard** (`routes/ceo_dashboard.py`, `/admin/ceo`, DOAR super-admin via `is_super_admin`, 403 pt sub-admini scoped): compune compute_health + feed + financial_cockpit + top 3 recomandări nerezolvate. UI: Business Score ring, 6 KPIs, „AI spune: prioritățile tale azi", puls departamente.
+- **Notification Center AI** (`routes/notification_center.py`, `/admin/notification-center`): „Ai N lucruri importante" — agregă warnings operaționale + health roșu + recomandări AI nerezolvate; ack per admin/zi în `notification_center_acks`; sortare severitate; buton «Rezolvă» cu link.
+- Sidebar: ceo_dashboard (badge OWNER, item-level superAdminOnly — filtrare adăugată în AdminLayoutMetronic), notification_center, automation_center.
+
+**Tests**: `iteration_104.json` → **26/26 backend pytest PASS** + frontend 100% (toate 7 pagini + interconnect + ack/toggle flows + regression). Test file: `/app/backend/tests/test_iter104_interconnect_yellow.py`.
+
+**Board**: progres actualizat — command_center 90%, business_health 90%, marketplace_intelligence 90%, financial_cockpit 85%, notification_center 85%, ceo_dashboard 85%, automation_center 75%, ai_insights_module 60%, city_analytics 55%, autonomy_levels 50%.
+
+
 ## 🔴 4 Module URGENTE construite — Command Center, Business Health, Marketplace Intel, Financial Cockpit (Iun 11, 2026, Part 2)
 
 **Scop**: User a aprobat construirea tuturor celor 4 urgențe roșii de pe board într-o singură sesiune.
