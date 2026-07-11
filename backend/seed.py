@@ -212,10 +212,11 @@ async def seed():
                 "created_at": datetime.now(timezone.utc).isoformat(),
             })
 
-    # Write test credentials
+    # Write test credentials (parola admin REALĂ din env — sursa driftului recurent)
+    admin_pw = os.environ.get("SEED_ADMIN_PASSWORD", "Admin123!")
     creds_path = Path("/app/memory/test_credentials.md")
     creds_path.parent.mkdir(exist_ok=True)
-    creds_path.write_text("""# PropManage Test Credentials
+    creds_path.write_text(f"""# PropManage Test Credentials
 
 ## Demo Accounts (Pre-seeded, idempotent)
 
@@ -224,12 +225,12 @@ async def seed():
 | Client | client@propmanage.io | Client123! |
 | Specialist (HVAC, verified) | specialist@propmanage.io | Spec123! |
 | Specialist (Plumbing, verified) | specialist2@propmanage.io | Spec123! |
-| Admin | admin@propmanage.io | Admin123! |
+| Admin | admin@propmanage.io | {admin_pw} |
 | Operator | operator@propmanage.io | Op123! |
 
 ## Auth Endpoints
-- POST /api/auth/login - Body: {email, password}
-- POST /api/auth/register - Body: {email, password, name, role}
+- POST /api/auth/login - Body: {{email, password}}
+- POST /api/auth/register - Body: {{email, password, name, role}}
 - POST /api/auth/logout
 - GET /api/auth/me
 

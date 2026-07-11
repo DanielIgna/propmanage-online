@@ -88,7 +88,7 @@ TIER3_SYSTEM_OPS = {
     "preset_schedules", "preset_schedule_runs", "preset_send_history",
     "client_copilot_cache", "it_copilot_reports", "marketplace_copilot_reports",
     "marketplace_intel_recos", "ai_documents", "ab_experiments",
-    "audit_anomalies", "automation_executions",
+    "audit_anomalies", "automation_executions", "kg_entity_registry",
 }
 
 
