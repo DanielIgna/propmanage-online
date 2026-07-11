@@ -2594,3 +2594,20 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - Bug fixat în timpul testării: duplicate la re-migrare (id vs _id) — legacy_id preferă acum `id` app-level
 - Testat: migrare+idempotență+dual-write interior/demo/city+summary+weekly report; zero schimbări frontend
 - URMEAZĂ (aprobare owner): 2.2 Config 4→1 (settings namespaces + façade fallback)
+
+## [2026-06-11] Sprint 2 · Pașii 2.2 + 2.3 + 2.4 LIVRAȚI ✅ (val 1, self-tested E2E)
+### 2.2 Config 4→1 — `settings` {namespace, key, value, tenant_id}
+- settings_store.py: get/put/patch cu FALLBACK legacy la citire + DUAL-WRITE legacy la scriere (28 cititori app_settings rămân corecți)
+- Migrate: app, security, platform, tiers (fix: platform_settings _id real = incident_spike_alert), landing (3 presets)
+- Consumatori migrați val 1: security_guard.py (get+save via façade — E2E: PUT rate_limit → ambele colecții sincrone), app_settings.py (mirror la write)
+- VAL 2 rămas: admin_console.py (platform_config, 7+ locuri) + cititorii direcți app_settings
+### 2.3 AI Chat 4→1 — `ai_sessions` {agent, session_id, messages[], user_id, tenant_id}
+- ai_session_store.py: sync_all idempotent ($set per sesiune) — 57 sesiuni unificate (concierge 1, marketing 6, interior 49, twin 1)
+- Cron sync la 30 min (server.py id=ai_sessions_sync); GDPR: ai_sessions_count adăugat în export + gdpr_delete_user() helper
+- Decizie arhitectură: sync periodic în loc de dual-write per punct (5 inserturi concierge cu shape-uri diferite = risc pe fluxuri AI live); VAL 2: citire directă din ai_sessions per modul
+### 2.4 Content — service_pages născut
+- `service_pages` {slug:"design-interior",...}: MASTER pentru conținutul serviciului; interior_design.py: citire service_pages→fallback legacy, PUT dual-write; migrat 1:1; pagina publică verificată vizual
+- landing_presets → settings ns "landing" (date migrate; consumator admin_console = val 2)
+- cms_content: 0 docs, DORMANT — retragere UI propusă la consolidarea admin (D1), nimic șters
+### Legacy: TOATE colecțiile vechi intacte (rollback natural). Zero schimbări frontend.
+### SPRINT 2 COMPLET (val 1). Următorul: Sprint 3 — Tenant Foundation (plan, fără migrare date) — AȘTEAPTĂ APROBARE.

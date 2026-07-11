@@ -109,7 +109,10 @@ DEFAULT_CONTENT: dict[str, Any] = {
 
 
 async def _get_content() -> dict[str, Any]:
-    doc = await db.interior_design_content.find_one({"_id": "main"})
+    # 2.4: service_pages e master; fallback + dual-write cu legacy interior_design_content
+    doc = await db.service_pages.find_one({"slug": "design-interior"})
+    if not doc:
+        doc = await db.interior_design_content.find_one({"_id": "main"})
     if not doc:
         await db.interior_design_content.update_one(
             {"_id": "main"}, {"$set": {**DEFAULT_CONTENT, "updated_at": datetime.now(timezone.utc).isoformat()}}, upsert=True
@@ -272,6 +275,11 @@ async def admin_update_content(patch: dict = Body(...), _admin=Depends(require_r
         raise HTTPException(400, "Nimic valid de actualizat.")
     clean["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.interior_design_content.update_one({"_id": "main"}, {"$set": clean}, upsert=True)
+    await db.service_pages.update_one(
+        {"slug": "design-interior"},
+        {"$set": {**clean, "slug": "design-interior", "tenant_id": "main"}},
+        upsert=True,
+    )
     return await _get_content()
 
 

@@ -39,18 +39,18 @@ DEFAULT_CONFIG = {
 
 
 async def _get_config() -> dict:
-    doc = await db.security_config.find_one({"_id": "global"})
-    if not doc:
-        return dict(DEFAULT_CONFIG)
+    from settings_store import get_settings
+    doc = await get_settings("security")
     merged = dict(DEFAULT_CONFIG)
     merged.update({k: v for k, v in doc.items() if k != "_id"})
     return merged
 
 
 async def _save_config(updates: dict, actor_id: str):
+    from settings_store import patch_settings
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
     updates["updated_by"] = actor_id
-    await db.security_config.update_one({"_id": "global"}, {"$set": updates}, upsert=True)
+    await patch_settings("security", updates, who=actor_id)
 
 
 # ============= HEURISTICS =============

@@ -233,6 +233,14 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=3600,
         )
+        from ai_session_store import sync_all as ai_sessions_sync
+        scheduler.add_job(
+            ai_sessions_sync,
+            CronTrigger(minute="*/30", timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="ai_sessions_sync",
+            replace_existing=True,
+            misfire_grace_time=900,
+        )
         scheduler.add_job(
             take_autonomy_snapshot_with_reflex,
             CronTrigger(hour=3, minute=15, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
