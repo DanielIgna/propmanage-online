@@ -1,5 +1,38 @@
 ## 📋 Roadmap & Backlog (prioritizat)
 
+> ⚡ De la Iun 2026, roadmap-ul LIVE se gestionează în aplicație: `/admin/roadmap` (21 module, cod culoare roșu/galben/verde, AI Analyzer). Secțiunile de mai jos rămân ca istoric.
+
+## 🧠 Design Intelligence Engine (P1a/b/c) + Platform Roadmap Board (Iun 11, 2026)
+
+**Scop**: Toate cele 3 sesiuni P1 din PropManage Design Intelligence Engine + board de evoluție cerut de user ("să știu evoluția exactă, roșu urgent / galben prioritar / verde îmbunătățire + AI să le analizeze pe toate").
+
+**P1a — Layout Optimizer AI** (`/app/backend/routes/design_intelligence.py`):
+- `POST /api/admin/design-intelligence/layout/analyze {page_key}` — Claude observă structura paginii (registry din design_audit) + scorurile de audit cached și propune 3-5 modificări de layout, fiecare susținută de o lege UX.
+- **Impact Score per modificare** calculat server-side: `ux_benefit×0.45 + users_reach×0.35 + inv_effort×0.10 + inv_risk×0.10` → tier high(≥70)/medium(≥40)/low + breakdown complet.
+
+**P1b — Component Optimizer AI**:
+- `POST /components/analyze {component_key}` — analizează componenta din COMPONENT_LIBRARY + tokens active (contrast, touch targets, consistență) → propuneri cu Impact Score, unele cu `token_patch` aplicabil LIVE.
+
+**P1c — Evolution Engine** (Observe → Propose → Test → Apply):
+- Pipeline: `proposed → testing → approved → applied | rejected` via `POST /proposals/{id}/advance {action}` (start_test/approve/reject/apply). Tranziții invalide → 400.
+- **Apply LIVE**: propunerile cu token_patch se merge-uiesc în `db.design_tokens {_id:'active'}` cu `applied_snapshot` stocat. `POST /proposals/{id}/rollback` restaurează exact tokens-urile anterioare.
+- NIMIC nu se aplică fără aprobare admin. `GET /summary` — counts + avg_impact + top_pending.
+- Frontend: `/admin/design-intelligence` (DesignIntelligencePage.jsx) — 3 tab-uri, ProposalCard cu ImpactBadge colorat + breakdown bars (UX/Reach/Efort/Risc), filter chips pe status, flash messages. Sidebar: AI Lab, badge IMPACT, icon Brain.
+
+**Platform Roadmap Board** (`/app/backend/routes/platform_roadmap.py`):
+- 21 module seedate idempotent (MODULE_CATALOG): 4 module Design & UI (3 done) + cele **15 module din viziunea user-ului 10.07** (AI Command Center, Business Health, AI Insights per modul, Marketplace Intelligence, City Analytics, Specialist/Client Score, Marketplace Radar, Financial Cockpit, Notification Center, Automation Center, User Timeline, AI Search, CEO Dashboard, Autonomy Levels 0-5) + Faza 5 Marketplace + Resend DNS.
+- Fiecare modul: `built[]` (ce există deja în cod — mapare onestă), `remaining[]`, priority (urgent/priority/improvement), status, progress %. Seed NU suprascrie editările adminului.
+- `PATCH /api/admin/roadmap/{key}` — admin schimbă prioritate/status/progres/notes din UI.
+- `POST /api/admin/roadmap/analyze` — Claude analizează TOT board-ul → verdict + top_priorities săptămâna asta + quick_wins + risks + overlaps + suggested_order. Cache în `platform_roadmap_analysis`.
+- Frontend: `/admin/roadmap` (PlatformRoadmapPage.jsx) — KPIs (progres general 35%, urgente, prioritare, construite 3/21), carduri color-coded cu border roșu/amber/emerald, expand cu liste ✓ construit / ○ de construit, butoane setare prioritate+status, panou AI Analyzer. Sidebar: Dashboard Business, badge LIVE, icon Map.
+
+**Prioritati actuale pe board (stare Iun 11)**: 🔴 URGENT: AI Command Center (35%), Business Health (15%), Marketplace Intelligence (30%), Financial Cockpit (35%). 🟡 PRIORITAR: 9 module. 🟢 ÎMBUNĂTĂȚIRE: 8 module.
+
+**Tests**: `iteration_102.json` → **25/25 backend pytest PASS** + frontend 100% (toate flows: analyze, pipeline transitions, apply/rollback tokens cu restaurare verificată, RBAC 403 client, sidebar navs). Test file: `/app/backend/tests/test_design_intelligence_iter102.py`. Bug fixat de testing agent: `Map` icon lipsea din importul lucide-react în AdminLayoutMetronic (crash ErrorBoundary pe /admin) — rezolvat.
+
+**Urmează (conform user)**: user va trimite restul prompturilor; modulele 1-15 se construiesc DUPĂ finalizarea designului. Board-ul `/admin/roadmap` e sursa de adevăr pentru evoluție.
+
+
 ### 🔴 P0 — Anomaly Detector (NEXT — necesar ~12-15 credite)
 **Trigger**: User a cerut Feb 26, 2026 dar buget insuficient (8 credite) → amânat la următoarea sesiune cu credite suficiente.
 

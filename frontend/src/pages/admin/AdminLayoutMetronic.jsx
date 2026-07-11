@@ -256,7 +256,7 @@ const NAV_SECTIONS = [
       { id: "architecture_board", label: "Architecture Review Board", icon: Compass, badge: "NEW", href: "/admin/architecture-board" },
       { id: "design_audit", label: "Design Audit · UX Score", icon: Palette, badge: "NEW", href: "/admin/design-audit" },
       { id: "design_studio", label: "Design Studio · UI Control", icon: Palette, badge: "NEW", href: "/admin/design-studio" },
-      { id: "design_intelligence", label: "Design Intelligence · AI", icon: Palette, badge: "IMPACT", href: "/admin/design-intelligence" },
+      { id: "design_intelligence", label: "Design Intelligence · AI", icon: Brain, badge: "IMPACT", href: "/admin/design-intelligence" },
     ],
   },
   {
