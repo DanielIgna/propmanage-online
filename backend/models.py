@@ -99,6 +99,7 @@ class RequestIn(BaseModel):
     description: str
     priority: Literal["low", "normal", "medium", "high", "urgent"] = "normal"
     budget_estimate: Optional[float] = None
+    county: Optional[str] = None
     photos: Optional[List[str]] = None
     taxonomy_node_id: Optional[str] = None
     subcategory: Optional[str] = None

@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import {
   Brain, Inbox, Users, CheckCircle2, TrendingUp, AlertTriangle,
-  Sparkles, RefreshCw, Zap,
+  Sparkles, RefreshCw, Zap, ExternalLink,
 } from "lucide-react";
 import { AdminLayoutMetronic, AdminCard } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
@@ -75,10 +75,12 @@ export default function CommandCenterPage() {
               <div className="space-y-2">
                 {(feed?.warnings || []).map((w) => {
                   const sv = SEV[w.severity] || SEV.low;
+                  const isHealth = w.key.startsWith("health_");
                   return (
                     <div key={w.key} className={`flex items-start gap-2 p-3 rounded-xl border ${sv.cls}`} data-testid={`cc-warning-${w.key}`}>
-                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${sv.badge}`}>{sv.label}</span>
-                      <span className="text-sm font-medium">{w.label}</span>
+                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${sv.badge}`}>{isHealth ? "HEALTH" : sv.label}</span>
+                      <span className="text-sm font-medium flex-1">{w.label}</span>
+                      {w.link && <a href={w.link} className="shrink-0 text-[10px] font-black underline opacity-70 hover:opacity-100" data-testid={`cc-warning-link-${w.key}`}>Vezi →</a>}
                     </div>
                   );
                 })}
@@ -103,16 +105,28 @@ export default function CommandCenterPage() {
                   {(recos.recommendations || []).map((r, i) => {
                     const sv = SEV[r.severity] || SEV.medium;
                     return (
-                      <div key={i} className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800" data-testid={`cc-reco-${i}`}>
-                        <span className="w-6 h-6 rounded-full bg-lime-400 text-slate-900 text-xs font-black flex items-center justify-center shrink-0">{i + 1}</span>
-                        <div className="min-w-0">
+                      <div key={i} className={`flex items-start gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 ${r.done ? "opacity-50" : ""}`} data-testid={`cc-reco-${i}`}>
+                        <button
+                          onClick={async () => { try { await ax.post("/admin/command-center/recommendations/toggle", { idx: r.idx ?? i }); load(); const rr = await ax.get("/admin/command-center/recommendations/latest"); setRecos(rr.data); } catch (e) { /* silent */ } }}
+                          className={`w-6 h-6 rounded-full text-xs font-black flex items-center justify-center shrink-0 border-2 transition-colors ${r.done ? "bg-emerald-500 border-emerald-500 text-white" : "bg-lime-400 border-lime-400 text-slate-900 hover:bg-emerald-400"}`}
+                          title={r.done ? "Marchează nerezolvat" : "Marchează rezolvat"}
+                          data-testid={`cc-reco-toggle-${i}`}
+                        >
+                          {r.done ? "✓" : i + 1}
+                        </button>
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${sv.badge}`}>{sv.label}</span>
                             {r.module && <span className="text-[10px] font-bold text-slate-400">{r.module}</span>}
                           </div>
-                          <div className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">{r.action}</div>
+                          <div className={`text-sm font-bold text-slate-900 dark:text-white mt-0.5 ${r.done ? "line-through" : ""}`}>{r.action}</div>
                           <div className="text-xs text-slate-500 dark:text-slate-400">{r.why}</div>
                         </div>
+                        {r.link && (
+                          <a href={r.link} className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] font-black bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-80" data-testid={`cc-reco-open-${i}`}>
+                            Deschide <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
                       </div>
                     );
                   })}

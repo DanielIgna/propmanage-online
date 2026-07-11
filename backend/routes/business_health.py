@@ -1,7 +1,8 @@
 """Business Health — 8 department scores computed from real platform data.
 
 Each score 0-100 with color: green ≥80 · yellow ≥60 · red <60.
-Formulas are deterministic and documented per department (detail field).
+compute_health() is reused by Command Center (red dept → alert) and CEO Dashboard.
+A daily snapshot is persisted into business_health_history (max 1/day) for trends.
 """
 import logging
 from datetime import datetime, timedelta, timezone
@@ -24,8 +25,7 @@ def _clamp(v: float) -> int:
     return int(max(0, min(100, round(v))))
 
 
-@router.get("")
-async def business_health(_admin=Depends(require_role("admin"))):
+async def compute_health() -> dict[str, Any]:
     now = datetime.now(timezone.utc)
     d30 = (now - timedelta(days=30)).isoformat()
     d60 = (now - timedelta(days=60)).isoformat()
@@ -36,7 +36,7 @@ async def business_health(_admin=Depends(require_role("admin"))):
     growth = ((users_30 - users_prev) / users_prev * 100) if users_prev else (100 if users_30 else 0)
     marketing = _clamp(60 + growth * 0.8)
 
-    # ── MARKETPLACE: fill rate — cereri cu specialist / total (30d fallback all-time) ──
+    # ── MARKETPLACE: fill rate — cereri cu specialist / total ────────────────
     total_req = await db.requests.count_documents({})
     filled = await db.requests.count_documents({"specialist_id": {"$nin": [None, ""]}})
     marketplace = _clamp((filled / total_req * 100)) if total_req else 50
@@ -105,3 +105,33 @@ async def business_health(_admin=Depends(require_role("admin"))):
         "overall_color": _color(overall),
         "generated_at": now.isoformat(),
     }
+
+
+async def _snapshot_daily(health: dict[str, Any]) -> None:
+    """Persist max one snapshot per calendar day for historic trends."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    existing = await db.business_health_history.find_one({"date": today})
+    if existing:
+        return
+    await db.business_health_history.insert_one({
+        "date": today,
+        "overall": health["overall"],
+        "scores": {d["key"]: d["score"] for d in health["departments"]},
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+@router.get("")
+async def business_health(_admin=Depends(require_role("admin"))):
+    health = await compute_health()
+    await _snapshot_daily(health)
+    return health
+
+
+@router.get("/history")
+async def health_history(days: int = 30, _admin=Depends(require_role("admin"))):
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=max(7, min(days, 90)))).strftime("%Y-%m-%d")
+    out = []
+    async for row in db.business_health_history.find({"date": {"$gte": cutoff}}, {"_id": 0}).sort("date", 1):
+        out.append(row)
+    return {"history": out, "days": days}

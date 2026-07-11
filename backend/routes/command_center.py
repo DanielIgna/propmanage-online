@@ -8,7 +8,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends, HTTPException
 
 from db import db
 from deps import require_role
@@ -17,6 +17,26 @@ router = APIRouter(prefix="/api/admin/command-center", tags=["command-center"])
 logger = logging.getLogger("propmanage.command_center")
 
 WAIT_STATUSES = ["open", "pending"]
+
+# Modul → link direct în admin pentru butonul de execuție al recomandării.
+MODULE_LINKS = {
+    "escrow": "/admin/financial-cockpit",
+    "financiar": "/admin/financial-cockpit",
+    "finanțe": "/admin/financial-cockpit",
+    "marketplace": "/admin/marketplace-intel",
+    "specialiști": "/admin/users",
+    "specialisti": "/admin/users",
+    "utilizatori": "/admin/users",
+    "dispute": "/admin",
+    "suport": "/admin",
+    "marketing": "/admin/marketing",
+    "conversii": "/admin/analytics",
+    "seo": "/admin/design-audit",
+}
+
+
+def _module_link(module: str) -> str:
+    return MODULE_LINKS.get((module or "").strip().lower(), "/admin")
 
 
 def _now() -> datetime:
@@ -60,6 +80,11 @@ async def _build_feed() -> dict[str, Any]:
     open_disputes = await db.disputes.count_documents({"status": {"$in": ["open", "pending", "in_review"]}})
     pending_payments = await db.payment_transactions.count_documents({"payment_status": {"$in": ["pending", "initiated"]}})
 
+    # ── Interconectare Business Health: departamentele ROȘII devin alerte ────
+    from routes.business_health import compute_health
+    health = await compute_health()
+    red_departments = [d for d in health["departments"] if d["color"] == "red"]
+
     stats = [
         {"key": "new_requests", "label": "Cereri noi (24h)", "value": new_requests_24h, "icon": "inbox"},
         {"key": "new_users", "label": "Utilizatori noi (24h)", "value": new_users_24h, "icon": "users"},
@@ -80,11 +105,20 @@ async def _build_feed() -> dict[str, Any]:
         warnings.append({"key": "incomplete_spec", "label": f"{incomplete_specialists} specialiști cu profil incomplet (fără specialitate sau neverificați)", "severity": "medium"})
     if pending_payments:
         warnings.append({"key": "pending_pay", "label": f"{pending_payments} plăți inițiate dar nefinalizate", "severity": "low"})
+    for d in red_departments:
+        warnings.append({
+            "key": f"health_{d['key']}",
+            "label": f"Business Health: {d['label']} în ROȘU (scor {d['score']}) — {d['detail']}",
+            "severity": "high",
+            "link": "/admin/business-health",
+        })
 
     return {
         "generated_at": _iso(now),
         "stats": stats,
         "warnings": warnings,
+        "health_overall": health["overall"],
+        "health_overall_color": health["overall_color"],
         "raw": {
             "new_requests_24h": new_requests_24h, "new_users_24h": new_users_24h,
             "completed_24h": completed_24h, "req_7d": req_7d, "req_prev_7d": req_prev_7d,
@@ -92,6 +126,8 @@ async def _build_feed() -> dict[str, Any]:
             "escrow_held_amount": escrow_held_amount, "escrow_held_count": escrow_held_count,
             "escrow_frozen_count": escrow_frozen_count, "incomplete_specialists": incomplete_specialists,
             "open_disputes": open_disputes, "pending_payments": pending_payments,
+            "health_overall": health["overall"],
+            "red_departments": [{"key": d["key"], "label": d["label"], "score": d["score"], "detail": d["detail"]} for d in red_departments],
         },
     }
 
@@ -121,7 +157,10 @@ async def generate_recommendations(_admin=Depends(require_role("admin"))):
             f"cereri >48h fără specialist={raw['waiting_48h']}, escrow neconfirmat={raw['escrow_held_amount']:.0f} lei "
             f"({raw['escrow_held_count']} cereri), escrow înghețat={raw['escrow_frozen_count']}, "
             f"dispute deschise={raw['open_disputes']}, specialiști profil incomplet={raw['incomplete_specialists']}, "
-            f"plăți nefinalizate={raw['pending_payments']}."
+            f"plăți nefinalizate={raw['pending_payments']}. "
+            f"Business Health general={raw.get('health_overall')}. Departamente în ROȘU (prioritizează fix-urile lor): "
+            + ("; ".join(f"{d['label']} scor {d['score']} ({d['detail']})" for d in raw.get("red_departments", [])) or "niciunul")
+            + "."
         )
         result = await claude_json(system=system, prompt=prompt, session_prefix="command-center")
         recos = [
@@ -145,9 +184,22 @@ async def generate_recommendations(_admin=Depends(require_role("admin"))):
         ]
         ai_generated = False
 
-    doc = {"generated_at": _iso(_now()), "recommendations": recos, "ai_generated": ai_generated, "snapshot": raw}
+    doc = {"generated_at": _iso(_now()), "recommendations": [{**r, "idx": i, "link": _module_link(r.get("module")), "done": False} for i, r in enumerate(recos)], "ai_generated": ai_generated, "snapshot": raw}
     await db.command_center_recos.update_one({"_id": "latest"}, {"$set": doc}, upsert=True)
     return doc
+
+
+@router.post("/recommendations/toggle")
+async def toggle_recommendation(idx: int = Body(..., embed=True), _admin=Depends(require_role("admin"))):
+    doc = await db.command_center_recos.find_one({"_id": "latest"})
+    if not doc or not doc.get("recommendations"):
+        raise HTTPException(404, "Nu există recomandări generate.")
+    recos = doc["recommendations"]
+    if idx < 0 or idx >= len(recos):
+        raise HTTPException(400, f"Index invalid: {idx}")
+    recos[idx]["done"] = not recos[idx].get("done", False)
+    await db.command_center_recos.update_one({"_id": "latest"}, {"$set": {"recommendations": recos}})
+    return {"idx": idx, "done": recos[idx]["done"]}
 
 
 @router.get("/recommendations/latest")

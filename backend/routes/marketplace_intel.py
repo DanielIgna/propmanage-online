@@ -149,3 +149,36 @@ async def recommend(_admin=Depends(require_role("admin"))):
 async def latest_recommend(_admin=Depends(require_role("admin"))):
     doc = await db.marketplace_intel_recos.find_one({"_id": "latest"}, {"_id": 0})
     return doc or {"recommendations": None}
+
+
+@router.get("/by-county")
+async def by_county(_admin=Depends(require_role("admin"))):
+    """Demand vs supply per county — requires county on requests + specialists."""
+    now = datetime.now(timezone.utc)
+    d90 = (now - timedelta(days=90)).isoformat()
+
+    demand: dict[str, int] = {}
+    async for r in db.requests.find({"created_at": {"$gte": d90}, "county": {"$nin": [None, ""]}}, {"county": 1}):
+        demand[r["county"]] = demand.get(r["county"], 0) + 1
+
+    supply: dict[str, int] = {}
+    async for u in db.users.find({"role": "specialist", "county": {"$nin": [None, ""]}}, {"county": 1}):
+        supply[u["county"]] = supply.get(u["county"], 0) + 1
+
+    counties = []
+    for county in sorted(set(demand) | set(supply)):
+        d = demand.get(county, 0)
+        s = supply.get(county, 0)
+        capacity = s * JOBS_PER_SPECIALIST_MONTH * 3  # fereastră 90z ≈ 3 luni
+        if d > capacity:
+            status = "deficit"
+            pct = round((d - capacity) / d * 100)
+        elif capacity > d * 2 and s > 0:
+            status = "surplus"
+            pct = round((capacity - d) / capacity * 100)
+        else:
+            status = "balanced"
+            pct = 0
+        counties.append({"county": county, "demand": d, "supply": s, "capacity": capacity, "status": status, "pct": pct})
+    counties.sort(key=lambda c: (-1 if c["status"] == "deficit" else 1, -c["pct"], -c["demand"]))
+    return {"counties": counties, "window": "90 zile", "generated_at": now.isoformat()}

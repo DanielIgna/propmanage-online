@@ -96,8 +96,11 @@ const NAV_SECTIONS = [
     zone: "business",
     items: [
       { id: "overview", label: "Dashboard Principal", icon: LayoutDashboard },
+      { id: "ceo_dashboard", label: "CEO Dashboard", icon: Trophy, badge: "OWNER", href: "/admin/ceo", superAdminOnly: true },
       { id: "command_center", label: "AI Command Center", icon: Brain, badge: "TOP 5", href: "/admin/command-center" },
+      { id: "notification_center", label: "Notification Center", icon: Sparkles, badge: "AI", href: "/admin/notification-center" },
       { id: "business_health", label: "Business Health", icon: Activity, badge: "8 SCORURI", href: "/admin/business-health" },
+      { id: "automation_center", label: "Automation Center", icon: Zap, badge: "DACĂ→ATUNCI", href: "/admin/automation" },
       { id: "roadmap", label: "Roadmap · Evoluție", icon: Map, badge: "LIVE", href: "/admin/roadmap" },
       { id: "control_tower", label: "Control Tower", icon: LayoutDashboard, badge: "NEW", href: "/admin/control-tower" },
       { id: "activity", label: "Activitate Live", icon: Sparkles },
@@ -691,6 +694,7 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
   const isSuperAdmin = !adminScope || (adminScope.admin_scope || "general").toLowerCase() === "general";
   if (!isSuperAdmin) {
     visibleSections = visibleSections.filter(s => !s.superAdminOnly);
+    visibleSections = visibleSections.map(s => ({ ...s, items: s.items.filter(it => !it.superAdminOnly) }));
   }
 
   // ── Active admin zone: "business" | "infrastructure" (persisted) ──────────

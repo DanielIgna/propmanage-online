@@ -98,3 +98,50 @@ async def financial_cockpit(_admin=Depends(require_role("admin"))):
         "cash_flow_30d": series,
         "cash_flow_total_30d": round(sum(s["amount"] for s in series), 2),
     }
+
+
+@router.post("/insights")
+async def generate_insights(_admin=Depends(require_role("admin"))):
+    """AI Insights pe datele financiare — modulul 3 din viziune (Insights după fiecare modul)."""
+    data = await financial_cockpit(_admin)
+    rev, esc, subs = data["revenue"], data["escrow"], data["subscriptions"]
+    try:
+        from orchestrator.llm import claude_json
+        system = (
+            "Ești analistul financiar AI al PropManage (marketplace RO cu escrow + abonamente). "
+            "Primești cifrele reale și returnezi 3-5 insights scurte, factuale, acționabile. "
+            "Răspunde STRICT JSON: {\"insights\": [{\"title\": str RO ≤80c, \"body\": str RO ≤180c, "
+            "\"severity\": \"positive|neutral|warning\"}]}."
+        )
+        prompt = (
+            f"Revenue: total={rev['total_paid']} lei, 30z={rev['last_30d']} (growth {rev['growth_pct']}%), "
+            f"pending={rev['pending_amount']}. Escrow: blocat={esc['held']['amount']} ({esc['held']['count']}), "
+            f"înghețat={esc['frozen']['amount']} ({esc['frozen']['count']}), eliberat={esc['released']['amount']}. "
+            f"Abonamente: {subs['active']} active, MRR={subs['mrr_ron']} lei, ARR={subs['arr_ron']} lei. "
+            f"TVA estimat 30z={data['vat']['estimated_30d']} lei."
+        )
+        result = await claude_json(system=system, prompt=prompt, session_prefix="fin-insights")
+        insights = [
+            {"title": str(i.get("title") or "")[:100], "body": str(i.get("body") or "")[:220],
+             "severity": i.get("severity") if i.get("severity") in ("positive", "neutral", "warning") else "neutral"}
+            for i in (result.get("insights") or [])[:5] if isinstance(i, dict) and i.get("title")
+        ]
+        if not insights:
+            raise ValueError("Zero insights")
+        ai_generated = True
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[fin-cockpit] LLM fail: {e} — fallback")
+        insights = [
+            {"title": "Escrow blocat semnificativ", "body": f"{esc['held']['amount']:.0f} lei stau neconfirmați în {esc['held']['count']} cereri — confirmă-le pentru cash flow.", "severity": "warning"},
+        ]
+        ai_generated = False
+
+    doc = {"generated_at": datetime.now(timezone.utc).isoformat(), "insights": insights, "ai_generated": ai_generated}
+    await db.financial_insights.update_one({"_id": "latest"}, {"$set": doc}, upsert=True)
+    return doc
+
+
+@router.get("/insights/latest")
+async def latest_insights(_admin=Depends(require_role("admin"))):
+    doc = await db.financial_insights.find_one({"_id": "latest"}, {"_id": 0})
+    return doc or {"insights": None}

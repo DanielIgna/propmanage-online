@@ -27,18 +27,21 @@ const Bar = ({ label, value, max, cls }) => (
 
 export default function MarketplaceIntelPage() {
   const [data, setData] = useState(null);
+  const [counties, setCounties] = useState([]);
   const [recos, setRecos] = useState(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [d, r] = await Promise.all([
+      const [d, r, c] = await Promise.all([
         ax.get("/admin/marketplace-intel/supply-demand"),
         ax.get("/admin/marketplace-intel/recommend/latest"),
+        ax.get("/admin/marketplace-intel/by-county"),
       ]);
       setData(d.data);
       setRecos(r.data.recommendations ? r.data : null);
+      setCounties(c.data.counties || []);
     } catch (e) { /* silent */ }
     setLoading(false);
   }, []);
@@ -119,6 +122,32 @@ export default function MarketplaceIntelPage() {
               )}
             </AdminCard>
           </div>
+
+          <AdminCard
+            title={<span className="flex items-center gap-2"><Radar className="w-4 h-4 text-lime-500" /> City Analytics — cerere vs capacitate pe județe (90 zile)</span>}
+            testid="mi-counties"
+          >
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {counties.map((c) => {
+                const st = STATUS[c.status];
+                return (
+                  <div key={c.county} className="p-3 rounded-xl border border-slate-200 dark:border-slate-700" data-testid={`mi-county-${c.county}`}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm font-bold text-slate-900 dark:text-white">{c.county}</span>
+                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${st.cls}`}>{st.label}{c.pct ? ` ${c.pct}%` : ""}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 space-y-0.5">
+                      <div>{c.demand} cereri · {c.supply} specialiști</div>
+                      <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <div className={`h-full ${c.status === "deficit" ? "bg-rose-500" : "bg-lime-400"}`} style={{ width: `${Math.min(100, c.capacity ? (c.demand / c.capacity) * 100 : 100)}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {!counties.length && <div className="text-xs text-slate-400 col-span-full">Fără date pe județe încă.</div>}
+            </div>
+          </AdminCard>
         </div>
       )}
     </AdminLayoutMetronic>

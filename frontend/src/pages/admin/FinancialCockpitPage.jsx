@@ -1,7 +1,7 @@
 // FinancialCockpitPage — vedere financiară completă: revenue, escrow, MRR/ARR, TVA, cash flow 30z.
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { Wallet, Lock, Snowflake, Unlock, Repeat, Receipt, TrendingUp, RefreshCw, Percent } from "lucide-react";
+import { Wallet, Lock, Snowflake, Unlock, Repeat, Receipt, TrendingUp, RefreshCw, Percent, Sparkles } from "lucide-react";
 import { AdminLayoutMetronic, AdminCard } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
 import { KpiCard, DSButton, DSSkeleton } from "../../design-system";
@@ -11,15 +11,30 @@ const lei = (v) => `${(v ?? 0).toLocaleString("ro-RO", { maximumFractionDigits: 
 
 export default function FinancialCockpitPage() {
   const [data, setData] = useState(null);
+  const [insights, setInsights] = useState(null);
+  const [genInsights, setGenInsights] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     setLoading(true);
     try {
-      const r = await ax.get("/admin/financial-cockpit");
+      const [r, i] = await Promise.all([
+        ax.get("/admin/financial-cockpit"),
+        ax.get("/admin/financial-cockpit/insights/latest"),
+      ]);
       setData(r.data);
+      setInsights(i.data.insights ? i.data : null);
     } catch (e) { /* silent */ }
     setLoading(false);
+  };
+
+  const generateInsights = async () => {
+    setGenInsights(true);
+    try {
+      const r = await ax.post("/admin/financial-cockpit/insights");
+      setInsights(r.data);
+    } catch (e) { /* silent */ }
+    setGenInsights(false);
   };
 
   useEffect(() => { load(); }, []);
@@ -112,6 +127,26 @@ export default function FinancialCockpitPage() {
               <span>{data?.cash_flow_30d?.[0]?.date}</span>
               <span>{data?.cash_flow_30d?.[data.cash_flow_30d.length - 1]?.date}</span>
             </div>
+          </AdminCard>
+
+          <AdminCard
+            title={<span className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-lime-500" /> AI Insights — Financial</span>}
+            action={<DSButton variant="primary" icon={genInsights ? RefreshCw : Sparkles} disabled={genInsights} onClick={generateInsights} data-testid="fc-insights-btn">{genInsights ? "Analizează…" : "Generează insights"}</DSButton>}
+            testid="fc-insights"
+          >
+            {genInsights && <DSSkeleton kpis={0} blocks={1} />}
+            {!genInsights && !insights && <div className="text-sm text-slate-500">AI-ul citește cifrele reale (revenue, escrow, MRR) și îți spune ce se mișcă și unde e riscul.</div>}
+            {!genInsights && insights && (
+              <div className="space-y-2" data-testid="fc-insights-body">
+                {(insights.insights || []).map((ins, i) => (
+                  <div key={i} className={`p-3 rounded-xl border text-sm ${ins.severity === "warning" ? "bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30" : ins.severity === "positive" ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30" : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"}`} data-testid={`fc-insight-${i}`}>
+                    <div className="font-bold text-slate-900 dark:text-white">{ins.title}</div>
+                    <div className="text-xs text-slate-600 dark:text-slate-300">{ins.body}</div>
+                  </div>
+                ))}
+                <div className="text-[10px] text-slate-400">{insights.ai_generated ? "Claude · date reale" : "Fallback"} · {insights.generated_at && new Date(insights.generated_at).toLocaleString("ro-RO")}</div>
+              </div>
+            )}
           </AdminCard>
         </div>
       )}

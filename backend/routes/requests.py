@@ -22,6 +22,7 @@ async def create_request(data: RequestIn, background_tasks: BackgroundTasks, use
     if not prop: raise HTTPException(404, "Property not found")
     doc = {
         **data.model_dump(),
+        "county": data.county or prop.get("county") or prop.get("zone") or prop.get("city"),
         "client_id": user["id"],
         "client_name": user["name"],
         "property_name": prop["name"],

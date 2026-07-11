@@ -26,15 +26,33 @@ const ScoreRing = ({ score, color }) => {
   );
 };
 
+const Sparkline = ({ points, color }) => {
+  if (!points || points.length < 2) return <span className="text-[9px] text-slate-400">trend din a 2-a zi</span>;
+  const w = 72, h = 20;
+  const min = Math.min(...points), max = Math.max(...points);
+  const range = max - min || 1;
+  const path = points.map((p, i) => `${(i / (points.length - 1)) * w},${h - ((p - min) / range) * h}`).join(" ");
+  return (
+    <svg width={w} height={h} className="overflow-visible">
+      <polyline points={path} fill="none" stroke={COLOR[color].ring} strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+};
+
 export default function BusinessHealthPage() {
   const [data, setData] = useState(null);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     setLoading(true);
     try {
-      const r = await ax.get("/admin/business-health");
+      const [r, h] = await Promise.all([
+        ax.get("/admin/business-health"),
+        ax.get("/admin/business-health/history?days=30"),
+      ]);
       setData(r.data);
+      setHistory(h.data.history || []);
     } catch (e) { /* silent */ }
     setLoading(false);
   };
@@ -61,6 +79,10 @@ export default function BusinessHealthPage() {
                 <div className="text-sm text-slate-600 dark:text-slate-300 mt-1.5">
                   Media celor 8 departamente. Fiecare scor e o formulă deterministă pe datele din DB — nu estimări.
                 </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <Sparkline points={history.map((h) => h.overall)} color={data?.overall_color || "yellow"} />
+                  <span className="text-[10px] text-slate-400" data-testid="bh-history-info">{history.length} snapshot{history.length === 1 ? "" : "-uri"} zilnice (30z)</span>
+                </div>
               </div>
             </div>
           </AdminCard>
@@ -73,6 +95,7 @@ export default function BusinessHealthPage() {
                   <ScoreRing score={d.score} color={d.color} />
                   <div className="text-sm font-black text-slate-900 dark:text-white">{d.label}</div>
                   <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${c.text}`}>{c.label}</span>
+                  <Sparkline points={history.map((h) => h.scores?.[d.key]).filter((v) => v != null)} color={d.color} />
                   <div className="text-[11px] text-slate-500 dark:text-slate-400">{d.detail}</div>
                 </div>
               );
