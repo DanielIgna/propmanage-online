@@ -344,18 +344,16 @@ async def generate_tasks(
     payload: dict = Body(default={}),
     user=Depends(require_role("admin")),
 ):
-    """Materialize current recommendations as actionable TODOs in admin_todos.
+    """Materialize current recommendations as actionable TODOs in admin_todos."""
+    return await materialize_recommendations(
+        max_items=int(payload.get("max_items", 6)),
+        min_impact=float(payload.get("min_impact", 0.0)),
+        dry_run=bool(payload.get("dry_run", False)),
+    )
 
-    Body (optional):
-      - max_items: int (default 6 — same as engine's hard cap)
-      - min_impact: float (default 0.0 — filter low-impact recs)
-      - dry_run: bool (default false — preview without insert)
 
-    De-duplicates by text (case-insensitive). Returns list of injected + skipped.
-    """
-    max_items = int(payload.get("max_items", 6))
-    min_impact = float(payload.get("min_impact", 0.0))
-    dry_run = bool(payload.get("dry_run", False))
+async def materialize_recommendations(max_items: int = 6, min_impact: float = 0.0, dry_run: bool = False) -> dict:
+    """Reusable: recomandările Autonomy → TODO-uri (de-dup pe text). Folosit și de Self-Driving cron."""
 
     # Always use a fresh report (no cache) so generated tasks reflect reality
     cfg = await load_targets()

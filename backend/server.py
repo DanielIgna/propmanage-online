@@ -53,6 +53,12 @@ from routes.it_digest import run_weekly_it_sprint_digest, _get_settings as _it_d
 from routes.legal import seed_default_legal_documents
 from routes.demo_activity import schedule_log as _schedule_demo_log
 from routes.site_menu import menu_popularity_reorder_tick
+from autonomy.self_driving import (
+    low_risk_autopilot_tick,
+    auto_materialize_tasks_job,
+    stale_request_escalation_tick,
+    weekly_lead_report_job,
+)
 from middleware_scope import admin_scope_middleware
 from admin_briefing_digest import run_morning_briefing_job
 from backup_service import run_daily_backup_job
@@ -195,6 +201,35 @@ async def startup():
             menu_popularity_reorder_tick,
             CronTrigger(hour=4, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="menu_popularity_reorder_daily",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        # Self-Driving Automations — țintă 90%+ autonomie
+        scheduler.add_job(
+            low_risk_autopilot_tick,
+            CronTrigger(hour="*/2", minute=10, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="sd_low_risk_autopilot",
+            replace_existing=True,
+            misfire_grace_time=1800,
+        )
+        scheduler.add_job(
+            auto_materialize_tasks_job,
+            CronTrigger(hour=3, minute=45, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="sd_auto_materialize_todos",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        scheduler.add_job(
+            stale_request_escalation_tick,
+            CronTrigger(hour="*/6", minute=20, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="sd_stale_request_escalation",
+            replace_existing=True,
+            misfire_grace_time=1800,
+        )
+        scheduler.add_job(
+            weekly_lead_report_job,
+            CronTrigger(day_of_week="mon", hour=9, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="sd_weekly_lead_report",
             replace_existing=True,
             misfire_grace_time=3600,
         )

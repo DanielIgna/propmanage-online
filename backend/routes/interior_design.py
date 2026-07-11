@@ -143,23 +143,50 @@ class LeadIn(BaseModel):
     lead_type: str = "proiect"  # proiect | oferta | consultanta
 
 
+def _triage_lead(p: "LeadIn") -> tuple[int, str]:
+    """Scoring determinist 0-100 → segment hot/warm/nurture (Self-Driving lead triage)."""
+    score = 20
+    if p.phone: score += 20
+    if p.budget:
+        b = p.budget.lower()
+        score += 25 if any(x in b for x in ("10000", "15000", "20000", "peste", ">")) else 15
+    if p.surface_mp and p.surface_mp >= 60: score += 10
+    if p.message and len(p.message) > 60: score += 10
+    if p.photo_urls: score += 10
+    if p.lead_type == "proiect": score += 5
+    score = min(100, score)
+    segment = "hot" if score >= 70 else "warm" if score >= 45 else "nurture"
+    return score, segment
+
+
 @router.post("/interior-design/leads")
 async def create_lead(payload: LeadIn):
+    score, segment = _triage_lead(payload)
     lead = {
         "id": uuid.uuid4().hex[:12],
         **payload.model_dump(),
         "photo_urls": payload.photo_urls[:10],
         "status": "new",
+        "score": score,
+        "segment": segment,
+        "triaged_by": "autonomy:lead_triage",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.interior_design_leads.insert_one({**lead})
     try:
         from orchestrator.engine import notify_admins
-        await notify_admins(
-            f"🎨 Lead nou Design Interior: {payload.name}",
-            f"{payload.lead_type} · {payload.style or 'stil nespecificat'} · {payload.budget or 'buget nespecificat'} · {payload.city or ''}",
-            link="/admin/interior-design",
-        )
+        if segment == "hot":
+            await notify_admins(
+                f"🔥 Lead HOT Design Interior ({score}/100): {payload.name}",
+                f"{payload.lead_type} · {payload.style or 'stil nespecificat'} · {payload.budget or 'buget nespecificat'} · {payload.city or ''} — contactează în max 1h!",
+                link="/admin/interior-design", send_emails=True,
+            )
+        else:
+            await notify_admins(
+                f"🎨 Lead nou Design Interior ({segment}, {score}/100): {payload.name}",
+                f"{payload.lead_type} · {payload.style or 'stil nespecificat'} · {payload.budget or 'buget nespecificat'} · {payload.city or ''}",
+                link="/admin/interior-design",
+            )
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[interior-design] notify fail: {e}")
     return {"ok": True, "lead_id": lead["id"], "message": "Mulțumim! Un designer te va contacta în 24-48h."}

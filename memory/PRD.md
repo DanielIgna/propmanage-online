@@ -2512,3 +2512,23 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - P1 XOS Faza 2: suprafețe noi Layout Builder (specialist, homepage) + widget-uri noi
 - P2 Pagini dedicate servicii + Developer Mode Design Studio
 - P3 Resend DNS (blocat pe user)
+
+## [2026-06-11] Self-Driving Automations — țintă 90%+ autonomie (Iter 110)
+
+### Livrat concret (modul nou /app/backend/autonomy/self_driving.py + panou în Autonomy Engine)
+1. **Low-Risk Autopilot** (cron la 2h): auto-închide TODO-urile Autonomy rezolvate (recomandarea a dispărut din raport) + auto-aprobă/execută approvals pending cu acțiuni low-risk (>1h) — la eroare rămân pending cu notă (rollback-safe)
+2. **Self-Healing Smoke Monitor** (în handle_smoke_fail): retry automat imediat → dacă trece = flake, zero notificare; dacă pică = caută fix-uri cunoscute în Bug Memory (qa_sessions închise) și notifică cu context
+3. **Lead Triage AI** (interior_design.py): scoring determinist 0-100 (telefon/buget/suprafață/mesaj/poze) → segment hot/warm/nurture; HOT = notificare urgentă + email; raport săptămânal luni 09:00
+4. **Auto-TODO din recomandări** (cron 03:45): materialize_recommendations() extras ca funcție reutilizabilă din routes/autonomy.py
+5. **Auto-escaladare cereri stale** (cron la 6h): open >24h fără oferte → re-notificare TOȚI specialiștii verificați + visibility_boost + ledger orchestrator; idempotent (autonomy_escalated_at)
+
+### API: GET/PUT /api/admin/self-driving/settings · GET /status · POST /run/{job}
+### UI: SelfDrivingPanel.jsx în AutonomyEnginePage (toggles + run now + rezultat live)
+### Testat: toate 4 joburile prin curl (1 TODO injectat, 3 cereri escaladate, idempotent la a 2-a rulare), lead triage (score 100/hot), handle_smoke_fail unitar, panou UI cu toggle+run
+
+### NOTĂ: necesită REDEPLOY pentru propmanage.ro
+
+### Backlog rămas
+- P1 XOS Faza 2: suprafețe noi Layout Builder + widget-uri noi
+- P2 Pagini dedicate servicii + Developer Mode Design Studio
+- P3 Resend DNS (blocat pe user)

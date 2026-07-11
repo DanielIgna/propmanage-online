@@ -10,6 +10,7 @@ import {
 
 const API = process.env.REACT_APP_BACKEND_URL;
 const ax = axios.create({ baseURL: API, withCredentials: true });
+import SelfDrivingPanel from "./SelfDrivingPanel";
 
 const TIER_META = {
   "self-driving": { label: "Self-Driving", color: "#a855f7", ring: "stroke-violet-500", text: "text-violet-300", bg: "bg-violet-500/15 border-violet-500/30" },
@@ -589,7 +590,10 @@ export const AutonomyEnginePage = () => {
         )}
 
         {/* HERO: ring + tier + summary */}
-        <div className="bg-[#0e0e10] border border-white/10 rounded-3xl p-6 md:p-8 mt-6">
+        <div className="mt-6">
+          <SelfDrivingPanel />
+        </div>
+        <div className="bg-[#0e0e10] border border-white/10 rounded-3xl p-6 md:p-8">
           <div className="grid md:grid-cols-[auto_1fr] gap-8 items-center">
             <div className="flex justify-center">
               <ScoreRing score={general} color={tierMeta.color} target={targetGeneral} />

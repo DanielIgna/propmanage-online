@@ -26,7 +26,48 @@ async def handle_smoke_fail(payload: dict) -> dict:
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
 
+    # Self-Healing pas 1: retry imediat — majoritatea eșecurilor sunt flake-uri de rețea
+    try:
+        from autonomy.self_driving import get_settings as _sd_settings
+        sd = await _sd_settings()
+    except Exception:  # noqa: BLE001
+        sd = {"self_healing_smoke": True}
+    if sd.get("self_healing_smoke") and not payload.get("is_retry"):
+        try:
+            from routes.admin_smoketest import _run_smoke_sequence
+            base_url = payload.get("base_url") or ""
+            if base_url:
+                retry_report = await _run_smoke_sequence(base_url)
+                if retry_report.get("overall_ok"):
+                    steps_log.append({"action": "self_healing_retry", "ok": True,
+                                      "detail": "Retry imediat a TRECUT — eșecul inițial a fost flake. Zero intervenție umană."})
+                    return {"steps": steps_log, "outcome": "self_healed_flake", "minutes_saved": 25, "escalate": False}
+                steps_log.append({"action": "self_healing_retry", "ok": False,
+                                  "detail": f"Retry a picat și el ({retry_report.get('failed')}/{retry_report.get('total')}) — eșec real, continui cu diagnoza."})
+        except Exception as e:  # noqa: BLE001
+            steps_log.append({"action": "self_healing_retry", "ok": False, "detail": f"Retry indisponibil: {str(e)[:120]}"})
+
     failed_steps = payload.get("steps") or []
+
+    # Self-Healing pas 2: caută fix-uri cunoscute în Bug Memory (qa_sessions findings închise)
+    known_fixes = []
+    try:
+        for s in failed_steps[:3]:
+            name = str(s.get("name", ""))[:40]
+            if not name:
+                continue
+            match = await db.qa_sessions.find_one(
+                {"findings": {"$elemMatch": {"text": {"$regex": name, "$options": "i"}, "status": {"$in": ["closed", "resolved"]}}}},
+                {"title": 1, "_id": 0},
+            )
+            if match:
+                known_fixes.append(f"'{name}' → fix documentat în sesiunea QA: {match.get('title')}")
+        if known_fixes:
+            steps_log.append({"action": "bug_memory_lookup", "ok": True,
+                              "detail": "Fix-uri cunoscute găsite: " + " | ".join(known_fixes)})
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[playbooks] bug memory lookup fail: {e}")
+
     lines = [
         f"- {s.get('name')}: {s.get('error') or ('HTTP ' + str(s.get('status_code')))}"
         for s in failed_steps
@@ -83,8 +124,10 @@ async def handle_smoke_fail(payload: dict) -> dict:
         })
 
     n = await notify_admins(
-        "🤖 Orchestrator: sesiune QA auto-creată (smoke fail)",
-        f"Smoke test a eșuat ({payload.get('failed')}/{payload.get('total')}). Finding-urile au fost înregistrate automat în QA Copilot.",
+        "🤖 Orchestrator: sesiune QA auto-creată (smoke fail confirmat după retry)",
+        f"Smoke test a eșuat ({payload.get('failed')}/{payload.get('total')}) și retry-ul automat a confirmat eșecul. "
+        + ("Fix-uri cunoscute din Bug Memory: " + " | ".join(known_fixes) + ". " if known_fixes else "")
+        + "Finding-urile au fost înregistrate automat în QA Copilot.",
         link="/admin/qa-copilot",
     )
     steps_log.append({"action": "notify_admins_inapp", "ok": True, "detail": f"{n} admini notificați in-app"})

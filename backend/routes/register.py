@@ -135,6 +135,7 @@ from routes.ai_search import router as ai_search_router
 from routes.interior_design import router as interior_design_router
 from routes.site_menu import router as site_menu_router
 from routes.xos import router as xos_router
+from autonomy.self_driving import router as self_driving_router
 
 # Registration order matters — kept identical to the original server.py loop.
 ALL_ROUTERS = (
@@ -266,4 +267,5 @@ ALL_ROUTERS = (
     interior_design_router,
     site_menu_router,
     xos_router,
+    self_driving_router,
 )
