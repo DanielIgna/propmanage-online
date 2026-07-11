@@ -26,7 +26,8 @@ const Layout = ({ icon: Icon, title, subtitle, children, testid }) => (
 
 export const PrivacyPage = () => (
   <Layout icon={Shield} title="Politică de confidențialitate" subtitle="Ultima actualizare: februarie 2026" testid="privacy-page">
-    <p><strong>PropManage SRL</strong> (&quot;noi&quot;, &quot;platforma&quot;) respectă confidențialitatea utilizatorilor și se conformează regulamentului GDPR (Regulamentul UE 2016/679) și legislației române privind protecția datelor personale.</p>
+    <p><strong>VINTAGE FURNITURE S.R.L.</strong> — operatorul platformei <strong>PropManage</strong> (&quot;noi&quot;, &quot;platforma&quot;) — respectă confidențialitatea utilizatorilor și se conformează regulamentului GDPR (Regulamentul UE 2016/679) și legislației române privind protecția datelor personale.</p>
+    <p className="text-sm">Operator de date: VINTAGE FURNITURE S.R.L. · CUI 35250247 · Nr. Reg. Com. J12/3534/2015 · Sediu: Aleea Negoiu nr. 8D, Ap. 25, Cluj-Napoca, jud. Cluj, 400676, România.</p>
 
     <h2>1. Ce date colectăm</h2>
     <ul>
@@ -95,7 +96,7 @@ export const TermsPage = () => (
     <p>Prin utilizarea platformei <strong>PropManage</strong> (&quot;Platforma&quot;), accepți acești Termeni. Dacă nu ești de acord, te rugăm să nu folosești serviciile.</p>
 
     <h2>1. Cine este responsabil</h2>
-    <p>Operator: <strong>PropManage SRL</strong>, sediu social în România. Contact: <a href="mailto:contact@propmanage.ro">contact@propmanage.ro</a>.</p>
+    <p>Operator: <strong>VINTAGE FURNITURE S.R.L.</strong> (brandul comercial <strong>PropManage</strong>) · CUI 35250247 · Nr. Reg. Com. J12/3534/2015 · Sediu: Aleea Negoiu nr. 8D, Ap. 25, Cluj-Napoca, jud. Cluj, 400676, România. Contact: <a href="mailto:contact@propmanage.ro">contact@propmanage.ro</a>.</p>
 
     <h2>2. Cont utilizator</h2>
     <ul>

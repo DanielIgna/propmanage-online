@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/admin/insights", tags=["ai-insights"])
 logger = logging.getLogger("propmanage.ai_insights")
 
 CACHE_HOURS = 6
-MODULES = {"analytics", "finance", "marketplace", "overview", "control_tower", "users", "bi"}
+MODULES = {"analytics", "finance", "marketplace", "overview", "control_tower", "users", "bi", "ai_control", "governance"}
 
 
 async def _users_stats() -> dict:
@@ -44,6 +44,33 @@ async def _bi_stats() -> dict:
         "completed_30d": done_30d,
         "completion_rate_pct": round(done_30d / new_30d * 100, 1) if new_30d else 0,
         "disputes_open": await db.disputes.count_documents({"status": "open"}),
+    }
+
+
+async def _ai_control_stats(user: dict) -> dict:
+    from routes.ai_control import overview as ai_overview
+    d = await ai_overview(admin=user)
+    return {
+        "provider": d["config"].get("provider"),
+        "model": d["config"].get("model"),
+        "ecosystem_enabled": bool(d["config"].get("enabled")),
+        "memories_total": d["memory"].get("total", 0),
+        "bugs_total": d["bugs"].get("total", 0),
+        "agents_active": len([a for a in d["agents"] if a["status"] == "active"]),
+        "agents_total": len(d["agents"]),
+    }
+
+
+async def _governance_stats(user: dict) -> dict:
+    from routes.ai_governance import get_summary
+    s = await get_summary(user=user)
+    return {
+        "agents_active": (s.get("by_lifecycle") or {}).get("active", 0),
+        "agents_legacy": (s.get("by_lifecycle") or {}).get("legacy", 0),
+        "agents_deprecated": (s.get("by_lifecycle") or {}).get("deprecated", 0),
+        "activity_24h": s.get("global_activity_24h", 0),
+        "activity_7d": s.get("global_activity_7d", 0),
+        "phase": s.get("phase"),
     }
 
 
@@ -92,6 +119,10 @@ async def _context_for(module: str, user: dict) -> dict:
         return await _users_stats()
     if module == "bi":
         return await _bi_stats()
+    if module == "ai_control":
+        return await _ai_control_stats(user)
+    if module == "governance":
+        return await _governance_stats(user)
     return {}
 
 
@@ -132,7 +163,34 @@ async def rule_insights(module: str, user=Depends(require_role("admin"))):
         if s["open_requests"] > s["active_jobs"] * 2 and s["open_requests"] > 5:
             recommendations.append("Cereri deschise mult peste lucrările active — verifică oferta de specialiști pe categoriile cerute (tab Demand Index).")
         return {"bullets": bullets, "alerts": alerts, "recommendations": recommendations}
-    raise HTTPException(400, "Modul necunoscut. Valide: users, bi")
+    if module == "ai_control":
+        s = await _ai_control_stats(user)
+        bullets = [
+            f"Model activ: {s['model']} ({s['provider']}) · {s['agents_active']}/{s['agents_total']} agenți activi.",
+            f"{s['memories_total']} amintiri salvate în memoria cross-session · {s['bugs_total']} bug-uri indexate în istoricul de căutare.",
+        ]
+        alerts = []
+        if not s["ecosystem_enabled"]:
+            alerts.append("Ecosistemul de memorie AI este DEZACTIVAT — agenții nu rețin context între sesiuni.")
+        recommendations = []
+        if s["bugs_total"] == 0:
+            recommendations.append("Rulează QA Playbook ca să populezi Bug Memory — căutarea AI devine utilă cu istoric.")
+        return {"bullets": bullets, "alerts": alerts, "recommendations": recommendations}
+    if module == "governance":
+        s = await _governance_stats(user)
+        bullets = [
+            f"{s['agents_active']} agenți activi · {s['agents_legacy']} legacy · {s['agents_deprecated']} depreciati.",
+            f"Activitate ecosistem: {s['activity_24h']} acțiuni în 24h · {s['activity_7d']} în 7 zile.",
+            f"Fază curentă: {s['phase']}.",
+        ]
+        alerts = []
+        if s["activity_7d"] > 0 and s["activity_24h"] > s["activity_7d"] / 7 * 3:
+            alerts.append(f"Vârf de activitate AI: {s['activity_24h']} acțiuni/24h vs media zilnică ~{round(s['activity_7d'] / 7)} — verifică costurile.")
+        recommendations = []
+        if s["agents_legacy"] > 0:
+            recommendations.append(f"{s['agents_legacy']} agenți legacy — planifică migrarea sau deprecation cu dată-țintă (Art. 3 din Constituție).")
+        return {"bullets": bullets, "alerts": alerts, "recommendations": recommendations}
+    raise HTTPException(400, "Modul necunoscut. Valide: users, bi, ai_control, governance")
 
 
 @router.get("/llm")

@@ -1509,6 +1509,15 @@ const Footer = () => {
             })}
           </div>
         </div>
+        <div className="border-t border-white/5 mt-6 pt-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-2" data-testid="footer-legal">
+          <p className="text-[10px] text-stone-600 leading-relaxed">
+            PropManage este un brand operat de <strong className="text-stone-500">VINTAGE FURNITURE S.R.L.</strong> · CUI 35250247 · Nr. Reg. Com. J12/3534/2015 · Aleea Negoiu nr. 8D, Ap. 25, Cluj-Napoca, jud. Cluj, 400676
+          </p>
+          <div className="flex items-center gap-4 text-[10px] text-stone-600 shrink-0">
+            <a href="https://anpc.ro/ce-este-sal/" target="_blank" rel="noopener noreferrer" className="hover:text-stone-400 transition-colors" data-testid="footer-anpc-sal">ANPC — SAL</a>
+            <a href="https://ec.europa.eu/consumers/odr" target="_blank" rel="noopener noreferrer" className="hover:text-stone-400 transition-colors" data-testid="footer-anpc-sol">SOL — Litigii online</a>
+          </div>
+        </div>
       </div>
     </footer>
   );

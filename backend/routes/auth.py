@@ -507,7 +507,7 @@ async def send_backup_password(user: dict = Depends(get_current_user)):
         f"<a href='mailto:contact@propmanage.ro' style='color:#d4ff3a;'>contact@propmanage.ro</a>.</p>"
         f"<hr style='border:none;border-top:1px solid #292524; margin:24px 0;'/>"
         f"<p style='color:#78716c; font-size:11px; text-align:center;'>"
-        f"PropManage SRL · {front_url}</p>"
+        f"PropManage · operat de VINTAGE FURNITURE S.R.L. · CUI 35250247 · {front_url}</p>"
         f"</div>"
     )
     try:

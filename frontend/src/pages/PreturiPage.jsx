@@ -25,13 +25,18 @@ export default function PreturiPage() {
   const [page, setPage] = useState(null);
   const [notFound, setNotFound] = useState(false);
   const [city, setCity] = useState(null);
+  const [pulse, setPulse] = useState(null);
 
   useEffect(() => {
-    setPage(null); setNotFound(false); setCity(null);
+    setPage(null); setNotFound(false); setCity(null); setPulse(null);
     fetch(`${API}/api/construction/prices/seo-pages/${slug}`)
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
       .then(d => { setPage(d); setCity(d.default_city); })
       .catch(() => setNotFound(true));
+    fetch(`${API}/api/construction/prices/seo-pages/${slug}/pulse`)
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(setPulse)
+      .catch(() => {});
   }, [slug]);
 
   useSEO(page ? {
@@ -95,6 +100,18 @@ export default function PreturiPage() {
               Cât costă {page.noun} în {city} în {page.year}?
             </h1>
             <p className="mt-4 text-stone-400 max-w-2xl">{page.description}</p>
+
+            {/* Market Pulse (Faza 5 — Marketplace Intelligence) */}
+            {pulse && (pulse.requests_30d > 0 || pulse.active_specialists > 0) && (
+              <div className="mt-6 inline-flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border border-[#d4ff3a]/20 bg-[#d4ff3a]/5 px-5 py-3 text-xs" data-testid="preturi-market-pulse">
+                <span className="flex items-center gap-1.5 font-bold text-stone-200">
+                  <span className="w-2 h-2 rounded-full bg-[#d4ff3a] animate-pulse" /> Piața acum
+                </span>
+                {pulse.requests_30d > 0 && <span className="text-stone-400"><strong className="text-stone-200">{pulse.requests_30d}</strong> {pulse.requests_30d === 1 ? "cerere" : "cereri"} în ultimele 30 zile</span>}
+                {pulse.active_specialists > 0 && <span className="text-stone-400"><strong className="text-stone-200">{pulse.active_specialists}</strong> specialiști activi</span>}
+                {pulse.open_now > 0 && <span className="text-stone-400"><strong className="text-stone-200">{pulse.open_now}</strong> {pulse.open_now === 1 ? "cerere deschisă" : "cereri deschise"} acum</span>}
+              </div>
+            )}
 
             {/* Selector oraș */}
             <div className="mt-8 flex flex-wrap gap-2" data-testid="preturi-city-tabs">

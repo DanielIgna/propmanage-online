@@ -210,6 +210,25 @@ async def seo_price_page_detail(slug: str, city: Optional[str] = None):
     return page
 
 
+@router.get("/prices/seo-pages/{slug}/pulse")
+async def seo_price_page_pulse(slug: str):
+    """Public — Market Pulse (Faza 5): cerere reală + ofertă activă pe categoria paginii."""
+    from datetime import datetime, timedelta, timezone
+    from construction.price_seo import PRICE_SEO
+    meta = PRICE_SEO.get(slug)
+    if not meta:
+        raise HTTPException(404, "Pagina de prețuri nu există")
+    cat = meta["category"]
+    since30 = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    requests_30d = await db.requests.count_documents({"category": cat, "created_at": {"$gte": since30}})
+    open_now = await db.requests.count_documents({"category": cat, "status": "open"})
+    specialists = await db.users.count_documents({
+        "role": "specialist", "banned": {"$ne": True}, "deleted": {"$ne": True},
+        "$or": [{"specialty": cat}, {"service_categories": cat}],
+    })
+    return {"category": cat, "requests_30d": requests_30d, "open_now": open_now, "active_specialists": specialists}
+
+
 @router.get("/prices")
 async def list_price_observations(
     category: Optional[str] = None,

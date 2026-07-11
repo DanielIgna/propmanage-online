@@ -276,7 +276,7 @@ export const GhidPage = () => {
       </main>
 
       <footer className="border-t border-white/5 mt-16 py-8 px-6 text-center text-xs text-stone-500">
-        © {new Date().getFullYear()} PropManage · <Link to="/terms" className="hover:text-stone-300">Termeni</Link> · <Link to="/privacy" className="hover:text-stone-300">Confidențialitate</Link>
+        © {new Date().getFullYear()} PropManage · operat de Vintage Furniture S.R.L. (CUI 35250247) · <Link to="/terms" className="hover:text-stone-300">Termeni</Link> · <Link to="/privacy" className="hover:text-stone-300">Confidențialitate</Link>
       </footer>
     </div>
   );

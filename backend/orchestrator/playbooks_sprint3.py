@@ -85,6 +85,45 @@ async def handle_pattern_scan(payload: dict) -> dict:
         })
     steps_log.append({"action": "scan_stale_demand", "ok": True, "detail": f"{stale} cereri stagnante"})
 
+    # d) Supply gap (Autonomy 2.0): categorii cu cerere reală în 30z dar zero specialiști activi
+    demand30 = {}
+    async for row in db.requests.aggregate([
+        {"$match": {"created_at": {"$gte": _days_ago(30)}}},
+        {"$group": {"_id": "$category", "n": {"$sum": 1}}},
+    ]):
+        if row["_id"]:
+            demand30[row["_id"]] = row["n"]
+    supply = {}
+    async for u in db.users.find(
+        {"role": "specialist", "deleted": {"$ne": True}, "banned": {"$ne": True}},
+        {"specialty": 1, "service_categories": 1},
+    ):
+        for c in {u.get("specialty"), *(u.get("service_categories") or [])}:
+            if c:
+                supply[c] = supply.get(c, 0) + 1
+    gaps = [(cat, n) for cat, n in demand30.items() if n >= 3 and supply.get(cat, 0) == 0]
+    for cat, n in sorted(gaps, key=lambda x: -x[1])[:3]:
+        findings.append({
+            "kind": "supply_gap", "severity": "warning",
+            "detail": f"Gol de ofertă pe «{cat}»: {n} cereri/30z și ZERO specialiști activi — prioritate de recrutare marketplace.",
+        })
+    steps_log.append({"action": "scan_supply_gap", "ok": True, "detail": f"{len(gaps)} categorii fără acoperire"})
+
+    # e) Churn risk (Autonomy 2.0): specialiști VERIFIED/PREMIUM inactivi de 21+ zile
+    churn_cutoff = _days_ago(21)
+    churn = await db.users.find(
+        {"role": "specialist", "tier": {"$in": ["VERIFIED", "PREMIUM"]}, "banned": {"$ne": True},
+         "deleted": {"$ne": True}, "last_seen": {"$lt": churn_cutoff}},
+        {"name": 1, "tier": 1, "last_seen": 1},
+    ).sort("last_seen", 1).to_list(50)
+    if len(churn) >= 2:
+        names = ", ".join((u.get("name") or "—") for u in churn[:3])
+        findings.append({
+            "kind": "churn_risk", "severity": "warning",
+            "detail": f"{len(churn)} specialiști {('VERIFIED/PREMIUM')} inactivi de 21+ zile (ex: {names}) — risc de churn, campanie de reactivare recomandată.",
+        })
+    steps_log.append({"action": "scan_churn_risk", "ok": True, "detail": f"{len(churn)} specialiști premium inactivi 21z+"})
+
     if not payload.get("test") and findings:
         await db.pattern_findings.insert_one({
             "id": uuid.uuid4().hex, "ts": _now(), "findings": findings, "trigger": payload.get("trigger", "manual"),
