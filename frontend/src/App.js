@@ -81,6 +81,10 @@ const DesignAuditPage = lazy(() => import("./pages/admin/DesignAuditPage"));
 const DesignStudioPage = lazy(() => import("./pages/admin/DesignStudioPage"));
 const DesignIntelligencePage = lazy(() => import("./pages/admin/DesignIntelligencePage"));
 const PlatformRoadmapPage = lazy(() => import("./pages/admin/PlatformRoadmapPage"));
+const CommandCenterPage = lazy(() => import("./pages/admin/CommandCenterPage"));
+const BusinessHealthPage = lazy(() => import("./pages/admin/BusinessHealthPage"));
+const MarketplaceIntelPage = lazy(() => import("./pages/admin/MarketplaceIntelPage"));
+const FinancialCockpitPage = lazy(() => import("./pages/admin/FinancialCockpitPage"));
 const BugMemoryAggregatorPage = lazy(() => import("./pages/admin/BugMemoryAggregatorPage"));
 const ArchitectureBoardPage = lazy(() => import("./pages/admin/ArchitectureBoardPage"));
 const AIProductManagerPage = lazy(() => import("./pages/admin/AIProductManagerPage"));
@@ -1684,6 +1688,10 @@ function App() {
               <Route path="/admin/design-studio" element={<DesignStudioPage />} />
               <Route path="/admin/design-intelligence" element={<DesignIntelligencePage />} />
               <Route path="/admin/roadmap" element={<PlatformRoadmapPage />} />
+              <Route path="/admin/command-center" element={<CommandCenterPage />} />
+              <Route path="/admin/business-health" element={<BusinessHealthPage />} />
+              <Route path="/admin/marketplace-intel" element={<MarketplaceIntelPage />} />
+              <Route path="/admin/financial-cockpit" element={<FinancialCockpitPage />} />
               <Route path="/admin/bug-memory" element={<BugMemoryAggregatorPage />} />
               <Route path="/admin/architecture-board" element={<ArchitectureBoardPage />} />
               <Route path="/admin/ai-pm" element={<AIProductManagerPage />} />

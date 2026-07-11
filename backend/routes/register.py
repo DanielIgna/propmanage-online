@@ -122,6 +122,10 @@ from routes.design_audit import router as design_audit_router
 from routes.design_studio import router as design_studio_router
 from routes.design_intelligence import router as design_intelligence_router
 from routes.platform_roadmap import router as platform_roadmap_router
+from routes.command_center import router as command_center_router
+from routes.business_health import router as business_health_router
+from routes.marketplace_intel import router as marketplace_intel_router
+from routes.financial_cockpit import router as financial_cockpit_router
 
 # Registration order matters — kept identical to the original server.py loop.
 ALL_ROUTERS = (
@@ -240,4 +244,8 @@ ALL_ROUTERS = (
     design_studio_router,
     design_intelligence_router,
     platform_roadmap_router,
+    command_center_router,
+    business_health_router,
+    marketplace_intel_router,
+    financial_cockpit_router,
 )

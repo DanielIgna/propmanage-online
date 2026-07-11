@@ -96,6 +96,8 @@ const NAV_SECTIONS = [
     zone: "business",
     items: [
       { id: "overview", label: "Dashboard Principal", icon: LayoutDashboard },
+      { id: "command_center", label: "AI Command Center", icon: Brain, badge: "TOP 5", href: "/admin/command-center" },
+      { id: "business_health", label: "Business Health", icon: Activity, badge: "8 SCORURI", href: "/admin/business-health" },
       { id: "roadmap", label: "Roadmap · Evoluție", icon: Map, badge: "LIVE", href: "/admin/roadmap" },
       { id: "control_tower", label: "Control Tower", icon: LayoutDashboard, badge: "NEW", href: "/admin/control-tower" },
       { id: "activity", label: "Activitate Live", icon: Sparkles },
@@ -133,6 +135,7 @@ const NAV_SECTIONS = [
     zone: "business",
     items: [
       { id: "finance", label: "Finanțe & Escrow", icon: Wallet },
+      { id: "financial_cockpit", label: "Financial Cockpit", icon: Wallet, badge: "MRR·ARR", href: "/admin/financial-cockpit" },
     ],
   },
   {
@@ -143,6 +146,7 @@ const NAV_SECTIONS = [
     superAdminOnly: true,
     items: [
       { id: "strategic_partners_dashboard", label: "Strategic Dashboard", icon: Network, badge: "AI XREF", href: "/admin/strategic-partners" },
+      { id: "marketplace_intel", label: "Marketplace Intelligence", icon: Activity, badge: "DEFICIT", href: "/admin/marketplace-intel" },
       { id: "city_partners_list", label: "City Partners", icon: Building2, badge: "NEW V1", href: "/admin/city-partners" },
       { id: "marketplace_partners_list", label: "Marketplace Partners", icon: Award, badge: "AI", href: "/admin/marketplace-partners" },
     ],
