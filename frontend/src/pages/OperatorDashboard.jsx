@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { TwinEditorModal, TWIN_STATUS_LABELS } from "./OperatorTwin";
 import { API, DashLayout, Stat } from "./DashShared";
+import { KpiCard } from "../design-system";
 import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
 import { NonConformityFlagModal } from "./ActivityTimeline";
@@ -61,11 +62,15 @@ export const OperatorDashboard = () => {
     <DashLayout role="operator" title={title} bottomNav={<BottomNav tabs={tabs} active={tab} onChange={setTab} dataPrefix="op-tab" />}>
       {tab === "twins" && (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <Stat icon={Building} label="Twins activi" value={approvedTwins.length} sub="Aprobate" color="emerald" tid="op-approved" />
-            <Stat icon={Clock} label="În validare" value={pendingTwins.length} sub="Acțiune" color="amber" tid="op-pending-twins" data-tour="operator-twin-queue" />
-            <Stat icon={AlertTriangle} label="Revizie cerută" value={revisionTwins.length} sub="Așteptare client" color="red" tid="op-revision" />
-            <Stat icon={FileCheck} label="Logs mentenanță" value={queue.length} sub="În coadă" tid="op-logs" data-tour="operator-kyc-queue" />
+          {/* „Astăzi:" — workspace operațional (Hick: fiecare card = 1 click către rezolvare) */}
+          <div className="mb-6" data-testid="op-today-summary">
+            <h3 className="text-sm font-bold mb-3" style={{ color: "var(--pm-text-variant)" }}>Astăzi:</h3>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <KpiCard icon={Clock} label="Twins de validat" value={pendingTwins.length} accent="warning" onClick={() => document.querySelector('[data-testid="no-pending-twins"], [data-tour="operator-twin-queue"]')?.scrollIntoView({ behavior: "smooth" })} testid="op-pending-twins" />
+              <KpiCard icon={Box} label="DT Pro de setat" value={dtCounters.needs_setup || 0} accent="info" onClick={() => setTab("dt_pro")} testid="op-dtpro-setup" />
+              <KpiCard icon={FileCheck} label="Logs în coadă" value={queue.length} accent="critical" onClick={() => setTab("logs")} testid="op-logs" />
+              <KpiCard icon={Bell} label="Notificări necitite" value={unreadNotifs} accent="neutral" onClick={() => setTab("notifications")} testid="op-notifs" />
+            </div>
           </div>
 
           {/* Digital Twin Pro shortcut card (dublat — accesibil și aici și în tab-ul propriu) */}

@@ -133,7 +133,7 @@ export default function ClientDashboardV2() {
 
   return (
     <div className="min-h-screen bg-[#FAFBFA] cv2-scope" data-testid="client-dashboard-v2">
-      <div className="max-w-md mx-auto min-h-screen sm:border-x sm:border-slate-100 relative pb-20">
+      <div className="max-w-md lg:max-w-2xl mx-auto min-h-screen sm:border-x sm:border-slate-100 relative pb-24 lg:pb-28">
         {/* Header slim */}
         <div className="flex items-center gap-2.5 px-5 pt-5 pb-3" data-testid="v2-header">
           <span className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-black shrink-0" style={{ background: GREEN }}>
@@ -155,6 +155,21 @@ export default function ClientDashboardV2() {
           </button>
           <ThemeSwitcher />
         </div>
+        {/* Desktop: taburi mari + CTA „Solicită ofertă" proeminent (Legea lui Hick) */}
+        <div className="hidden lg:flex items-center gap-2 px-5 pb-4" data-testid="v2-desktop-nav">
+          {NAV.filter(([, , id]) => id !== "request").map(([Icon, label, id]) => (
+            <button key={id} onClick={() => { window.scrollTo({ top: 0 }); setTab(id); }} data-testid={`v2-desktop-nav-${id}`}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold transition-colors ${tab === id ? "bg-slate-900 text-white" : "bg-slate-50 text-slate-600 border border-slate-100 hover:bg-slate-100"}`}>
+              <Icon style={{ width: 18, height: 18 }} /> {label === "Propr." ? "Proprietăți" : label}
+            </button>
+          ))}
+          <button onClick={() => actions.openWizard()} data-testid="v2-desktop-cta"
+            className="ml-auto flex items-center gap-2 px-6 py-3 rounded-full text-sm font-black text-black shadow-lg shadow-[#d4ff3a]/40 hover:scale-[1.02] transition-transform"
+            style={{ background: "#d4ff3a" }}>
+            <Plus style={{ width: 18, height: 18 }} strokeWidth={2.6} /> Solicită ofertă
+          </button>
+        </div>
+
         {TITLES[tab] && <h1 className="px-5 pb-3 text-xl font-black text-slate-900">{TITLES[tab]}</h1>}
 
         {tab === "home" && (!loaded ? <HomeSkeleton /> : <HomeV2 user={user} prop={prop} properties={properties} requests={requests} notifs={notifs} offersCount={offersCount} go={setTab} actions={actions} />)}
@@ -186,19 +201,19 @@ export default function ClientDashboardV2() {
           </div>
         )}
 
-        {/* Bottom nav — 5, FAB verde central */}
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-100" data-testid="v2-bottom-nav">
+        {/* Bottom nav — 5, FAB lime central (doar mobil; desktop are taburile de sus) */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-100" data-testid="v2-bottom-nav">
           <div className="max-w-md mx-auto grid grid-cols-5">
             {NAV.map(([Icon, label, id]) => (
-              <button key={id} onClick={() => { window.scrollTo({ top: 0 }); (id === "request" ? actions.openWizard() : setTab(id)); }} data-testid={`v2-nav-${id}`} className="flex flex-col items-center gap-0.5 py-2.5">
+              <button key={id} onClick={() => { window.scrollTo({ top: 0 }); (id === "request" ? actions.openWizard() : setTab(id)); }} data-testid={`v2-nav-${id}`} className="flex flex-col items-center gap-1 pt-2.5 pb-3">
                 {id === "request" ? (
-                  <span className="w-12 h-12 -mt-6 rounded-full flex items-center justify-center border-4 border-white shadow-lg shadow-[#d4ff3a]/40" style={{ background: "#d4ff3a" }}>
-                    <Icon className="w-5 h-5 text-black" strokeWidth={2.5} />
+                  <span className="w-[52px] h-[52px] -mt-7 rounded-full flex items-center justify-center border-4 border-white shadow-lg shadow-[#d4ff3a]/40" style={{ background: "#d4ff3a" }}>
+                    <Icon className="w-6 h-6 text-black" strokeWidth={2.5} />
                   </span>
                 ) : (
-                  <Icon className="w-5 h-5" style={{ color: tab === id ? GREEN : "#CBD5E1" }} strokeWidth={tab === id ? 2.5 : 2} />
+                  <Icon className="w-6 h-6" style={{ color: tab === id ? GREEN : "#CBD5E1" }} strokeWidth={tab === id ? 2.4 : 2} />
                 )}
-                <span className="text-[9px] font-bold" style={{ color: tab === id ? GREEN : "#94A3B8" }}>{label}</span>
+                <span className="text-[10px] font-bold" style={{ color: tab === id ? GREEN : "#94A3B8" }}>{label}</span>
               </button>
             ))}
           </div>

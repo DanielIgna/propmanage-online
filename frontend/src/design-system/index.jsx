@@ -181,8 +181,8 @@ export const TabBar = ({ tabs, active, onChange, testidPrefix = "ds-tab" }) => (
   <div className="flex flex-wrap items-center gap-2" data-testid={`${testidPrefix}-bar`}>
     {tabs.map(([id, label, Icon]) => (
       <button key={id} onClick={() => onChange(id)} data-testid={`${testidPrefix}-${id}`}
-        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold transition-colors ${active === id ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"}`}>
-        {Icon && <Icon className="w-4 h-4" />} {label}
+        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors ${active === id ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"}`}>
+        {Icon && <Icon className="w-[18px] h-[18px]" />} {label}
       </button>
     ))}
   </div>
