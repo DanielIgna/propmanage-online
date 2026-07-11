@@ -2672,3 +2672,15 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - E2E verificat: dry-run găsește candidați; run real eșuează cu eroarea Resend de domeniu AȘTEPTATĂ + retry înregistrat → se activează cu 1 switch (PUT enabled:true) după fix DNS
 ### Developer Mode: NU implementat — marcat ❄️ înghețat în MASTER_PRODUCT_AUDIT_v2 (sub valoarea consolidării); rămâne în backlog P3
 - BACKLOG: Tenant val 3 (filtrare citiri + primul francizat real + rol franchise_admin) · admin UI editare conținut service hub · activare followup după DNS
+
+## [2026-06-11] TENANT VAL 3 + SECVENȚA NURTURE LIVRATE ✅ (iteration_116: backend 28/28, frontend 5/5, zero bugs)
+### Tenant Val 3 — primul francizat funcțional
+- Rol nou franchise_admin (legat de tenant): creat de HQ via POST/GET /api/admin/tenants/{slug}/admins (validări 400/404/409, main interzis)
+- Scoping citiri: tenant_scope_for în tenancy.py — franchise_admin FORȚAT pe tenantul lui la /api/admin/leads + /summary (nu poate ocoli cu ?tenant=); HQ admin vede tot + filtru opțional
+- Lead-uri publice multi-tenant: POST /api/services/{slug}/leads rezolvă X-Tenant-ID (invalid→fallback main); sync_lead propagă tenant_id; /api/auth/me expune tenant_id
+- PRIMUL FRANCIZAT SEED: tenant 'cluj' (PropManage Cluj, activ) + cont franciza.cluj@propmanage.io / Franciza123! (în test_credentials.md + seed.py template)
+- Frontend: FranchiseDashboard (/franciza + /franchise_admin) — nume tenant, staturi hot/warm/nurture, tabel lead-uri scoped, guard-uri (nelogat→login, admin→/admin); experience profile franchise_admin (entry /franciza)
+### Secvența nurture (email 2)
+- lead_followup refactorizat cu _run_sequence generic; secvența nurture_7d: lead-uri nurture la 7 zile primesc ghidul '5 greșeli scumpe în renovări' (inline în email) + CTA; config nurture_enabled(false)/nurture_delay_hours(168)/nurture_subject; POST /run?sequence=nurture_7d; job orar rulează ambele secvențe
+- AMBELE SECVENȚE STAU PE DISABLED până user rezolvă DNS Resend — activare cu 1 switch
+- BACKLOG: admin UI editare conținut service hub · subdomeniu→tenant la proxy (val 3 final) · Developer Mode (❄️ P3) · activare followup post-DNS
