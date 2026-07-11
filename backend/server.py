@@ -128,13 +128,19 @@ for r in ALL_ROUTERS:
 scheduler = AsyncIOScheduler(timezone=pytz.timezone(BUCHAREST_TZ_NAME))
 
 
+async def _lead_followup_tick():
+    from lead_followup import run_followup_scan
+    await run_followup_scan()
+
+
 @app.on_event("startup")
 async def startup():
     await seed()
     try:
-        from tenancy import ensure_main_tenant, backfill_user_tenants
+        from tenancy import ensure_main_tenant, backfill_user_tenants, backfill_tier1_tenant_data
         await ensure_main_tenant()
         await backfill_user_tenants()
+        await backfill_tier1_tenant_data()
         from kg.registry import seed_registry
         await seed_registry()
     except Exception as e:
@@ -191,6 +197,13 @@ async def startup():
     except Exception as e:
         logger.warning(f"Legal docs seed failed: {e}")
     if not scheduler.running:
+        scheduler.add_job(
+            _lead_followup_tick,
+            CronTrigger(minute=25, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="lead_followup_hourly",
+            replace_existing=True,
+            misfire_grace_time=1800,
+        )
         scheduler.add_job(
             run_daily_digests,
             CronTrigger(hour=19, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),

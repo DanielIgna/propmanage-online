@@ -48,6 +48,7 @@ TIER1_TENANT_SCOPED = {
     "verified_estate_inquiries", "verified_estate_external_requests",
     # comunicare & tracking per tenant
     "email_log", "onboarding_emails", "automation_emails", "push_subscriptions",
+    "lead_followup_log",
     "docs_share_tokens", "docs_send_events", "activity_events",
     "analytics_events", "analytics_sessions", "ab_events", "consent_audit_log",
     "legal_documents", "menu_clicks",
@@ -84,7 +85,7 @@ TIER3_SYSTEM_OPS = {
     "price_observations", "feature_pairs", "strategic_cross_refs", "tenants",
     "auto_match_runs", "auto_match_schedule", "autopilot_runs", "boost_dev_runs",
     "dev_velocity_runs", "tier_promotion_runs", "notification_center_acks",
-    "design_lock", "design_proposals", "app_settings_snapshots",
+    "design_lock", "design_proposals", "app_settings_snapshots", "tenant_migrations",
     "preset_schedules", "preset_schedule_runs", "preset_send_history",
     "client_copilot_cache", "it_copilot_reports", "marketplace_copilot_reports",
     "marketplace_intel_recos", "ai_documents", "ab_experiments",
@@ -127,6 +128,31 @@ async def backfill_user_tenants() -> int:
     if r.modified_count:
         logger.info(f"[tenancy] backfill users tenant_id=main: {r.modified_count}")
     return r.modified_count
+
+
+async def backfill_tier1_tenant_data(force: bool = False) -> dict:
+    """Val 2, idempotent cu marker: toate colecțiile T1 primesc tenant_id='main' + index."""
+    marker = await db.tenant_migrations.find_one({"wave": 2})
+    if marker and not force:
+        return {"skipped": True, "done_at": marker.get("done_at")}
+    now = datetime.now(timezone.utc).isoformat()
+    results, total = {}, 0
+    for col in sorted(TIER1_TENANT_SCOPED):
+        try:
+            r = await db[col].update_many({"tenant_id": {"$exists": False}}, {"$set": {"tenant_id": DEFAULT_TENANT}})
+            await db[col].create_index("tenant_id")
+            if r.modified_count:
+                results[col] = r.modified_count
+                total += r.modified_count
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[tenancy] backfill {col} fail: {e}")
+    await db.tenant_migrations.update_one(
+        {"wave": 2},
+        {"$set": {"wave": 2, "done_at": now, "backfilled_docs": total, "results": results}},
+        upsert=True,
+    )
+    logger.info(f"[tenancy] Val 2 backfill: {total} docs în {len(results)} colecții")
+    return {"skipped": False, "backfilled_docs": total, "collections": results}
 
 
 async def get_tenant(slug: str) -> dict | None:

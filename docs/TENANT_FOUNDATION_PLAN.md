@@ -52,7 +52,7 @@ guvernanță: nicio colecție nouă fără clasificare de tier.
 |---|---|---|---|
 | **0** ✅ | Infrastructură (acest sprint): registru, rezolvare, clasificare, raport | zero | fără schimbare de comportament |
 | **1** ✅ | `users.tenant_id`: stamping la register (email + Google OAuth) + backfill idempotent `main` la startup (`backfill_user_tenants`) — LIVRAT | mic | 1207/1207 useri acoperiți |
-| **2** | Core business: `properties`, `requests`, `transactions`, `reviews`, `notifications` + filtrare pe tenant în citiri (prin dependency `get_tenant_id`) | mediu | backfill idempotent `tenant_id="main"`, apoi filtre |
+| **2** ✅ | Backfill idempotent `tenant_id="main"` pe TOATE cele 78 colecții T1 + index `tenant_id` + marker `tenant_migrations` (wave 2) + `POST /api/admin/tenants/backfill` — LIVRAT: 96.135 docs, acoperire 100% | mic | filtrele pe citiri se activează în val 3, la primul francizat real |
 | **3** | Restul T1 + override-uri T2 per tenant + rezolvare pe subdomeniu | mediu | activarea reală a primului francizat |
 
 Regulă strangler (identică cu Sprint 2): backfill idempotent cu `main`, filtrele se adaugă

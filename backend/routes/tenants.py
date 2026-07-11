@@ -75,6 +75,13 @@ async def tenant_coverage(user: dict = Depends(require_role("admin"))):
     return await coverage_report()
 
 
+@router.post("/backfill")
+async def tenant_backfill(force: bool = False, user: dict = Depends(require_role("admin"))):
+    """Val 2: re-rulează backfill-ul tenant_id='main' pe colecțiile T1 (idempotent)."""
+    from tenancy import backfill_tier1_tenant_data
+    return await backfill_tier1_tenant_data(force=force)
+
+
 @public_router.get("/tenant-context")
 async def tenant_context(request: Request):
     """Tenantul rezolvat pentru requestul curent (consumat de frontend în val 2)."""
