@@ -2577,3 +2577,10 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 ### Bug fixat post-testing: <ExperienceProfilesPanel /> nerandat în XOSBuilderPage (import fără render) — re-aplicat + verificat vizual cu save/restore
 ### ATENȚIE RECURENT: /app/memory/test_credentials.md revine la parola STALE Admin123! (a 3-a oară) — parola corectă e SEED_ADMIN_PASSWORD=1!nasov01ADMIN din backend/.env. Re-corectat.
 ### Sprint 1 COMPLET (1.1+1.2+1.3). Următorul: Sprint 2 — Consolidare (Config/Content/AI-chat/Leads) — AȘTEAPTĂ APROBARE OWNER.
+
+## [2026-06-11] Sprint 2 — CONSOLIDATION_PLAN.md livrat (analiză-only)
+- /app/docs/CONSOLIDATION_PLAN.md: analiza celor 4 unificări cu scheme REALE din DB + volume + consumatori
+- Leads 5→1 (`leads`, 21 docs, triage universal) · Config 4→1 (`settings` namespaces, façade cu fallback, 28 consumatori app_settings) · AI Chat 4→1 (`ai_sessions`, atenție GDPR) · Content: cms_content GOALĂ→retragere, interior_design_content→`service_pages` (Service Page Factory), landing_presets→settings
+- Ordine propusă: 2.1 Leads → 2.2 Config → 2.3 AI Chat → 2.4 Content, fiecare cu raport+STOP
+- Strategie: façade + migrare idempotentă + legacy intact (rollback natural), endpointuri publice neschimbate
+- STATUS: AȘTEAPTĂ aprobarea ordinii + start 2.1
