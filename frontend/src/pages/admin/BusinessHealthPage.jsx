@@ -43,16 +43,19 @@ export default function BusinessHealthPage() {
   const [data, setData] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [menuStats, setMenuStats] = useState(null);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [r, h] = await Promise.all([
+      const [r, h, m] = await Promise.all([
         ax.get("/admin/business-health"),
         ax.get("/admin/business-health/history?days=30"),
+        ax.get("/admin/site-menu/analytics?days=30").catch(() => ({ data: null })),
       ]);
       setData(r.data);
       setHistory(h.data.history || []);
+      setMenuStats(m.data);
     } catch (e) { /* silent */ }
     setLoading(false);
   };

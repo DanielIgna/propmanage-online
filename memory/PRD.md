@@ -2470,3 +2470,23 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - P2 Developer Mode în Design Studio
 - P2 Pagini dedicate servicii (Design Exterior, Arhitectură, Construcții etc. — acum trimit către /marketplace?categorie=X, editabile din Menu Manager)
 - P3 Resend DNS custom domain (blocat pe user: DKIM/SPF)
+
+## [2026-06-11] XOS Faza 1 — Layout Builder, UI Rules, Content Manager, Menu Tracking (Iter 108)
+
+### Livrat concret
+1. **XOS Layout Builder** (/admin/xos-builder): drag&drop (framer-motion Reorder) pentru widget-urile dashboard-ului client (hero, quick_actions, copilot, contextual, discover) — ordine + vizibil/ascuns, fără cod. HomeV2 randează din config (`xos_layouts`).
+2. **Dynamic UI Rules Engine** (/admin/ui-rules): builder vizual „DACĂ [rol/verificat/proiecte finalizate/vechime cont] ATUNCI [ascunde/arată doar dacă] [element meniu / widget client]". Evaluare server-side GET /api/ui-rules/my; aplicat în SiteNav + HomeV2.
+3. **Theme & Content Manager** (/admin/content-manager): banner anunț homepage (activ/text/link/variantă, cu preview live — componenta AnnouncementBanner), override texte Hero, intrări key/value libere (`site_content`).
+4. **Menu Click Tracking**: POST /api/public/site-menu/track la fiecare click în meniu + widget „📊 Top servicii căutate din meniu (30 zile)" în Business Health (GET /api/admin/site-menu/analytics).
+
+### Bug fixat (iter 108)
+- BusinessHealthPage: state `menuStats` + fetch analytics pierdute la un checkout — re-aplicate, pagina verificată vizual.
+
+### Testare: iteration_108.json — backend 20/20 (100%), frontend 6/6 după fix
+
+### Backlog rămas (prioritizat)
+- P1 XOS Faza 2: mai multe suprafețe în Layout Builder (dashboard specialist, homepage public), widget picker cu widget-uri noi
+- P1 UI Rules: feedback validare în admin la condiții invalide
+- P2 Developer Mode în Design Studio
+- P2 Pagini dedicate servicii (Design Exterior, Arhitectură etc.)
+- P3 Resend DNS custom domain (blocat pe user: DKIM/SPF)
