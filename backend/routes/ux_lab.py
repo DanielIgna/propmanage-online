@@ -176,7 +176,14 @@ async def specialist_entry_apply(payload: dict = Body(...)):
         return {"ok": True, "deduped": True, "request_number": existing["request_number"]}
 
     ins = await db.specialist_entry_applications.insert_one(doc)
-    await sync_lead("specialist_entry", {**doc, "id": str(ins.inserted_id)})
+    lead_doc = {**doc, "id": str(ins.inserted_id)}
+    await sync_lead("specialist_entry", lead_doc)
+    # Faza 3 — ack instant + alertă admin (fire-safe; dry_run când enabled=False)
+    try:
+        from specialist_followup import send_immediate_ack
+        await send_immediate_ack(lead_doc)
+    except Exception as _e:  # noqa: BLE001
+        logger.warning(f"[ux-lab] specialist ack failed: {_e}")
     logger.info(f"[ux-lab] aplicație specialist entry: {trade} / {request_number}")
     return {"ok": True, "request_number": request_number}
 

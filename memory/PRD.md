@@ -1,3 +1,26 @@
+## ⚡ Autonomous UX Lab · Faza 3 — Specialist Entry Follow-Up (Iul 12, 2026)
+
+**Goal**: Reduce timp contact <1h + activare specialist prin secvențe automate email.
+
+**Backend nou**:
+- `/app/backend/specialist_followup.py` — config + 4 momente: ack instant (specialist + alertă admin), reminder 1h, nurture 24h. Fire-safe. Config namespace `specialist_followup` (`enabled=false` implicit → dry-run automat).
+- `/app/backend/routes/specialist_followup.py` — GET/PUT `/api/admin/specialist-followup/config`, POST `/run?sequence=reminder_1h|nurture_24h&dry_run`, GET `/log`.
+- `server.py` scheduler: `_specialist_followup_tick` la fiecare 15 min (rulează doar dacă `enabled=true`).
+- `routes/ux_lab.py` `POST /api/public/specialist-entry/apply` → hook `send_immediate_ack(lead_doc)` (dry-run când switch e off).
+
+**Tests validated (curl)**:
+- ✅ Apply → dry-run log în `specialist_followup_log` cu `ack_specialist=dry_run`, `alert_admin=dry_run`.
+- ✅ GET/PUT config funcțional. `enabled=false` default protejează producția.
+- ✅ Run manual reminder_1h / nurture_24h → dry_run (candidates=0 fără lead-uri vechi de 1h/24h).
+- ✅ Non-manual scan cu `enabled=false` returnează `{ran:false, reason:disabled}` (safe by default).
+
+**Activare producție** (pas manual admin): PUT `/api/admin/specialist-followup/config` cu `{"enabled":true}` după confirmare DNS Resend.
+
+**SMS**: DEFERRED — necesită integrare Twilio separată; hook-ul e pregătit ca extensie viitoare.
+
+---
+
+
 ## 📋 Roadmap & Backlog (prioritizat)
 
 ## 🏢 Public Franchise Application "Devino francizat PropManage" (Iul 11, 2026)

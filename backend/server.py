@@ -134,6 +134,11 @@ async def _lead_followup_tick():
     await run_nurture_scan()
 
 
+async def _specialist_followup_tick():
+    from specialist_followup import run_all_sequences
+    await run_all_sequences()
+
+
 async def _tenant_selfheal_tick():
     # Val 2 self-healing: orice insert T1 rămas fără tenant_id primește 'main' noaptea
     from tenancy import backfill_tier1_tenant_data
@@ -210,6 +215,14 @@ async def startup():
             id="lead_followup_hourly",
             replace_existing=True,
             misfire_grace_time=1800,
+        )
+        # Faza 3 — specialist_entry follow-up (reminder 1h + nurture 24h). Rulează la fiecare 15 min.
+        scheduler.add_job(
+            _specialist_followup_tick,
+            CronTrigger(minute="*/15", timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="specialist_followup_15min",
+            replace_existing=True,
+            misfire_grace_time=900,
         )
         scheduler.add_job(
             _tenant_selfheal_tick,
