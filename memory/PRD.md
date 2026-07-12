@@ -1,24 +1,31 @@
 ## ⚡ Autonomous UX Lab · Faza 3 — Specialist Entry Follow-Up (Iul 12, 2026)
 
-**Goal**: Reduce timp contact <1h + activare specialist prin secvențe automate email.
+**Goal**: Reduce timp contact <1h + activare specialist prin secvențe automate email + SMS.
 
-**Backend nou**:
-- `/app/backend/specialist_followup.py` — config + 4 momente: ack instant (specialist + alertă admin), reminder 1h, nurture 24h. Fire-safe. Config namespace `specialist_followup` (`enabled=false` implicit → dry-run automat).
+**Backend**:
+- `/app/backend/specialist_followup.py` — config + 4 momente: ack instant (email specialist cu CTA „📞 Programează apel" + alertă admin) + **SMS stub** cu template `sms_ack_text` (`{first}`, `{ref}`, `{book_url}`), reminder 1h, nurture 24h. Fire-safe. Config namespace `specialist_followup` (`enabled=false`, `sms_enabled=false` implicit → dry-run + stub log).
 - `/app/backend/routes/specialist_followup.py` — GET/PUT `/api/admin/specialist-followup/config`, POST `/run?sequence=reminder_1h|nurture_24h&dry_run`, GET `/log`.
 - `server.py` scheduler: `_specialist_followup_tick` la fiecare 15 min (rulează doar dacă `enabled=true`).
-- `routes/ux_lab.py` `POST /api/public/specialist-entry/apply` → hook `send_immediate_ack(lead_doc)` (dry-run când switch e off).
+- `routes/ux_lab.py` `POST /api/public/specialist-entry/apply` → hook `send_immediate_ack(lead_doc)` care trimite email welcome + admin alert + (opțional) SMS stub logat în DB.
 
-**Tests validated (curl)**:
-- ✅ Apply → dry-run log în `specialist_followup_log` cu `ack_specialist=dry_run`, `alert_admin=dry_run`.
-- ✅ GET/PUT config funcțional. `enabled=false` default protejează producția.
-- ✅ Run manual reminder_1h / nurture_24h → dry_run (candidates=0 fără lead-uri vechi de 1h/24h).
-- ✅ Non-manual scan cu `enabled=false` returnează `{ran:false, reason:disabled}` (safe by default).
+**Config nouă (Iul 12)**:
+- `sms_enabled` (default `false`) — activează SMS stub la ack instant.
+- `sms_ack_text` — template mesaj SMS, cu placeholder-e `{first}` / `{ref}` / `{book_url}`.
+- `call_booking_url` — URL programare apel (gol → derivat automat `{FRONTEND_PUBLIC_URL}/specialist#programare`).
 
-**Activare producție** (pas manual admin): PUT `/api/admin/specialist-followup/config` cu `{"enabled":true}` după confirmare DNS Resend.
+**Tests validated (curl · Iul 12)**:
+- ✅ Apply → 2 entry-uri log: `ack_instant` (email dry_run + admin dry_run + sms=stub) + `sms_ack_instant` cu textul complet și `book_url` corect.
+- ✅ Reminder 1h manual cu lead artificial vechi de 90 min → 1 candidat, sent 1 (dry_run).
+- ✅ Nurture 24h manual, dry_run OK.
+- ✅ `run_all_sequences()` cu `enabled=false` returnează `{ran:false, reason:disabled}` (safe by default).
 
-**SMS**: DEFERRED — necesită integrare Twilio separată; hook-ul e pregătit ca extensie viitoare.
+**Activare producție** (pași manuali admin):
+1. Confirmă DNS Resend (P3 blocker existent).
+2. PUT `/api/admin/specialist-followup/config` `{"enabled":true}` — pornește email real.
+3. Când integrăm Twilio/SMSO: înlocuiește `_send_sms_stub` cu apel real → activează `{"sms_enabled":true}`.
 
 ---
+
 
 
 ## 📋 Roadmap & Backlog (prioritizat)
