@@ -3047,3 +3047,13 @@ Decizie centrală: v1 = recalibrare statistică versionată, NU ML (volum insufi
 Separare: MVP = GI-4a (Ledger v2 + Outcome Tracker + UI read-only) + GI-4b (AI Memory +
 Confidence v2); Sprint ulterior = GI-4c calibrare + GI-4d GDPR tooling; Future = KG/ML/embeddings.
 STATUS: AȘTEAPTĂ APROBAREA BOARD pentru GI-4a. Nu implementa nimic până la aprobare.
+
+---
+
+## 📐 REVIEW CRITIC BUSINESS OS — GI-5 DOCUMENT STRATEGIC LIVRAT (25 Iul 2026, doar analiză)
+GI-4 rămâne FROZEN. Identificate 11 capabilități de business lipsă (post-GI-4), fiecare cu:
+de ce lipsește / de ce nu acum / când / impact comercial / impact autonomie / risc dacă niciodată.
+Alertă critică: Business Constitution executabilă = PRIMA componentă GI-5, pre-condiție autonomie.
+Roadmap cu gates: GI-4 → GI-5 (Business Intelligence) → GI-6 (Autonomous OS) → GI-7 (Cross-Domain).
+Document: /app/memory/GI5_BUSINESS_OS.md. Zero cod/DB modificat.
+STATUS: Așteaptă decizia Board (aprobare GI-4a implementare sau alte directive).
