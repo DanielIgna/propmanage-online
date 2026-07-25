@@ -3069,3 +3069,14 @@ redesign, Explainability universal, Learning Loop generalizat din Value Loop, Va
 (PVI + Technical Condition + Investment Index), Maturity Score L0-L5 (fiecare treaptă = ofertă).
 Document: /app/memory/GI5P_PROPERTY_INTELLIGENCE.md. Zero cod/DB modificat.
 STATUS: Așteaptă decizia Board (aprobare implementare GI-4a sau GI-5P MVP sau alte directive).
+
+---
+
+## 🔬 COHERENCE REVIEW GI-4×GI-5×GI-5P LIVRAT (25 Iul 2026, doar review)
+Verdict: ⚠ READY WITH MINOR ADJUSTMENTS. Arch 84/100, Business 91/100. 13 tensiuni reale
+identificate, 15 simplificări, 6 ajustări declarative (taxonomie memorii, 1 singur KG, confidence
+2 axe, Property Brain absorbit în GI-5P, contract Event Bus idempotent, seed-DNA onboarding),
+12 Legi Fundamentale, SSoT = istoria de evenimente append-only. Roadmap final: GI-0 declarat →
+GI-4 start imediat → GI-5P MVP paralel → GI-5 (Constituție prima) → GI-6 → GI-7.
+Document: /app/memory/GI_COHERENCE_REVIEW.md. Zero cod/DB/documente frozen modificate.
+STATUS: Board să aprobe anexa cu 6 ajustări + roadmap → apoi implementare GI-4a + GI-5P MVP.
