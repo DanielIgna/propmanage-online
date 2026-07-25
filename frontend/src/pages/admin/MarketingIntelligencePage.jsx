@@ -2,6 +2,7 @@
 // + AI Contact Playbook (AI recomandă, omul aprobă: Trimite / Editează / Ignoră).
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { toast } from "sonner";
 import {
   Megaphone, RefreshCw, AlertTriangle, MessageCircle, Target, TrendingUp,
   Flame, Sparkles, Copy, Check, X, Pencil, Wallet,
@@ -40,7 +41,9 @@ const PlaybookPanel = ({ item, onClose }) => {
     try {
       await ax.post(`/admin/marketing-intel/playbook/${pb.id}/decision`, { action, final_message: editing ? msg : "" });
       setDecided(action);
-    } catch (e) { /* silent */ }
+    } catch (e) {
+      toast.error("Decizia nu a putut fi salvată — încearcă din nou.");
+    }
   };
   const copy = () => { navigator.clipboard?.writeText(msg).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1500); };
 
@@ -120,7 +123,15 @@ export default function MarketingIntelligencePage() {
   };
   const runScan = async () => {
     setRunning(true);
-    try { const r = await ax.post("/admin/marketing-intel/run"); setData(r.data); const q = await ax.get("/admin/marketing-intel/opportunity-queue"); setQueue(q.data); } catch (e) { /* silent */ }
+    try {
+      const r = await ax.post("/admin/marketing-intel/run");
+      setData(r.data);
+      const q = await ax.get("/admin/marketing-intel/opportunity-queue");
+      setQueue(q.data);
+      toast.success("Analiza de marketing a fost actualizată.");
+    } catch (e) {
+      toast.error("Analiza a eșuat — încearcă din nou.");
+    }
     setRunning(false);
   };
   useEffect(() => { load(); }, []);

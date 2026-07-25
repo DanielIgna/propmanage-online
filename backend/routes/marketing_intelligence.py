@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Body, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from db import db
 from deps import require_role
@@ -49,13 +49,20 @@ async def opportunity_queue(user: dict = Depends(require_role("admin"))):
 # ============================================================================
 class PlaybookIn(BaseModel):
     target_type: str  # opportunity | lead
-    ref_id: str
+    ref_id: str = Field(min_length=1, max_length=80)
 
 
 @router.post("/playbook")
 async def generate_playbook(body: PlaybookIn, user: dict = Depends(require_role("admin"))):
     if body.target_type not in ("opportunity", "lead"):
         raise HTTPException(400, "target_type invalid")
+    # debounce cost LLM: refolosește playbook-ul generat recent pentru același target, nedecis încă
+    from datetime import timedelta
+    recent_cutoff = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+    existing = await db.contact_playbooks.find_one(
+        {"ref_id": body.ref_id, "status": "generated", "created_at": {"$gte": recent_cutoff}}, {"_id": 0})
+    if existing:
+        return existing
     # context real: semnale lead + serviciu + valoare
     lead = opp = None
     if body.target_type == "opportunity":

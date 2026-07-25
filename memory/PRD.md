@@ -2992,3 +2992,45 @@ pe datele reale: 260 vizitatori scorați (2 prospects reali cu multi_day_return)
 **Note arhitectură (din code review)**: run_lead_scan în memorie — OK sub ~50k sesiuni;
 praguri tier hard-coded — se calibrează în GI-4 Learning Engine.
 **Next (ordinea Board)**: GI-3 Marketing Intelligence+ → GI-4 Learning Engine → GI-5 AI UX Tester.
+
+---
+
+## ✅ SPRINT GI-3 — „MARKETING INTELLIGENCE+" LIVRAT & VALIDAT (25 Iul 2026)
+Board Decision 007 (Master Prompt): recomandări executive + Opportunity Queue + Contact Playbook.
+Principiu respectat: AI recomandă, OMUL aprobă — nimic nu se trimite automat (grep-verificat de tester).
+1. **Engine** `/app/backend/marketing_intelligence.py` — rule-based la scan (zero cost LLM):
+   - best_send_windows: ferestre 2h × zi (Europe/Bucharest), uplift % vs media de conversie →
+     text executiv „Trimite {zi} {h}–{h+2} — conversie +X% peste medie în 60 zile" (overall + WhatsApp)
+   - channel_performance: sesiuni/vizitatori/conturi/cereri/conversie per sursă + canal câștigător
+   - message_performance: campanii (reuse _campaign_stats) + câștigători A/B semnificativi
+   - commercial_intelligence: top venit (escrow confirmat/categorie 90z), cea mai bună conversie
+     (accept rate oportunități), de promovat (trend 30z vs 30z), pierde clienți (dispute/categorie)
+   - build_opportunity_queue: revenue_opportunities active × lead_scores + lead-uri hot/qualified
+     fără oportunitate (serviciu dedus din semnale) → priority = prob × valoare × urgență(1.3 hot)
+   - run_marketing_scan: 6+ recomandări executive FIECARE cu motiv + confidence(+label) +
+     impact_estimate + KPI + categorie (cerință Board 007) → marketing_insights latest+history +
+     event marketing.scan_completed
+2. **AI Contact Playbook** (`routes/marketing_intelligence.py`):
+   - POST /playbook: Claude generează {whatsapp_message, email_subject/body, notification_text}
+     personalizat pe semnalele reale ale lead-ului (why[] afișat operatorului); fallback șablon;
+     debounce 10 min per ref_id (cost LLM)
+   - POST /playbook/{id}/decision: sent|edited|ignored → contact_playbooks + **ai_decision_ledger**
+     {recommendation, reason, approved_by, action, result:pending_outcome} — FUNDAȚIA GI-4;
+     event playbook.decision. Fără nicio trimitere automată.
+   - GET /latest, /run, /opportunity-queue, /playbooks
+3. **Cron** marketing_intelligence_daily 06:55. Agent în registry (marketing_intelligence).
+4. **UI** `/admin/marketing-intel` (nav: Marketing & Growth → Marketing Intelligence+, badge GI-3):
+   4 KPI, card WhatsApp Intelligence, Recomandări executive (badge încredere+categorie+KPI+impact),
+   Commercial Intelligence (4 răspunsuri directe), Opportunity Queue (prob% – nume – serviciu –
+   valoare – urgență) cu PlaybookPanel inline (De ce contează + mesaj + Copiază/Trimite/Editează/
+   Ignoră + confirmare Ledger). Toast-uri sonner pe erori.
+**VALIDAT (iteration_122.json)**: backend 20/20 PASS, frontend 100%, zero bug-uri.
+Insights REALE: «hvac» +475% trend cereri (46 vs 8) + top venit 3.250 RON; «electric» pierde
+clienți (14 dispute); /login pierde 35.8% utilizatori; queue 30 items / 45.000 RON pipeline;
+playbook Claude personalizat pe request_abandoned real în ~9s.
+**Post-testare**: ref_id min_length (422 la gol), debounce playbook 10min, toast erori UI — verificate.
+**Suite**: /app/backend/tests/test_marketing_intel_iter122.py.
+**Note scalare (code review)**: N+1 lookups în commercial_intelligence/queue — OK la scara actuală,
+$lookup pipeline la >5k active.
+**Next (ordinea Board 007)**: GI-4 Learning Engine (ai_decision_ledger deja populat) →
+GI-5 AI UX Tester → GI-6 Revenue Automation + Command Center v2.
