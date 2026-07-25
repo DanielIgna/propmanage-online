@@ -2840,3 +2840,25 @@ STATUS: Kickoff Sprint 1 prezentat fondatorului cu opțiuni A/B/C — AȘTEAPTĂ
 Salvat în /app/memory/PROPERTY_DNA.md. Confirmă explicit Opțiunea B și Property Graph API ca prim pas.
 Property DNA = reprezentare logică canonică (proiecție, nu tabel); Capability Map = organizare pe
 capabilități; Mission Control consumă doar DNA/CapMap/EventBus/KG/Timeline, nu structura DB.
+
+---
+
+## ✅ SPRINT 1 / FELIA 1 — „Property DNA" LIVRATĂ & TESTATĂ (25 Iul 2026)
+Aprobare fondator: START (Opțiunea B, felii verticale Strangler).
+1. **Event Bus canonic** (`/app/backend/event_bus.py`): emit() cu Capability Map (Prompt 005),
+   derivare automată property_id din request_id (Legea 2), forward către orchestrator playbooks.
+   services.log_event() DELEGĂ acum către bus — un singur punct de emisie, zero breaking changes.
+2. **Property DNA API**: `GET /api/properties/{id}/dna` — proiecție read-only pe 10 capabilități
+   (identity/health/twin/works/financial/documents/relations/maintenance/sensors/recommendations)
+   + dna_completeness % + timeline unificat (evenimente canonice + repere derivate, dedup).
+   Securitate: owner/admin/operator/franchise_admin; alții 403. ZERO migrare destructivă.
+3. **Jurnal central agenți** (`agent_journal.py`): APScheduler listener → db.agent_runs (cap 6000)
+   pentru toate cele 51+ cron jobs + `GET /api/admin/agent-runs` (admin-only).
+4. **UI vizibil**: card „Cartea Casei" în tab Proprietatea (client V2) — completitudine DNA,
+   chips capabilități, mini-timeline. Demo: 70% pe proprietatea clientului demo.
+5. Fix minor: /api/requests/{id} → 404 (nu 500) pe id non-ObjectId.
+**Testare**: iteration_118.json — backend 10/10 pytest, frontend 100%. Suite reutilizabilă:
+/app/backend/tests/test_property_dna.py.
+**Următoarea felie (2)**: Job Closure Enrichment (Legea 8) — finalizarea lucrării scrie obligatoriu
+în Twin (foto după, garanție, materiale, re-scoring House Health). Apoi Felia 3: ledger unic +
+taxonomie unică + Adoption Metrics.

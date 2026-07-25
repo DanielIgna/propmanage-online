@@ -145,6 +145,8 @@ async def list_requests(
 
 @router.get("/requests/{req_id}")
 async def get_request(req_id: str, user: dict = Depends(get_current_user)):
+    if not ObjectId.is_valid(req_id):
+        raise HTTPException(404, "Request not found")
     doc = await db.requests.find_one({"_id": ObjectId(req_id)})
     if not doc: raise HTTPException(404, "Request not found")
     return serialize_doc(doc)
