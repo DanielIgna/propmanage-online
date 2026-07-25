@@ -2829,3 +2829,9 @@ Orice task viitor se verifică obligatoriu pe toate 4 + cele 20 de legi.
 Adăugată la LEGILE_ECOSISTEMULUI.md. Impune: validare înainte de optimizare/scalare, educarea pieței
 ca parte din produs (conținut educațional auto-generat), indicatori de adopție per funcționalitate.
 Impact direct asupra planului: instrumentare metrici de adopție + motor de educare a pieței.
+
+## 📜 PROTOCOLUL DE LUCRU (25 Iul 2026)
+Directiva finală a Fondatorului — salvată în /app/memory/PROTOCOL_DE_LUCRU.md.
+Mod de lucru CTO: ritual început de sprint (analiză→riscuri→opțiuni→recomandare→aprobare),
+implementare incrementală, raport final de sprint. Stack doctrinar complet: 001-004 + L21 + Protocol.
+STATUS: Kickoff Sprint 1 prezentat fondatorului cu opțiuni A/B/C — AȘTEAPTĂ APROBARE.
