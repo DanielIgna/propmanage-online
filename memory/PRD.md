@@ -3117,3 +3117,38 @@ vizibil în /admin/learning și în snapshot-ul Command Center. Ceasul outcome-u
 constructorul decis — intenționat). Următorul gate GI-4c: ≥30 outcome-uri reale.
 **Next**: GI-5P MVP (Maturity Score L0-L5 + registru active + predictive actuarial) conform
 roadmap-ului aprobat; apoi GI-4b (AI Memory) sau GI-5 Constituția executabilă — decizia Board.
+
+---
+
+## ✅ SPRINT GI-5P 1 — PROPERTY INTELLIGENCE MVP LIVRAT (Iun 2026, Board approved & frozen)
+Directive noi salvate: 013 extins (Product Vision/Commercial Intelligence → BOARD_DIRECTIVE_013_PRODUCT_VISION.md),
+014 extins (Commercial Execution: Audit First, categorii, priority 1-5, 90-Day Rule →
+BOARD_DIRECTIVE_014_COMMERCIAL_EXECUTION.md), 015 (Trust & Data Integrity: provenance, confidence,
+No Fake Precision → BOARD_DIRECTIVE_015_TRUST_DATA_INTEGRITY.md).
+Implementat (extensie pură, zero refactor):
+1. **`/app/backend/property_intelligence.py`**: bibliotecă actuarială statică versionată (2026.06-v1,
+   4 active: centrală/tablou electric/acoperiș/termopane), compute_eol determinist cu INTERVALE
+   (No Fake Precision, lărgite la confidence slab), Maturity L0-L5 criterii binare cumulative
+   (L1 identitate, L2 PVI≥40, L3 timeline viu 12 luni, L4 audit<24 luni, L5 active complete),
+   refresh_maturity (persist + property_maturity_history + event twin.maturity_changed),
+   detect_predictive_candidates (Revenue Hunter), maturity_summary (KPI CEO).
+2. **`/app/backend/routes/property_intelligence.py`**: GET /api/properties/{id}/{maturity,assets,predictive},
+   POST/PATCH assets cu Trust Model 015 (source/confidence/verification_status/last_updated/updated_by),
+   client limitat la owner_declared/official_document, slot replace (Asset Lifecycle), reuse
+   _load_property_for din property_dna. Audit First: sub L2 next_step.cta = audit obligatoriu.
+3. **`revenue_hunter.py` extins**: COMMERCIAL_META (category + commercial_priority 1-5 +
+   commercial_domains pe TOATE oportunitățile), detector predictiv (EOL overdue/attention →
+   confidence slab = oportunitate audit_tehnic, confidence solid = predictive_{asset} cu cost interval),
+   score × (0.8+0.1×priority), maturity refresh în scan-ul zilnic (reuse cron).
+4. **UI Cartea Casei** (PropertyHubV2.jsx): card Twin Maturity (ladder L0-L5, criterii, next-step
+   comercial cu CTA — acceptă oportunitatea audit existentă prin fluxul GI-4a sau deschide wizard) +
+   card Activele casei (4 sloturi, formular inline an+sursă, badge confidence RO, EOL cu badge-uri
+   Estimat/status + interval ani + cost RON + acțiune recomandată + CTA audit la confidence slab).
+5. **CEO Dashboard**: KPI „Twin Maturity mediu LX/5" (ceo-vl-maturity, grid 5 tile-uri).
+**VALIDAT (iteration_124.json)**: backend 18/18 pytest PASS (test_property_intelligence_iter124.py),
+frontend 100% (4/4 flows + regresie DNA/PVI/CEO), zero bug-uri, zero regresii.
+**90-Day Rule**: CTA audit live din ziua 1; pipeline predictiv → Revenue Hunter → outcome tracking
+GI-4a (venit atribuit vizibil în /admin/learning).
+**Next (decizie Board)**: GI-5P Sprint 2 (DNA v2 straturi critice cu provenance, Health decay
+temporal, Risk Engine tehnic+întreținere+juridic) SAU GI-4b AI Memory SAU arhitectura GI-5D
+(Interior Intelligence — permisă DOAR după GI-5P MVP complet).
