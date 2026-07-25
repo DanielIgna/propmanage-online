@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 
 export const GREEN = "#65a30d";        // lime-600 — accent lizibil pe alb (text, iconițe, borduri)
 export const GREEN_SOFT = "#f0fbd1";   // container lime deschis
-export const LIME = "#d4ff3a";         // lime brand — FILL pentru CTA-uri (text negru obligatoriu)
+export const LIME = "#ccff00";         // accent luminos brand — FILL pentru CTA-uri (text negru obligatoriu)
 
 // ---- AmountInput: input de sumă cu formatare live (separator mii ro-RO)
 // State-ul din parent stochează DOAR cifrele raw (string, ex: "35000").
@@ -57,7 +57,7 @@ AmountInput.displayName = "AmountInput";
 export const CTA = ({ children, onClick, testid, disabled, subtle }) => (
   <button onClick={onClick} disabled={disabled} data-testid={testid}
     className={`w-full py-3.5 rounded-full text-sm font-bold transition-transform active:scale-[0.98] disabled:opacity-50 ${
-      subtle ? "bg-white text-slate-900 border border-slate-200" : "text-black shadow-lg shadow-[#d4ff3a]/30"}`}
+      subtle ? "bg-white text-slate-900 border border-slate-200" : "text-black shadow-[0_10px_32px_-12px_rgba(204,255,0,0.5)]"}`}
     style={subtle ? {} : { background: LIME }}>
     {children}
   </button>
@@ -70,8 +70,11 @@ export const Steps = ({ current }) => (
   <div className="flex items-center gap-1.5">
     {STEP_LABELS.map((s, i) => (
       <React.Fragment key={s}>
-        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${i <= current ? "text-white" : "bg-slate-100 text-slate-400"}`}
-          style={i <= current ? { background: GREEN } : {}}>{s}</span>
+        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+          i === current ? "text-black" : i < current ? "text-white" : "bg-slate-100 text-slate-400"}`}
+          style={i === current ? { background: LIME, boxShadow: "0 4px 16px -6px rgba(204,255,0,0.6)" } : i < current ? { background: GREEN } : {}}>
+          {i < current ? "✓ " : ""}{s}
+        </span>
         {i < 3 && <span className={`flex-1 h-0.5 rounded ${i < current ? "bg-[#34C759]" : "bg-slate-100"}`} />}
       </React.Fragment>
     ))}

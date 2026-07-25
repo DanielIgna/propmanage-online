@@ -29,13 +29,13 @@ export const SpecialistEntryHome = ({ user, open, mine, onAccept, onVerify, onGo
       <div className="lg:grid lg:grid-cols-[1fr_1.2fr] lg:gap-10 lg:items-start">
       <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-bold">Salut, {user?.name?.split(" ")[0] || "specialist"}!</h2>
-        <p className="text-sm text-stone-400 mt-1">Hai să obții prima lucrare. Doar 3 pași.</p>
+        <h2 className="xos-display text-3xl lg:text-4xl font-light tracking-tight">Salut, <span className="font-medium">{user?.name?.split(" ")[0] || "specialist"}</span>!</h2>
+        <p className="text-sm text-stone-400 mt-1.5">Hai să obții prima lucrare. Doar 3 pași.</p>
       </div>
 
       <PMCard testid="spec-entry-checklist">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-bold flex items-center gap-2">
+          <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] flex items-center gap-2" style={{ color: "var(--pm-text-variant)" }}>
             <ShieldCheck className="w-4 h-4 text-[var(--pm-primary)]" aria-hidden="true" /> Primii tăi pași
           </h3>
           <span className="text-[11px] font-black text-[var(--pm-primary)]" data-testid="spec-entry-progress-badge">{doneCount}/3 completat</span>
@@ -65,7 +65,7 @@ export const SpecialistEntryHome = ({ user, open, mine, onAccept, onVerify, onGo
       </div>
 
       <div data-testid="spec-entry-opportunities" aria-live="polite" className="mt-8 lg:mt-0">
-        <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
+        <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] mb-3 flex items-center gap-2" style={{ color: "var(--pm-text-variant)" }}>
           <Target className="w-4 h-4 text-[var(--pm-primary)]" aria-hidden="true" /> Oportunități pentru tine
         </h3>
         {topOpen.length === 0 ? (
@@ -75,12 +75,12 @@ export const SpecialistEntryHome = ({ user, open, mine, onAccept, onVerify, onGo
           <div className="space-y-3">
             {topOpen.map((r, i) => (
               <div key={r.id} className="cj-reveal" style={{ animationDelay: `${i * 0.04}s` }}>
-              <PMCard accent={r.priority === "urgent" ? "urgent" : "default"} testid={`spec-entry-opp-${r.id}`}>
+              <PMCard accent={r.priority === "urgent" ? "urgent" : "default"} className="transition-transform duration-300 hover:-translate-y-0.5" testid={`spec-entry-opp-${r.id}`}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     {r.priority === "urgent" && <PMChip variant="error" className="mb-1">URGENT</PMChip>}
                     <div className="font-semibold text-sm truncate">{r.title}</div>
-                    <div className="text-xs text-stone-400 mt-0.5">Estimat: <span className="text-white font-semibold">{r.budget_estimate} RON</span></div>
+                    <div className="text-xs text-stone-400 mt-1">Estimat: <span className="font-mono font-semibold text-white">{r.budget_estimate} RON</span></div>
                   </div>
                   <PMPillButton variant="primary" onClick={() => onAccept(r)} testid={`spec-entry-accept-${r.id}`}>
                     Acceptă

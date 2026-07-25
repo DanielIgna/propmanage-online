@@ -37,15 +37,15 @@ export const SpecialistCockpit = ({ onGo }) => {
             [CheckCircle2, "Finalizate luna asta", p.done_this_month, "jobs", "spec-pipe-done"],
           ].map(([Icon, label, val, cta, tid]) => (
             <button key={tid} onClick={() => onGo(cta)} data-testid={tid}
-              className="text-left rounded-xl p-3 bg-slate-50 dark:bg-slate-700/40 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors">
+              className="text-left rounded-xl p-3 bg-slate-50 dark:bg-white/[0.04] hover:bg-slate-100 dark:hover:bg-white/[0.08] transition-colors">
               <Icon className="w-4 h-4 text-slate-400" />
-              <div className="mt-1.5 text-2xl font-black text-slate-900 dark:text-white leading-none">{val}</div>
+              <div className="mt-1.5 xos-num text-3xl text-slate-900 dark:text-white leading-none">{val}</div>
               <div className="mt-1 text-[10px] font-bold uppercase text-slate-400 leading-tight">{label}</div>
             </button>
           ))}
-          <div className="rounded-xl p-3 bg-[#d4ff3a]/15 border border-[#d4ff3a]/30" data-testid="spec-pipe-money">
+          <div className="rounded-xl p-3 bg-[#ccff00]/10 border border-[#ccff00]/25" data-testid="spec-pipe-money">
             <Wallet className="w-4 h-4" style={{ color: "var(--pm-accent-ink, #3f6212)" }} />
-            <div className="mt-1.5 text-2xl font-black text-slate-900 dark:text-white leading-none">{m.this_month.toLocaleString("ro")} <span className="text-xs font-bold">RON</span></div>
+            <div className="mt-1.5 xos-num text-3xl text-slate-900 dark:text-white leading-none">{m.this_month.toLocaleString("ro")} <span className="text-xs font-bold">RON</span></div>
             <div className="mt-1 text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
               luna aceasta
               {m.trend_pct !== null && (
@@ -70,7 +70,7 @@ export const SpecialistCockpit = ({ onGo }) => {
         <div className="space-y-2">
           {acts.map((a, i) => (
             <button key={i} onClick={() => onGo(a.cta)} data-testid={`spec-assistant-action-${a.kind}`}
-              className="w-full flex items-start gap-2 text-left rounded-xl px-3 py-2.5 bg-slate-50 dark:bg-slate-700/40 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors">
+              className="w-full flex items-start gap-2 text-left rounded-xl px-3 py-2.5 bg-slate-50 dark:bg-white/[0.04] hover:bg-slate-100 dark:hover:bg-white/[0.08] transition-colors">
               <span className="w-1.5 h-1.5 rounded-full bg-violet-400 mt-1.5 shrink-0" />
               <span className="flex-1 text-sm text-slate-700 dark:text-slate-200">{a.text}</span>
               <ArrowRight className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />

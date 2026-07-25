@@ -22,7 +22,7 @@ export const SP = { section: "space-y-6", cards: "gap-4", inCard: "space-y-3", l
 export const GRID12 = "grid grid-cols-1 md:grid-cols-6 xl:grid-cols-12 gap-4";
 
 // Card de bază — toate suprafețele Business folosesc exact acest stil
-export const CARD = "rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800";
+export const CARD = "rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#111213]";
 
 export const BADGE_STYLES = {
   NEW:     "bg-lime-50 text-lime-700 dark:bg-lime-500/15 dark:text-lime-300",

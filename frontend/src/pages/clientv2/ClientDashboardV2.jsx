@@ -133,7 +133,7 @@ export default function ClientDashboardV2() {
 
   return (
     <div className="min-h-screen bg-[#FAFBFA] cv2-scope" data-testid="client-dashboard-v2">
-      <div className="max-w-md lg:max-w-2xl mx-auto min-h-screen sm:border-x sm:border-slate-100 relative pb-24 lg:pb-28">
+      <div className="max-w-md lg:max-w-6xl mx-auto min-h-screen sm:border-x sm:border-slate-100 lg:border-0 relative pb-24 lg:pb-28 lg:px-4">
         {/* Header slim */}
         <div className="flex items-center gap-2.5 px-5 pt-5 pb-3" data-testid="v2-header">
           <span className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-black shrink-0" style={{ background: GREEN }}>
@@ -164,19 +164,19 @@ export default function ClientDashboardV2() {
             </button>
           ))}
           <button onClick={() => actions.openWizard()} data-testid="v2-desktop-cta"
-            className="ml-auto flex items-center gap-2 px-6 py-3 rounded-full text-sm font-black text-black shadow-lg shadow-[#d4ff3a]/40 hover:scale-[1.02] transition-transform"
-            style={{ background: "#d4ff3a" }}>
+            className="ml-auto flex items-center gap-2 px-6 py-3 rounded-full text-sm font-black text-black shadow-[0_12px_36px_-12px_rgba(204,255,0,0.55)] hover:scale-[1.02] transition-transform"
+            style={{ background: "#ccff00" }}>
             <Plus style={{ width: 18, height: 18 }} strokeWidth={2.6} /> Solicită ofertă
           </button>
         </div>
 
-        {TITLES[tab] && <h1 className="px-5 pb-3 text-xl font-black text-slate-900">{TITLES[tab]}</h1>}
+        {TITLES[tab] && <h1 className="px-5 pb-3 xos-display text-2xl lg:text-3xl font-medium tracking-tight text-slate-900">{TITLES[tab]}</h1>}
 
         {tab === "home" && (!loaded ? <HomeSkeleton /> : <HomeV2 user={user} prop={prop} properties={properties} requests={requests} notifs={notifs} offersCount={offersCount} go={setTab} actions={actions} />)}
-        {tab === "jobs" && <JobsV2 requests={requests} actions={actions} />}
-        {tab === "property" && <PropertyHubV2 user={user} prop={prop} properties={properties} setSelectedPropId={setSelectedPropId} actions={actions} />}
+        {tab === "jobs" && <div className="lg:max-w-3xl"><JobsV2 requests={requests} actions={actions} /></div>}
+        {tab === "property" && <div className="lg:max-w-3xl"><PropertyHubV2 user={user} prop={prop} properties={properties} setSelectedPropId={setSelectedPropId} actions={actions} /></div>}
         {tab === "settings" && (
-          <div className="px-5 pb-8 space-y-2" data-testid="v2-settings-view">
+          <div className="px-5 pb-8 space-y-2 lg:max-w-3xl" data-testid="v2-settings-view">
             <button onClick={() => setShow2FA(true)} data-testid="v2-set-2fa"
               className="w-full flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm text-left">
               <span className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center"><Shield className="w-5 h-5 text-slate-500" /></span>
@@ -201,19 +201,19 @@ export default function ClientDashboardV2() {
           </div>
         )}
 
-        {/* Bottom nav — 5, FAB lime central (doar mobil; desktop are taburile de sus) */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-100" data-testid="v2-bottom-nav">
+        {/* Bottom nav — 5, FAB accent central (doar mobil; desktop are taburile de sus) */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 xos-dock" data-testid="v2-bottom-nav">
           <div className="max-w-md mx-auto grid grid-cols-5">
             {NAV.map(([Icon, label, id]) => (
               <button key={id} onClick={() => { window.scrollTo({ top: 0 }); (id === "request" ? actions.openWizard() : setTab(id)); }} data-testid={`v2-nav-${id}`} className="flex flex-col items-center gap-1 pt-2.5 pb-3">
                 {id === "request" ? (
-                  <span className="w-[52px] h-[52px] -mt-7 rounded-full flex items-center justify-center border-4 border-white shadow-lg shadow-[#d4ff3a]/40" style={{ background: "#d4ff3a" }}>
+                  <span className="w-[52px] h-[52px] -mt-7 rounded-full flex items-center justify-center shadow-[0_10px_32px_-10px_rgba(204,255,0,0.6)]" style={{ background: "#ccff00" }}>
                     <Icon className="w-6 h-6 text-black" strokeWidth={2.5} />
                   </span>
                 ) : (
-                  <Icon className="w-6 h-6" style={{ color: tab === id ? GREEN : "#CBD5E1" }} strokeWidth={tab === id ? 2.4 : 2} />
+                  <Icon className={`w-6 h-6 ${tab === id ? "text-[#166534]" : "text-slate-300"}`} strokeWidth={tab === id ? 2.4 : 2} />
                 )}
-                <span className="text-[10px] font-bold" style={{ color: tab === id ? GREEN : "#94A3B8" }}>{label}</span>
+                <span className={`text-[10px] font-bold ${tab === id ? "text-[#166534]" : "text-slate-400"}`}>{label}</span>
               </button>
             ))}
           </div>

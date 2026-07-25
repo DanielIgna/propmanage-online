@@ -17,7 +17,7 @@ import { EmailVerifyPage } from "./pages/EmailVerifyPage";
 import { ClientRequestOffersPage } from "./pages/ClientRequestOffersPage";
 import { PremiumProfileEditorPage } from "./pages/PremiumProfileEditorPage";
 import { CookieBanner } from "./components/CookieBanner";
-import { WhatsAppFloat } from "./components/WhatsAppFloat";
+import { AssistantDock } from "./components/AssistantDock";
 import { ThemeToggle } from "./pages/DashShared";
 const ClientDashboard = lazy(() => import("./pages/Dashboards").then(m => ({ default: m.ClientDashboard })));
 const SpecialistDashboard = lazy(() => import("./pages/Dashboards").then(m => ({ default: m.SpecialistDashboard })));
@@ -1698,7 +1698,7 @@ function App() {
             <RoleTour />
             <AIConciergeBubble />
             <CookieBanner />
-            <WhatsAppFloat />
+            <AssistantDock />
             <LegalGate />
             </ErrorBoundary>
           </BrowserRouter>

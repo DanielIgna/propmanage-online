@@ -24,7 +24,6 @@ import { RequestTimelineModal, ScheduleProposalModal, LastActionBanner } from ".
 import { TierCelebrationBanner } from "../lib/TierCelebrationBanner";
 import { TierToolsPanel } from "../lib/TierToolsPanel";
 import { QuestPanel } from "../lib/QuestPanel";
-import { KpiCard } from "../design-system";
 import { SpecialistCockpit } from "./SpecialistCockpit";
 import { useTier } from "../lib/useTier";
 import {
@@ -125,13 +124,27 @@ export const SpecialistDashboard = () => {
       {!entryMode && tab === "opportunities" && (() => {
         const xosWidgets = {
           today_summary: (
-            <div className="mb-6 pm-fade-in" data-testid="spec-today-summary">
-              <h3 className="text-sm font-bold mb-3" style={{ color: "var(--pm-text-variant)" }}>Astăzi ai:</h3>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <KpiCard icon={Target} label="Cereri noi" value={open.length} accent="info" onClick={() => document.querySelector('[data-tour="specialist-leads"]')?.scrollIntoView({ behavior: "smooth" })} testid="spec-today-open" />
-                <KpiCard icon={Briefcase} label="Lucrări în lucru" value={mine.filter(r => r.status !== "confirmed").length} accent="warning" onClick={() => setTab("jobs")} testid="spec-today-active" />
-                <KpiCard icon={Bell} label="Notificări necitite" value={unreadNotifs} accent="neutral" onClick={() => setTab("notifications")} testid="spec-today-notifs" />
-                <KpiCard icon={Wallet} label="Încasări luna aceasta" value={`${monthlyEarnings.toLocaleString("ro")} RON`} accent="success" onClick={() => setTab("jobs")} testid="spec-today-earnings" />
+            <div className="mb-8 pm-fade-in" data-testid="spec-today-summary">
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.22em] mb-4" style={{ color: "var(--pm-text-muted)" }}>Astăzi ai</h3>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+                {[
+                  { label: "Cereri noi", value: open.length, onClick: () => document.querySelector('[data-tour="specialist-leads"]')?.scrollIntoView({ behavior: "smooth" }), testid: "spec-today-open" },
+                  { label: "Lucrări în lucru", value: mine.filter(r => r.status !== "confirmed").length, onClick: () => setTab("jobs"), testid: "spec-today-active" },
+                  { label: "Notificări necitite", value: unreadNotifs, onClick: () => setTab("notifications"), testid: "spec-today-notifs" },
+                  { label: "Încasări luna aceasta", value: monthlyEarnings.toLocaleString("ro"), suffix: "RON", accent: true, onClick: () => setTab("jobs"), testid: "spec-today-earnings" },
+                ].map(({ label, value, suffix, accent, onClick, testid }) => (
+                  <button key={testid} onClick={onClick} data-testid={testid}
+                    className="text-left rounded-2xl border p-4 lg:p-5 transition-transform duration-300 hover:-translate-y-1"
+                    style={{
+                      background: accent ? "rgba(204,255,0,0.07)" : "var(--pm-surface)",
+                      borderColor: accent ? "rgba(204,255,0,0.3)" : "var(--pm-outline)",
+                    }}>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "var(--pm-text-muted)" }}>{label}</div>
+                    <div className="mt-2.5 xos-num text-4xl lg:text-5xl leading-none" style={{ color: accent ? "var(--pm-accent-ink)" : "var(--pm-text)" }}>
+                      {value}{suffix && <span className="text-sm font-semibold ml-1.5 align-baseline" style={{ color: "var(--pm-text-variant)" }}>{suffix}</span>}
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
           ),

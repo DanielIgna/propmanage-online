@@ -239,7 +239,7 @@ export const DashLayout = ({ children, role, title, bottomNav }) => {
         </div>
       </header>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-24">
-        {title && <h1 className="font-serif text-3xl sm:text-4xl mb-6 sm:mb-8" data-testid="dash-title">{title}</h1>}
+        {title && <h1 className="xos-display font-light tracking-tight text-4xl sm:text-5xl mb-6 sm:mb-8" data-testid="dash-title">{title}</h1>}
         {(role === "client" || role === "specialist") && <GettingStartedWidget role={role} />}
         {(role === "client" || role === "specialist") && (
           <div className="mb-6"><PendingReviewsWidget /></div>
