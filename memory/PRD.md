@@ -3034,3 +3034,16 @@ playbook Claude personalizat pe request_abandoned real în ~9s.
 $lookup pipeline la >5k active.
 **Next (ordinea Board 007)**: GI-4 Learning Engine (ai_decision_ledger deja populat) →
 GI-5 AI UX Tester → GI-6 Revenue Automation + Command Center v2.
+
+---
+
+## 📐 BOARD DECISION 008 — ARHITECTURA GI-4 LEARNING ENGINE LIVRATĂ (25 Iul 2026, doar design)
+Rol exclusiv arhitect: ZERO cod modificat, zero fișiere create. Arhitectura completă livrată în chat:
+7 componente (Outcome Tracker, Ledger v2 unificat, Calibration bounded+versionat+rollback,
+AI Memory lecții, Confidence v2, Feedback, API/UI), 4 fluxuri, colecții noi (ai_outcomes,
+ai_models, ai_memory + ledger extins), contract Event Bus (learning.*), anti-hallucination
+(5 mecanisme), GDPR, KPI (outcome_rate, revenue_attributed, Brier), riscuri + mitigări.
+Decizie centrală: v1 = recalibrare statistică versionată, NU ML (volum insuficient).
+Separare: MVP = GI-4a (Ledger v2 + Outcome Tracker + UI read-only) + GI-4b (AI Memory +
+Confidence v2); Sprint ulterior = GI-4c calibrare + GI-4d GDPR tooling; Future = KG/ML/embeddings.
+STATUS: AȘTEAPTĂ APROBAREA BOARD pentru GI-4a. Nu implementa nimic până la aprobare.
