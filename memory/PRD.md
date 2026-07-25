@@ -3057,3 +3057,15 @@ Alertă critică: Business Constitution executabilă = PRIMA componentă GI-5, p
 Roadmap cu gates: GI-4 → GI-5 (Business Intelligence) → GI-6 (Autonomous OS) → GI-7 (Cross-Domain).
 Document: /app/memory/GI5_BUSINESS_OS.md. Zero cod/DB modificat.
 STATUS: Așteaptă decizia Board (aprobare GI-4a implementare sau alte directive).
+
+---
+
+## 📐 GI-5P — PROPERTY INTELLIGENCE LAYER LIVRAT (25 Iul 2026, doar arhitectură)
+Perspectivă nouă: cum învață PROPRIETATEA (Twin = produsul; restul = sateliți). 13 componente:
+Property Memory (experiențe, nu documente), DNA v2 provenance-first, Timeline unic append-only,
+Knowledge derivat, Health cu DECAY temporal, Risk Engine 6 categorii (mitigare=serviciu marketplace),
+Predictive Maintenance actuarial FĂRĂ ML, Asset Lifecycle, Knowledge Graph în 3 trepte fără
+redesign, Explainability universal, Learning Loop generalizat din Value Loop, Value Intelligence
+(PVI + Technical Condition + Investment Index), Maturity Score L0-L5 (fiecare treaptă = ofertă).
+Document: /app/memory/GI5P_PROPERTY_INTELLIGENCE.md. Zero cod/DB modificat.
+STATUS: Așteaptă decizia Board (aprobare implementare GI-4a sau GI-5P MVP sau alte directive).
