@@ -2799,3 +2799,12 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 - **FAZA B (next):** Faza 5 extins — Observatory public dashboard + trend-uri istorice de cerere.
 - **FAZA C:** Restyle DS complet pe modulele AI (P3) · CIP-C.
 - Backlog: P1 nurture email 3 pași franchise_application; P2 /specialist/programare (widget booking); P3 Resend DNS (blocat pe user); P3 Developer Mode; P4 Dynamic UI Rules Engine frontend.
+
+---
+
+## 📜 CONSTITUȚIA PLATFORMEI (25 Iul 2026) — DOCUMENT SUPREM
+Fondatorul a livrat Constituția PropManage AI OS v1.0 — salvată integral în `/app/memory/CONSTITUTIA.md`.
+PRIORITATE ABSOLUTĂ asupra oricărui prompt. Orice task viitor se verifică pe checklist-ul din Constituție
+(7 întrebări). Digital Twin = nucleul. Autonomie market-facing. Motor reutilizabil cross-industrie.
+Audit tehnic complet (Board CTO/AI Architect/SaaS Founder) în `/app/memory/AUDIT_AI_OS_2026.md` —
+Sprint 1 „Property First" propus, AȘTEAPTĂ APROBARE.
