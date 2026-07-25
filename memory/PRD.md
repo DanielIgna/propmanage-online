@@ -2835,3 +2835,8 @@ Directiva finală a Fondatorului — salvată în /app/memory/PROTOCOL_DE_LUCRU.
 Mod de lucru CTO: ritual început de sprint (analiză→riscuri→opțiuni→recomandare→aprobare),
 implementare incrementală, raport final de sprint. Stack doctrinar complet: 001-004 + L21 + Protocol.
 STATUS: Kickoff Sprint 1 prezentat fondatorului cu opțiuni A/B/C — AȘTEAPTĂ APROBARE.
+
+## 📜 PROMPT 005 — PROPERTY DNA & CAPABILITY MAP (25 Iul 2026)
+Salvat în /app/memory/PROPERTY_DNA.md. Confirmă explicit Opțiunea B și Property Graph API ca prim pas.
+Property DNA = reprezentare logică canonică (proiecție, nu tabel); Capability Map = organizare pe
+capabilități; Mission Control consumă doar DNA/CapMap/EventBus/KG/Timeline, nu structura DB.
