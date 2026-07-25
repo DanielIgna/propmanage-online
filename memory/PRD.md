@@ -2887,3 +2887,36 @@ Audit Tehnic, Design Interior, Design Tematic). Board Directive 001: doctrina î
 **Ciclul Constituției ÎNCHIS pentru prima dată**: Twin → AI → Oportunitate → Aprobare client →
 Cerere → Matching (existent) → Feedback (stats conversie).
 **Next**: Felia 2 Sprint 2 — Job Closure Enrichment (Legea 8) SAU Command Center decizional multi-rol.
+
+---
+
+## ✅ SPRINT 2 / FELIA 2 — „VALUE LOOP + PVI" LIVRATĂ & VALIDATĂ E2E (25 Iul 2026)
+Board Decision 002 + 003: Job Closure Enrichment + Property Value Index, apoi STOP implementare
+și validare completă înainte de Command Center.
+1. **Engine** `/app/backend/value_loop.py`:
+   - `enrich_on_closure()` (Legea 8): la POST /api/requests/{id}/confirm → garanție automată
+     (idempotentă per cerere, luni per categorie: instalații 24, termopane 60, design 12, default 12),
+     House Health actualizat BOUNDED (+2 documents_health, +4 componenta categoriei, cap 100 —
+     înlocuiește $inc-ul nelimitat istoric), eveniment canonic twin.enriched, re-scoring PVI.
+   - `compute_pvi()`: scor 0-100 din 6 componente (twin 20, works 20, audit 15, installations 15,
+     warranties 15, identity 15) cu motive ✔ în limbajul clientului. NU e preț — e maturitate/documentare.
+   - `refresh_pvi()`: salvează pe properties.pvi + pvi_history + event property.pvi_updated la schimbare.
+   - `value_loop_summary()`: indicatori strategici (avg_pvi, properties_scored/total, active_warranties,
+     twin_enrichments) — REUTILIZAT în 3 locuri (DRY).
+2. **API**: PVI expus în GET /api/properties/{id}/dna (score + delta_6m + reasons);
+   GET /api/admin/value-loop/stats; GET /api/admin/ceo → cheia value_loop;
+   GET /api/admin/command-center/feed → stat avg_pvi (icon gem) + raw.
+3. **UI**: widget PVI proeminent în Cartea Casei (pvi-score, pvi-delta, bară progres, motive ✔);
+   card „Value Loop — valoarea creată în ecosistem" în CEO Dashboard (ceo-value-loop);
+   KPI „PVI mediu ecosistem" în AI Command Center (cc-stat-avg_pvi, grid 5 coloane).
+**VALIDARE BOARD 003 (iteration_119.json)**: backend 7/7 pytest PASS (garanție creată+idempotentă,
+PVI 90/100 pe proprietatea demo, pvi_history trigger=job_closure, twin.enriched în activity_events,
+health bounded ≤100, DNA cu 6 reasons, Revenue Hunter OK, toate cele 3 endpoint-uri admin OK).
+Frontend 100% PASS (Cartea Casei, CEO, Command Center). Suite reutilizabilă:
+/app/backend/tests/test_value_loop_iter119.py.
+**Bug găsit & reparat la validare**: import lipsă `Check` (lucide-react) în PropertyHubV2.jsx
+crăpa întreaga Carte a Casei (ErrorBoundary). Fixat de testing agent, verificat de main agent.
+**VALUE LOOP ÎNCHIS COMPLET**: Audit → Twin → Recomandare (Revenue Hunter) → Lucrare →
+Confirmare → Garanție + Health + Documentare → PVI crește → noi recomandări.
+**Next (decizie Board după validare)**: arhitectura Command Center decizional multi-rol pe baza
+utilizării reale; alternativ Dispute/Pricing Intelligence (P2).
