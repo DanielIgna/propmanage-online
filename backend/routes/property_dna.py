@@ -69,7 +69,7 @@ async def property_dna(prop_id: str, user: dict = Depends(get_current_user)):
 
     # ── financial: investiția totală prin platformă + garanții ──────────────
     total_invested = sum(float(r.get("escrow_amount") or 0) for r in reqs if r.get("status") == "confirmed")
-    warranties = await db.service_contracts.count_documents({"property_id": prop_id})
+    warranties_active = await db.warranties.count_documents({"property_id": prop_id, "status": "active"})
 
     # ── twin: starea Digital Twin ────────────────────────────────────────────
     twin = await db.twins.find_one({"property_id": prop_id})
@@ -141,9 +141,9 @@ async def property_dna(prop_id: str, user: dict = Depends(get_current_user)):
                      "recent": [{"title": r.get("title"), "status": r.get("status")} for r in reqs[:3]]},
         },
         "financial": {
-            "populated": total_invested > 0 or warranties > 0,
+            "populated": total_invested > 0 or warranties_active > 0,
             "data": {"total_invested_ron": round(total_invested, 2),
-                     "confirmed_works": by_status.get("confirmed", 0), "warranties": warranties},
+                     "confirmed_works": by_status.get("confirmed", 0), "warranties": warranties_active},
         },
         "documents": {
             "populated": twin_assets > 0,
@@ -163,13 +163,45 @@ async def property_dna(prop_id: str, user: dict = Depends(get_current_user)):
     populated = sum(1 for c in capabilities.values() if c["populated"])
     completeness = round(populated / len(capabilities) * 100)
 
+    # ── PVI — Property Value Index (Board Decision 002) ─────────────────────
+    from value_loop import pvi_delta_6m, refresh_pvi
+    pvi = prop.get("pvi")
+    if not pvi:
+        pvi = await refresh_pvi(prop_id, trigger="dna_view")
+    delta = await pvi_delta_6m(prop_id, pvi["score"])
+
     return {
         "property_id": prop_id,
         "dna_completeness": completeness,
         "capabilities_populated": populated,
         "capabilities_total": len(capabilities),
         "capabilities": capabilities,
+        "pvi": {"score": pvi["score"], "delta_6m": delta, "reasons": pvi.get("reasons", [])},
         "timeline": events,
+    }
+
+
+# ============================================================================
+# VALUE LOOP — indicatori pentru Mission Control / CEO Copilot (Board Decision 002)
+# ============================================================================
+@router.get("/admin/value-loop/stats")
+async def value_loop_stats(user: dict = Depends(get_current_user)):
+    role = user.get("active_view") or user.get("role")
+    if role != "admin":
+        raise HTTPException(403, "Doar admin")
+    scored = warranties = 0
+    total = avg = 0
+    async for d in db.properties.aggregate([
+        {"$match": {"pvi.score": {"$exists": True}}},
+        {"$group": {"_id": None, "avg": {"$avg": "$pvi.score"}, "n": {"$sum": 1}}},
+    ]):
+        avg, scored = round(d.get("avg") or 0, 1), d.get("n", 0)
+    total = await db.properties.estimated_document_count()
+    warranties = await db.warranties.count_documents({"status": "active"})
+    enriched = await db.activity_events.count_documents({"event_type": "twin.enriched"})
+    return {
+        "avg_pvi": avg, "properties_scored": scored, "properties_total": total,
+        "active_warranties": warranties, "twin_enrichments": enriched,
     }
 
 

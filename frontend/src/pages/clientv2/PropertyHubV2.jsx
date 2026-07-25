@@ -63,7 +63,7 @@ const timeAgo = (iso) => {
   return d.toLocaleDateString("ro-RO", { day: "numeric", month: "short", year: "numeric" });
 };
 
-// Cartea Casei — proiecția Property DNA (Sprint 1 / Felia 1)
+// Cartea Casei — proiecția Property DNA + PVI (Board Decision 002 / Value Loop)
 const PropertyDnaCard = ({ propId }) => {
   const [dna, setDna] = useState(null);
   useEffect(() => {
@@ -71,6 +71,7 @@ const PropertyDnaCard = ({ propId }) => {
     axios.get(`${API}/properties/${propId}/dna`).then(r => setDna(r.data)).catch(() => {});
   }, [propId]);
   if (!dna) return null;
+  const pvi = dna.pvi || {};
   return (
     <div className="mt-4 rounded-3xl border border-slate-100 bg-white shadow-sm p-4" data-testid="dna-card">
       <div className="flex items-center gap-2.5">
@@ -79,17 +80,34 @@ const PropertyDnaCard = ({ propId }) => {
         </span>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-black text-slate-900 leading-none xos-display tracking-tight">Cartea Casei</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">Property DNA · identitatea digitală a locuinței</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">Property Value Index · valoarea documentată a locuinței</div>
         </div>
         <div className="text-right">
-          <div className="xos-num text-3xl leading-none text-slate-900" data-testid="dna-completeness">{dna.dna_completeness}%</div>
-          <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">completă</div>
+          <div className="xos-num text-4xl leading-none text-slate-900" data-testid="pvi-score">
+            {pvi.score ?? 0}<span className="text-sm text-slate-400 font-semibold">/100</span>
+          </div>
+          {pvi.delta_6m > 0 && (
+            <div className="text-[10px] font-black text-[#166534]" data-testid="pvi-delta">+{pvi.delta_6m} puncte · 6 luni</div>
+          )}
         </div>
       </div>
-      <div className="mt-3 h-1.5 rounded-full bg-slate-100" role="progressbar" aria-valuenow={dna.dna_completeness} aria-valuemin={0} aria-valuemax={100}>
-        <div className="h-full rounded-full bg-[#ccff00] transition-all duration-500" style={{ width: `${dna.dna_completeness}%` }} />
+      <div className="mt-3 h-1.5 rounded-full bg-slate-100" role="progressbar" aria-valuenow={pvi.score ?? 0} aria-valuemin={0} aria-valuemax={100}>
+        <div className="h-full rounded-full bg-[#ccff00] transition-all duration-500" style={{ width: `${pvi.score ?? 0}%` }} />
       </div>
-      <div className="mt-3 flex flex-wrap gap-1.5" data-testid="dna-capabilities">
+      {pvi.reasons?.length > 0 && (
+        <div className="mt-3 space-y-1.5" data-testid="pvi-reasons">
+          {pvi.reasons.map((r) => (
+            <div key={r.key} className="flex items-center gap-2" data-testid={`pvi-reason-${r.key}`}>
+              <span className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${r.done ? "bg-[#ccff00]" : "bg-slate-100"}`}>
+                <Check className={`w-2.5 h-2.5 ${r.done ? "text-black" : "text-slate-300"}`} strokeWidth={3.5} />
+              </span>
+              <span className={`text-xs ${r.done ? "font-semibold text-slate-700" : "text-slate-400"}`}>{r.label}</span>
+              <span className="ml-auto text-[10px] font-mono text-slate-400">{r.points}/{r.max}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap gap-1.5" data-testid="dna-capabilities">
         {Object.entries(CAPS).map(([key, [label, Icon]]) => {
           const on = dna.capabilities?.[key]?.populated;
           return (
@@ -101,8 +119,9 @@ const PropertyDnaCard = ({ propId }) => {
           );
         })}
       </div>
+      <div className="mt-1.5 text-[10px] text-slate-400" data-testid="dna-completeness">Profil digital {dna.dna_completeness}% complet</div>
       {dna.timeline?.length > 0 && (
-        <div className="mt-4 pt-3 border-t border-slate-100" data-testid="dna-timeline">
+        <div className="mt-3 pt-3 border-t border-slate-100" data-testid="dna-timeline">
           <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Ultimele evenimente</div>
           <div className="mt-2 space-y-2">
             {dna.timeline.slice(0, 5).map((ev, i) => (
@@ -117,7 +136,7 @@ const PropertyDnaCard = ({ propId }) => {
           </div>
         </div>
       )}
-      <p className="mt-3 text-[10px] text-slate-400">O Carte a Casei completă = documentație pentru vânzare, siguranță și lucrări fără surprize. Fiecare lucrare finalizată prin PropManage o îmbogățește automat.</p>
+      <p className="mt-3 text-[10px] text-slate-400">Fiecare lucrare finalizată prin PropManage adaugă automat garanții, documentație și puncte de valoare Cărții Casei.</p>
     </div>
   );
 };

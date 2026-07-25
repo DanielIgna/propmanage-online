@@ -328,16 +328,18 @@ async def confirm_complete(req_id: str, user: dict = Depends(require_role("clien
         except Exception as e:
             logging.warning(f"Referral bonus failed: {e}")
 
-    # Update property health (+5%)
-    await db.properties.update_one(
-        {"_id": ObjectId(req["property_id"])},
-        {"$inc": {"health_score": 5, "utilities_health": 3}}
-    )
-    
     await db.requests.update_one(
         {"_id": ObjectId(req_id)},
         {"$set": {"status": "confirmed", "escrow_status": "released", "confirmed_at": datetime.now(timezone.utc).isoformat()}}
     )
+    # Value Loop (Board Decision 002 / Legea 8): închiderea lucrării îmbogățește Digital Twin —
+    # garanție automată + sănătate actualizată (bounded) + documentare + PVI re-scoring
+    value_loop_result = {}
+    try:
+        from value_loop import enrich_on_closure
+        value_loop_result = await enrich_on_closure(req, user)
+    except Exception as e:
+        logging.warning(f"Value Loop enrichment failed: {e}")
     await log_event(req_id, "work.confirmed", actor=user, payload={"tokens_awarded": 100, "amount_released": specialist_amount})
     # Notify specialist about payment
     if req.get("specialist_id"):
@@ -361,7 +363,9 @@ async def confirm_complete(req_id: str, user: dict = Depends(require_role("clien
             await check_tier_milestones(req["client_id"])
         except Exception:
             pass
-    return {"ok": True, "tokens_earned": 100}
+    return {"ok": True, "tokens_earned": 100,
+            "value_loop": {"pvi": (value_loop_result.get("pvi") or {}).get("score"),
+                           "warranty_months": value_loop_result.get("warranty_months")}}
 
 @router.post("/requests/{req_id}/review")
 async def review_specialist(req_id: str, data: ReviewIn, user: dict = Depends(require_role("client"))):
