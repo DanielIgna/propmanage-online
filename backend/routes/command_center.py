@@ -149,14 +149,21 @@ async def _generate_recos() -> dict[str, Any]:
     """Core logic — folosit de endpoint și de cron-ul de dimineață."""
     feed = await _build_feed()
     raw = feed["raw"]
+    growth = await db.growth_insights.find_one({"_id": "latest"}) or {}
+    beh = growth.get("behavior") or {}
+    top_ux = (growth.get("ux_problems") or [])[:2]
     try:
         from orchestrator.llm import claude_json
         system = (
             "Ești directorul de operațiuni AI al PropManage — marketplace românesc de servicii pentru proprietate "
-            "cu escrow, specialiști verificați și lead fees. Primești snapshot-ul operațional zilnic și returnezi "
-            "TOP 5 acțiuni concrete pe care adminul să le facă AZI, ordonate după impact. "
+            "cu escrow, specialiști verificați și lead fees. Primești snapshot-ul operațional + growth zilnic și returnezi "
+            "TOP 5 acțiuni concrete pe care adminul să le facă AZI, ordonate după impact comercial. "
             "Răspunde STRICT JSON: {\"recommendations\": [{\"action\": str RO imperativ ≤120c, "
-            "\"why\": str RO ≤150c, \"severity\": \"high|medium|low\", \"module\": str (ex: Escrow, Marketplace, Specialiști)}]}. "
+            "\"why\": str RO ≤150c, \"severity\": \"high|medium|low\", \"module\": str (ex: Escrow, Marketplace, Specialiști), "
+            "\"category\": \"ux|marketing|comercial|operational|ceo\"}]}. "
+            "Alege category corect: ux=interfață/abandon pagini/formulare; marketing=campanii/mesaje/surse trafic/momente trimitere; "
+            "comercial=vânzare servicii/oportunități/specialiști/conversie; ceo=strategie/PVI/sănătate business; "
+            "operational=DOAR escrow/dispute/plăți/procese interne. NU eticheta totul operational. "
             "Fii specific cifrelor primite, nu generic."
         )
         prompt = (
@@ -168,6 +175,13 @@ async def _generate_recos() -> dict[str, Any]:
             f"plăți nefinalizate={raw['pending_payments']}. "
             f"Business Health general={raw.get('health_overall')}. Departamente în ROȘU (prioritizează fix-urile lor): "
             + ("; ".join(f"{d['label']} scor {d['score']} ({d['detail']})" for d in raw.get("red_departments", [])) or "niciunul")
+            + f". Value Loop: PVI mediu={raw.get('avg_pvi')}, garanții active={raw.get('active_warranties')}, "
+            f"îmbogățiri Twin={raw.get('twin_enrichments')}. "
+            f"Growth Intelligence (date reale): moment optim WhatsApp={beh.get('best_whatsapp_time', {}).get('text', 'necunoscut')}; "
+            f"surse={beh.get('source_comparison', {}).get('text', 'fără date')}; "
+            f"serviciu top={beh.get('top_service', {}).get('text', 'fără date')}. "
+            f"Top probleme UX din comportament real: "
+            + ("; ".join(p.get("label", "") for p in top_ux) or "niciuna detectată")
             + "."
         )
         result = await claude_json(system=system, prompt=prompt, session_prefix="command-center")

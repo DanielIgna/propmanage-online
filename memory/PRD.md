@@ -2920,3 +2920,38 @@ crăpa întreaga Carte a Casei (ErrorBoundary). Fixat de testing agent, verifica
 Confirmare → Garanție + Health + Documentare → PVI crește → noi recomandări.
 **Next (decizie Board după validare)**: arhitectura Command Center decizional multi-rol pe baza
 utilizării reale; alternativ Dispute/Pricing Intelligence (P2).
+
+---
+
+## ✅ SPRINT GI-1 — „GROWTH INTELLIGENCE + BEHAVIORAL INTELLIGENCE" LIVRAT & VALIDAT (25 Iul 2026)
+Board Decision 004 (Growth Intelligence & Autonomous Business Engine) + 005 (ratificare) +
+006 (Real Business Validation Protocol — datele reale = sursa de adevăr).
+1. **Engine** `/app/backend/growth_intelligence.py` — agent permanent RULE-BASED (zero cost LLM):
+   - analyze_ux_problems: bounce mare pe intrare, timp <8s pe pagini cu trafic, căderi funnel
+   - analyze_abandon_pages: paginile de ieșire (ultimul pageview/sesiune)
+   - analyze_journeys: traseele reale (secvențe de pagini, top 8)
+   - analyze_behavior: ora/ziua optimă postări + WhatsApp (grid dow×hour Europe/Bucharest,
+     ponderat conversii), comparație surse („X convertește cu N% mai bine decât Y"),
+     serviciul cu cea mai mare tracțiune, conversia oportunităților Revenue Hunter/serviciu
+   - **Board 006**: validation_level(sample, strong) — MIN_SAMPLE=20 →
+     confirmed_real | partially_confirmed | ai_hypothesis | rejected pe FIECARE concluzie
+   - run_growth_scan: persistă growth_insights (latest) + growth_insights_history,
+     emite growth.scan_completed pe Event Bus
+2. **API** `/api/admin/growth-intel/`: GET /latest, POST /run, GET /behavior?days= (admin-only, 403 client)
+3. **Cron** growth_intelligence_daily 06:40 (înaintea Command Center 07:00 → recomandările AI
+   folosesc mereu date proaspete). Agent înregistrat în ai_governance/agent_registry.
+4. **AI Command Center devine decizional (Stream 1)**: promptul Claude include acum Value Loop
+   (PVI/garanții/twin), Behavioral Intelligence și top probleme UX din date reale; recomandările
+   au câmp `category` (ux|marketing|comercial|operational|ceo) cu ghidaj anti-"totul operational".
+5. **UI**: pagină nouă `/admin/growth-intel` (nav: Statistici & KPI → Growth Intelligence, badge AI):
+   4 KPI, card Behavioral cu răspunsuri directe + badge-uri validare, Top probleme UX,
+   Pagini de abandon, Trasee reale, Recomandările agentului. Command Center: badge categorie pe recos.
+**VALIDAT (iteration_120.json)**: backend 15/15 pytest PASS, frontend 100%, securitate OK,
+regresii OK (CEO/value-loop/feed). Rulare pe DATE REALE: 276 sesiuni analizate, 7 probleme UX
+(ex: /login ține vizitatorii 2s), serviciu top «electric» (80/178 cereri 60z), 3/5 recomandări
+confirmed_real. Fix post-testare: prompt categorii Command Center (pierdut la o editare) —
+re-verificat curl: categorii diverse și corecte, Claude referă datele growth.
+**Suite**: /app/backend/tests/test_growth_intel_iter120.py.
+**Next (recomandarea AI, ordonată după impact creștere)**: Sprint GI-2 — Lead Intelligence
+(identify vizitator↔user la login + Lead Quality Score + prioritizare Revenue Hunter) >
+GI-3 Marketing Intelligence+ > GI-4 Learning Engine > GI-5 AI UX Tester.
