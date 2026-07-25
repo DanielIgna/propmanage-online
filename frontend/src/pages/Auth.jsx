@@ -73,22 +73,7 @@ export const LoginPage = () => {
     }
   };
   
-  const demoLogin = async (role) => {
-    const creds = {
-      client: { email: "client@propmanage.io", password: "Client123!" },
-      specialist: { email: "specialist@propmanage.io", password: "Spec123!" },
-      admin: { email: "admin@propmanage.io", password: "Admin123!" },
-      operator: { email: "operator@propmanage.io", password: "Op123!" },
-    }[role];
-    setEmail(creds.email); setPassword(creds.password);
-    setError(""); setLoading(true);
-    try {
-      const u = await login(creds.email, creds.password);
-      navigate(`/${u.role}`);
-    } catch (err) {
-      setError(formatApiError(err));
-    } finally { setLoading(false); }
-  };
+  // demoLogin eliminat (cod mort cu parolă admin greșită — semnalat de code review iter123)
   
   return (
     <div className="min-h-screen relative flex items-center justify-center p-6">

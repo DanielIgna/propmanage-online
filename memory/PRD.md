@@ -3090,3 +3090,30 @@ valoare comercială > UX > arhitectură > viziune. "Implement first. Abstract la
 FINAL CONSTITUTIONAL RULE: Twin = produsul; AI servește Twin-ul, niciodată invers.
 Directiva completă: /app/memory/BOARD_DIRECTIVE_010_GUARDIAN.md.
 Roadmap implementare aprobat (coherence review): GI-4a → GI-5P MVP → GI-5 → GI-6 → GI-7.
+
+---
+
+## ✅ SPRINT IMPLEMENTARE 1 (Directive 011) — /LOGIN QUICK-WIN + GI-4a LEARNING ENGINE (25 Iul 2026)
+1. **Quick-win conversie /login**: CTA proeminent „Nou pe PropManage? Creează cont gratuit în
+   2 minute" deasupra formularului (Auth.jsx, login-new-account-cta) — răspuns direct la problema
+   #1 din datele reale (35.8% abandon, 2s pe pagină). KPI de urmărit: exit_share /login în
+   Growth Intelligence. + curățat cod mort demoLogin (parolă admin greșită, semnalat de review).
+2. **GI-4a Learning Engine (arhitectura frozen, implementată exact)**:
+   - `/app/backend/learning_engine.py`: run_outcome_scan — ferestre atribuire 7z (engagement/
+     conversion) și 30z (request/revenue), last-touch, idempotent; scurtătură request_id pentru
+     oportunități (cererea legată se urmărește direct până la confirmed→revenue); intrări fără
+     target → untracked final; learning_stats; ledger_entry() constructor unic.
+   - Ledger v2 scrieri: opportunities accept/dismiss (cu target user/property/service + request_id),
+     playbook (target adăugat + source_agent), Command Center reco toggle done.
+   - API /api/admin/learning/{stats,ledger,run}; cron 07:20; agent în registry; colecție ai_outcomes.
+   - Command Center: raw + prompt includ ai_revenue_attributed_30d + ai_decisions_total.
+   - UI /admin/learning (nav: Statistici & KPI → Learning Engine, badge GI-4): 4 KPI, performanță
+     pe tip de decizie, AI Decision Ledger cu badge-uri outcome (VENIT · X lei).
+**VALIDAT (iteration_123.json)**: backend 19/19 PASS, frontend 100%, zero bug-uri.
+E2E dovedit: accept oportunitate → ledger → outcome request → confirmare → VENIT 800 RON atribuit,
+vizibil în /admin/learning și în snapshot-ul Command Center. Ceasul outcome-urilor A PORNIT.
+**Suite**: /app/backend/tests/test_learning_engine_iter123.py.
+**Note**: playbook ledger păstrează status='pending' până la decizia umană (semantic diferit de
+constructorul decis — intenționat). Următorul gate GI-4c: ≥30 outcome-uri reale.
+**Next**: GI-5P MVP (Maturity Score L0-L5 + registru active + predictive actuarial) conform
+roadmap-ului aprobat; apoi GI-4b (AI Memory) sau GI-5 Constituția executabilă — decizia Board.
