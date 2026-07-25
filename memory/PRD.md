@@ -3080,3 +3080,13 @@ identificate, 15 simplificări, 6 ajustări declarative (taxonomie memorii, 1 si
 GI-4 start imediat → GI-5P MVP paralel → GI-5 (Constituție prima) → GI-6 → GI-7.
 Document: /app/memory/GI_COHERENCE_REVIEW.md. Zero cod/DB/documente frozen modificate.
 STATUS: Board să aprobe anexa cu 6 ajustări + roadmap → apoi implementare GI-4a + GI-5P MVP.
+
+---
+
+## ⚖️ BOARD DIRECTIVE 010 — IMPLEMENTATION MODE ACTIVAT (25 Iul 2026)
+Faza de arhitectură ÎNCHISĂ. GI-4/GI-5/GI-5P aprobate & frozen. Rol permanent: CTO & Guardian
+(nu generator de arhitectură). Testul celor 6 întrebări obligatoriu. Priorități: working software >
+valoare comercială > UX > arhitectură > viziune. "Implement first. Abstract later."
+FINAL CONSTITUTIONAL RULE: Twin = produsul; AI servește Twin-ul, niciodată invers.
+Directiva completă: /app/memory/BOARD_DIRECTIVE_010_GUARDIAN.md.
+Roadmap implementare aprobat (coherence review): GI-4a → GI-5P MVP → GI-5 → GI-6 → GI-7.
