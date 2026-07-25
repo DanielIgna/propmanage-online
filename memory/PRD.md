@@ -2808,3 +2808,8 @@ PRIORITATE ABSOLUTĂ asupra oricărui prompt. Orice task viitor se verifică pe 
 (7 întrebări). Digital Twin = nucleul. Autonomie market-facing. Motor reutilizabil cross-industrie.
 Audit tehnic complet (Board CTO/AI Architect/SaaS Founder) în `/app/memory/AUDIT_AI_OS_2026.md` —
 Sprint 1 „Property First" propus, AȘTEAPTĂ APROBARE.
+
+## 📜 PROMPT 002 — AI CORE ARCHITECTURE (25 Iul 2026)
+Fondatorul a livrat Prompt 002 (12 Motoare Autonome + Agent Registry + Command Center unic + Decision Flow
++ Guardrails + Business First). Salvat integral în `/app/memory/AI_CORE_ARCHITECTURE.md`.
+Completează Constituția, nu o înlocuiește. Maparea motoarelor pe codul existent — livrată în chat.
