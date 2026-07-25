@@ -192,6 +192,7 @@ const NAV_SECTIONS = [
     zone: "business",
     superAdminOnly: true,
     items: [
+      { id: "marketing_intel", label: "Marketing Intelligence+", icon: Target, badge: "GI-3", href: "/admin/marketing-intel" },
       { id: "marketing_department", label: "AI Marketing Department", icon: Megaphone, badge: "NEW · AI", href: "/admin/marketing" },
       { id: "marketing_campaigns", label: "Campanii (Auto-Trigger)", icon: Zap, badge: "AI+IMG", href: "/admin/marketing?tab=campaigns" },
       { id: "marketing_performance", label: "Performance Loop", icon: Activity, badge: "LEARN", href: "/admin/marketing?tab=performance" },

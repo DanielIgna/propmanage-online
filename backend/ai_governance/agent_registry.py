@@ -85,6 +85,18 @@ AI_AGENTS = [
         "owner": "Intelligence Engine",
         "permission_level": "suggest",
     },
+    {
+        "slug": "marketing_intelligence",
+        "name": "Marketing Intelligence+ Engine",
+        "category": "intelligence",
+        "lifecycle": "active",
+        "maturity": "experimental",
+        "provider": "mixed",  # scan rule-based; Contact Playbook folosește Claude la cerere
+        "purpose": "Recomandări executive de marketing din date reale (ferestre optime WhatsApp/postări cu uplift vs medie, canal/mesaj câștigător, serviciu de promovat, pagina care pierde utilizatori) + Opportunity Queue + AI Contact Playbook cu aprobare umană (Board 007). Deciziile intră în ai_decision_ledger.",
+        "data_sources": ["marketing_insights", "contact_playbooks", "ai_decision_ledger"],
+        "owner": "Intelligence Engine",
+        "permission_level": "suggest",
+    },
 
     # --- Multi-agent dev team (read-only architecture) ---
     {
