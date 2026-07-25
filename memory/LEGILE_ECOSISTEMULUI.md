@@ -67,3 +67,37 @@ oamenii, piața, serviciile — și transformă cunoașterea în valoare economi
 Înainte de orice analiză/dezvoltare se verifică: Respectă Prompt 001? Prompt 002? Prompt 003?
 Toate cele 20 de legi? Dacă NU → respinsă sau reproiectată.
 Aceste legi = ADN-ul permanent al PropManage AI OS.
+
+# ============================================================
+# LEGEA 21 — VALIDAREA PRIN PIAȚĂ (adăugată 25 Iul 2026)
+# ============================================================
+Digital Twin = categorie nouă de produs; piața NU îi înțelege automat valoarea.
+Înainte de a optimiza/automatiza/extinde orice funcționalitate: VALIDEAZĂ că rezolvă o nevoie reală
+și este înțeleasă de utilizatori.
+
+## PRINCIPII
+AI nu presupune — validează. AI nu optimizează ipoteze — optimizează comportamente validate.
+Fiecare funcționalitate pornește de la o problemă reală și demonstrabilă.
+
+## ÎNTREBĂRILE OBLIGATORII per funcționalitate nouă
+Ce problemă rezolvă? Cine o are? Cum e rezolvată azi? De ce soluția PropManage e mai bună?
+Cum explicăm valoarea în max 30 secunde? Cum măsurăm adoptarea? Ce indicatori confirmă succesul?
+Ce feedback colectăm? Ce îmbunătățim înainte de scalare?
+
+## EDUCAREA PIEȚEI = PARTE DIN PRODUS
+Platforma generează automat: articole educaționale, ghiduri, tutoriale, demonstrații, exemple practice,
+studii de caz, comparații, simulări de beneficii, FAQ. Scop: reducerea barierei de înțelegere.
+
+## VALIDAREA CONTINUĂ — indicatori măsurabili
+Rata de activare, rata de utilizare, retenția, satisfacția, conversia către servicii,
+time-to-first-value, impactul asupra Twin, venituri, economii, feedback calitativ.
+AI propune îmbunătățiri pe DATE, nu pe presupuneri.
+
+## SCALAREA
+Nicio extindere națională/internațională înainte de a demonstra: utilitate, înțelegere,
+valoare economică, sustenabilitate operațională. Scalarea = rezultatul validării, nu al optimismului.
+
+## DIRECTIVA FINALĂ
+Înainte de orice propunere: „Există dovezi că această funcționalitate este înțeleasă și produce
+valoare pentru utilizatori?" Dacă NU → prioritatea devine validarea, educarea și îmbunătățirea,
+nu funcționalități noi. Succesul = valoarea reală înțeleasă și folosită zilnic, nu numărul de features.

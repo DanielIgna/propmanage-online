@@ -2824,3 +2824,8 @@ Salvat integral în `/app/memory/LEGILE_ECOSISTEMULUI.md` — 20 de legi imuabil
 în caz de conflict. Doctrina completă pe 4 niveluri:
 001 CONSTITUTIA.md · 002 AI_CORE_ARCHITECTURE.md · 003 MISSION_CONTROL.md · 004 LEGILE_ECOSISTEMULUI.md.
 Orice task viitor se verifică obligatoriu pe toate 4 + cele 20 de legi.
+
+## 📜 LEGEA 21 — VALIDAREA PRIN PIAȚĂ (25 Iul 2026)
+Adăugată la LEGILE_ECOSISTEMULUI.md. Impune: validare înainte de optimizare/scalare, educarea pieței
+ca parte din produs (conținut educațional auto-generat), indicatori de adopție per funcționalitate.
+Impact direct asupra planului: instrumentare metrici de adopție + motor de educare a pieței.
