@@ -2772,3 +2772,30 @@ User a deploiat în producție (propmanage.ro) — modificările noi cer REDEPLO
 ### Cont test nou: entry.spec@test.ro / Entry123! (specialist tier ENTRY)
 ### URMEAZĂ (STOP — așteaptă aprobarea PO)
 - FAZA 3 propusă: măsurare & auto-optimizare (dashboard admin UX Lab cu funnels live, alerting drop-off) SAU extindere tratament UX Lab pe alte pagini (/preturi din screenshot-ul PO avea cognitive 71) — la alegerea PO
+
+---
+
+## ✅ FAZA A — Redesign Vizual Complet XOS 2026 (25 Iul 2026) — LIVRAT & TESTAT
+
+**Alegerea userului:** opțiunea (a) redesign complet mobil + desktop; „las designerul să decidă complet"; scope extins la dashboard-urile complete Client/Specialist. Ordine aprobată: A (redesign) → B (Faza 5 Observatory) → C (Restyle DS module AI).
+
+**Design system nou (design_agent):** obsidian crisp (#050505 bg / #111 surface / #222 borders), accent Electric Luminous **#ccff00**, fonturi **Outfit** (display + numere KPI light 300) + **Plus Jakarta Sans**, foto signature services, glass topbar/dock.
+
+**Implementat:**
+1. **/incepe (Client Junior funnel):** header glass cu wordmark, H1 Outfit light „Ce vrei să rezolvi azi?", trust strip uppercase, 2 carduri semnătură cu FOTOGRAFIE (Digital Twin blueprint + Design Interior generat AI), grid categorii minimalist (icon + preț mono, fără chip-uri repetitive), wizard cu progress bar accent + radio-uri redesenate, confirmare cu timeline, dock glass 4 taburi. Desktop max-w-5xl, grid 2/3 coloane.
+2. **/client (Dashboard V2):** bento grid desktop 12 col (hero 7 / Copilot 5 row-span-2 / quick actions / contextual / discover 12), quick actions cu icoane distincte pe culori (accent/sky/amber/violet + glow AI), Copilot pe panou accent, Discover cu carduri imagine, Steps cu stare curentă #ccff00 + finalizate olive ✓, FAB nav mobil #ccff00.
+3. **/specialist (full):** titlu dash Outfit light 5xl, „Astăzi ai" = 4 tile-uri KPI cu numere Outfit light 4xl-5xl (earnings pe tile accent tinted), cockpit Pipeline & Bani de-navy-ficat (alb/4% în dark), CARD token global dark:#111213 (fără slate-800 navy).
+4. **Specialist Entry Home:** greeting Outfit light, split desktop 2 coloane (checklist | oportunități), bugete mono, reveal stagger.
+5. **Rezolvarea coliziunilor (P0 user complaint):** CookieBanner → strip fix SUS slim (48px, compact pe mobil); WhatsAppFloat ELIMINAT din App.js; NOU **AssistantDock** = un singur FAB #ccff00 jos-dreapta cu popover (Asistent AI + WhatsApp), se ascunde când panoul concierge e deschis (evenimente pm-open-ai / pm-ai-state).
+6. Palete globale: pm-* tokens crisp + #ccff00; cv2-scope dark remap actualizat; body #050505.
+
+**Testare:** testing_agent iteration_117.json — **backend 7/7, frontend 10/10 (100%)**. Zero regresii. Wizard /incepe creează lead real (CJ-XXXXXX). Tema light verificată prin computed styles (nota: tool-ul de screenshot forțează auto-dark — vezi /app/memory/LEARNINGS.md).
+
+**Cont nou testare:** entry.demo@propmanage.io / Entry123! (tier ENTRY).
+
+**Fișiere cheie modificate:** index.css (tokens XOS), ClientJuniorDashboard.jsx + clientjunior/components.jsx (rescrise), HomeV2.jsx (rescris), ClientDashboardV2.jsx, ui.jsx, SpecialistDashboard.jsx, SpecialistEntryHome.jsx (rescris), SpecialistCockpit.jsx, DashShared.jsx, CookieBanner.jsx (rescris), AssistantDock.jsx (NOU), AIConciergeBubble.jsx, App.js, design-system/tokens.js.
+
+## 📋 URMĂTOARELE FAZE (aprobate de user, în ordine)
+- **FAZA B (next):** Faza 5 extins — Observatory public dashboard + trend-uri istorice de cerere.
+- **FAZA C:** Restyle DS complet pe modulele AI (P3) · CIP-C.
+- Backlog: P1 nurture email 3 pași franchise_application; P2 /specialist/programare (widget booking); P3 Resend DNS (blocat pe user); P3 Developer Mode; P4 Dynamic UI Rules Engine frontend.
