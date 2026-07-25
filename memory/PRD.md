@@ -2818,3 +2818,9 @@ Completează Constituția, nu o înlocuiește. Maparea motoarelor pe codul exist
 Salvat integral în `/app/memory/MISSION_CONTROL.md`. Nivelul suprem de orchestrare: event-driven,
 model-agnostic, cost-aware (reguli→cache→KG→LLM), controlează toți cei 12 agenți.
 Doctrina completă: CONSTITUTIA.md (001) + AI_CORE_ARCHITECTURE.md (002) + MISSION_CONTROL.md (003).
+
+## 📜 PROMPT 004 — LEGILE ECOSISTEMULUI (25 Iul 2026)
+Salvat integral în `/app/memory/LEGILE_ECOSISTEMULUI.md` — 20 de legi imuabile, PRIORITATE SUPREMĂ
+în caz de conflict. Doctrina completă pe 4 niveluri:
+001 CONSTITUTIA.md · 002 AI_CORE_ARCHITECTURE.md · 003 MISSION_CONTROL.md · 004 LEGILE_ECOSISTEMULUI.md.
+Orice task viitor se verifică obligatoriu pe toate 4 + cele 20 de legi.
