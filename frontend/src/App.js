@@ -112,6 +112,7 @@ const AnalyticsGrowthPage = lazy(() => import("./pages/admin/AnalyticsGrowthPage
 const GrowthIntelligencePage = lazy(() => import("./pages/admin/GrowthIntelligencePage"));
 const LeadIntelligencePage = lazy(() => import("./pages/admin/LeadIntelligencePage"));
 const MarketingIntelligencePage = lazy(() => import("./pages/admin/MarketingIntelligencePage"));
+const LearningEnginePage = lazy(() => import("./pages/admin/LearningEnginePage"));
 const ITCollaboratorsHubPage = lazy(() => import("./pages/admin/ITCollaboratorsHubPage"));
 const ITCopilotPage = lazy(() => import("./pages/admin/ITCopilotPage"));
 const LegalAuditPage = lazy(() => import("./pages/admin/LegalAuditPage"));
@@ -1665,6 +1666,7 @@ function App() {
               <Route path="/admin/growth-intel" element={<GrowthIntelligencePage />} />
               <Route path="/admin/lead-intel" element={<LeadIntelligencePage />} />
               <Route path="/admin/marketing-intel" element={<MarketingIntelligencePage />} />
+              <Route path="/admin/learning" element={<LearningEnginePage />} />
               <Route path="/admin/it-collaborators" element={<ITCollaboratorsHubPage />} />
               <Route path="/admin/it-collaborators/copilot" element={<ITCopilotPage />} />
               <Route path="/admin/legal-audit" element={<LegalAuditPage />} />

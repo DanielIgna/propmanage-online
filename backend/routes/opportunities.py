@@ -83,6 +83,14 @@ async def accept_opportunity(opp_id: str, user: dict = Depends(require_role("cli
     await emit("recommendation.accepted", property_id=opp["property_id"], actor=user,
                payload={"service": opp["service"], "value": opp.get("estimated_value_ron"), "opp_id": opp_id})
 
+    # GI-4a: decizia clientului intră în Ledger (SSoT decizii AI) → Outcome Tracker o urmărește
+    from learning_engine import ledger_entry
+    await db.ai_decision_ledger.insert_one(ledger_entry(
+        "opportunity", "revenue_hunter", opp.get("title") or f"Oportunitate {opp['service_label']}",
+        opp.get("benefit") or "", "accepted", user.get("email") or user["id"],
+        target={"user_id": user["id"], "property_id": opp["property_id"], "service": opp["service"]},
+        extra={"opp_id": opp_id, "request_id": req_id, "estimated_value_ron": opp.get("estimated_value_ron")}))
+
     # Rutare umană: serviciile PropManage (twin/audit) merg la admini; design → specialiști potriviți
     try:
         if opp["service"] in ("digital_twin", "audit_tehnic"):
@@ -109,6 +117,12 @@ async def dismiss_opportunity(opp_id: str, user: dict = Depends(require_role("cl
     await db.revenue_opportunities.update_one({"id": opp_id}, {"$set": {"status": "dismissed", "acted_at": _now()}})
     await emit("recommendation.dismissed", property_id=opp["property_id"], actor=user,
                payload={"service": opp["service"], "opp_id": opp_id})
+    from learning_engine import ledger_entry
+    await db.ai_decision_ledger.insert_one(ledger_entry(
+        "opportunity", "revenue_hunter", opp.get("title") or f"Oportunitate {opp.get('service_label')}",
+        opp.get("benefit") or "", "dismissed", user.get("email") or user["id"],
+        target={"user_id": user["id"], "property_id": opp["property_id"], "service": opp["service"]},
+        extra={"opp_id": opp_id}))
     return {"ok": True}
 
 

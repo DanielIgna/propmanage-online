@@ -97,6 +97,18 @@ AI_AGENTS = [
         "owner": "Intelligence Engine",
         "permission_level": "suggest",
     },
+    {
+        "slug": "learning_engine",
+        "name": "Learning Engine (GI-4a Outcome Tracker)",
+        "category": "intelligence",
+        "lifecycle": "active",
+        "maturity": "experimental",
+        "provider": "mixed",  # rule-based, zero LLM
+        "purpose": "Leagă fiecare decizie AI de rezultatul real (engagement → conversie → cerere → venit RON) prin ferestre de atribuire last-touch. Ledger-ul = SSoT pentru deciziile AI (arhitectura GI-4 frozen).",
+        "data_sources": ["ai_decision_ledger", "ai_outcomes"],
+        "owner": "Intelligence Engine",
+        "permission_level": "suggest",
+    },
 
     # --- Multi-agent dev team (read-only architecture) ---
     {

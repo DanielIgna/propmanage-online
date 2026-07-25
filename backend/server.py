@@ -655,6 +655,15 @@ async def startup():
             CronTrigger(hour=6, minute=55, timezone=pytz.timezone("Europe/Bucharest")),
             id="marketing_intelligence_daily", replace_existing=True, misfire_grace_time=3600,
         )
+        # GI-4a: Learning Engine — outcome scan zilnic (după toate motoarele)
+        async def _learning_tick():
+            from learning_engine import run_outcome_scan
+            await run_outcome_scan(trigger="cron")
+        scheduler.add_job(
+            _learning_tick,
+            CronTrigger(hour=7, minute=20, timezone=pytz.timezone("Europe/Bucharest")),
+            id="learning_outcomes_daily", replace_existing=True, misfire_grace_time=3600,
+        )
         scheduler.start()
         # Felia 1 (Sprint 1): jurnalul central al agenților — toate execuțiile cron în agent_runs
         try:

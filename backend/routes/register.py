@@ -147,6 +147,7 @@ from routes.opportunities import router as opportunities_router
 from routes.growth_intelligence import router as growth_intelligence_router
 from routes.lead_intelligence import router as lead_intelligence_router
 from routes.marketing_intelligence import router as marketing_intelligence_router
+from routes.learning import router as learning_router
 
 # Registration order matters — kept identical to the original server.py loop.
 ALL_ROUTERS = (
@@ -290,5 +291,6 @@ ALL_ROUTERS = (
     growth_intelligence_router,
     lead_intelligence_router,
     marketing_intelligence_router,
+    learning_router,
     ux_lab_router,
 )

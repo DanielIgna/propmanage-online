@@ -94,6 +94,10 @@ async def _build_feed() -> dict[str, Any]:
     hot_leads = await db.lead_scores.count_documents({"tier": "hot"})
     qualified_leads = await db.lead_scores.count_documents({"tier": "qualified"})
 
+    # ── GI-4a: venit atribuit deciziilor AI (Learning Engine) ───────────────
+    from learning_engine import learning_stats
+    lstats = await learning_stats()
+
     stats = [
         {"key": "new_requests", "label": "Cereri noi (24h)", "value": new_requests_24h, "icon": "inbox"},
         {"key": "new_users", "label": "Utilizatori noi (24h)", "value": new_users_24h, "icon": "users"},
@@ -141,6 +145,8 @@ async def _build_feed() -> dict[str, Any]:
             "avg_pvi": vl["avg_pvi"], "active_warranties": vl["active_warranties"],
             "twin_enrichments": vl["twin_enrichments"],
             "hot_leads": hot_leads, "qualified_leads": qualified_leads,
+            "ai_revenue_attributed_30d": lstats["revenue_attributed_30d_ron"],
+            "ai_decisions_total": lstats["total_decisions"],
             "health_overall": health["overall"],
             "red_departments": [{"key": d["key"], "label": d["label"], "score": d["score"], "detail": d["detail"]} for d in red_departments],
         },
@@ -188,6 +194,7 @@ async def _generate_recos() -> dict[str, Any]:
             f"surse={beh.get('source_comparison', {}).get('text', 'fără date')}; "
             f"serviciu top={beh.get('top_service', {}).get('text', 'fără date')}. "
             f"Lead Intelligence: {raw.get('hot_leads', 0)} lead-uri fierbinți + {raw.get('qualified_leads', 0)} calificate așteaptă acțiune comercială. "
+            f"Learning Engine: {raw.get('ai_decisions_total', 0)} decizii AI memorate, venit atribuit 30z={raw.get('ai_revenue_attributed_30d', 0)} RON. "
             f"Top probleme UX din comportament real: "
             + ("; ".join(p.get("label", "") for p in top_ux) or "niciuna detectată")
             + "."
@@ -288,6 +295,11 @@ async def toggle_recommendation(idx: int = Body(..., embed=True), _admin=Depends
         raise HTTPException(400, f"Index invalid: {idx}")
     recos[idx]["done"] = not recos[idx].get("done", False)
     await db.command_center_recos.update_one({"_id": "latest"}, {"$set": {"recommendations": recos}})
+    if recos[idx]["done"]:
+        from learning_engine import ledger_entry
+        await db.ai_decision_ledger.insert_one(ledger_entry(
+            "command_center_reco", "command_center", recos[idx].get("action") or "",
+            recos[idx].get("why") or "", "done", _admin.get("email") or "admin"))
     return {"idx": idx, "done": recos[idx]["done"]}
 
 

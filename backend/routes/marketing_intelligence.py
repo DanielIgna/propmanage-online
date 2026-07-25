@@ -124,12 +124,16 @@ async def generate_playbook(body: PlaybookIn, user: dict = Depends(require_role(
         "status": "generated", "created_by": user.get("email"), "created_at": _now(),
     }
     await db.contact_playbooks.insert_one({**playbook})
-    # AI Decision Ledger (fundația GI-4): recomandarea așteaptă decizia omului
+    # AI Decision Ledger (GI-4a): recomandarea așteaptă decizia omului; target → Outcome Tracker
     await db.ai_decision_ledger.insert_one({
         "ledger_id": uuid.uuid4().hex, "type": "contact_playbook", "playbook_id": pid,
+        "source_agent": "marketing_intelligence",
         "recommendation": f"Contactează {name or 'lead-ul'} pentru {service_label}",
         "reason": "; ".join(why), "confidence": "ai_hypothesis",
         "status": "pending", "created_at": _now(),
+        "target": {"visitor_id": (lead or {}).get("visitor_id"),
+                   "user_id": (lead or {}).get("user_id") or (opp or {}).get("owner_id"),
+                   "service": (opp or {}).get("service")},
     })
     return playbook
 
