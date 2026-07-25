@@ -620,6 +620,13 @@ async def startup():
             misfire_grace_time=7200,
         )
         scheduler.start()
+        # Felia 1 (Sprint 1): jurnalul central al agenților — toate execuțiile cron în agent_runs
+        try:
+            import asyncio as _asyncio
+            from agent_journal import attach_journal
+            attach_journal(scheduler, _asyncio.get_running_loop())
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Agent journal attach failed: {e}")
         # Record an immediate ping on startup so sparkline is non-empty from minute 1.
         try:
             await record_health_ping()

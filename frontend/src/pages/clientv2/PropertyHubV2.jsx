@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Building2, Box, HeartPulse, Clock, Wallet, Settings2, CreditCard } from "lucide-react";
+import { Building2, Box, HeartPulse, Clock, Wallet, Settings2, CreditCard, Dna, Fingerprint, Wrench, FileText, Share2, CalendarClock, Radio, Sparkles } from "lucide-react";
 import { API } from "../DashShared";
 import { formatApiError } from "../../auth";
 import { GREEN, GREEN_SOFT, ListItem, Sheet, CTA, AmountInput } from "./ui";
@@ -43,6 +43,85 @@ export const WalletSheet = ({ user, onClose }) => {
   );
 };
 
+const CAPS = {
+  identity: ["Identitate", Fingerprint],
+  health: ["Sănătate", HeartPulse],
+  twin: ["Digital Twin", Box],
+  works: ["Lucrări", Wrench],
+  financial: ["Financiar", Wallet],
+  documents: ["Documente", FileText],
+  relations: ["Relații", Share2],
+  maintenance: ["Mentenanță", CalendarClock],
+  sensors: ["Senzori", Radio],
+  recommendations: ["Recomandări AI", Sparkles],
+};
+
+const timeAgo = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso); const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  if (days <= 0) return "azi"; if (days === 1) return "ieri"; if (days < 30) return `acum ${days} zile`;
+  return d.toLocaleDateString("ro-RO", { day: "numeric", month: "short", year: "numeric" });
+};
+
+// Cartea Casei — proiecția Property DNA (Sprint 1 / Felia 1)
+const PropertyDnaCard = ({ propId }) => {
+  const [dna, setDna] = useState(null);
+  useEffect(() => {
+    setDna(null);
+    axios.get(`${API}/properties/${propId}/dna`).then(r => setDna(r.data)).catch(() => {});
+  }, [propId]);
+  if (!dna) return null;
+  return (
+    <div className="mt-4 rounded-3xl border border-slate-100 bg-white shadow-sm p-4" data-testid="dna-card">
+      <div className="flex items-center gap-2.5">
+        <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-[#ccff00]">
+          <Dna className="w-4.5 h-4.5 text-black" style={{ width: 18, height: 18 }} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-black text-slate-900 leading-none xos-display tracking-tight">Cartea Casei</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">Property DNA · identitatea digitală a locuinței</div>
+        </div>
+        <div className="text-right">
+          <div className="xos-num text-3xl leading-none text-slate-900" data-testid="dna-completeness">{dna.dna_completeness}%</div>
+          <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">completă</div>
+        </div>
+      </div>
+      <div className="mt-3 h-1.5 rounded-full bg-slate-100" role="progressbar" aria-valuenow={dna.dna_completeness} aria-valuemin={0} aria-valuemax={100}>
+        <div className="h-full rounded-full bg-[#ccff00] transition-all duration-500" style={{ width: `${dna.dna_completeness}%` }} />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5" data-testid="dna-capabilities">
+        {Object.entries(CAPS).map(([key, [label, Icon]]) => {
+          const on = dna.capabilities?.[key]?.populated;
+          return (
+            <span key={key} data-testid={`dna-cap-${key}`}
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold ${
+                on ? "bg-[#166534]/5 text-[#166534]" : "bg-slate-50 text-slate-300"}`}>
+              <Icon className="w-3 h-3" aria-hidden="true" />{label}
+            </span>
+          );
+        })}
+      </div>
+      {dna.timeline?.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-slate-100" data-testid="dna-timeline">
+          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Ultimele evenimente</div>
+          <div className="mt-2 space-y-2">
+            {dna.timeline.slice(0, 5).map((ev, i) => (
+              <div key={i} className="flex items-start gap-2.5" data-testid={`dna-timeline-item-${i}`}>
+                <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 bg-[#166534]" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-semibold text-slate-700 leading-snug truncate">{ev.title}</div>
+                  <div className="text-[10px] text-slate-400">{timeAgo(ev.timestamp)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <p className="mt-3 text-[10px] text-slate-400">Fiecare lucrare finalizată prin PropManage îmbogățește automat Cartea Casei.</p>
+    </div>
+  );
+};
+
 export const PropertyHubV2 = ({ user, prop, properties, setSelectedPropId, actions }) => {
   if (!prop) {
     return (
@@ -73,6 +152,7 @@ export const PropertyHubV2 = ({ user, prop, properties, setSelectedPropId, actio
           {prop.address && <div className="mt-0.5 text-[11px] text-slate-400">{prop.address}</div>}
         </div>
       </div>
+      <PropertyDnaCard propId={prop.id} />
       <div className="mt-4 space-y-2">
         <ListItem icon={Box} label="Digital Twin" sub="locuința ta în 3D" onClick={actions.openTwin} testid="v2-hub-twin" />
         <ListItem icon={HeartPulse} label="House Health" sub="scor + recomandări" onClick={actions.openHealth} testid="v2-hub-health" />

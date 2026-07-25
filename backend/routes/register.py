@@ -142,6 +142,7 @@ from routes.tenants import router as tenants_router, public_router as tenants_pu
 from routes.service_hub import router as service_hub_router
 from routes.lead_followup import router as lead_followup_router
 from routes.specialist_followup import router as specialist_followup_router
+from routes.property_dna import router as property_dna_router
 
 # Registration order matters — kept identical to the original server.py loop.
 ALL_ROUTERS = (
@@ -280,5 +281,6 @@ ALL_ROUTERS = (
     service_hub_router,
     lead_followup_router,
     specialist_followup_router,
+    property_dna_router,
     ux_lab_router,
 )
