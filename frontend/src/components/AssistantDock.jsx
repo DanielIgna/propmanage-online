@@ -72,6 +72,7 @@ export const AssistantDock = () => {
           )}
           {hasWa && (
             <a href={waHref} target="_blank" rel="noreferrer" data-testid="assistant-dock-whatsapp"
+              onClick={() => { import("../lib/analytics").then(({ trackIntent }) => trackIntent("whatsapp_opened")).catch(() => {}); }}
               className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/5 transition-colors border-t border-white/5">
               <span className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: "#25D366" }}>
                 <WaIcon />

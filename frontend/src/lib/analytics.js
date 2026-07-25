@@ -12,6 +12,7 @@
 const API = process.env.REACT_APP_BACKEND_URL;
 const VISITOR_KEY = "pm_vid";
 const SESSION_KEY = "pm_sid";
+const USER_KEY = "pm_uid"; // GI-2: identify vizitator↔utilizator
 const ATTR_KEY = "pm_attr"; // {c, utm_source, via_qr, ts}
 const SESSION_TTL = 30 * 60 * 1000;
 const ATTR_TTL = 30 * 24 * 3600 * 1000;
@@ -85,9 +86,13 @@ const push = (ev) => {
 const flush = (useBeacon = false) => {
   if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
   if (!queue.length) return;
+  let identity = {};
+  try { identity = JSON.parse(localStorage.getItem(USER_KEY) || "{}"); } catch { /* noop */ }
   const body = JSON.stringify({
     visitor_id: getVisitorId(),
     session_id: getSessionId(),
+    user_id: identity.id || "",
+    user_role: identity.role || "",
     events: queue.splice(0, 50),
   });
   try {
@@ -125,6 +130,22 @@ export const trackFunnel = (step) => {
   // step: signup_started | account_created | property_added | subscription | specialist_request
   push({ type: "funnel", funnel_step: step, path: currentPath });
   flush();
+};
+
+// GI-2: Intent Score — semnale de intenție dincolo de pageview-uri
+// signal: twin_viewed | audit_viewed | request_started | request_abandoned |
+//         offer_requested | whatsapp_opened | specialist_compared | guide_downloaded
+export const trackIntent = (signal) => {
+  push({ type: "intent", intent_signal: signal, path: currentPath });
+  flush();
+};
+
+// GI-2: leagă vizitatorul anonim de contul autentificat (persistă 30 zile de sesiuni)
+export const identify = (userId, role = "") => {
+  try {
+    if (userId) localStorage.setItem(USER_KEY, JSON.stringify({ id: String(userId), role }));
+    else localStorage.removeItem(USER_KEY);
+  } catch { /* noop */ }
 };
 
 // A/B testing: variantă deterministă per vizitator (hash vid+key) + expunere trimisă o dată/sesiune

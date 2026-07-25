@@ -90,6 +90,10 @@ async def _build_feed() -> dict[str, Any]:
     from value_loop import value_loop_summary
     vl = await value_loop_summary()
 
+    # ── GI-2: lead-uri fierbinți din Intent & Lead Intelligence ─────────────
+    hot_leads = await db.lead_scores.count_documents({"tier": "hot"})
+    qualified_leads = await db.lead_scores.count_documents({"tier": "qualified"})
+
     stats = [
         {"key": "new_requests", "label": "Cereri noi (24h)", "value": new_requests_24h, "icon": "inbox"},
         {"key": "new_users", "label": "Utilizatori noi (24h)", "value": new_users_24h, "icon": "users"},
@@ -111,6 +115,8 @@ async def _build_feed() -> dict[str, Any]:
         warnings.append({"key": "incomplete_spec", "label": f"{incomplete_specialists} specialiști cu profil incomplet (fără specialitate sau neverificați)", "severity": "medium"})
     if pending_payments:
         warnings.append({"key": "pending_pay", "label": f"{pending_payments} plăți inițiate dar nefinalizate", "severity": "low"})
+    if hot_leads:
+        warnings.append({"key": "hot_leads", "label": f"{hot_leads} lead-uri fierbinți așteaptă contact — probabilitate mare de conversie", "severity": "medium", "link": "/admin/lead-intel"})
     for d in red_departments:
         warnings.append({
             "key": f"health_{d['key']}",
@@ -134,6 +140,7 @@ async def _build_feed() -> dict[str, Any]:
             "open_disputes": open_disputes, "pending_payments": pending_payments,
             "avg_pvi": vl["avg_pvi"], "active_warranties": vl["active_warranties"],
             "twin_enrichments": vl["twin_enrichments"],
+            "hot_leads": hot_leads, "qualified_leads": qualified_leads,
             "health_overall": health["overall"],
             "red_departments": [{"key": d["key"], "label": d["label"], "score": d["score"], "detail": d["detail"]} for d in red_departments],
         },
@@ -180,6 +187,7 @@ async def _generate_recos() -> dict[str, Any]:
             f"Growth Intelligence (date reale): moment optim WhatsApp={beh.get('best_whatsapp_time', {}).get('text', 'necunoscut')}; "
             f"surse={beh.get('source_comparison', {}).get('text', 'fără date')}; "
             f"serviciu top={beh.get('top_service', {}).get('text', 'fără date')}. "
+            f"Lead Intelligence: {raw.get('hot_leads', 0)} lead-uri fierbinți + {raw.get('qualified_leads', 0)} calificate așteaptă acțiune comercială. "
             f"Top probleme UX din comportament real: "
             + ("; ".join(p.get("label", "") for p in top_ux) or "niciuna detectată")
             + "."

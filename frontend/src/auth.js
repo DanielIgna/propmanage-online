@@ -23,7 +23,10 @@ export const AuthProvider = ({ children }) => {
       return;
     }
     axios.get(`${API}/auth/me`)
-      .then(r => setUser(r.data))
+      .then(r => {
+        setUser(r.data);
+        import("@/lib/analytics").then(({ identify }) => identify(r.data?.id, r.data?.role)).catch(() => {});
+      })
       .catch(() => setUser(false));
   }, []);
   
@@ -32,19 +35,25 @@ export const AuthProvider = ({ children }) => {
     if (totp_code) payload.totp_code = totp_code;
     const { data } = await axios.post(`${API}/auth/login`, payload);
     setUser(data);
+    try { const { identify } = await import("@/lib/analytics"); identify(data?.id, data?.role); } catch { /* noop */ }
     return data;
   };
   
   const register = async (payload) => {
     try { const { trackFunnel } = await import("@/lib/analytics"); trackFunnel("signup_started"); } catch { /* noop */ }
     const { data } = await axios.post(`${API}/auth/register`, payload);
-    try { const { trackFunnel } = await import("@/lib/analytics"); trackFunnel("account_created"); } catch { /* noop */ }
+    try {
+      const { trackFunnel, identify } = await import("@/lib/analytics");
+      trackFunnel("account_created");
+      identify(data?.id, data?.role);
+    } catch { /* noop */ }
     setUser(data);
     return data;
   };
   
   const logout = async () => {
     await axios.post(`${API}/auth/logout`);
+    try { const { identify } = await import("@/lib/analytics"); identify(null); } catch { /* noop */ }
     setUser(false);
   };
   

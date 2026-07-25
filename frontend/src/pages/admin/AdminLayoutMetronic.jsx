@@ -7,7 +7,7 @@ import {
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
   LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, ChevronRight, Sparkles, Bot, Zap, Inbox,
   UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb, Bug, Compass, Layers, BookOpenCheck, GraduationCap, Gamepad2, Trophy, BarChart3, Eye, Heart,
-  Star, Clock, Command, Network, Megaphone, Brain, Rocket, Activity, KeyRound, Server, Palette, Map
+  Star, Clock, Command, Network, Megaphone, Brain, Rocket, Activity, KeyRound, Server, Palette, Map, Target
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { useTheme as useGlobalTheme } from "../../contexts/ThemeContext";
@@ -220,6 +220,7 @@ const NAV_SECTIONS = [
     items: [
       { id: "growth_analytics", label: "Analytics & Growth", icon: Activity, badge: "NEW", href: "/admin/analytics-growth" },
       { id: "growth_intel", label: "Growth Intelligence", icon: Brain, badge: "AI", href: "/admin/growth-intel" },
+      { id: "lead_intel", label: "Lead & Intent Intelligence", icon: Target, badge: "AI", href: "/admin/lead-intel" },
       { id: "bi_moe", label: "Business Intelligence", icon: BarChart3, badge: "SPRINT F", href: "/admin/bi-moe" },
       { id: "abtests", label: "A/B Tests", icon: Sparkles },
     ],

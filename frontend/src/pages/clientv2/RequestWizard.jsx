@@ -18,6 +18,16 @@ export const RequestWizard = ({ property, onClose, onCreated }) => {
   const [form, setForm] = useState({ category: "", title: "", description: "", priority: "normal", budget_estimate: "200", subcategory: "", taxonomy_node_id: null });
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
+  // GI-2 Intent Score: început → (finalizat | abandonat)
+  useEffect(() => {
+    let created = false;
+    window.__pmWizardCreated = () => { created = true; };
+    import("../../lib/analytics").then(({ trackIntent }) => trackIntent("request_started")).catch(() => {});
+    return () => {
+      if (!created) import("../../lib/analytics").then(({ trackIntent }) => trackIntent("request_abandoned")).catch(() => {});
+      delete window.__pmWizardCreated;
+    };
+  }, []);
   // CIP-B: hint preț orientativ pentru categoria selectată
   const [priceHint, setPriceHint] = useState(null);
   useEffect(() => {
@@ -52,6 +62,8 @@ export const RequestWizard = ({ property, onClose, onCreated }) => {
     try {
       const payload = { ...form, budget_estimate: parseFloat(form.budget_estimate) || 0, property_id: property.id, photos: [] };
       const { data } = await axios.post(`${API}/requests`, payload);
+      if (window.__pmWizardCreated) window.__pmWizardCreated();
+      import("../../lib/analytics").then(({ trackIntent }) => trackIntent("offer_requested")).catch(() => {});
       onCreated(data);
       setDone(true);
     } catch (e) { alert(formatApiError(e)); }

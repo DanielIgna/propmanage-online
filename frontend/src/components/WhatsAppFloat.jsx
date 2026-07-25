@@ -35,6 +35,7 @@ export const WhatsAppFloat = () => {
 
   return (
     <a href={href} target="_blank" rel="noreferrer" data-testid="whatsapp-float-btn" aria-label="Scrie-ne pe WhatsApp" title="Scrie-ne pe WhatsApp"
+      onClick={() => { import("../lib/analytics").then(({ trackIntent }) => trackIntent("whatsapp_opened")).catch(() => {}); }}
       className={`fixed ${posClass} z-40 ${sizeClass} rounded-full flex items-center justify-center shadow-lg shadow-black/20 hover:scale-110 active:scale-95 transition-transform`}
       style={{ background: "#25D366" }}>
       <WaIcon />

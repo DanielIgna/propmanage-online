@@ -70,7 +70,7 @@ def classify_source(referrer: str = "", utm_source: str = "", campaign_code: str
 # ═══════════════════════════ TRACKING (public) ═══════════════════════════
 
 class TrackEvent(BaseModel):
-    type: str  # pageview | heartbeat | click | funnel
+    type: str  # pageview | heartbeat | click | funnel | intent
     path: str = ""
     referrer: str = ""
     utm_source: str = ""
@@ -82,6 +82,7 @@ class TrackEvent(BaseModel):
     x_pct: Optional[float] = None  # click: coordonate % (pt heatmap Faza 2)
     y_pct: Optional[float] = None
     funnel_step: str = ""          # signup_started | account_created | property_added | subscription | specialist_request
+    intent_signal: str = ""        # GI-2: twin_viewed | audit_viewed | request_started | request_abandoned | offer_requested | whatsapp_opened | ...
     ab_key: str = ""               # A/B testing: cheia experimentului
     ab_variant: str = ""           # A | B
     ts: str = ""
@@ -90,6 +91,7 @@ class TrackEvent(BaseModel):
 class TrackBatch(BaseModel):
     visitor_id: str = Field(min_length=8, max_length=64)
     session_id: str = Field(min_length=8, max_length=64)
+    user_id: str = ""              # GI-2: identify vizitator↔utilizator
     user_role: str = ""
     events: List[TrackEvent] = Field(max_length=50)
 
@@ -122,6 +124,7 @@ async def ingest_events(batch: TrackBatch, request: Request):
             "duration_ms": max(0, min(ev.duration_ms, 3_600_000)),
             "x_pct": ev.x_pct, "y_pct": ev.y_pct,
             "funnel_step": (ev.funnel_step or "")[:40],
+            "intent_signal": (ev.intent_signal or "")[:40],
             "ab_key": (ev.ab_key or "")[:40],
             "ab_variant": (ev.ab_variant or "")[:2],
             "visitor_id": batch.visitor_id,
@@ -145,8 +148,20 @@ async def ingest_events(batch: TrackBatch, request: Request):
             sess_updates.setdefault("source", source)
         if ev.type == "funnel" and ev.funnel_step:
             sess_updates[f"funnel_{ev.funnel_step[:30]}"] = True
+        if ev.type == "intent" and ev.intent_signal:
+            sess_updates[f"intent_{ev.intent_signal[:30]}"] = True
         if ev.type == "ab" and ev.ab_key and ev.ab_variant in ("A", "B"):
             sess_updates[f"ab_{ev.ab_key[:30]}"] = ev.ab_variant
+    if batch.user_id:
+        sess_updates["user_id"] = batch.user_id[:40]
+        if batch.user_role:
+            sess_updates["user_role"] = batch.user_role[:20]
+        await db.visitor_identities.update_one(
+            {"visitor_id": batch.visitor_id},
+            {"$set": {"user_id": batch.user_id[:40], "role": (batch.user_role or "")[:20], "last_seen_at": now},
+             "$setOnInsert": {"first_seen_at": now}},
+            upsert=True,
+        )
     if docs:
         await db.analytics_events.insert_many(docs)
     await db.analytics_sessions.update_one(

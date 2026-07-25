@@ -173,8 +173,8 @@ export const PropertyHubV2 = ({ user, prop, properties, setSelectedPropId, actio
       </div>
       <PropertyDnaCard propId={prop.id} />
       <div className="mt-4 space-y-2">
-        <ListItem icon={Box} label="Digital Twin" sub="locuința ta în 3D" onClick={actions.openTwin} testid="v2-hub-twin" />
-        <ListItem icon={HeartPulse} label="House Health" sub="scor + recomandări" onClick={actions.openHealth} testid="v2-hub-health" />
+        <ListItem icon={Box} label="Digital Twin" sub="locuința ta în 3D" onClick={() => { import("../../lib/analytics").then(({ trackIntent }) => trackIntent("twin_viewed")).catch(() => {}); actions.openTwin(); }} testid="v2-hub-twin" />
+        <ListItem icon={HeartPulse} label="House Health" sub="scor + recomandări" onClick={() => { import("../../lib/analytics").then(({ trackIntent }) => trackIntent("audit_viewed")).catch(() => {}); actions.openHealth(); }} testid="v2-hub-health" />
         <ListItem icon={Clock} label="Timeline" sub="istoricul proprietății" onClick={actions.openPropTimeline} testid="v2-hub-timeline" />
         <ListItem icon={Wallet} label="Plăți & Portofel" sub={`sold ${(user?.wallet_balance ?? 0).toFixed(0)} RON`} onClick={actions.openWallet} testid="v2-hub-wallet" />
         <ListItem icon={Settings2} label="Administrează proprietățile" sub="adaugă, editează, fotografii" onClick={actions.openPropManager} testid="v2-hub-manage" muted />

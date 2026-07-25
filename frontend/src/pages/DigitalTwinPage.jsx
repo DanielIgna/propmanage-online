@@ -354,6 +354,7 @@ export default function DigitalTwinPage() {
   const [plansFor, setPlansFor] = useState(null);
   const [showSentReports, setShowSentReports] = useState(false);
   const [pendingReportsCount, setPendingReportsCount] = useState(0);
+  useEffect(() => { import("../lib/analytics").then(({ trackIntent }) => trackIntent("twin_viewed")).catch(() => {}); }, []);
 
   const loadAll = async () => {
     setLoading(true);

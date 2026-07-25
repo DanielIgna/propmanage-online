@@ -73,6 +73,18 @@ AI_AGENTS = [
         "owner": "Intelligence Engine",
         "permission_level": "suggest",
     },
+    {
+        "slug": "lead_intelligence",
+        "name": "Intent & Lead Intelligence Engine",
+        "category": "intelligence",
+        "lifecycle": "active",
+        "maturity": "experimental",
+        "provider": "mixed",  # v1 rule-based — zero cost LLM; calibrare Learning Engine în GI-4
+        "purpose": "Intent Score 0-100 per vizitator din semnale reale (twin/audit vizualizat, cereri începute/abandonate, WhatsApp, reveniri, campanii) → clasificare visitor/prospect/qualified/hot/client. Prioritizează automat Revenue Hunter și alimentează Command Center.",
+        "data_sources": ["lead_scores", "visitor_identities"],
+        "owner": "Intelligence Engine",
+        "permission_level": "suggest",
+    },
 
     # --- Multi-agent dev team (read-only architecture) ---
     {

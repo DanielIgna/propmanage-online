@@ -20,6 +20,7 @@ const HouseHealthPage = () => {
 
   useEffect(() => {
     axios.get(`${API}/house-health/dashboard`).then((r) => setDashData(r.data)).catch(() => {});
+    import("../lib/analytics").then(({ trackIntent }) => trackIntent("audit_viewed")).catch(() => {});
   }, []);
 
   const renderSection = () => {

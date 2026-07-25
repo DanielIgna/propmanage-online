@@ -111,6 +111,11 @@ async def scan_property(prop: dict) -> int:
     if active >= MAX_ACTIVE_PER_PROPERTY:
         return 0
 
+    # GI-2: Intent & Lead Intelligence — boost de prioritate pentru lead-uri fierbinți
+    lead = await db.lead_scores.find_one({"user_id": owner_id}, {"tier": 1, "score": 1})
+    lead_tier = (lead or {}).get("tier")
+    lead_boost = {"hot": 1.5, "qualified": 1.2}.get(lead_tier, 1.0)
+
     cooldown_cutoff = (datetime.now(timezone.utc) - timedelta(days=COOLDOWN_DAYS)).isoformat()
     recent_services = set()
     async for o in db.revenue_opportunities.find(
@@ -137,7 +142,8 @@ async def scan_property(prop: dict) -> int:
             "title": meta["title"],
             "benefit": meta["benefit"],
             "estimated_value_ron": round(value, 2),
-            "score": round(value * confidence, 2),  # prioritizare Mission Control: valoare comercială
+            "score": round(value * confidence * lead_boost, 2),  # prioritizare: valoare × încredere × intent (GI-2)
+            "lead_tier": lead_tier,
             "status": "active",
             "created_at": _now(),
         }
@@ -169,7 +175,22 @@ async def run_revenue_hunter_tick(limit: int = 500) -> dict:
         logger.info("[revenue_hunter] disabled via kill-switch — skipping tick")
         return {"enabled": False, "scanned": 0, "created": 0}
     scanned = created = 0
+    # GI-2: lead-urile fierbinți/calificate primele — proprietățile lor se scanează prioritar
+    hot_owner_ids = [d["user_id"] async for d in db.lead_scores.find(
+        {"tier": {"$in": ["hot", "qualified"]}, "user_id": {"$nin": [None, ""]}}, {"user_id": 1}
+    ).sort("score", -1).limit(100)]
+    seen_props = set()
+    for owner_id in hot_owner_ids:
+        async for prop in db.properties.find({"owner_id": owner_id}):
+            seen_props.add(str(prop["_id"]))
+            scanned += 1
+            try:
+                created += await scan_property_throttled(prop)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[revenue_hunter] hot-lead scan failed for {prop.get('_id')}: {e}")
     async for prop in db.properties.find({}).limit(limit):
+        if str(prop["_id"]) in seen_props:
+            continue
         scanned += 1
         try:
             created += await scan_property_throttled(prop)
