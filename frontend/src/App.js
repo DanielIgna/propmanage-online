@@ -109,6 +109,7 @@ const FeatureConfiguratorPage = lazy(() => import("./pages/admin/FeatureConfigur
 const SpecialistProgressionPage = lazy(() => import("./pages/admin/SpecialistProgressionPage"));
 const BIMoePage = lazy(() => import("./pages/admin/BIMoePage"));
 const AnalyticsGrowthPage = lazy(() => import("./pages/admin/AnalyticsGrowthPage"));
+const GrowthIntelligencePage = lazy(() => import("./pages/admin/GrowthIntelligencePage"));
 const ITCollaboratorsHubPage = lazy(() => import("./pages/admin/ITCollaboratorsHubPage"));
 const ITCopilotPage = lazy(() => import("./pages/admin/ITCopilotPage"));
 const LegalAuditPage = lazy(() => import("./pages/admin/LegalAuditPage"));
@@ -1659,6 +1660,7 @@ function App() {
               <Route path="/admin/specialist-progression" element={<SpecialistProgressionPage />} />
               <Route path="/admin/bi-moe" element={<BIMoePage />} />
               <Route path="/admin/analytics-growth" element={<AnalyticsGrowthPage />} />
+              <Route path="/admin/growth-intel" element={<GrowthIntelligencePage />} />
               <Route path="/admin/it-collaborators" element={<ITCollaboratorsHubPage />} />
               <Route path="/admin/it-collaborators/copilot" element={<ITCopilotPage />} />
               <Route path="/admin/legal-audit" element={<LegalAuditPage />} />

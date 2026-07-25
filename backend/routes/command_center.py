@@ -177,6 +177,7 @@ async def _generate_recos() -> dict[str, Any]:
                 "why": str(r.get("why") or "")[:200],
                 "severity": r.get("severity") if r.get("severity") in ("high", "medium", "low") else "medium",
                 "module": str(r.get("module") or "")[:40],
+                "category": r.get("category") if r.get("category") in ("ux", "marketing", "comercial", "operational", "ceo") else "operational",
             }
             for r in (result.get("recommendations") or [])[:5] if isinstance(r, dict) and r.get("action")
         ]
@@ -186,9 +187,9 @@ async def _generate_recos() -> dict[str, Any]:
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[command-center] LLM fail: {e} — fallback")
         recos = [
-            {"action": f"Rezolvă cele {raw['waiting_48h']} cereri care așteaptă >48h", "why": "Cererile neonorate duc la abandon.", "severity": "high", "module": "Marketplace"},
-            {"action": f"Confirmă escrow-ul de {raw['escrow_held_amount']:.0f} lei", "why": "Banii blocați erodează încrederea.", "severity": "high", "module": "Escrow"},
-            {"action": f"Contactează {raw['incomplete_specialists']} specialiști cu profil incomplet", "why": "Profilele incomplete reduc conversia.", "severity": "medium", "module": "Specialiști"},
+            {"action": f"Rezolvă cele {raw['waiting_48h']} cereri care așteaptă >48h", "why": "Cererile neonorate duc la abandon.", "severity": "high", "module": "Marketplace", "category": "operational"},
+            {"action": f"Confirmă escrow-ul de {raw['escrow_held_amount']:.0f} lei", "why": "Banii blocați erodează încrederea.", "severity": "high", "module": "Escrow", "category": "operational"},
+            {"action": f"Contactează {raw['incomplete_specialists']} specialiști cu profil incomplet", "why": "Profilele incomplete reduc conversia.", "severity": "medium", "module": "Specialiști", "category": "comercial"},
         ]
         ai_generated = False
 
@@ -272,3 +273,4 @@ async def toggle_recommendation(idx: int = Body(..., embed=True), _admin=Depends
 async def latest_recommendations(_admin=Depends(require_role("admin"))):
     doc = await db.command_center_recos.find_one({"_id": "latest"}, {"_id": 0})
     return doc or {"recommendations": None}
+

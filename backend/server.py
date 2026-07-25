@@ -628,6 +628,15 @@ async def startup():
             CronTrigger(hour=7, minute=10, timezone=pytz.timezone("Europe/Bucharest")),
             id="revenue_hunter_daily", replace_existing=True, misfire_grace_time=3600,
         )
+        # Sprint GI-1 (Board 004/005/006): Growth Intelligence — scan zilnic pe date reale
+        async def _growth_intel_tick():
+            from growth_intelligence import run_growth_scan
+            await run_growth_scan(trigger="cron")
+        scheduler.add_job(
+            _growth_intel_tick,
+            CronTrigger(hour=6, minute=40, timezone=pytz.timezone("Europe/Bucharest")),
+            id="growth_intelligence_daily", replace_existing=True, misfire_grace_time=3600,
+        )
         scheduler.start()
         # Felia 1 (Sprint 1): jurnalul central al agenților — toate execuțiile cron în agent_runs
         try:

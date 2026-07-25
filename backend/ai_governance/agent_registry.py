@@ -61,6 +61,18 @@ AI_AGENTS = [
         "owner": "Intelligence Engine",
         "permission_level": "suggest",
     },
+    {
+        "slug": "growth_intelligence",
+        "name": "Growth Intelligence Agent",
+        "category": "intelligence",
+        "lifecycle": "active",
+        "maturity": "experimental",
+        "provider": "mixed",  # v1 rule-based — zero cost LLM (ierarhia de cost, Prompt 003)
+        "purpose": "Analizează comportamentul real (sesiuni, bounce, funnel, trasee, ore/zile, surse) și produce probleme UX, pagini de abandon, Behavioral Intelligence și recomandări cu nivel de validare (Board 006).",
+        "data_sources": ["growth_insights", "growth_insights_history"],
+        "owner": "Intelligence Engine",
+        "permission_level": "suggest",
+    },
 
     # --- Multi-agent dev team (read-only architecture) ---
     {

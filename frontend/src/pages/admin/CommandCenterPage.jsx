@@ -117,6 +117,7 @@ export default function CommandCenterPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${sv.badge}`}>{sv.label}</span>
+                            {r.category && <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300" data-testid={`cc-reco-category-${i}`}>{r.category}</span>}
                             {r.module && <span className="text-[10px] font-bold text-slate-400">{r.module}</span>}
                           </div>
                           <div className={`text-sm font-bold text-slate-900 dark:text-white mt-0.5 ${r.done ? "line-through" : ""}`}>{r.action}</div>
