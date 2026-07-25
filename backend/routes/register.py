@@ -144,6 +144,7 @@ from routes.lead_followup import router as lead_followup_router
 from routes.specialist_followup import router as specialist_followup_router
 from routes.property_dna import router as property_dna_router
 from routes.property_intelligence import router as property_intelligence_router
+from routes.resend_diagnostics import router as resend_diagnostics_router
 from routes.opportunities import router as opportunities_router
 from routes.growth_intelligence import router as growth_intelligence_router
 from routes.lead_intelligence import router as lead_intelligence_router
@@ -294,5 +295,6 @@ ALL_ROUTERS = (
     marketing_intelligence_router,
     learning_router,
     property_intelligence_router,
+    resend_diagnostics_router,
     ux_lab_router,
 )
