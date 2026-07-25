@@ -121,6 +121,7 @@ export default function ClientDashboardV2() {
 
   const actions = {
     payEscrow, confirmRequest, setChatRequest, setReviewFor, setDisputeFor, setTimelineRequestId,
+    reloadRequests: loadRequests,
     openWizard: () => (prop ? setShowWizard(true) : setShowPropManager(true)),
     openPropManager: () => setShowPropManager(true),
     openNotifs: () => setShowNotifs(true),

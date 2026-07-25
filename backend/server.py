@@ -619,6 +619,15 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=7200,
         )
+        # Sprint 2 (Board Review 001): Revenue Hunter — oportunități comerciale zilnice
+        async def _revenue_hunter_tick():
+            from revenue_hunter import run_revenue_hunter_tick
+            await run_revenue_hunter_tick()
+        scheduler.add_job(
+            _revenue_hunter_tick,
+            CronTrigger(hour=7, minute=10, timezone=pytz.timezone("Europe/Bucharest")),
+            id="revenue_hunter_daily", replace_existing=True, misfire_grace_time=3600,
+        )
         scheduler.start()
         # Felia 1 (Sprint 1): jurnalul central al agenților — toate execuțiile cron în agent_runs
         try:

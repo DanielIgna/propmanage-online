@@ -2862,3 +2862,28 @@ Aprobare fondator: START (Opțiunea B, felii verticale Strangler).
 **Următoarea felie (2)**: Job Closure Enrichment (Legea 8) — finalizarea lucrării scrie obligatoriu
 în Twin (foto după, garanție, materiale, re-scoring House Health). Apoi Felia 3: ledger unic +
 taxonomie unică + Adoption Metrics.
+
+---
+
+## ✅ SPRINT 2 / FELIA 1 — „REVENUE HUNTER" LIVRATĂ & TESTATĂ (25 Iul 2026)
+Board Review 001: Lead Hunter → REVENUE HUNTER (oportunități comerciale pentru: Digital Twin,
+Audit Tehnic, Design Interior, Design Tematic). Board Directive 001: doctrina închisă, focus implementare.
+1. **Engine** `/app/backend/revenue_hunter.py` — detectori RULE-BASED (zero LLM, ierarhia Prompt 003)
+   pe starea Property DNA: fără twin→Digital Twin; sănătate necunoscută/scăzută→Audit; renovare
+   recentă→Design Interior; twin existent→Design Tematic. Copy exclusiv în BENEFICII (nu procente).
+   Guardrails: max 3 active/proprietate, cooldown 30 zile/(prop,serviciu), kill-switch orchestrator
+   (id: revenue_hunter), scan throttle 12h, fără contact direct client.
+2. **API** `/app/backend/routes/opportunities.py`: GET /api/client/opportunities (lazy scan),
+   POST {id}/accept → CERERE REALĂ în db.requests (intră în pipeline matching; twin/audit notifică
+   adminii, design notifică specialiștii interior_design), POST {id}/dismiss.
+   Admin: GET /api/admin/revenue-hunter/stats (conversie, pipeline RON — Legea 21), POST run, POST toggle.
+3. **Agent Registry**: revenue_hunter înregistrat (ai_governance/agent_registry.py, permission: suggest).
+4. **Cron**: revenue_hunter_daily 07:10 (înregistrat automat în agent_runs de jurnalul Felia 1).
+5. **UI**: widget „Recomandat pentru casa ta" în HomeV2 (accept→stare succes→Vezi lucrarea→jobs;
+   dismiss→dispare). DNA capability 'recommendations' acum populată. Layout merge pentru widget-uri noi.
+6. Events adopție (Legea 21): recommendation.created/accepted/dismissed prin Event Bus.
+**Testat**: curl e2e (accept a creat request real 6a64ee39..., conversie 50% în stats) + UI e2e
+(dismiss/accept/navigare Lucrări — toate PASS). Demo: pipeline activ 11.100 RON pe contul demo.
+**Ciclul Constituției ÎNCHIS pentru prima dată**: Twin → AI → Oportunitate → Aprobare client →
+Cerere → Matching (existent) → Feedback (stats conversie).
+**Next**: Felia 2 Sprint 2 — Job Closure Enrichment (Legea 8) SAU Command Center decizional multi-rol.

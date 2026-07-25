@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
   Plus, Building2, Wrench, MessageCircle, Sparkles, ShieldCheck, ChevronRight,
-  CreditCard, Star, Bell, Brain,
+  CreditCard, Star, Bell, Brain, Box, Palette, Check, X,
 } from "lucide-react";
 import { GREEN, CTA, Steps, stepForStatus, Skeleton } from "./ui";
 import { API } from "../DashShared";
@@ -11,6 +11,83 @@ import { API } from "../DashShared";
 const IMG_TWIN = "https://images.unsplash.com/photo-1721244654394-36a7bc2da288?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzh8MHwxfHNlYXJjaHwyfHxhcmNoaXRlY3R1cmFsJTIwYmx1ZXByaW50JTIwYnVpbGRpbmd8ZW58MHx8fHwxNzg0OTkwMDEyfDA&ixlib=rb-4.1.0&q=85&w=800";
 const IMG_HEALTH = "https://images.pexels.com/photos/36035073/pexels-photo-36035073.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
 const IMG_GUIDE = "https://static.prod-images.emergentagent.com/jobs/c0629304-e2e2-4a6f-8f15-5c4c3ef257d1/images/7b363db9e5f2b9781098798793b0f1746f212980f43a212562902c1e28838a43.jpeg";
+
+// Revenue Hunter — inbox de decizii comerciale (Sprint 2, Board Review 001)
+const OPP_ICONS = { digital_twin: Box, audit_tehnic: ShieldCheck, design_interior: Palette, design_tematic: Sparkles };
+
+const OpportunitiesCard = ({ actions, go }) => {
+  const [opps, setOpps] = useState([]);
+  const [busy, setBusy] = useState(null);
+  const [accepted, setAccepted] = useState(null);
+  useEffect(() => {
+    axios.get(`${API}/client/opportunities`).then(r => setOpps(r.data.opportunities || [])).catch(() => {});
+  }, []);
+  const accept = async (opp) => {
+    setBusy(opp.id);
+    try {
+      await axios.post(`${API}/client/opportunities/${opp.id}/accept`);
+      setAccepted(opp.id);
+      await actions.reloadRequests?.();
+    } catch { /* noop */ }
+    setBusy(null);
+  };
+  const dismiss = async (opp) => {
+    setBusy(opp.id);
+    try {
+      await axios.post(`${API}/client/opportunities/${opp.id}/dismiss`);
+      setOpps(o => o.filter(x => x.id !== opp.id));
+    } catch { /* noop */ }
+    setBusy(null);
+  };
+  if (!opps.length) return null;
+  return (
+    <div className="mx-5 mt-6 lg:mx-0 lg:mt-0 cv2-fade cv2-d2" data-testid="v2-opportunities">
+      <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 px-1">Recomandat pentru casa ta</h3>
+      <div className="mt-2 space-y-2.5">
+        {opps.slice(0, 2).map((opp) => {
+          const Icon = OPP_ICONS[opp.service] || Sparkles;
+          if (accepted === opp.id) {
+            return (
+              <div key={opp.id} className="rounded-2xl border border-[#166534]/25 bg-[#166534]/5 p-4 flex items-center gap-3" data-testid={`opp-accepted-${opp.service}`}>
+                <Check className="w-5 h-5 text-[#166534] shrink-0" />
+                <span className="text-xs font-semibold text-slate-700 flex-1">Cererea a fost creată — specialiștii au fost anunțați.</span>
+                <button onClick={() => go("jobs")} className="text-[11px] font-black text-[#166534] shrink-0" data-testid="opp-see-job">Vezi lucrarea →</button>
+              </div>
+            );
+          }
+          return (
+            <div key={opp.id} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm" data-testid={`opp-card-${opp.service}`}>
+              <div className="flex items-start gap-3">
+                <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-[#166534]/5">
+                  <Icon className="w-4.5 h-4.5 text-[#166534]" style={{ width: 18, height: 18 }} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[9px] font-black uppercase tracking-[0.14em] text-[#166534]">{opp.service_label}</span>
+                    {opp.property_name && <span className="text-[10px] text-slate-400 truncate">· {opp.property_name}</span>}
+                    {opp.estimated_value_ron && <span className="text-[10px] font-mono font-semibold text-slate-400">≈ {Number(opp.estimated_value_ron).toLocaleString("ro")} RON</span>}
+                  </div>
+                  <div className="mt-0.5 text-sm font-black text-slate-900 leading-snug">{opp.title}</div>
+                  <p className="mt-1 text-xs text-slate-500 leading-relaxed">{opp.benefit}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <button onClick={() => accept(opp)} disabled={busy === opp.id} data-testid={`opp-accept-${opp.service}`}
+                  className="flex-1 min-h-[40px] rounded-full text-xs font-black text-black bg-[#ccff00] shadow-[0_8px_24px_-10px_rgba(204,255,0,0.5)] active:scale-[0.98] transition-transform disabled:opacity-50">
+                  {busy === opp.id ? "Se creează…" : "Vreau ofertă"}
+                </button>
+                <button onClick={() => dismiss(opp)} disabled={busy === opp.id} data-testid={`opp-dismiss-${opp.service}`}
+                  className="px-4 min-h-[40px] rounded-full text-xs font-semibold text-slate-400 border border-slate-200 hover:text-slate-600 transition-colors" aria-label="Nu acum">
+                  Nu acum
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 // Copilot — „Care e următoarea acțiune pentru casa ta?" (Blueprint Faza 4)
 const CopilotCard = ({ go, actions, hasProps }) => {
@@ -142,20 +219,29 @@ export const HomeSkeleton = () => (
 const WIDGET_SPAN = {
   hero: "lg:col-span-7",
   quick_actions: "lg:col-span-7",
+  opportunities: "lg:col-span-7",
   copilot: "lg:col-span-5 lg:row-span-2",
   contextual: "lg:col-span-7",
   discover: "lg:col-span-12",
 };
 
+const DEFAULT_LAYOUT = [
+  { id: "hero", enabled: true }, { id: "quick_actions", enabled: true }, { id: "opportunities", enabled: true },
+  { id: "copilot", enabled: true }, { id: "contextual", enabled: true }, { id: "discover", enabled: true },
+];
+
 export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, go, actions }) => {
   const navigate = useNavigate();
-  const [layout, setLayout] = useState([
-    { id: "hero", enabled: true }, { id: "quick_actions", enabled: true }, { id: "copilot", enabled: true },
-    { id: "contextual", enabled: true }, { id: "discover", enabled: true },
-  ]);
+  const [layout, setLayout] = useState(DEFAULT_LAYOUT);
   const [hidden, setHidden] = useState([]);
   useEffect(() => {
-    axios.get(`${API}/xos/layout/client_home`).then(r => { if (r.data.items?.length) setLayout(r.data.items); }).catch(() => {});
+    axios.get(`${API}/xos/layout/client_home`).then(r => {
+      if (r.data.items?.length) {
+        const items = r.data.items;
+        const merged = [...items, ...DEFAULT_LAYOUT.filter(d => !items.find(i => i.id === d.id))];
+        setLayout(merged);
+      }
+    }).catch(() => {});
     axios.get(`${API}/ui-rules/my`).then(r => setHidden(r.data.hidden || [])).catch(() => {});
   }, []);
   const activeReqs = requests.filter(r => r.status !== "confirmed");
@@ -207,6 +293,7 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
       </div>
     ),
     copilot: <CopilotCard key="copilot" go={go} actions={actions} hasProps={properties.length > 0} />,
+    opportunities: <OpportunitiesCard key="opportunities" actions={actions} go={go} />,
     contextual: contextual.length > 0 ? (
       <div key="contextual" className="mx-5 mt-6 lg:mx-0 lg:mt-0 cv2-fade cv2-d2" data-testid="v2-contextual">
           <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 px-1">Noutăți pentru tine</h3>

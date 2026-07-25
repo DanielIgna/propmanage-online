@@ -49,6 +49,19 @@ AI_AGENTS = [
         "permission_level": "suggest",
     },
 
+    {
+        "slug": "revenue_hunter",
+        "name": "Revenue Hunter Engine",
+        "category": "revenue",
+        "lifecycle": "active",
+        "maturity": "experimental",
+        "provider": "mixed",  # v1 rule-based — zero cost LLM (ierarhia de cost, Prompt 003)
+        "purpose": "Transformă starea Property DNA în oportunități comerciale pentru serviciile monetizabile (Digital Twin, Audit Tehnic, Design Interior, Design Tematic). Board Review 001. Nu contactează clientul — aprobare prin click in-app.",
+        "data_sources": ["revenue_opportunities", "revenue_hunter_scans"],
+        "owner": "Intelligence Engine",
+        "permission_level": "suggest",
+    },
+
     # --- Multi-agent dev team (read-only architecture) ---
     {
         "slug": "ai_dev_team_frontend",

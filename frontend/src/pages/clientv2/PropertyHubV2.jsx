@@ -117,7 +117,7 @@ const PropertyDnaCard = ({ propId }) => {
           </div>
         </div>
       )}
-      <p className="mt-3 text-[10px] text-slate-400">Fiecare lucrare finalizată prin PropManage îmbogățește automat Cartea Casei.</p>
+      <p className="mt-3 text-[10px] text-slate-400">O Carte a Casei completă = documentație pentru vânzare, siguranță și lucrări fără surprize. Fiecare lucrare finalizată prin PropManage o îmbogățește automat.</p>
     </div>
   );
 };

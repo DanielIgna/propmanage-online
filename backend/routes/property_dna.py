@@ -113,6 +113,12 @@ async def property_dna(prop_id: str, user: dict = Depends(get_current_user)):
     events.sort(key=lambda e: e.get("timestamp") or "", reverse=True)
     events = events[:30]
 
+    # ── recommendations: oportunități comerciale active (Revenue Hunter) ────
+    active_opps = await db.revenue_opportunities.count_documents({"property_id": prop_id, "status": "active"})
+    top_opp = await db.revenue_opportunities.find_one(
+        {"property_id": prop_id, "status": "active"}, {"_id": 0, "title": 1, "service_label": 1}, sort=[("score", -1)]
+    )
+
     capabilities = {
         "identity": {
             "populated": bool(prop.get("name") or prop.get("address")),
@@ -149,7 +155,10 @@ async def property_dna(prop_id: str, user: dict = Depends(get_current_user)):
         },
         "maintenance": {"populated": False, "data": {}},
         "sensors": {"populated": False, "data": {}},
-        "recommendations": {"populated": False, "data": {}},
+        "recommendations": {
+            "populated": active_opps > 0,
+            "data": {"active": active_opps, "top": (top_opp or {}).get("title")},
+        },
     }
     populated = sum(1 for c in capabilities.values() if c["populated"])
     completeness = round(populated / len(capabilities) * 100)
