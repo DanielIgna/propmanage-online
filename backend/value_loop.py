@@ -111,6 +111,23 @@ async def pvi_delta_6m(prop_id: str, current: int) -> int:
     return current - int(baseline.get("score") or 0)
 
 
+async def value_loop_summary() -> dict:
+    """Indicatori strategici Value Loop pentru Mission Control / CEO Copilot."""
+    scored, avg = 0, 0
+    async for d in db.properties.aggregate([
+        {"$match": {"pvi.score": {"$exists": True}}},
+        {"$group": {"_id": None, "avg": {"$avg": "$pvi.score"}, "n": {"$sum": 1}}},
+    ]):
+        avg, scored = round(d.get("avg") or 0, 1), d.get("n", 0)
+    total = await db.properties.estimated_document_count()
+    warranties = await db.warranties.count_documents({"status": "active"})
+    enriched = await db.activity_events.count_documents({"event_type": "twin.enriched"})
+    return {
+        "avg_pvi": avg, "properties_scored": scored, "properties_total": total,
+        "active_warranties": warranties, "twin_enrichments": enriched,
+    }
+
+
 # ============================================================================
 # JOB CLOSURE ENRICHMENT — Legea 8
 # ============================================================================

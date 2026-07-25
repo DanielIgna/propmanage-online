@@ -189,20 +189,8 @@ async def value_loop_stats(user: dict = Depends(get_current_user)):
     role = user.get("active_view") or user.get("role")
     if role != "admin":
         raise HTTPException(403, "Doar admin")
-    scored = warranties = 0
-    total = avg = 0
-    async for d in db.properties.aggregate([
-        {"$match": {"pvi.score": {"$exists": True}}},
-        {"$group": {"_id": None, "avg": {"$avg": "$pvi.score"}, "n": {"$sum": 1}}},
-    ]):
-        avg, scored = round(d.get("avg") or 0, 1), d.get("n", 0)
-    total = await db.properties.estimated_document_count()
-    warranties = await db.warranties.count_documents({"status": "active"})
-    enriched = await db.activity_events.count_documents({"event_type": "twin.enriched"})
-    return {
-        "avg_pvi": avg, "properties_scored": scored, "properties_total": total,
-        "active_warranties": warranties, "twin_enrichments": enriched,
-    }
+    from value_loop import value_loop_summary
+    return await value_loop_summary()
 
 
 # ============================================================================

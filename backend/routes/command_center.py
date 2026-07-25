@@ -86,11 +86,16 @@ async def _build_feed() -> dict[str, Any]:
     health = await compute_health()
     red_departments = [d for d in health["departments"] if d["color"] == "red"]
 
+    # ── Value Loop (Board Decision 002/003): PVI ca indicator strategic ──────
+    from value_loop import value_loop_summary
+    vl = await value_loop_summary()
+
     stats = [
         {"key": "new_requests", "label": "Cereri noi (24h)", "value": new_requests_24h, "icon": "inbox"},
         {"key": "new_users", "label": "Utilizatori noi (24h)", "value": new_users_24h, "icon": "users"},
         {"key": "completed", "label": "Lucrări finalizate (24h)", "value": completed_24h, "icon": "check"},
         {"key": "trend", "label": "Marketplace 7z vs 7z", "value": f"{'+' if (marketplace_trend or 0) >= 0 else ''}{marketplace_trend}%" if marketplace_trend is not None else "—", "icon": "trend"},
+        {"key": "avg_pvi", "label": "PVI mediu ecosistem", "value": f"{vl['avg_pvi']}/100" if vl["properties_scored"] else "—", "icon": "gem"},
     ]
 
     warnings = []
@@ -127,6 +132,8 @@ async def _build_feed() -> dict[str, Any]:
             "escrow_held_amount": escrow_held_amount, "escrow_held_count": escrow_held_count,
             "escrow_frozen_count": escrow_frozen_count, "incomplete_specialists": incomplete_specialists,
             "open_disputes": open_disputes, "pending_payments": pending_payments,
+            "avg_pvi": vl["avg_pvi"], "active_warranties": vl["active_warranties"],
+            "twin_enrichments": vl["twin_enrichments"],
             "health_overall": health["overall"],
             "red_departments": [{"key": d["key"], "label": d["label"], "score": d["score"], "detail": d["detail"]} for d in red_departments],
         },

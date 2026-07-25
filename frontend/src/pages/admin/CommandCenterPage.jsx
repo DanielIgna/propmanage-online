@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import {
   Brain, Inbox, Users, CheckCircle2, TrendingUp, AlertTriangle,
-  Sparkles, RefreshCw, Zap, ExternalLink,
+  Sparkles, RefreshCw, Zap, ExternalLink, Gem,
 } from "lucide-react";
 import { AdminLayoutMetronic, AdminCard } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
@@ -18,7 +18,7 @@ const SEV = {
   low:    { label: "INFO",     cls: "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300", badge: "bg-slate-400 text-white" },
 };
 
-const ICONS = { inbox: Inbox, users: Users, check: CheckCircle2, trend: TrendingUp };
+const ICONS = { inbox: Inbox, users: Users, check: CheckCircle2, trend: TrendingUp, gem: Gem };
 
 export default function CommandCenterPage() {
   const [feed, setFeed] = useState(null);
@@ -59,7 +59,7 @@ export default function CommandCenterPage() {
       {loading ? <DSSkeleton kpis={4} blocks={2} /> : (
         <div className="space-y-6" data-testid="command-center-root">
           {/* Astăzi */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             {(feed?.stats || []).map((s, i) => (
               <KpiCard key={s.key} icon={ICONS[s.icon] || Inbox} label={s.label} value={s.value} accent={accents[i % 4]} testid={`cc-stat-${s.key}`} />
             ))}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Building2, Box, HeartPulse, Clock, Wallet, Settings2, CreditCard, Dna, Fingerprint, Wrench, FileText, Share2, CalendarClock, Radio, Sparkles } from "lucide-react";
+import { Building2, Box, HeartPulse, Clock, Wallet, Settings2, CreditCard, Dna, Fingerprint, Wrench, FileText, Share2, CalendarClock, Radio, Sparkles, Check } from "lucide-react";
 import { API } from "../DashShared";
 import { formatApiError } from "../../auth";
 import { GREEN, GREEN_SOFT, ListItem, Sheet, CTA, AmountInput } from "./ui";

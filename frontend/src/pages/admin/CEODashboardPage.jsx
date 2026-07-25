@@ -1,7 +1,7 @@
 // CEODashboardPage — vedere strategică doar pentru owner (super-admin).
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { Crown, TrendingUp, Wallet, Lock, Users, Inbox, AlertTriangle, RefreshCw, ExternalLink, Repeat } from "lucide-react";
+import { Crown, TrendingUp, Wallet, Lock, Users, Inbox, AlertTriangle, RefreshCw, ExternalLink, Repeat, Gem, ShieldCheck, Layers, Home } from "lucide-react";
 import { AdminLayoutMetronic, AdminCard } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
 import { KpiCard, DSButton, DSSkeleton, EmptyState } from "../../design-system";
@@ -66,6 +66,31 @@ export default function CEODashboardPage() {
               <KpiCard icon={Users}   label="Utilizatori noi 24h" value={data?.new_users_24h ?? 0} accent="neutral" testid="ceo-kpi-users" />
             </div>
           </div>
+
+          <AdminCard
+            title={<span className="flex items-center gap-2"><Gem className="w-4 h-4 text-lime-500" /> Value Loop — valoarea creată în ecosistem</span>}
+            testid="ceo-value-loop"
+          >
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="p-3 rounded-xl bg-slate-900 dark:bg-slate-800 text-white" data-testid="ceo-vl-pvi">
+                <div className="text-[10px] font-black uppercase tracking-wide text-lime-400 flex items-center gap-1"><Gem className="w-3 h-3" /> PVI mediu</div>
+                <div className="text-2xl font-black mt-1">{data?.value_loop?.avg_pvi ?? 0}<span className="text-sm text-slate-400 font-semibold">/100</span></div>
+                <div className="text-[10px] text-slate-400">Property Value Index · maturitatea documentării</div>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800" data-testid="ceo-vl-scored">
+                <div className="text-[10px] font-black uppercase tracking-wide text-slate-400 flex items-center gap-1"><Home className="w-3 h-3" /> Proprietăți scorate</div>
+                <div className="text-2xl font-black mt-1 text-slate-900 dark:text-white">{data?.value_loop?.properties_scored ?? 0}<span className="text-sm text-slate-400 font-semibold">/{data?.value_loop?.properties_total ?? 0}</span></div>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800" data-testid="ceo-vl-warranties">
+                <div className="text-[10px] font-black uppercase tracking-wide text-slate-400 flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Garanții active</div>
+                <div className="text-2xl font-black mt-1 text-slate-900 dark:text-white">{data?.value_loop?.active_warranties ?? 0}</div>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800" data-testid="ceo-vl-enrichments">
+                <div className="text-[10px] font-black uppercase tracking-wide text-slate-400 flex items-center gap-1"><Layers className="w-3 h-3" /> Îmbogățiri Twin</div>
+                <div className="text-2xl font-black mt-1 text-slate-900 dark:text-white">{data?.value_loop?.twin_enrichments ?? 0}</div>
+              </div>
+            </div>
+          </AdminCard>
 
           <div className="grid lg:grid-cols-2 gap-4">
             <AdminCard title={<span className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-lime-500" /> AI spune: prioritățile tale azi</span>}
