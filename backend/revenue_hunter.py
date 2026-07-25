@@ -54,6 +54,22 @@ SERVICES = {
         "value": 1500.0,
         "category": "interior_design",
     },
+    "predictive_maintenance": {
+        "label": "Mentenanță Predictivă",
+        "title": "Planifică din timp, evită urgențele",
+        "benefit": "Un activ aproape de finalul duratei de viață se înlocuiește planificat, nu în criză — costuri mai mici și zero surprize.",
+        "value": 0.0,
+        "category": "maintenance",
+    },
+}
+
+# Directiva 014 — Commercial Execution: (categorie, prioritate comercială 1-5, domenii)
+COMMERCIAL_META = {
+    "digital_twin": ("documentation", 3, ["technical"]),
+    "audit_tehnic": ("technical", 4, ["technical"]),
+    "design_interior": ("interior", 2, ["interior"]),
+    "design_tematic": ("interior", 2, ["interior"]),
+    "predictive_maintenance": ("maintenance", 3, ["technical"]),
 }
 
 _RENOV_CATS = {"painting", "zugravit", "parchet", "faianta", "gips_carton", "interior_design"}
@@ -126,11 +142,25 @@ async def scan_property(prop: dict) -> int:
     twin = await db.twins.find_one({"property_id": prop_id})
     reqs = await db.requests.find({"property_id": prop_id}).sort("created_at", -1).to_list(100)
 
+    candidates = [{"service": s, "value": v, "confidence": c}
+                  for s, v, c in await _detect(prop, twin, reqs)]
+    # GI-5P: detector predictiv — active aproape de EOL (bibliotecă actuarială)
+    try:
+        from property_intelligence import detect_predictive_candidates
+        candidates += await detect_predictive_candidates(prop_id, reqs)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[revenue_hunter] predictive detect failed: {e}")
+
     created = 0
-    for service, value, confidence in await _detect(prop, twin, reqs):
+    for cand in candidates:
+        service = cand["service"]
         if service in recent_services or active + created >= MAX_ACTIVE_PER_PROPERTY:
             continue
-        meta = SERVICES[service]
+        meta = SERVICES.get(cand.get("template") or service) or {}
+        category, priority, domains = COMMERCIAL_META.get(
+            cand.get("template") or service, ("technical", 3, ["technical"]))
+        priority = int(cand.get("commercial_priority") or priority)
+        value, confidence = cand["value"], cand["confidence"]
         opp = {
             "id": uuid.uuid4().hex,
             "agent": AGENT_ID,
@@ -138,11 +168,15 @@ async def scan_property(prop: dict) -> int:
             "property_name": prop.get("name"),
             "owner_id": owner_id,
             "service": service,
-            "service_label": meta["label"],
-            "title": meta["title"],
-            "benefit": meta["benefit"],
+            "service_label": cand.get("service_label") or meta.get("label"),
+            "title": cand.get("title") or meta.get("title"),
+            "benefit": cand.get("benefit") or meta.get("benefit"),
             "estimated_value_ron": round(value, 2),
-            "score": round(value * confidence * lead_boost, 2),  # prioritizare: valoare × încredere × intent (GI-2)
+            # prioritizare: valoare × încredere × intent (GI-2) × prioritate comercială (Directiva 014)
+            "score": round(value * confidence * lead_boost * (0.8 + 0.1 * priority), 2),
+            "category": cand.get("category") or category,
+            "commercial_priority": priority,
+            "commercial_domains": cand.get("commercial_domains") or domains,
             "lead_tier": lead_tier,
             "status": "active",
             "created_at": _now(),
@@ -166,7 +200,14 @@ async def scan_property_throttled(prop: dict) -> int:
     if last and (last.get("ts") or "") >= cutoff:
         return 0
     await db.revenue_hunter_scans.update_one({"_id": prop_id}, {"$set": {"ts": _now()}}, upsert=True)
-    return await scan_property(prop)
+    created = await scan_property(prop)
+    # GI-5P: Maturity Score se împrospătează odată cu scanarea zilnică (reuse cron existent)
+    try:
+        from property_intelligence import refresh_maturity
+        await refresh_maturity(prop)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[revenue_hunter] maturity refresh failed: {e}")
+    return created
 
 
 async def run_revenue_hunter_tick(limit: int = 500) -> dict:

@@ -71,7 +71,7 @@ export default function CEODashboardPage() {
             title={<span className="flex items-center gap-2"><Gem className="w-4 h-4 text-lime-500" /> Value Loop — valoarea creată în ecosistem</span>}
             testid="ceo-value-loop"
           >
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
               <div className="p-3 rounded-xl bg-slate-900 dark:bg-slate-800 text-white" data-testid="ceo-vl-pvi">
                 <div className="text-[10px] font-black uppercase tracking-wide text-lime-400 flex items-center gap-1"><Gem className="w-3 h-3" /> PVI mediu</div>
                 <div className="text-2xl font-black mt-1">{data?.value_loop?.avg_pvi ?? 0}<span className="text-sm text-slate-400 font-semibold">/100</span></div>
@@ -88,6 +88,11 @@ export default function CEODashboardPage() {
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800" data-testid="ceo-vl-enrichments">
                 <div className="text-[10px] font-black uppercase tracking-wide text-slate-400 flex items-center gap-1"><Layers className="w-3 h-3" /> Îmbogățiri Twin</div>
                 <div className="text-2xl font-black mt-1 text-slate-900 dark:text-white">{data?.value_loop?.twin_enrichments ?? 0}</div>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800" data-testid="ceo-vl-maturity">
+                <div className="text-[10px] font-black uppercase tracking-wide text-slate-400 flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Twin Maturity mediu</div>
+                <div className="text-2xl font-black mt-1 text-slate-900 dark:text-white">L{data?.maturity?.avg_level ?? 0}<span className="text-sm text-slate-400 font-semibold">/5</span></div>
+                <div className="text-[10px] text-slate-400">{data?.maturity?.scanned ?? 0} proprietăți evaluate</div>
               </div>
             </div>
           </AdminCard>

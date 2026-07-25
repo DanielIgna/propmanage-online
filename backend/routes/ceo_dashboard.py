@@ -32,6 +32,9 @@ async def ceo_dashboard(admin=Depends(require_role("admin"))):
     from value_loop import value_loop_summary
     vl = await value_loop_summary()
 
+    from property_intelligence import maturity_summary
+    maturity = await maturity_summary()
+
     recos_doc = await db.command_center_recos.find_one({"_id": "latest"}, {"_id": 0})
     top3 = (recos_doc or {}).get("recommendations", [])
     top3 = [r for r in top3 if not r.get("done")][:3] if top3 else []
@@ -52,6 +55,7 @@ async def ceo_dashboard(admin=Depends(require_role("admin"))):
         "marketplace_trend_pct": raw["marketplace_trend_pct"],
         "warnings_count": len(feed["warnings"]),
         "value_loop": vl,
+        "maturity": maturity,
         "top_priorities": top3,
         "generated_at": feed["generated_at"],
     }
