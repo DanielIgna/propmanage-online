@@ -2955,3 +2955,40 @@ re-verificat curl: categorii diverse și corecte, Claude referă datele growth.
 **Next (recomandarea AI, ordonată după impact creștere)**: Sprint GI-2 — Lead Intelligence
 (identify vizitator↔user la login + Lead Quality Score + prioritizare Revenue Hunter) >
 GI-3 Marketing Intelligence+ > GI-4 Learning Engine > GI-5 AI UX Tester.
+
+---
+
+## ✅ SPRINT GI-2 — „INTENT & LEAD INTELLIGENCE" LIVRAT & VALIDAT (25 Iul 2026)
+Board Decision GI-2: nu doar Lead Score — INTENT SCORE din comportamentul real complet.
+1. **Engine** `/app/backend/lead_intelligence.py` — rule-based, zero cost LLM:
+   - Semnale EXPLICITE (tracker intent): offer_requested 25, request_started 20,
+     request_abandoned 12 (derivat: început fără finalizare → follow-up!), twin_viewed 15,
+     whatsapp_opened 15, audit_viewed 12, specialist_compared 10, guide_downloaded 8
+   - Semnale DERIVATE (date existente, Board 006): account_created 15, multi_day_return 12,
+     campaign_return 10, repeat_page_interest 10, same_day_return 8, engaged_time 8,
+     deep_navigation 5, bounce_only −10
+   - Clasificare: visitor <20 / prospect / qualified 40+ / hot 60+ / client (are cerere)
+   - conv_probability_pct heuristic; model marcat ai_hypothesis (Board 006) până la GI-4
+   - run_lead_scan: lead_scores + lead_scores_meta, evenimente lead.scan_completed +
+     lead.hot_detected (la prima trecere în hot)
+2. **Identify vizitator↔utilizator**: tracker analytics.js (identify(), pm_uid localStorage,
+   user_id în batch) + auth.js (login/register/me/logout) + backend visitor_identities upsert.
+3. **Instrumentare intent frontend**: WhatsAppFloat + AssistantDock (whatsapp_opened),
+   RequestWizard (request_started/abandoned/offer_requested), PropertyHubV2 (twin/audit click),
+   DigitalTwinPage + HouseHealthPage (mount). Ingest: type=intent + intent_signal + sesiune flag.
+4. **Prioritizare automată**: Revenue Hunter — lead_boost (hot ×1.5, qualified ×1.2) pe scorul
+   oportunității + scanare hot-owners primii; oportunitățile poartă lead_tier.
+   Command Center — warning „N lead-uri fierbinți așteaptă contact" (link /admin/lead-intel),
+   raw + prompt Claude includ hot/qualified leads.
+5. **UI**: pagină `/admin/lead-intel` (nav: Statistici & KPI → Lead & Intent Intelligence):
+   5 KPI, top semnale ecosistem, listă lead-uri sortate după Intent Score cu semnale
+   explicabile + puncte + probabilitate conversie, filtre tier. Cron zilnic 06:50
+   (după growth 06:40, înaintea Command Center 07:00 și Revenue Hunter 07:10).
+   Agent înregistrat în ai_governance/agent_registry.
+**VALIDAT (iteration_121.json)**: backend 17/17 PASS, frontend 100%, zero bug-uri.
+E2E real: vizitator cu semnale intent → 82/100 „hot" cu request_abandoned derivat corect;
+pe datele reale: 260 vizitatori scorați (2 prospects reali cu multi_day_return).
+**Suite**: /app/backend/tests/test_lead_intel_iter121.py.
+**Note arhitectură (din code review)**: run_lead_scan în memorie — OK sub ~50k sesiuni;
+praguri tier hard-coded — se calibrează în GI-4 Learning Engine.
+**Next (ordinea Board)**: GI-3 Marketing Intelligence+ → GI-4 Learning Engine → GI-5 AI UX Tester.
