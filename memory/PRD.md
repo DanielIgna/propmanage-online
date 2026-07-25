@@ -2813,3 +2813,8 @@ Sprint 1 „Property First" propus, AȘTEAPTĂ APROBARE.
 Fondatorul a livrat Prompt 002 (12 Motoare Autonome + Agent Registry + Command Center unic + Decision Flow
 + Guardrails + Business First). Salvat integral în `/app/memory/AI_CORE_ARCHITECTURE.md`.
 Completează Constituția, nu o înlocuiește. Maparea motoarelor pe codul existent — livrată în chat.
+
+## 📜 PROMPT 003 — MISSION CONTROL AI (25 Iul 2026)
+Salvat integral în `/app/memory/MISSION_CONTROL.md`. Nivelul suprem de orchestrare: event-driven,
+model-agnostic, cost-aware (reguli→cache→KG→LLM), controlează toți cei 12 agenți.
+Doctrina completă: CONSTITUTIA.md (001) + AI_CORE_ARCHITECTURE.md (002) + MISSION_CONTROL.md (003).
