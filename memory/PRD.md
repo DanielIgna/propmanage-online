@@ -12,6 +12,8 @@
 
 **EXECUTION ORDER 001 status**: P1 ✅ · P2 Stripe LIVE (Founder) · P3 Resend DNS (Founder) · P4 e-Factura · P5 Case Library · P6 Market Expansion.
 
+**Addendum (aceeași zi)**: Fondatorul a trimis „ENTERPRISE CEO MODE v1.0" (salvat verbatim în `prompts/ENTERPRISE_CEO_MODE.md`) + formatul „AUTONOMOUS EXECUTION REPORT" (salvat în `governance/AUTONOMOUS_EXECUTION_REPORT_FORMAT.md`, cu regulă de adevăr — cifrele din exemplu NU erau reale). Implementat raportul REAL 24h: `build_execution_report_24h()` în `lead_followup.py` (doar date măsurate: procesate/trimise/coadă/reactivate/consultanțe/contracte/venit/ore salvate, formulă declarată 6 min/follow-up) → expus în `GET /api/admin/leads/followup/status.report_24h` + secțiune `autonomous_execution` în CEO Briefing (`ceo-brief-autonomous` în `CeoBriefingPage.jsx`). Testat curl + screenshot ✅. Notă: cei 450 RON venit real din sistem provin din plată manuală anterioară, NU din follow-up autonom (0 emailuri trimise — DNS blocat).
+
 ---
 
 

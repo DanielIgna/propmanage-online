@@ -76,6 +76,34 @@ export default function CeoBriefingPage() {
           ))}
         </div>
 
+        {/* Autonomous Execution Report 24h */}
+        {b.autonomous_execution && (
+          <div className="bg-[#0e0e10] rounded-3xl border border-emerald-500/20 p-6 mb-8" data-testid="ceo-brief-autonomous">
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+              <h2 className="font-serif text-xl">Execuție autonomă · ultimele 24h <span className="text-[10px] align-middle ml-2 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">L2</span></h2>
+              {!b.autonomous_execution.email_live && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300" data-testid="ceo-brief-auto-blocked">EMAIL BLOCAT (DNS Resend)</span>}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 text-center">
+              {[
+                { l: "Procesate", v: b.autonomous_execution.leads_processed },
+                { l: "Trimise", v: b.autonomous_execution.emails_sent },
+                { l: "În coadă", v: b.autonomous_execution.emails_queued },
+                { l: "Reactivate", v: b.autonomous_execution.leads_reactivated },
+                { l: "Consultanțe", v: b.autonomous_execution.consultations_scheduled },
+                { l: "Contracte", v: b.autonomous_execution.contracts_signed },
+                { l: "Venit (RON)", v: b.autonomous_execution.revenue_generated_ron },
+                { l: "Ore salvate", v: b.autonomous_execution.hours_saved },
+              ].map((s, i) => (
+                <div key={i} className="bg-white/[0.02] border border-white/10 rounded-xl px-2 py-2.5">
+                  <div className="font-serif text-lg text-emerald-300">{s.v}</div>
+                  <div className="text-[10px] text-stone-500">{s.l}</div>
+                </div>
+              ))}
+            </div>
+            <div className="text-[11px] text-stone-500 mt-3" data-testid="ceo-brief-auto-reco">→ <span className="text-emerald-300/90">{b.autonomous_execution.recommendation}</span> · {b.autonomous_execution.truth_note}</div>
+          </div>
+        )}
+
         <div className="grid md:grid-cols-2 gap-6 mb-8">
           {/* Risks */}
           <div className="bg-[#0e0e10] rounded-3xl border border-white/10 p-6" data-testid="ceo-brief-risks">

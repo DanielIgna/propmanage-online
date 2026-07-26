@@ -174,6 +174,14 @@ async def ceo_briefing(user=Depends(require_role("admin"))):
         "founder_only": ([one_thing["action"]] + [str(b) for b in blockers])[:3],
     }
 
+    # ── Execuție autonomă 24h (D156 L2 · EXECUTION ORDER 001) ───────────────
+    autonomous_execution = None
+    try:
+        from lead_followup import build_execution_report_24h
+        autonomous_execution = await build_execution_report_24h()
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[CEO Briefing] autonomous report failed: {e}")
+
     briefing = {
         "day": today,
         "generated_at": now.isoformat(),
@@ -181,6 +189,7 @@ async def ceo_briefing(user=Depends(require_role("admin"))):
                               "overall": overall, "reason": reason, "escalated": overall < 60,
                               "enterprise_score": es["score"], "enterprise_score_band": es["band"]},
         "one_thing": one_thing,
+        "autonomous_execution": autonomous_execution,
         "snapshot": snapshot,
         "top_risks": risks,
         "top_opportunities": opportunities,
