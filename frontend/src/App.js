@@ -87,6 +87,7 @@ const MarketplaceIntelPage = lazy(() => import("./pages/admin/MarketplaceIntelPa
 const FinancialCockpitPage = lazy(() => import("./pages/admin/FinancialCockpitPage"));
 const AutomationCenterPage = lazy(() => import("./pages/admin/AutomationCenterPage"));
 const CEODashboardPage = lazy(() => import("./pages/admin/CEODashboardPage"));
+const FirstRevenueWarRoom = lazy(() => import("./pages/admin/FirstRevenueWarRoom"));
 const NotificationCenterPage = lazy(() => import("./pages/admin/NotificationCenterPage"));
 const UserTimelinePage = lazy(() => import("./pages/admin/UserTimelinePage"));
 const AISearchPage = lazy(() => import("./pages/admin/AISearchPage"));
@@ -1651,6 +1652,7 @@ function App() {
               <Route path="/admin/financial-cockpit" element={<FinancialCockpitPage />} />
               <Route path="/admin/automation" element={<AutomationCenterPage />} />
               <Route path="/admin/ceo" element={<CEODashboardPage />} />
+              <Route path="/admin/war-room" element={<FirstRevenueWarRoom />} />
               <Route path="/admin/notification-center" element={<NotificationCenterPage />} />
               <Route path="/admin/user-timeline" element={<UserTimelinePage />} />
               <Route path="/admin/ai-search" element={<AISearchPage />} />

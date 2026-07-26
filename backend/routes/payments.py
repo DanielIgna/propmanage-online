@@ -241,6 +241,12 @@ async def stripe_webhook(request: Request):
                 "request_id": payment["request_id"], "session_id": evt.session_id, "via_webhook": True,
                 "created_at": now_iso,
             })
+        # Verified Estate orders (Phase A — first revenue)
+        try:
+            from routes.verified_estate import mark_order_paid as _ve_mark_paid
+            await _ve_mark_paid(evt.session_id)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"VE order webhook processing failed: {e}")
     return {"received": True, "event_type": evt.event_type, "session_id": evt.session_id}
 
 
