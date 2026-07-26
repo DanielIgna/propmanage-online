@@ -115,3 +115,15 @@
   - POST /api/admin/operations/win — One Win Per Day
 - Frontend: OperationsCenter.jsx + OpsGapsPanel.jsx + OpsPaymentsPanel.jsx (route /admin/operations, admin only)
 - Main agent self-test: full curl E2E passed (lead patch, gap assign, manual payment, CSV export, validations); smoke screenshots OK.
+
+## Iteration 129 — Enterprise Health Engine (D122) + Formula Registry (D151)
+- Date: 2026-07-26
+- Backend: /app/backend/routes/enterprise_health.py (new) — prefix /api/admin/enterprise-health
+  - GET '' — overall score + 11 domains (product, ux, operations, growth, marketplace, customer_trust, knowledge, revenue, automation, technical_debt, ai_learning) computed from REAL evidence; alerts for domains < warning_threshold (cause, business_impact, top 3 actions with estimated_gain_pts, estimated_effect); daily snapshot into enterprise_health_history
+  - GET /formulas — registry list (11 formulas, seeded idempotently in eh_formulas)
+  - GET /formulas/{key}/explain — calculation steps, weights, contributions, positive/negative contributors, confidence
+  - PATCH /formulas/{key} — edit weights/thresholds/status; requires reason (400 otherwise); validations (invalid metric 400, negative weight 400, warn<=crit 400); versioning + audit into eh_formula_audit
+  - POST /formulas/{key}/rollback — restores previous version
+  - GET /formulas/{key}/audit — audit log
+- Frontend: EnterpriseHealthPage.jsx + EhDomainCard.jsx, route /admin/enterprise-health, menu item in AdminLayoutMetronic
+- Main agent self-test: full curl suite passed (summary, formulas, explain, PATCH+validations, rollback restores weights, audit trail); screenshots OK (overall 59 Critical, 9 alerts with actions).

@@ -102,6 +102,7 @@ const NAV_SECTIONS = [
       { id: "command_center", label: "AI Command Center", icon: Brain, badge: "TOP 5", href: "/admin/command-center" },
       { id: "notification_center", label: "Notification Center", icon: Sparkles, badge: "AI", href: "/admin/notification-center" },
       { id: "business_health", label: "Business Health", icon: Activity, badge: "8 SCORURI", href: "/admin/business-health" },
+      { id: "enterprise_health", label: "Enterprise Health", icon: Activity, badge: "D122", href: "/admin/enterprise-health", superAdminOnly: true },
       { id: "automation_center", label: "Automation Center", icon: Zap, badge: "DACĂ→ATUNCI", href: "/admin/automation" },
       { id: "roadmap", label: "Roadmap · Evoluție", icon: Map, badge: "LIVE", href: "/admin/roadmap" },
       { id: "ai_search", label: "AI Search", icon: Search, badge: "NLP", href: "/admin/ai-search" },
