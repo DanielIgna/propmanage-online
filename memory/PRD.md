@@ -1,3 +1,25 @@
+## 💰 FAZA A — Verified Properties Commercial Engine + First Revenue War Room (Iul 26, 2026)
+
+**Context Board**: Directivele 054–068 salvate (`/app/memory/BOARD_DIRECTIVE_05*.md`, `_060_067_`, `_068_`). Audit executiv complet fără cod: `/app/docs/VERIFIED_PROPERTIES_AUDIT_2026.md` + review Board per-executive: `/app/docs/BOARD_REVIEW_VERIFIED_PROPERTIES_EPIC.md`. Founder GO: „Continue Phase A" (Board Confidence 92%). **EXECUTION MODE activ (D068): un singur obiectiv — prima plată reală.**
+
+**Backend implementat**:
+- `routes/verified_estate.py::mark_order_paid(session_id)` — idempotent: marchează comanda paid, auto-creează draft listing, notifică admin, email cumpărător. Apelat din: (1) webhook Stripe `payments.py::stripe_webhook` (fix G1 — înainte webhook-ul procesa DOAR escrow, comenzile VE rămâneau pending pe Stripe LIVE); (2) `GET /checkout/status/{session_id}` care acum face poll direct la Stripe pentru comenzile pending non-demo (robust la webhook pierdut).
+- `POST /api/verified-estate/admin/listings/{id}/mark-sold` {sale_price_ron, buyer_name?, buyer_email?, notes?} — doar pe published; comision 2.5% (configurabil app_settings), deducere preț Twin dacă pachetul sursă era twin/bundle (politica „twin-ul se scade din comision"); salvează în `verified_estate_sales` + listing devine `sold` (dispare din public). 400 RO pe draft.
+- `GET /api/verified-estate/admin/sales` + stats extins: `listings_sold`, `commission_net_total_ron`, `orders_revenue_real_ron`, `orders_revenue_demo_ron`.
+- **NOU `routes/first_revenue.py`** — `GET /api/admin/war-room` (admin): mission FIRST REVENUE, 9 milestones („firsts": first_customer, first_real_payment, first_audit_sold, first_bundle, first_twin, first_verified_property, first_commission, first_buyer, first_invoice/e-Factura backlog), status integrări (Stripe live/test/demo, Resend din `integration_health`, checkout flag), pipeline (comenzi/venit real vs demo, comision net, leads), blockers computați cu owner founder/ops, briefing dimineață (cele 3 întrebări D067).
+
+**Frontend**:
+- **NOU `pages/admin/FirstRevenueWarRoom.jsx`** la `/admin/war-room` (sidebar „War Room · First Revenue", superAdminOnly, lângă CEO Dashboard): banner misiune, 6 stats pipeline, grid milestones, Acțiuni Founder vs Ops/Dev, briefing 3 întrebări. data-testid complete.
+- `VerifiedEstateAdmin.jsx`: coloană Kanban „Sold" (5 coloane), buton „Vândut" pe published (prompt preț + confirm → mark-sold), info vânzare pe card sold, stats „Vândute" + „Comision net (RON)".
+- `EstateDetail.jsx` fix G6 (cerință CPO): blocul Digital Twin condiționat — demo-twin → /demo; twin real → buton „Solicită tur 3D ghidat" (scroll la inquiry #inquiry-card); fără twin → badge „ÎN PREGĂTIRE" + mesaj onest (nu mai promitem twin inexistent).
+
+**Tests**: `iteration_126.json` → **backend 7/7 PASS + frontend 100%** (`/app/backend/tests/test_first_revenue_iter126.py`). Verificat: comision 6.250 RON la 250k (2.5%), sold dispare din public, 400 pe draft, checkout demo regression OK, War Room UI complet, cleanup date demo făcut.
+
+**Blockers externe rămase (Founder, vizibile în War Room)**: Stripe LIVE neactivat · Resend DNS pe Rackhost. **Condiție C3 Board: Fazele B–D pornesc DOAR după GO separat + minim 1 tranzacție reală.**
+
+---
+
+
 ## ⚡ Autonomous UX Lab · Faza 3 — Specialist Entry Follow-Up (Iul 12, 2026)
 
 **Goal**: Reduce timp contact <1h + activare specialist prin secvențe automate email + SMS.
