@@ -98,6 +98,7 @@ const NAV_SECTIONS = [
       { id: "overview", label: "Dashboard Principal", icon: LayoutDashboard },
       { id: "ceo_dashboard", label: "CEO Dashboard", icon: Trophy, badge: "OWNER", href: "/admin/ceo", superAdminOnly: true },
       { id: "ceo_briefing", label: "CEO Briefing · Azi", icon: Trophy, badge: "D152", href: "/admin/ceo-briefing", superAdminOnly: true },
+      { id: "knowledge_center", label: "Knowledge Center", icon: BookOpenCheck, badge: "FOUNDER", href: "/admin/knowledge-center", ownerOnly: true },
       { id: "evolution_council", label: "Evolution Council", icon: Trophy, badge: "AI 27", href: "/admin/evolution-council", superAdminOnly: true },
       { id: "war_room", label: "War Room · First Revenue", icon: Activity, badge: "💰 059", href: "/admin/war-room", superAdminOnly: true },
       { id: "operations_center", label: "Operations Center", icon: Inbox, badge: "OPS", href: "/admin/operations", superAdminOnly: true },

@@ -84,6 +84,7 @@ from routes.deprecation_pulse import router as deprecation_pulse_router
 from routes.architecture_board import router as architecture_board_router
 from routes.ai_pm import router as ai_pm_router
 from routes.operating_manual import router as operating_manual_router
+from routes.knowledge_center import router as knowledge_center_router
 from routes.experience_tiers import router as experience_tiers_router, self_router as experience_tiers_self_router
 from routes.feature_configurator import router as feature_configurator_router, self_router as feature_configurator_self_router
 from routes.twin_orchestrator import router as twin_orchestrator_router
@@ -231,6 +232,7 @@ ALL_ROUTERS = (
     architecture_board_router,
     ai_pm_router,
     operating_manual_router,
+    knowledge_center_router,
     experience_tiers_router,
     experience_tiers_self_router,
     feature_configurator_router,
