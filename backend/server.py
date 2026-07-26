@@ -296,6 +296,15 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=3600,
         )
+        # AI 27 — Enterprise Evolution Council: ședința automată nightly (Rezoluția 003)
+        from routes.evolution_council import run_evolution_council
+        scheduler.add_job(
+            run_evolution_council,
+            CronTrigger(hour=23, minute=45, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="evolution_council_nightly",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
         # Auto-Tune weekly orchestrator — every Monday 04:00 Europe/Bucharest.
         # Self-healing: keeps platform in self-driving tier without manual action.
         scheduler.add_job(

@@ -3335,3 +3335,28 @@ Implementat (D152, reuse total peste Enterprise Health + War Room + Ops + Gap En
 **VALIDAT (self-test)**: curl cu structură completă verificată + 2 screenshot-uri — output
 identic cu CEO Summary cerut de Board (10 leads, plată manuală, 5 audituri, ~2h, 94%).
 **Next**: neschimbat (D119 Market Expansion aşteaptă confirmare; e-Factura; Case Library).
+
+---
+
+## ✅ EVOLUTION COUNCIL (AI 27) + GUVERNANȚĂ EXECUTION MODE (26 Iul 2026)
+Guvernanță salvată: D156 Autonomous Execution Engine, AI_ORGANIZATION_CHARTERS.md (21
+departamente AI: Orchestrator, Brain, CTO/COO/CFO/CMO, Marketplace, Knowledge, QA, Twin,
+Copilot, Evolution, Strategy, Competitor, Customer Voice, Compliance, Simulation, Scaling,
+Partnership, Sustainability, Crisis + prompt universal), ENTERPRISE_RESOLUTIONS.md (001
+From Architecture to Execution — RATIFICATĂ, 002 Continuous Execution Mode, 003
+Self-Improving Enterprise, Mission 2027, Success Formula), ENTERPRISE_EVOLUTION_CONTRACT.md
+(10 articole), ENTERPRISE_EXECUTION_CHARTER.md (master system prompt).
+Implementat (AI 27 — cerut explicit de Founder în română):
+1. **Backend `/app/backend/routes/evolution_council.py`** — `run_evolution_council()`:
+   ședința automată a departamentelor AI care răspunde la cele 5 întrebări (ce s-a
+   îmbunătățit / înrăutățit / ce oprim / ce automatizăm / acțiunea ROI de mâine) din date
+   reale (delte Enterprise Health, plăți azi, gaps, leads, one_thing din CEO Briefing —
+   reuse total). Persistat în db.evolution_council_reports (1/zi).
+   GET /api/admin/evolution-council (latest + istoric 7 zile), POST /run (manual).
+2. **Scheduler nightly 23:45** Europe/Bucharest în server.py (id: evolution_council_nightly).
+3. **UI `/admin/evolution-council`** (EvolutionCouncilPage.jsx + meniu "AI 27"): raportul
+   unic cu 5 secțiuni + acțiunea de mâine evidențiată + istoric ședințe.
+**VALIDAT (self-test)**: POST /run → raport complet cu date reale (450 RON azi, 1 gap
+alocat, 36 leads NEW de automatizat, tomorrow action 94% încredere); GET OK; screenshot OK.
+**Next**: neschimbat (D119 Market Expansion așteaptă confirmare; Case Library D112 —
+apare deja în recomandările de automatizare ale Consiliului; e-Factura RO).

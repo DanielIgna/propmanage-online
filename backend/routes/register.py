@@ -150,6 +150,7 @@ from routes.lead_magnets import router as lead_magnets_router
 from routes.operations_center import router as operations_center_router
 from routes.enterprise_health import router as enterprise_health_router
 from routes.ceo_briefing import router as ceo_briefing_router
+from routes.evolution_council import router as evolution_council_router
 from routes.opportunities import router as opportunities_router
 from routes.growth_intelligence import router as growth_intelligence_router
 from routes.lead_intelligence import router as lead_intelligence_router
@@ -306,5 +307,6 @@ ALL_ROUTERS = (
     operations_center_router,
     enterprise_health_router,
     ceo_briefing_router,
+    evolution_council_router,
     ux_lab_router,
 )
