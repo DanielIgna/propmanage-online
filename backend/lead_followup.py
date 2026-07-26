@@ -306,5 +306,13 @@ async def build_execution_report_24h(gate: dict | None = None) -> dict:
         "recommendation": ("Deblochează DNS Resend — coada pleacă LIVE automat."
                            if not gate.get("live") else
                            ("ROI pozitiv — continuă." if reactivated else "Continuă și măsoară reactivările.")),
-        "truth_note": "Doar date măsurate (lead_followup_log, leads.stage). Zero valori estimate ca fapte.",
+        # D161 Truth Engine — clasa de evidență per câmp
+        "evidence_classification": {
+            "measured": ["leads_processed", "emails_sent", "emails_queued", "emails_failed",
+                         "leads_reactivated", "consultations_scheduled", "contracts_signed",
+                         "revenue_generated_ron"],
+            "estimated": {"hours_saved": {"formula": "6 min per follow-up manual evitat",
+                                          "confidence_pct": 60}},
+        },
+        "truth_note": "D161: Measured = lead_followup_log + leads.stage + plăți. hours_saved = Estimated (60%).",
     }

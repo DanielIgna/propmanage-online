@@ -92,7 +92,7 @@ export default function CeoBriefingPage() {
                 { l: "Consultanțe", v: b.autonomous_execution.consultations_scheduled },
                 { l: "Contracte", v: b.autonomous_execution.contracts_signed },
                 { l: "Venit (RON)", v: b.autonomous_execution.revenue_generated_ron },
-                { l: "Ore salvate", v: b.autonomous_execution.hours_saved },
+                { l: "Ore salvate (est. 60%)", v: b.autonomous_execution.hours_saved },
               ].map((s, i) => (
                 <div key={i} className="bg-white/[0.02] border border-white/10 rounded-xl px-2 py-2.5">
                   <div className="font-serif text-lg text-emerald-300">{s.v}</div>
