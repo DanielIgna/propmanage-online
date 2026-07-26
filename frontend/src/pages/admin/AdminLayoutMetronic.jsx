@@ -97,6 +97,7 @@ const NAV_SECTIONS = [
     items: [
       { id: "overview", label: "Dashboard Principal", icon: LayoutDashboard },
       { id: "ceo_dashboard", label: "CEO Dashboard", icon: Trophy, badge: "OWNER", href: "/admin/ceo", superAdminOnly: true },
+      { id: "ceo_briefing", label: "CEO Briefing · Azi", icon: Trophy, badge: "D152", href: "/admin/ceo-briefing", superAdminOnly: true },
       { id: "war_room", label: "War Room · First Revenue", icon: Activity, badge: "💰 059", href: "/admin/war-room", superAdminOnly: true },
       { id: "operations_center", label: "Operations Center", icon: Inbox, badge: "OPS", href: "/admin/operations", superAdminOnly: true },
       { id: "command_center", label: "AI Command Center", icon: Brain, badge: "TOP 5", href: "/admin/command-center" },

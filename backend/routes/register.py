@@ -149,6 +149,7 @@ from routes.first_revenue import router as first_revenue_router
 from routes.lead_magnets import router as lead_magnets_router
 from routes.operations_center import router as operations_center_router
 from routes.enterprise_health import router as enterprise_health_router
+from routes.ceo_briefing import router as ceo_briefing_router
 from routes.opportunities import router as opportunities_router
 from routes.growth_intelligence import router as growth_intelligence_router
 from routes.lead_intelligence import router as lead_intelligence_router
@@ -304,5 +305,6 @@ ALL_ROUTERS = (
     lead_magnets_router,
     operations_center_router,
     enterprise_health_router,
+    ceo_briefing_router,
     ux_lab_router,
 )

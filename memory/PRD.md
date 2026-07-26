@@ -3314,3 +3314,24 @@ Implementat (Directiva 122 + 151, idee explicită Founder):
 Revenue 9 (450 RON vs țintă 5000), Knowledge 30, Product 49 → alertele arată exact acțiunile.
 **Next**: Directiva 119 Market Expansion Engine (pagini recrutare din gaps — propus, așteaptă
 confirmare) → e-Factura RO → SEO Engine → Case Library (D112) / Customer Voice (D113).
+
+---
+
+## ✅ CEO BRIEFING ENGINE (D152) + CONSTITUȚIA ENTERPRISE (26 Iul 2026)
+Guvernanță salvată permanent: Directive 152-155 (CEO Briefing, Decision Journal, Digital DNA,
+North Star) + ENTERPRISE_STANDARDS.md (ES-001..010) + ENTERPRISE_PLAYBOOKS.md (EP-001..010)
++ ENTERPRISE_PRINCIPLES.md (PR-001..012) + GOVERNANCE_HIERARCHY.md (9 niveluri) +
+**/app/enterprise/constitution.md** (documentul suprem: Zero Layer Meta Rule, Articolele I-V,
+Manifesto, Covenant, 12 părți — cerut explicit de Founder).
+Implementat (D152, reuse total peste Enterprise Health + War Room + Ops + Gap Engine):
+1. **Backend `/app/backend/routes/ceo_briefing.py`** — GET /api/admin/ceo-briefing: O PAGINĂ
+   pe zi: status companie (+ escaladare EP-007 sub 60), motiv compus din dovezi, secțiunea
+   supremă "UN SINGUR lucru azi" (acțiune + de ce + ROI + ROT + impact Health + încredere%),
+   snapshot noise-filtered (8 linii: Mission/Revenue/Clienți/Marketplace/Ops/Growth/Knowledge/
+   AI), top 5 riscuri (alerte + blockers P0 din War Room), top 5 oportunități (pending orders,
+   hot leads, gaps, proiecte fără case study), Founder Focus (Ignoră azi / Deleagă / Doar tu).
+   Persistat zilnic în db.ceo_briefings.
+2. **UI `/admin/ceo-briefing`** (CeoBriefingPage.jsx + meniu admin "CEO Briefing · Azi").
+**VALIDAT (self-test)**: curl cu structură completă verificată + 2 screenshot-uri — output
+identic cu CEO Summary cerut de Board (10 leads, plată manuală, 5 audituri, ~2h, 94%).
+**Next**: neschimbat (D119 Market Expansion aşteaptă confirmare; e-Factura; Case Library).
