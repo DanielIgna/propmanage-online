@@ -226,8 +226,12 @@ async def seed():
 | Specialist (HVAC, verified) | specialist@propmanage.io | Spec123! |
 | Specialist (Plumbing, verified) | specialist2@propmanage.io | Spec123! |
 | Admin | admin@propmanage.io | {admin_pw} |
+| Founder / Owner (PREVIEW ONLY — prod folosește Google) | danieligna1@gmail.com | Founder2026!kc |
 | Operator | operator@propmanage.io | Op123! |
 | Franchise Admin (tenant: cluj) | franciza.cluj@propmanage.io | Franciza123! |
+
+Notă Founder: Enterprise Knowledge Center (`/admin/knowledge-center`, API `/api/founder/knowledge/*`)
+este vizibil DOAR pentru OWNER_EMAIL (danieligna1@gmail.com). Ceilalți admini primesc 403.
 
 ## Auth Endpoints
 - POST /api/auth/login - Body: {{email, password}}

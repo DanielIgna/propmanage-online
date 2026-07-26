@@ -1,4 +1,16 @@
-## 🤖 EXECUTION ORDER 001 · P1 — Autonomous Lead Follow-up L2 + Reorganizare Enterprise Memory (Iun 26, 2026)
+## 🏛️ EXECUTION ORDER 002 · V1 — Enterprise Knowledge Center (Founder-only) (Iun 26, 2026)
+
+**Ordinul „Enterprise Visibility"** (+ Phase 2 Control Center 14 module + specs Interactive Manual / X-Ray / Enterprise Digital Twin / Story Mode + Relationship Registry spec + Capital Allocation & companion rules) salvate VERBATIM în `board/`. Fazare aprobată: **V1 (livrat) → V2 Dashboard Inspector → V3 Enterprise Explorer/X-Ray/Twin/Story**.
+
+**V1 LIVRAT + TESTAT (iter. 130 — backend 18/18, frontend 100%)**:
+- **Backend NOU `routes/knowledge_center.py`** — `/api/founder/knowledge/{access,tree,doc,search,registry}`, gate exclusiv `OWNER_EMAIL` (danieligna1@gmail.com; alți admini→403, neautentificat→401, path traversal blocat). Tree: 174 documente din `/app/memory` + `/app/docs` în 21+ categorii (mapare pe path/nume), metadate derivate (titlu/versiune/status Active|Draft-pending-verbatim/autor verbatim|derivat/updated).
+- **Enterprise Relationship Registry** — `backend/data/enterprise_registry.json`: 46 noduri (prompts/documents/engines/metrics/automations/APIs/DB/dashboards) + **44 relații toate VERIFIED**, fiecare cu modelul complet cerut de Board (id/source/target/type/description/evidence/evidence_type/confidence/verification_status/last_verified/verified_by/version). Curat manual din cod real — zero inferență (Truth Engine D161).
+- **Frontend NOU `KnowledgeCenter.jsx`** la `/admin/knowledge-center` (sidebar `ownerOnly` — infrastructura existentă reutilizată): categorii+listă+viewer markdown cu metadate și relații (Depinde de / Folosit de, badge-uri VERIFIED + evidență), căutare globală (documente+noduri registry), **Dependency Map** SVG interactiv pe coloane de tip, click nod → panou cu toate relațiile și evidența. data-testid `kc-*` complete.
+- **Founder login preview**: parolă setată pentru danieligna1@gmail.com (`Founder2026!kc`, PREVIEW ONLY — prod = Google). Persistat și în template-ul din `seed.py` (seed-ul rescria test_credentials.md la fiecare restart — fix aplicat).
+
+---
+
+
 
 **Memory reorganizată** conform structurii impuse de Fondator: `/app/memory/{constitution,board(+directives/),strategy,governance,metrics,prompts}` + `INDEX.md` + `MEMORY_RULES.md` (Memory Rule 001: guvernanță VERBATIM, fără rezumare). Directivele 010–157 mutate în `board/directives/` cu index. Salvate verbatim: `board/EXECUTION_ORDER_001.md` (6 priorități, „no additional features"). **7 documente în așteptarea retransmiterii verbatim de la Founder** (pierdute la fork): Resolution 004, Executive Constitution, Operating Philosophy, Century Manifesto, Grand Strategy 2035, Enterprise Evolution Engine (doc strategic), Exponential Growth Engine — placeholder-e marcate `PENDING VERBATIM`.
 
