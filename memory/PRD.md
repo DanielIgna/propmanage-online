@@ -1,3 +1,18 @@
+## 🧲 FAZA G1 — Growth OS „Lead Engine" (Iul 26, 2026, Part 3)
+
+**Directivele 088–108 salvate** (Growth OS, Property Intelligence Suite, AI Organization + Constitution, Evolution Governance 093, Principii 094, Memory OS/DNA/Genome/Operating Manual 095–107, FOUNDATION LOCK, Legacy Log 108 → `/app/docs/LEGACY_LOG.md` cu 4 intrări). Board review Growth OS cu GAP analysis (45% exista deja): `/app/docs/BOARD_REVIEW_GROWTH_OS_EPIC.md`.
+
+**Livrat G1 (testat iter_127: backend 9/9 + frontend 100%)**:
+- **Backend NOU `routes/lead_magnets.py`**: `POST /api/public/lead-magnet` (magnete: health_score, buying_checklist; validare consent GDPR/email; dedupe email+magnet+zi; sync în leads unificate source=lead_magnet — adăugat în `leads_store.LEGACY_SOURCES`; email rezultat către user + notificare admin) + `GET /api/admin/growth/funnel` (vizitatori 30d din analytics_events, leads per sursă, comenzi VE, procente conversie).
+- **Frontend NOU**: `/scorul-casei` (`pages/growth/HealthScorePage.jsx` — 12 întrebări ponderate suma max=100, scor instant + verdict A-D + top riscuri, email opțional DUPĂ rezultat, CTA audit→/imobile-verificate/sell) · `/checklist-cumparare` (`BuyingChecklistPage.jsx` — 25 iteme interactive în 5 categorii, progress, email→checklist, CTA Traseul C) · `components/LeadMagnetCTA.jsx` inserat pe TOATE ghidurile (GhidPage).
+- **4 ghiduri comerciale noi** în `data/ghiduri.js` (total 10): audit-tehnic-apartament-pret, verificare-apartament-inainte-de-cumparare, ce-este-digital-twin-locuinta, imobile-verificate-cum-functioneaza — fiecare cu FAQ JSON-LD + CTA-uri spre checkout.
+- **Sitemap** actualizat (+/scorul-casei, /checklist-cumparare, /imobile-verificate, 4 slug-uri ghiduri).
+- Tech debt nou: TD-07 (fără rate limiting pe endpoint public — P2).
+
+**Postponed prin D093** (decizia D-007): CRO/heatmaps (fără trafic), National Property Index/Insights publice (0 proiecte reale = date false — blocat până la 50+ audituri), Landing Builder generic, AI Organization ca microservicii (există orchestrator/autonomy). Faza G2 (Local SEO orașe + Growth Dashboard) și G3 (Referral+Reputation+Content Studio) = GO separat.
+
+---
+
 ## 🏛️ Enterprise Value Office + Guvernanță finală 069–087 (Iul 26, 2026, Part 2)
 
 **Directivele 069–087 salvate** în `/app/memory/` (4 fișiere consolidate: `_069_070_ENTERPRISE_VALUE_OFFICE`, `_071_075_EXECUTIVE_SYSTEMS`, `_076_081_STRATEGIC_OFFICES`, `_082_087_CHARTERS`). Faza Foundation+Governance ÎNCHISĂ oficial (D082). Agent = **Executive Intelligence System** cu autonomie proactivă (D081). Cadre decizionale active: Time Horizons H1/H2/H3 (D084), Cashflow First (D085), Founder's Compass (3 întrebări + matrice), Covenant Founder–AI.

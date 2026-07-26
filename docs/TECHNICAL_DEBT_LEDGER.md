@@ -9,6 +9,7 @@
 | TD-04 | Facturare | e-Factura RO inexistentă | Nefezabil pre-revenue | Neconformitate legală la volum B2B | RIDICAT la volum | 15–20 credite | **P1 legal** | Înainte de >5 facturi B2B/lună |
 | TD-05 | first_revenue.py | `started_at` reparsat din ISO la fiecare call; milestone first_invoice hardcodat `done=False` | Simplitate | Neglijabil | Neglijabil | 30 min | P4 | Oportunist |
 | TD-06 | Email delivery | Fallback pe console când Resend e blocat | DNS extern nefixat | Emailuri de confirmare nelivrate în producție | RIDICAT (extern) | 0 dev — acțiune Founder DNS | **P0 extern** | Imediat (Founder) |
+| TD-07 | lead_magnets.py | Fără rate limiting pe POST /api/public/lead-magnet (endpoint public, trigger de email) | Viteză G1 | Spam/abuz posibil la trafic mare | Scăzut acum, MEDIU la trafic | 2h (slowapi per IP) | P2 | La primele semne de abuz sau >100 leads/zi |
 
 ## Bilanț per Sprint
 | Sprint | Debt nou | Debt rezolvat | Total activ | Trend |
