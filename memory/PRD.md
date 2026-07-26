@@ -3252,3 +3252,32 @@ testing agent frontend 100% (iteration_125.json), zero regresii.
 (GET /api/admin/integrations/resend/diagnostics) — DNS încă BLOCAT pe user (Rackhost).
 **Next (Execution Master Plan)**: R0.8-S2 Resend (după DNS user) → R0.9-S1 Commercial
 hardening (după Stripe LIVE user) → R0.9-S2 Integration Control Center → R1.0 e-Factura+launch.
+
+---
+
+## ✅ OPERATIONS CENTER COMPLET — GAP ENGINE + MANUAL PAYMENT MODE (26 Iul 2026, iteration 128)
+Directive noi salvate: 112 (Case Library Engine), 113 (Customer Voice Engine), 114 (Company
+Learning Engine) — toate PERMANENT, în /app/memory/.
+Implementat (backend /app/backend/routes/operations_center.py — rescris, frontend
+OperationsCenter.jsx + OpsGapsPanel.jsx + OpsPaymentsPanel.jsx, rută /admin/operations):
+1. **Bug-uri reparate**: leads fără `id` (list_leads elimina _id → PATCH eșua din UI);
+   $push pe `notes` string → mutat pe `ops_notes` array; sync_lead respectă acum `ops_stage`
+   (stage-ul setat de Founder nu mai e suprascris la re-sync legacy).
+2. **Specialist Gap Engine**: fiecare cerere deschisă fără specialist → Gap Record automat
+   (db.specialist_gaps, sync idempotent + auto-resolve). GET /gaps (filtre status/categorie/
+   oraș + sumar: total, clienți în așteptare, venit pierdut est., by_city/by_category),
+   GET /gaps/{id}/candidates (matching + fallback top verified), POST /gaps/{id}/assign
+   (alocă specialist pe cerere, notifică client+specialist, log event), GET /gaps/export (CSV).
+3. **Manual Payment Mode**: db.manual_payments ledger — Cash/Transfer/POS/Link/Stripe manual,
+   toate VERIFIED, legate de Lead + Client + Proiect. POST /manual-payments (generic, lead →
+   stage payment_received + revenue_generated inc.), POST /manual-payment (comenzi VE, scrie
+   și în ledger), GET /manual-payments (listă + totaluri). Totalul apare în coo_report.
+4. **UI**: secțiune Gap Engine full-width (filtre, alocare cu candidați inline, Export CSV,
+   3 carduri sumar) + secțiune Plăți manuale (formular cu lead autofill + listă VERIFIED).
+**VALIDAT**: E2E complet Lead → Ops Center → Assignment → Manual Payment → Completed:
+pytest 22/22 (test_operations_center_iter128.py) + testing agent frontend 100%
+(iteration_128.json), zero bug-uri funcționale, zero regresii. Date de test curățate.
+**P0 BLOCATE (acțiune user)**: Stripe LIVE claim + Resend DNS (Rackhost).
+**Next**: P3 e-Factura RO (obligatoriu legal B2B) → P4 SEO Engine landing pages orașe →
+Directive 112-114 (Case Library / Customer Voice / Learning engines) când Board-ul le
+prioritizează → P5 Verified Properties flow diagram.
