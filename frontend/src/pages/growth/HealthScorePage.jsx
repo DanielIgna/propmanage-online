@@ -52,6 +52,7 @@ export default function HealthScorePage() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
 
   useSEO({
     title: "Scorul Casei Tale — calculator gratuit de sănătate a locuinței · PropManage",
@@ -208,6 +209,29 @@ export default function HealthScorePage() {
                 <p className="text-sm text-stone-200">Raportul a fost trimis pe email. Verifică și folderul Spam.</p>
               </div>
             )}
+
+            <div className="glass-strong rounded-2xl p-5 mb-8 text-center" data-testid="hs-share-block">
+              <div className="text-sm text-stone-300 mb-3">Provoacă-ți prietenii: pot casele lor să treacă testul?</div>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(`Casa mea are scorul ${score}/100 la testul tehnic PropManage. Află-l pe al tău în 2 minute: https://propmanage.ro/scorul-casei?utm_source=share&utm_medium=whatsapp`)}`}
+                  target="_blank" rel="noreferrer"
+                  className="px-4 py-2 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs font-medium hover:bg-emerald-500/25 transition"
+                  data-testid="hs-share-whatsapp"
+                >WhatsApp</a>
+                <a
+                  href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent("https://propmanage.ro/scorul-casei?utm_source=share&utm_medium=facebook")}&quote=${encodeURIComponent(`Casa mea are scorul ${score}/100 la testul tehnic PropManage. Poate casa ta să treacă testul?`)}`}
+                  target="_blank" rel="noreferrer"
+                  className="px-4 py-2 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 text-xs font-medium hover:bg-blue-500/25 transition"
+                  data-testid="hs-share-facebook"
+                >Facebook</a>
+                <button
+                  onClick={() => { navigator.clipboard?.writeText(`Casa mea are scorul ${score}/100 la testul tehnic PropManage. Află-l pe al tău: https://propmanage.ro/scorul-casei?utm_source=share&utm_medium=copy`); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                  className="px-4 py-2 rounded-full bg-white/5 text-stone-300 border border-white/15 text-xs font-medium hover:bg-white/10 transition"
+                  data-testid="hs-share-copy"
+                >{copied ? "Copiat ✓" : "Copiază link"}</button>
+              </div>
+            </div>
 
             <div className="glass-strong rounded-3xl p-8 text-center" data-testid="hs-audit-cta">
               <h2 className="font-serif text-2xl mb-2">Vrei evaluarea exactă, făcută de un specialist?</h2>

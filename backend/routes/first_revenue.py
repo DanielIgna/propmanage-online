@@ -184,10 +184,44 @@ async def war_room(user=Depends(require_role("admin"))):
         "top_blockers": [b["title"] for b in blockers][:5],
     }
 
+    # ---------- Mission 100 (D109) — măsurat de la startul misiunii ----------
+    start_iso = meta["started_at"]
+    both = lambda f: {"$or": [{f: {"$gte": started}}, {f: {"$gte": start_iso}}]}  # noqa: E731
+    m_rows = await db.analytics_events.aggregate([
+        {"$match": {"ts": {"$gte": start_iso}}},
+        {"$group": {"_id": "$visitor_id"}}, {"$count": "n"},
+    ]).to_list(1)
+    m_visitors = m_rows[0]["n"] if m_rows else 0
+    m_scores = await db.lead_magnet_leads.count_documents({"magnet": "health_score", "created_at": {"$gte": start_iso}})
+    m_emails = await db.lead_magnet_leads.count_documents({"created_at": {"$gte": start_iso}})
+    m_qualified = await db.leads.count_documents({"segment": {"$in": ["hot", "warm"]}, "created_at": {"$gte": start_iso}})
+    m_audits = await db.verified_estate_orders.count_documents(
+        {"status": "paid", "demo_mode": {"$ne": True}, "package": {"$in": ["audit", "bundle"]}, **both("paid_at")})
+    m_twins = await db.verified_estate_orders.count_documents(
+        {"status": "paid", "demo_mode": {"$ne": True}, "package": {"$in": ["twin", "bundle"]}, **both("paid_at")})
+    m_reviews = await db.reviews.count_documents(both("created_at"))
+    m_referrals = await db.leads.count_documents({"source": "referral", "created_at": {"$gte": start_iso}})
+    mission_targets = [
+        {"id": "visitors", "label": "Vizitatori", "target": 100, "actual": m_visitors},
+        {"id": "property_scores", "label": "Scoruri Casa (calculator)", "target": 100, "actual": m_scores},
+        {"id": "emails", "label": "Emailuri capturate", "target": 100, "actual": m_emails},
+        {"id": "qualified_leads", "label": "Leads calificate (hot/warm)", "target": 50, "actual": m_qualified},
+        {"id": "audits", "label": "Audituri plătite (real)", "target": 10, "actual": m_audits},
+        {"id": "twins", "label": "Digital Twins plătite (real)", "target": 5, "actual": m_twins},
+        {"id": "reviews", "label": "Recenzii clienți", "target": 5, "actual": m_reviews},
+        {"id": "referrals", "label": "Referrals", "target": 3, "actual": m_referrals},
+    ]
+    mission_100 = {
+        "targets": mission_targets,
+        "progress_pct": round(sum(min(1.0, t["actual"] / t["target"]) for t in mission_targets) / len(mission_targets) * 100, 1),
+        "complete": all(t["actual"] >= t["target"] for t in mission_targets),
+    }
+
     first_payment_done = bool(first_paid_real)
     return {
         "mission": "FIRST REVENUE",
         "mission_complete": first_payment_done,
+        "mission_100": mission_100,
         "days_since_start": days_since_start,
         "days_to_first_payment": (
             max(0, (datetime.fromisoformat(_iso(first_paid_real.get("paid_at"))) - started).days)

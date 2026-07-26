@@ -125,6 +125,30 @@ export default function FirstRevenueWarRoom() {
           ))}
         </div>
 
+        {/* Mission 100 — D109 */}
+        <div className="bg-[#0e0e10] rounded-3xl border border-white/10 p-6 mb-10" data-testid="mission-100">
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
+            <h2 className="font-serif text-2xl flex items-center gap-2"><Target className="w-5 h-5 text-[#d4ff3a]" /> Mission 100</h2>
+            <div className="text-sm text-stone-400">Progres global: <span className="text-[#d4ff3a] font-semibold" data-testid="mission-100-progress">{data.mission_100?.progress_pct ?? 0}%</span></div>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {(data.mission_100?.targets || []).map(t => {
+              const pct = Math.min(100, Math.round((t.actual / t.target) * 100));
+              return (
+                <div key={t.id} data-testid={`m100-${t.id}`}>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-stone-400">{t.label}</span>
+                    <span className={t.actual >= t.target ? "text-emerald-400" : "text-stone-300"}>{t.actual}/{t.target}</span>
+                  </div>
+                  <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${t.actual >= t.target ? "bg-emerald-400" : "bg-[#d4ff3a]"}`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Milestones */}
         <h2 className="font-serif text-2xl mb-4">Milestones — „The Firsts"</h2>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3 mb-10" data-testid="milestones-grid">
