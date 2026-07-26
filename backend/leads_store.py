@@ -71,10 +71,12 @@ async def sync_lead(source: str, legacy_doc: dict) -> None:
             score, segment = legacy_doc["score"], legacy_doc.get("segment", "warm")
         else:
             score, segment = _triage(root, meta)
+        existing = await db.leads.find_one({"source": source, "meta.legacy_id": legacy_id}, {"ops_stage": 1})
+        stage = existing.get("ops_stage") if existing and existing.get("ops_stage") else STAGE_MAP.get(raw_stage, "new")
         await db.leads.update_one(
             {"source": source, "meta.legacy_id": legacy_id},
             {"$set": {
-                **root, "source": source, "stage": STAGE_MAP.get(raw_stage, "new"), "stage_raw": raw_stage,
+                **root, "source": source, "stage": stage, "stage_raw": raw_stage,
                 "score": score, "segment": segment, "meta": meta,
                 "tenant_id": legacy_doc.get("tenant_id") or TENANT,
                 "updated_at": datetime.now(timezone.utc).isoformat(),

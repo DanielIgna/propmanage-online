@@ -7,6 +7,8 @@ import {
   AlertTriangle, Trophy, Users, TrendingUp, CheckCircle2, StickyNote
 } from "lucide-react";
 import axios from "axios";
+import { OpsGapsPanel } from "./OpsGapsPanel";
+import { OpsPaymentsPanel } from "./OpsPaymentsPanel";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -198,10 +200,10 @@ export default function OperationsCenter() {
               </div>
             </div>
 
-            {/* Specialist gaps */}
+            {/* Specialist gaps — sumar rapid (detalii în Gap Engine mai jos) */}
             <div className="bg-[#0e0e10] rounded-3xl border border-white/10 p-6" data-testid="ops-gaps">
               <h2 className="font-serif text-xl mb-1 flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-amber-400" /> Gaps specialiști</h2>
-              <p className="text-[11px] text-stone-500 mb-4">Cereri fără specialist = oportunități de recrutare.</p>
+              <p className="text-[11px] text-stone-500 mb-4">Cereri fără specialist = oportunități de recrutare. Detalii + alocare mai jos.</p>
               <div className="space-y-2">
                 {(data.gaps || []).length === 0
                   ? <p className="text-sm text-stone-500">Toate cererile au specialist. 🎉</p>
@@ -224,6 +226,12 @@ export default function OperationsCenter() {
             </div>
           </div>
         </div>
+
+        {/* Specialist Gap Engine — filtrare / alocare / export */}
+        <OpsGapsPanel onChanged={load} />
+
+        {/* Manual Payment Mode — plăți VERIFIED legate de Lead + Client + Proiect */}
+        <OpsPaymentsPanel leads={data.leads || []} methods={data.manual_methods || []} onChanged={load} />
       </div>
     </div>
   );

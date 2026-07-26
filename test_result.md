@@ -101,3 +101,17 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+## Iteration 128 — Operations Center Complete (Gap Engine + Manual Payment Mode)
+- Date: 2026-07-26
+- Backend: /app/backend/routes/operations_center.py (rewritten)
+  - GET /api/admin/operations — summary (leads now include `id`, gaps from specialist_gaps collection, coo_report with manual_payments)
+  - PATCH /api/admin/operations/leads/{id} — stage/note/next_action (notes push to ops_notes array; sets ops_stage to survive legacy re-sync)
+  - GET /api/admin/operations/gaps?status=&category=&city= — Gap Records (auto-synced from unassigned open requests)
+  - GET /api/admin/operations/gaps/export?status= — CSV export
+  - GET /api/admin/operations/gaps/{gap_id}/candidates — matching specialists (fallback: top verified)
+  - POST /api/admin/operations/gaps/{gap_id}/assign — assigns specialist to request, resolves gap, notifies
+  - GET/POST /api/admin/operations/manual-payments — VERIFIED payments ledger linked to Lead+Customer+Project (lead moves to payment_received, revenue_generated incremented)
+  - POST /api/admin/operations/manual-payment — VE order manual payment (also writes ledger)
+  - POST /api/admin/operations/win — One Win Per Day
+- Frontend: OperationsCenter.jsx + OpsGapsPanel.jsx + OpsPaymentsPanel.jsx (route /admin/operations, admin only)
+- Main agent self-test: full curl E2E passed (lead patch, gap assign, manual payment, CSV export, validations); smoke screenshots OK.
