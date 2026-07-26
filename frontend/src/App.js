@@ -88,6 +88,8 @@ const FinancialCockpitPage = lazy(() => import("./pages/admin/FinancialCockpitPa
 const AutomationCenterPage = lazy(() => import("./pages/admin/AutomationCenterPage"));
 const CEODashboardPage = lazy(() => import("./pages/admin/CEODashboardPage"));
 const FirstRevenueWarRoom = lazy(() => import("./pages/admin/FirstRevenueWarRoom"));
+const HealthScorePage = lazy(() => import("./pages/growth/HealthScorePage"));
+const BuyingChecklistPage = lazy(() => import("./pages/growth/BuyingChecklistPage"));
 const NotificationCenterPage = lazy(() => import("./pages/admin/NotificationCenterPage"));
 const UserTimelinePage = lazy(() => import("./pages/admin/UserTimelinePage"));
 const AISearchPage = lazy(() => import("./pages/admin/AISearchPage"));
@@ -1688,6 +1690,8 @@ function App() {
               <Route path="/contracts/:id" element={<ContractPage />} />
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />
               <Route path="/ghiduri" element={<GhiduriIndex />} />
+              <Route path="/scorul-casei" element={<HealthScorePage />} />
+              <Route path="/checklist-cumparare" element={<BuyingChecklistPage />} />
               <Route path="/preturi" element={<PreturiIndex />} />
               <Route path="/preturi/:slug" element={<PreturiPage />} />
               <Route path="/ghiduri/:slug" element={<GhidPage />} />

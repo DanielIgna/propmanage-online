@@ -476,6 +476,9 @@ async def public_sitemap():
         ("/devino-francizat", "0.9", "weekly"),
         ("/marketplace",     "0.9", "daily"),
         ("/ghiduri",         "0.85", "weekly"),
+        ("/scorul-casei",    "0.9",  "weekly"),
+        ("/checklist-cumparare", "0.9", "weekly"),
+        ("/imobile-verificate", "0.9", "daily"),
         ("/digital-twin",    "0.7", "monthly"),
         ("/login",           "0.4", "monthly"),
         ("/register",        "0.5", "monthly"),
@@ -493,6 +496,10 @@ async def public_sitemap():
         ("cost-instalatie-electrica-apartament", "2026-02-29"),
         ("cum-functioneaza-escrow-lucrari",    "2026-02-29"),
         ("cum-alegi-zugrav-bun",               "2026-02-29"),
+        ("audit-tehnic-apartament-pret",       "2026-07-26"),
+        ("verificare-apartament-inainte-de-cumparare", "2026-07-26"),
+        ("ce-este-digital-twin-locuinta",      "2026-07-26"),
+        ("imobile-verificate-cum-functioneaza", "2026-07-26"),
     ]
 
     urls_xml = []

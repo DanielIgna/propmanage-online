@@ -8,6 +8,7 @@ import { Building2, Clock, Calendar, ArrowRight, ArrowLeft, ChevronDown, BookOpe
 import { useSEO } from "../hooks/useSEO";
 import { GHIDURI, getGhidBySlug } from "../data/ghiduri";
 import { SEO_CATEGORY_MAP } from "../utils/seoSlugs";
+import { LeadMagnetCTA } from "../components/LeadMagnetCTA";
 
 const SITE_URL = "https://propmanage.ro";
 
@@ -240,6 +241,9 @@ export const GhidPage = () => {
               </div>
             </section>
           )}
+
+          {/* Lead magnets — Growth OS G1 */}
+          <LeadMagnetCTA />
 
           {/* Bottom CTA */}
           <div className="mt-12 glass-strong rounded-3xl p-8 text-center" data-testid="ghid-cta">
