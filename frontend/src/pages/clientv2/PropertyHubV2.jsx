@@ -353,6 +353,164 @@ const PropertyAssetsCard = ({ propId, actions }) => {
   );
 };
 
+// ── GI-5P Sprint 2 — Riscuri & Recomandări (Risk Engine) ─────────────────────
+const RISK_BADGES = {
+  technical: "bg-rose-50 text-rose-700",
+  maintenance: "bg-amber-50 text-amber-700",
+  legal: "bg-sky-50 text-sky-700",
+};
+
+const PropertyRisksCard = ({ propId, actions }) => {
+  const [data, setData] = useState(null);
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    setData(null); setDone(false);
+    axios.get(`${API}/properties/${propId}/risks`).then(r => setData(r.data)).catch(() => {});
+  }, [propId]);
+  if (!data) return null;
+  const mitigate = async (risk) => {
+    const cta = risk.mitigation?.cta;
+    if (cta === "audit") {
+      if (data.audit_opportunity_id) {
+        try { await axios.post(`${API}/client/opportunities/${data.audit_opportunity_id}/accept`); setDone(true); }
+        catch (e) { alert(formatApiError(e)); }
+      } else actions.openWizard?.();
+    } else if (cta === "wizard") actions.openWizard?.();
+    else if (cta === "edit_property") actions.openPropManager?.();
+  };
+  return (
+    <div className="mt-4 rounded-3xl border border-slate-100 bg-white shadow-sm p-4" data-testid="risks-card">
+      <div className="flex items-center gap-2.5">
+        <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-rose-50">
+          <ShieldCheck className="text-rose-500" style={{ width: 18, height: 18 }} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-black text-slate-900 leading-none xos-display tracking-tight">Riscuri & Recomandări</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">Ce amenință casa ta · cu dovezi din Twin</div>
+        </div>
+        <div className="xos-num text-2xl leading-none text-slate-900" data-testid="risks-count">{data.risks.length}</div>
+      </div>
+      {data.risks.length === 0 ? (
+        <div className="mt-3 rounded-2xl bg-emerald-50 p-3 text-xs font-bold text-emerald-700" data-testid="risks-empty">
+          ✓ Niciun risc major identificat pe baza datelor din Twin.
+        </div>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {data.risks.slice(0, 3).map(risk => (
+            <div key={risk.id} className="rounded-2xl border border-slate-100 p-3" data-testid={`risk-${risk.id}`}>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${RISK_BADGES[risk.category] || "bg-slate-100 text-slate-500"}`}>
+                  {risk.category_label}
+                </span>
+                {risk.estimated && <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-slate-200 text-slate-500">Estimat</span>}
+                <span className="ml-auto text-[9px] font-mono text-slate-400">risc {risk.score}/100</span>
+              </div>
+              <div className="mt-1.5 text-xs font-black text-slate-900">{risk.title}</div>
+              <div className="mt-0.5 text-[10px] text-slate-500">
+                Probabilitate {risk.probability} · Impact: {risk.impact_label}
+              </div>
+              {risk.evidence?.[0] && <div className="mt-1 text-[9px] text-slate-400">{risk.evidence[0]}</div>}
+              {!done && (
+                <button onClick={() => mitigate(risk)} data-testid={`risk-mitigate-${risk.id}`}
+                  className="mt-2 text-[10px] font-black text-[#166534] underline">
+                  {risk.mitigation?.label} →
+                </button>
+              )}
+            </div>
+          ))}
+          {done && (
+            <div className="rounded-2xl bg-emerald-50 p-3 text-xs font-bold text-emerald-700" data-testid="risk-mitigate-success">
+              ✓ Cererea de audit a fost creată — un specialist te va contacta.
+            </div>
+          )}
+        </div>
+      )}
+      <p className="mt-3 text-[10px] text-slate-400">{data.disclaimer}</p>
+    </div>
+  );
+};
+
+// ── GI-5P Sprint 2 — DNA v2: date declarate cu provenance ────────────────────
+const ATTR_OPTION_LABELS = {
+  beton: "Beton", caramida: "Cărămidă", bca: "BCA", lemn: "Lemn", metal: "Metal", mixt: "Mixt",
+  polistiren: "Polistiren", vata_minerala: "Vată minerală", vata_bazaltica: "Vată bazaltică",
+  neizolat: "Neizolat", alta: "Alta", tigla: "Țiglă", tabla: "Tablă", membrana: "Membrană",
+  sindrila: "Șindrilă", terasa: "Terasă", centrala_gaz: "Centrală gaz",
+  centrala_electrica: "Centrală electrică", termoficare: "Termoficare",
+  pompa_caldura: "Pompă de căldură", lemne: "Lemne",
+};
+
+const AttrRow = ({ attr, propId, source, onSaved }) => {
+  const [val, setVal] = useState(attr.value ?? "");
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    if (val === "" || val === null) return;
+    setBusy(true);
+    try {
+      await axios.patch(`${API}/properties/${propId}/dna-attributes`,
+        { attributes: { [attr.key]: val }, source });
+      onSaved();
+    } catch (e) { alert(formatApiError(e)); }
+    setBusy(false);
+  };
+  return (
+    <div className="flex items-center gap-2" data-testid={`dna-attr-${attr.key}`}>
+      <div className="flex-1 min-w-0">
+        <div className="text-[11px] font-bold text-slate-700">{attr.label}</div>
+        {attr.confidence_label && (
+          <div className="text-[9px] text-slate-400" data-testid={`dna-attr-conf-${attr.key}`}>{attr.confidence_label}</div>
+        )}
+      </div>
+      {attr.type === "enum" ? (
+        <select value={val} onChange={e => setVal(e.target.value)} data-testid={`dna-attr-input-${attr.key}`}
+          className="w-36 px-2 py-1.5 rounded-full border-2 border-slate-200 text-[10px] font-bold text-slate-600 bg-white">
+          <option value="">—</option>
+          {attr.options.map(o => <option key={o} value={o}>{ATTR_OPTION_LABELS[o] || o}</option>)}
+        </select>
+      ) : (
+        <input type="number" value={val} onChange={e => setVal(e.target.value)} placeholder="—"
+          data-testid={`dna-attr-input-${attr.key}`}
+          className="w-24 px-3 py-1.5 rounded-full border-2 border-slate-200 text-[11px] outline-none focus:border-[#34C759]" />
+      )}
+      {String(val) !== String(attr.value ?? "") && val !== "" && (
+        <button onClick={save} disabled={busy} data-testid={`dna-attr-save-${attr.key}`}
+          className="px-2.5 py-1.5 rounded-full text-[9px] font-black text-black disabled:opacity-50" style={{ background: "#d4ff3a" }}>
+          {busy ? "…" : "Salvează"}
+        </button>
+      )}
+    </div>
+  );
+};
+
+const DnaAttributesCard = ({ propId }) => {
+  const [attrs, setAttrs] = useState(null);
+  const [source, setSource] = useState("owner_declared");
+  const load = () => axios.get(`${API}/properties/${propId}/dna-attributes`).then(r => setAttrs(r.data.attributes)).catch(() => {});
+  useEffect(() => { setAttrs(null); load(); }, [propId]);
+  if (!attrs) return null;
+  return (
+    <div className="mt-4 rounded-3xl border border-slate-100 bg-white shadow-sm p-4" data-testid="dna-attributes-card">
+      <div className="flex items-center gap-2.5">
+        <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: GREEN_SOFT }}>
+          <Fingerprint style={{ width: 18, height: 18, color: GREEN }} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-black text-slate-900 leading-none xos-display tracking-tight">Detaliile casei</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">Date declarate · fiecare cu sursă și nivel de încredere</div>
+        </div>
+        <select value={source} onChange={e => setSource(e.target.value)} data-testid="dna-attr-source"
+          className="px-2 py-1 rounded-full border-2 border-slate-200 text-[9px] font-bold text-slate-600 bg-white">
+          <option value="owner_declared">Declarat de mine</option>
+          <option value="official_document">Am document oficial</option>
+        </select>
+      </div>
+      <div className="mt-3 space-y-2.5">
+        {attrs.map(a => <AttrRow key={a.key} attr={a} propId={propId} source={source} onSaved={load} />)}
+      </div>
+    </div>
+  );
+};
+
 export const PropertyHubV2 = ({ user, prop, properties, setSelectedPropId, actions }) => {
   if (!prop) {
     return (
@@ -385,7 +543,9 @@ export const PropertyHubV2 = ({ user, prop, properties, setSelectedPropId, actio
       </div>
       <PropertyDnaCard propId={prop.id} />
       <TwinMaturityCard propId={prop.id} actions={actions} />
+      <PropertyRisksCard propId={prop.id} actions={actions} />
       <PropertyAssetsCard propId={prop.id} actions={actions} />
+      <DnaAttributesCard propId={prop.id} />
       <div className="mt-4 space-y-2">
         <ListItem icon={Box} label="Digital Twin" sub="locuința ta în 3D" onClick={() => { import("../../lib/analytics").then(({ trackIntent }) => trackIntent("twin_viewed")).catch(() => {}); actions.openTwin(); }} testid="v2-hub-twin" />
         <ListItem icon={HeartPulse} label="House Health" sub="scor + recomandări" onClick={() => { import("../../lib/analytics").then(({ trackIntent }) => trackIntent("audit_viewed")).catch(() => {}); actions.openHealth(); }} testid="v2-hub-health" />

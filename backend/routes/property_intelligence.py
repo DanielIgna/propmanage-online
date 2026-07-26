@@ -135,3 +135,70 @@ async def property_predictive(prop_id: str, user: dict = Depends(get_current_use
             "predictions": await pi.predictions(prop_id),
             "disclaimer": ("Valori estimate pe baza bibliotecii actuariale de referință — sunt recomandări, "
                            "nu fapte. Un audit tehnic confirmă starea reală.")}
+
+
+# ── GI-5P Sprint 2 — DNA v2 atribute cu provenance + Risk Engine ─────────────
+@router.get("/properties/{prop_id}/dna-attributes")
+async def get_dna_attributes(prop_id: str, user: dict = Depends(get_current_user)):
+    prop = await _load_property_for(user, prop_id)
+    stored = prop.get("dna_attributes") or {}
+    attributes = []
+    for key, spec in pi.DNA_ATTRIBUTES.items():
+        cur = stored.get(key) or {}
+        attributes.append({"key": key, "label": spec["label"], "type": spec["type"],
+                           "options": spec.get("options"), "value": cur.get("value"),
+                           "source": cur.get("source"),
+                           "confidence_label": pi.CONFIDENCE_LABELS.get(cur.get("confidence")),
+                           "last_updated": cur.get("last_updated")})
+    return {"property_id": prop_id, "attributes": attributes}
+
+
+@router.patch("/properties/{prop_id}/dna-attributes")
+async def patch_dna_attributes(prop_id: str, body: dict = Body(...),
+                               user: dict = Depends(get_current_user)):
+    prop = await _load_property_for(user, prop_id)
+    source = body.get("source") or "owner_declared"
+    role = user.get("active_view") or user.get("role")
+    allowed = ADMIN_SOURCES if role in ("admin", "operator") else CLIENT_SOURCES
+    if source not in allowed:
+        raise HTTPException(400, f"Sursă invalidă. Permise: {', '.join(sorted(allowed))}")
+    updates = body.get("attributes") or {}
+    if not updates:
+        raise HTTPException(400, "Nimic de actualizat")
+    sets = {}
+    for key, value in updates.items():
+        spec = pi.DNA_ATTRIBUTES.get(key)
+        if not spec:
+            raise HTTPException(400, f"Atribut necunoscut: {key}")
+        if spec["type"] == "int":
+            try:
+                value = int(value)
+            except (TypeError, ValueError):
+                raise HTTPException(400, f"{spec['label']}: valoare invalidă")
+            if not (spec["min"] <= value <= spec["max"]):
+                raise HTTPException(400, f"{spec['label']}: în afara intervalului {spec['min']}–{spec['max']}")
+        elif spec["type"] == "enum" and value not in spec["options"]:
+            raise HTTPException(400, f"{spec['label']}: opțiune invalidă")
+        # Trust Model — Directiva 015: provenance pe fiecare atribut
+        sets[f"dna_attributes.{key}"] = {"value": value, "source": source, "confidence": source,
+                                         "last_updated": _now(),
+                                         "updated_by": user.get("email") or user.get("id")}
+    await db.properties.update_one({"_id": prop["_id"]}, {"$set": sets})
+    try:
+        from event_bus import emit
+        await emit("twin.dna_attribute_updated", property_id=prop_id, actor=user,
+                   payload={"attributes": list(updates.keys()), "source": source})
+    except Exception:  # noqa: BLE001
+        pass
+    return {"ok": True, "updated": list(updates.keys())}
+
+
+@router.get("/properties/{prop_id}/risks")
+async def property_risks(prop_id: str, user: dict = Depends(get_current_user)):
+    prop = await _load_property_for(user, prop_id)
+    risks = await pi.compute_risks(prop)
+    await pi.refresh_risk_profile(prop, risks)
+    return {"property_id": prop_id, "risks": risks,
+            "audit_opportunity_id": await _audit_opp_id(prop_id),
+            "disclaimer": ("Riscuri estimate pe baza dovezilor din Digital Twin — "
+                           "un audit tehnic confirmă starea reală.")}

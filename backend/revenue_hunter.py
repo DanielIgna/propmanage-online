@@ -201,12 +201,16 @@ async def scan_property_throttled(prop: dict) -> int:
         return 0
     await db.revenue_hunter_scans.update_one({"_id": prop_id}, {"$set": {"ts": _now()}}, upsert=True)
     created = await scan_property(prop)
-    # GI-5P: Maturity Score se împrospătează odată cu scanarea zilnică (reuse cron existent)
+    # GI-5P: decay + maturity + profil de risc se împrospătează cu scanarea zilnică (reuse cron)
     try:
-        from property_intelligence import refresh_maturity
+        from property_intelligence import apply_health_decay, refresh_maturity, refresh_risk_profile
+        decayed = await apply_health_decay(prop)
+        if decayed:
+            prop = {**prop, **decayed}
         await refresh_maturity(prop)
+        await refresh_risk_profile(prop)
     except Exception as e:  # noqa: BLE001
-        logger.warning(f"[revenue_hunter] maturity refresh failed: {e}")
+        logger.warning(f"[revenue_hunter] intelligence refresh failed: {e}")
     return created
 
 

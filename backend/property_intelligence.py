@@ -322,6 +322,204 @@ async def refresh_maturity(prop: dict) -> dict:
     return m
 
 
+# ============================================================================
+# GI-5P SPRINT 2 — DNA v2 (atribute cu provenance), Health Decay, Risk Engine
+# ============================================================================
+DNA_ATTRIBUTES = {
+    "year_built": {"label": "Anul construcției", "type": "int", "min": 1800, "max": 2100},
+    "structure_type": {"label": "Tip structură", "type": "enum",
+                       "options": ["beton", "caramida", "bca", "lemn", "metal", "mixt"]},
+    "insulation_type": {"label": "Izolație termică", "type": "enum",
+                        "options": ["polistiren", "vata_minerala", "vata_bazaltica", "neizolat", "alta"]},
+    "roof_type": {"label": "Tip acoperiș", "type": "enum",
+                  "options": ["tigla", "tabla", "membrana", "sindrila", "terasa", "alta"]},
+    "heating_type": {"label": "Tip încălzire", "type": "enum",
+                     "options": ["centrala_gaz", "centrala_electrica", "termoficare", "pompa_caldura", "lemne", "alta"]},
+}
+
+HEALTH_FIELDS = ("structure_health", "utilities_health", "documents_health")
+DECAY_FLOOR = 25
+DECAY_GRACE_DAYS = 183  # 6 luni fără eveniment dovedit → începe îngrijirea
+
+
+def _to_dt(v):
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+    try:
+        return datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+    except Exception:  # noqa: BLE001
+        return None
+
+
+async def apply_health_decay(prop: dict) -> dict | None:
+    """Decay temporal determinist: −1 pct/component/lună după 6 luni fără întreținere dovedită.
+
+    Idempotent lunar. Podea 25. Creșterea rămâne DOAR prin evenimente dovedite (value_loop).
+    """
+    prop_id = str(prop["_id"])
+    if not any(isinstance(prop.get(f), (int, float)) for f in HEALTH_FIELDS):
+        return None
+    now = datetime.now(timezone.utc)
+    decay_state = prop.get("health_decay") or {}
+    last_applied = _to_dt(decay_state.get("last_applied"))
+    if last_applied and (now - last_applied).days < 28:
+        return None
+    last_event = _to_dt(prop.get("last_enriched_at"))
+    ev = await db.hh_evaluations.find_one({"property_id": prop_id}, sort=[("created_at", -1)])
+    if ev:
+        ev_dt = _to_dt(ev.get("created_at"))
+        if ev_dt and (not last_event or ev_dt > last_event):
+            last_event = ev_dt
+    if not last_event:
+        last_event = _to_dt(prop.get("created_at"))
+    if last_event and (now - last_event).days < DECAY_GRACE_DAYS:
+        return None
+
+    sets = {}
+    for f in HEALTH_FIELDS:
+        v = prop.get(f)
+        if isinstance(v, (int, float)) and v > DECAY_FLOOR:
+            sets[f] = max(DECAY_FLOOR, round(v - 1))
+    if not sets:
+        return None
+    merged = {**prop, **sets}
+    parts = [merged.get(f) for f in HEALTH_FIELDS if isinstance(merged.get(f), (int, float))]
+    sets["health_score"] = min(100, round(sum(parts) / len(parts)))
+    sets["health_decay"] = {"last_applied": _now(),
+                            "points_lost": (decay_state.get("points_lost") or 0) + len([f for f in sets if f in HEALTH_FIELDS])}
+    await db.properties.update_one({"_id": ObjectId(prop_id)}, {"$set": sets})
+    await db.health_history.insert_one({
+        "property_id": prop_id, "ts": _now(), "reason": "decay",
+        "components": {f: sets[f] for f in HEALTH_FIELDS if f in sets},
+        "health_score": sets["health_score"],
+        "note": "Îngrijire: fără eveniment de întreținere dovedit în ultimele 6 luni",
+    })
+    try:
+        from event_bus import emit
+        await emit("health.decayed", property_id=prop_id,
+                   payload={"health_score": sets["health_score"], "trigger": "decay"})
+    except Exception:  # noqa: BLE001
+        pass
+    return sets
+
+
+RISK_CATEGORY_LABELS = {"technical": "Tehnic", "maintenance": "Întreținere", "legal": "Juridic & Documente"}
+
+
+async def compute_risks(prop: dict) -> list:
+    """Risc = probabilitate × impact, determinist, cu DOVEZI + mitigare comercială (Directiva 014)."""
+    prop_id = str(prop["_id"])
+    risks = []
+    reqs = await _confirmed_reqs(prop_id)
+
+    # 1. TEHNIC — active la finalul duratei de referință (reuse Sprint 1)
+    for a in await db.property_assets.find({"property_id": prop_id, "status": "active"}).to_list(20):
+        if a.get("asset_type") not in ASSET_LIBRARY:
+            continue
+        eol = compute_eol(a, _serviced_recently(a, reqs))
+        if eol["status"] not in ("overdue", "attention"):
+            continue
+        high = eol["status"] == "overdue"
+        risks.append({
+            "id": f"tech_{a['asset_type']}", "category": "technical",
+            "category_label": RISK_CATEGORY_LABELS["technical"],
+            "title": (f"{eol['label']}: risc de avarie" if high
+                      else f"{eol['label']}: aproape de finalul duratei de viață"),
+            "probability": "ridicată" if high else "medie",
+            "impact_label": eol.get("cost_label") or "necunoscut fără verificare",
+            "score": 85 if high else 60,
+            "estimated": True, "confidence": eol["confidence"],
+            "confidence_label": eol["confidence_label"],
+            "evidence": [eol["reason"], f"Durată rămasă: {eol['remaining_label']}"],
+            "mitigation": {"cta": "audit" if eol["needs_audit"] else "wizard",
+                           "label": ("Programează Audit Tehnic" if eol["needs_audit"]
+                                     else "Cere oferte de înlocuire")},
+        })
+
+    # 2. ÎNTREȚINERE — audit vechi / decay activ
+    cutoff_24m = (datetime.now(timezone.utc) - timedelta(days=730)).isoformat()
+    audited = await db.hh_evaluations.count_documents(
+        {"property_id": prop_id, "created_at": {"$gte": cutoff_24m}}) > 0
+    if not audited:
+        risks.append({
+            "id": "maint_audit", "category": "maintenance",
+            "category_label": RISK_CATEGORY_LABELS["maintenance"],
+            "title": "Stare tehnică neverificată de un profesionist",
+            "probability": "medie", "impact_label": "necunoscut fără verificare",
+            "score": 50, "estimated": True, "confidence": "unknown",
+            "confidence_label": CONFIDENCE_LABELS["unknown"],
+            "evidence": ["Fără audit tehnic în ultimele 24 de luni"],
+            "mitigation": {"cta": "audit", "label": "Programează Audit Tehnic"},
+        })
+    decay_state = prop.get("health_decay") or {}
+    if decay_state.get("points_lost"):
+        risks.append({
+            "id": "maint_decay", "category": "maintenance",
+            "category_label": RISK_CATEGORY_LABELS["maintenance"],
+            "title": "Casa are nevoie de îngrijire",
+            "probability": "medie", "impact_label": "sănătatea documentată scade lent",
+            "score": 40, "estimated": True, "confidence": "verified",
+            "confidence_label": CONFIDENCE_LABELS["verified"],
+            "evidence": [f"Sănătatea a scăzut cu {decay_state['points_lost']} puncte — "
+                         "fără întreținere dovedită în ultimele 6 luni"],
+            "mitigation": {"cta": "wizard", "label": "Programează o lucrare sau o revizie"},
+        })
+
+    # 3. JURIDIC & DOCUMENTE
+    identity_ok = bool(prop.get("address")) and bool(prop.get("rooms") or prop.get("surface"))
+    if not identity_ok:
+        risks.append({
+            "id": "legal_identity", "category": "legal",
+            "category_label": RISK_CATEGORY_LABELS["legal"],
+            "title": "Identitatea proprietății este incompletă",
+            "probability": "certă", "impact_label": "scoruri și oferte imprecise",
+            "score": 45, "estimated": False, "confidence": "verified",
+            "confidence_label": CONFIDENCE_LABELS["verified"],
+            "evidence": ["Lipsesc adresa sau camerele/suprafața"],
+            "mitigation": {"cta": "edit_property", "label": "Completează detaliile"},
+        })
+    dh = prop.get("documents_health")
+    if isinstance(dh, (int, float)) and dh < 50:
+        risks.append({
+            "id": "legal_docs", "category": "legal",
+            "category_label": RISK_CATEGORY_LABELS["legal"],
+            "title": "Documentație subțire pentru vânzare sau asigurare",
+            "probability": "medie", "impact_label": "valoare percepută mai mică la tranzacționare",
+            "score": 42, "estimated": True, "confidence": "verified",
+            "confidence_label": CONFIDENCE_LABELS["verified"],
+            "evidence": [f"Sănătatea documentară e {round(dh)}/100 — puține dovezi arhivate"],
+            "mitigation": {"cta": "audit", "label": "Programează Audit Tehnic (documentează starea)"},
+        })
+
+    risks.sort(key=lambda r: -r["score"])
+    return risks
+
+
+async def refresh_risk_profile(prop: dict, risks: list | None = None) -> dict:
+    if risks is None:
+        risks = await compute_risks(prop)
+    profile = {"total": len(risks),
+               "max_score": max((r["score"] for r in risks), default=0),
+               "top_category": risks[0]["category"] if risks else None,
+               "top_title": risks[0]["title"] if risks else None,
+               "computed_at": _now()}
+    await db.properties.update_one({"_id": ObjectId(str(prop["_id"]))},
+                                   {"$set": {"risk_profile": profile}})
+    return profile
+
+
+async def risk_summary() -> dict:
+    """KPI CEO: riscuri active totale + proprietăți cu risc critic (score ≥ 80)."""
+    out = {"active_risks": 0, "critical_properties": 0}
+    async for d in db.properties.aggregate([
+        {"$match": {"risk_profile.total": {"$gt": 0}}},
+        {"$group": {"_id": None, "total": {"$sum": "$risk_profile.total"},
+                    "critical": {"$sum": {"$cond": [{"$gte": ["$risk_profile.max_score", 80]}, 1, 0]}}}},
+    ]):
+        out = {"active_risks": d["total"], "critical_properties": d["critical"]}
+    return out
+
+
 async def maturity_summary() -> dict:
     """KPI strategic: Maturity mediu + distribuție — pentru CEO Dashboard / Mission Control."""
     dist = {str(i): 0 for i in range(6)}

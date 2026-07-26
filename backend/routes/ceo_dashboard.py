@@ -32,8 +32,9 @@ async def ceo_dashboard(admin=Depends(require_role("admin"))):
     from value_loop import value_loop_summary
     vl = await value_loop_summary()
 
-    from property_intelligence import maturity_summary
+    from property_intelligence import maturity_summary, risk_summary
     maturity = await maturity_summary()
+    property_risks = await risk_summary()
 
     recos_doc = await db.command_center_recos.find_one({"_id": "latest"}, {"_id": 0})
     top3 = (recos_doc or {}).get("recommendations", [])
@@ -56,6 +57,7 @@ async def ceo_dashboard(admin=Depends(require_role("admin"))):
         "warnings_count": len(feed["warnings"]),
         "value_loop": vl,
         "maturity": maturity,
+        "property_risks": property_risks,
         "top_priorities": top3,
         "generated_at": feed["generated_at"],
     }

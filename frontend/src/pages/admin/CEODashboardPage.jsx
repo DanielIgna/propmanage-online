@@ -92,7 +92,7 @@ export default function CEODashboardPage() {
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800" data-testid="ceo-vl-maturity">
                 <div className="text-[10px] font-black uppercase tracking-wide text-slate-400 flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Twin Maturity mediu</div>
                 <div className="text-2xl font-black mt-1 text-slate-900 dark:text-white">L{data?.maturity?.avg_level ?? 0}<span className="text-sm text-slate-400 font-semibold">/5</span></div>
-                <div className="text-[10px] text-slate-400">{data?.maturity?.scanned ?? 0} proprietăți evaluate</div>
+                <div className="text-[10px] text-slate-400">{data?.maturity?.scanned ?? 0} proprietăți evaluate{data?.property_risks ? ` · ${data.property_risks.active_risks} riscuri active` : ""}</div>
               </div>
             </div>
           </AdminCard>
