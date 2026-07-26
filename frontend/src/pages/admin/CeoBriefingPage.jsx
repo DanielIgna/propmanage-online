@@ -46,7 +46,12 @@ export default function CeoBriefingPage() {
             <div className="text-lg font-medium" style={{ color: st.band.color }}>Company Status: {st.status}{st.escalated && <span className="text-[10px] bg-red-500/15 text-red-300 px-2 py-0.5 rounded-full ml-2 uppercase tracking-wide">Escaladat (EP-007)</span>}</div>
             <p className="text-xs text-stone-400 mt-1">{st.reason}</p>
           </div>
-          <Link to="/admin/enterprise-health" className="text-xs text-[#d4ff3a] hover:underline shrink-0">Enterprise Health →</Link>
+          <div className="text-right shrink-0">
+            {st.enterprise_score != null && (
+              <div className="text-xs text-stone-500 mb-1" data-testid="ceo-brief-es">Enterprise Score: <span className="font-serif text-xl" style={{ color: st.enterprise_score_band?.color }}>{Math.round(st.enterprise_score)}</span></div>
+            )}
+            <Link to="/admin/enterprise-health" className="text-xs text-[#d4ff3a] hover:underline">Enterprise Health →</Link>
+          </div>
         </div>
 
         {/* ONE THING */}

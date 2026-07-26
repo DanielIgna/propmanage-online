@@ -93,6 +93,12 @@ export default function EnterpriseHealthPage() {
             </div>
           </div>
           <div className="text-right text-xs text-stone-500">
+            {data.enterprise_score && (
+              <div className="mb-2" data-testid="eh-enterprise-score" title={data.enterprise_score.formula}>
+                <span className="text-stone-400">Enterprise Score: </span>
+                <span className="font-serif text-2xl" style={{ color: data.enterprise_score.band.color }}>{Math.round(data.enterprise_score.score)}</span>
+              </div>
+            )}
             <div>{data.alerts.length} {data.alerts.length === 1 ? "domeniu sub prag" : "domenii sub prag"}</div>
             <div className="mt-1">Actualizat: {String(data.generated_at).slice(0, 16).replace("T", " ")}</div>
           </div>

@@ -3360,3 +3360,24 @@ Implementat (AI 27 — cerut explicit de Founder în română):
 alocat, 36 leads NEW de automatizat, tomorrow action 94% încredere); GET OK; screenshot OK.
 **Next**: neschimbat (D119 Market Expansion așteaptă confirmare; Case Library D112 —
 apare deja în recomandările de automatizare ale Consiliului; e-Factura RO).
+
+---
+
+## ✅ ENTERPRISE SCORE + GUVERNANȚA LIVING ENTERPRISE V2 (26 Iul 2026)
+Guvernanță salvată: D157 Priority Engine, ENTERPRISE_COUNCIL_GOVERNANCE.md (Board Meeting
+protocol, Red Team, conflict resolution, Council 27 membri, pipeline decizie 11 pași, Never
+Idle rule), ENTERPRISE_OPERATING_AGREEMENT.md (10 Core Laws + formula Enterprise Score +
+learning loop + founder dependency), ENTERPRISE_V2_LIVING_ENTERPRISE.md (Capability
+Registry, Board Laws v2 001-010, Constitution Check), ENTERPRISE_ROADMAP_V2.md (Fazele A-H;
+Phase G = CEO Briefing ✅), MASTER_EXECUTIVE_PROMPT_V3.md, FOUNDER_AI_COVENANT.md
+(+ Doctrina 15 principii + Creed + întrebarea zilnică).
+Implementat: **Enterprise Score** (ponderile Board: 20% Customer Success + 15% Revenue +
+15% EH + 10% Trust + 10% Knowledge + 10% Automation + 5% Security/Performance/Marketplace/
+Innovation) — `compute_enterprise_score()` în enterprise_health.py cu breakdown transparent
+per componentă (sursă documentată, contribuție puncte; security/performance din
+autonomy_snapshots). Expus în GET /api/admin/enterprise-health (+ snapshot zilnic) și în
+CEO Briefing (enterprise_status). UI: chip Enterprise Score pe ambele pagini.
+**Scor actual: 61.2 At Risk** (tras în jos de Revenue 9.3 × 15% și Knowledge 29.5 × 10%).
+**VALIDAT (self-test)**: curl breakdown complet corect + screenshot (EH 59 + ES 61 vizibile).
+**Next**: per verdictul Consiliului — execuție comercială (leads), Case Library D112,
+follow-up automation; D119; e-Factura. NU mai construim engine-uri noi fără cerere explicită.

@@ -44,6 +44,8 @@ async def ceo_briefing(user=Depends(require_role("admin"))):
             alerts.append(_build_alert(key, f, res))
     overall = round(sum(r["score"] for r in domains.values()) / len(domains), 1) if domains else 0
     band = _band(overall)
+    from routes.enterprise_health import compute_enterprise_score
+    es = await compute_enterprise_score({k: v["score"] for k, v in domains.items()}, overall)
 
     sorted_by_score = sorted(domains.items(), key=lambda kv: kv[1]["score"])
     weakest = sorted_by_score[:2]
@@ -176,7 +178,8 @@ async def ceo_briefing(user=Depends(require_role("admin"))):
         "day": today,
         "generated_at": now.isoformat(),
         "enterprise_status": {"status": STATUS_RO.get(band["key"], band["label"]), "band": band,
-                              "overall": overall, "reason": reason, "escalated": overall < 60},
+                              "overall": overall, "reason": reason, "escalated": overall < 60,
+                              "enterprise_score": es["score"], "enterprise_score_band": es["band"]},
         "one_thing": one_thing,
         "snapshot": snapshot,
         "top_risks": risks,

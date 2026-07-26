@@ -401,6 +401,42 @@ async def _history_context() -> dict:
     return {"previous": previous, "old30": old, "series": series}
 
 
+ES_WEIGHTS = {"customer_success": 0.20, "revenue": 0.15, "enterprise_health": 0.15,
+              "trust": 0.10, "knowledge": 0.10, "automation": 0.10, "security": 0.05,
+              "performance": 0.05, "marketplace_growth": 0.05, "innovation": 0.05}
+ES_LABELS = {"customer_success": "Customer Success", "revenue": "Revenue",
+             "enterprise_health": "Enterprise Health", "trust": "Trust", "knowledge": "Knowledge",
+             "automation": "Automation", "security": "Security", "performance": "Performance",
+             "marketplace_growth": "Marketplace Growth", "innovation": "Innovation"}
+
+
+async def compute_enterprise_score(domain_scores: dict, overall: float) -> dict:
+    """Enterprise Score (Operating Agreement) — ponderi Board, surse documentate transparent."""
+    snap = await db.autonomy_snapshots.find_one({}, sort=[("_id", -1)])
+    sc = (snap or {}).get("scores") or {}
+    sources = {
+        "customer_success": (domain_scores.get("customer_trust"), "Domeniul Customer Trust (rating, dispute, recenzii)"),
+        "revenue": (domain_scores.get("revenue"), "Domeniul Revenue (venit real încasat)"),
+        "enterprise_health": (overall, "Media celor 11 domenii de sănătate (D122)"),
+        "trust": (domain_scores.get("customer_trust"), "Customer Trust — sursă comună cu Customer Success (documentat)"),
+        "knowledge": (domain_scores.get("knowledge"), "Domeniul Knowledge"),
+        "automation": (domain_scores.get("automation"), "Domeniul Automation"),
+        "security": (sc.get("security"), "Autonomy Engine · scores.security"),
+        "performance": (sc.get("technical"), "Autonomy Engine · scores.technical"),
+        "marketplace_growth": (domain_scores.get("marketplace"), "Domeniul Marketplace"),
+        "innovation": (domain_scores.get("ai_learning"), "Domeniul AI Learning"),
+    }
+    components, total = [], 0.0
+    for k, w in ES_WEIGHTS.items():
+        val, source = sources[k]
+        v = val if val is not None else 50
+        total += v * w
+        components.append({"key": k, "label": ES_LABELS[k], "weight": w, "value": round(v, 1),
+                           "source": source, "contribution_pts": round(v * w, 1), "estimated": val is None})
+    return {"score": _clamp(total), "band": _band(total), "components": components,
+            "formula": "20% Customer Success + 15% Revenue + 15% Enterprise Health + 10% Trust + 10% Knowledge + 10% Automation + 5% Security + 5% Performance + 5% Marketplace + 5% Innovation"}
+
+
 @router.get("")
 async def enterprise_health(user=Depends(require_role("admin"))):
     formulas = await _get_formulas()
@@ -428,10 +464,12 @@ async def enterprise_health(user=Depends(require_role("admin"))):
             alerts.append(_build_alert(key, f, res))
 
     overall = _clamp(sum(d["score"] for d in domains) / len(domains)) if domains else 0
+    enterprise_score = await compute_enterprise_score(scores_map, overall)
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     if not await db.enterprise_health_history.find_one({"date": today}):
         await db.enterprise_health_history.insert_one({
             "date": today, "overall": overall, "scores": scores_map,
+            "enterprise_score": enterprise_score["score"],
             "created_at": datetime.now(timezone.utc).isoformat(),
         })
 
@@ -439,6 +477,7 @@ async def enterprise_health(user=Depends(require_role("admin"))):
         "overall": {"score": overall, "band": _band(overall),
                     "previous": (ctx["previous"] or {}).get("overall"),
                     "trend_30d": round(overall - ctx["old30"]["overall"], 1) if ctx["old30"] else None},
+        "enterprise_score": enterprise_score,
         "domains": sorted(domains, key=lambda d: d["score"]),
         "alerts": sorted(alerts, key=lambda a: a["score"]),
         "history": ctx["series"],
