@@ -6,6 +6,8 @@ primesc un email de recuperare. Config în settings namespace `leads_followup`
 (enabled=False până la rezolvarea DNS Resend — se activează cu un switch).
 """
 import logging
+import time
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from db import db
@@ -24,6 +26,7 @@ DEFAULT_CONFIG = {
     "nurture_enabled": False,
     "nurture_delay_hours": 168,
     "nurture_subject": "Ghid gratuit: 5 greșeli scumpe în renovări (și cum le eviți) — PropManage",
+    "autonomy_level": "L2",
 }
 
 SERVICE_LABELS = {
@@ -105,7 +108,8 @@ async def run_nurture_scan(manual: bool = False, dry_run: bool = False) -> dict:
 
 
 async def _run_sequence(cfg: dict, sequence: str, segments: list, delay_hours: int, subject: str,
-                        sent_field: str, attempts_field: str, template, dry_run: bool) -> dict:
+                        sent_field: str, attempts_field: str, template, dry_run: bool,
+                        blocked_reason: str | None = None) -> dict:
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=delay_hours)).isoformat()
     q = {
         "segment": {"$in": segments},
@@ -118,12 +122,24 @@ async def _run_sequence(cfg: dict, sequence: str, segments: list, delay_hours: i
     }
     leads = await db.leads.find(q).sort("created_at", 1).to_list(int(cfg["batch_size"]))
     now = datetime.now(timezone.utc).isoformat()
-    sent, failed = 0, 0
+    sent, failed, queued = 0, 0, 0
     for lead in leads:
         label, href = SERVICE_LABELS.get(lead.get("source"), ("PropManage", "/"))
         log = {"lead_id": lead.get("id"), "email": lead["email"], "source": lead.get("source"),
                "segment": lead.get("segment"), "tenant_id": lead.get("tenant_id", "main"),
                "sequence": sequence, "dry_run": dry_run, "at": now}
+        if blocked_reason and not dry_run:
+            # Email indisponibil (ex: DNS Resend) — lead-ul intră în coadă o singură dată,
+            # rămâne candidat și va fi trimis LIVE automat când gate-ul se deschide.
+            if (lead.get("followup") or {}).get(f"queued_{sequence}"):
+                continue
+            await db.leads.update_one({"_id": lead["_id"]},
+                                      {"$set": {f"followup.queued_{sequence}": now, "updated_at": now}})
+            log["status"] = "queued_blocked"
+            log["blocked_by"] = blocked_reason
+            await db.lead_followup_log.insert_one(dict(log))
+            queued += 1
+            continue
         if dry_run:
             log["status"] = "dry_run"
             await db.lead_followup_log.insert_one(dict(log))
@@ -149,7 +165,103 @@ async def _run_sequence(cfg: dict, sequence: str, segments: list, delay_hours: i
             failed += 1
         await db.lead_followup_log.insert_one(dict(log))
     summary = {"ran": True, "sequence": sequence, "candidates": len(leads), "sent": sent,
-               "failed": failed, "dry_run": dry_run, "at": now}
+               "failed": failed, "queued": queued, "dry_run": dry_run, "at": now}
     if leads:
         logger.info(f"[lead_followup] {summary}")
     return summary
+
+
+# ===================== D156 — Autonomie L2 (EXECUTION ORDER 001) =====================
+
+async def _email_gate() -> dict:
+    """Gate de siguranță L2: trimitem LIVE doar când providerul de email poate livra."""
+    from email_service import PROVIDER
+    if PROVIDER != "resend":
+        live = PROVIDER == "sendgrid"
+        return {"live": live, "provider": PROVIDER, "reason": None if live else "console_mode"}
+    try:
+        from routes.resend_diagnostics import run_diagnostics
+        diag = await run_diagnostics()
+        ok = bool(diag.get("dns_ok"))
+        return {"live": ok, "provider": "resend", "reason": None if ok else "resend_dns_unverified"}
+    except Exception as e:  # noqa: BLE001
+        return {"live": False, "provider": "resend", "reason": f"gate_error:{str(e)[:80]}"}
+
+
+def _sequence_args(cfg: dict, sequence: str) -> dict:
+    if sequence == "nurture_7d":
+        return dict(sequence="nurture_7d", segments=["nurture"], delay_hours=int(cfg["nurture_delay_hours"]),
+                    subject=cfg["nurture_subject"], sent_field="followup.nurture_sent_at",
+                    attempts_field="followup.nurture_attempts", template=_nurture_html)
+    return dict(sequence="warm_48h", segments=cfg["segments"], delay_hours=int(cfg["delay_hours"]),
+                subject=cfg["subject"], sent_field="followup.sent_at",
+                attempts_field="followup.attempts", template=_email_html)
+
+
+async def run_autonomous_cycle(trigger: str = "scheduler") -> dict:
+    """Ciclu autonom orar (D156 L2): gate email → rulează secvențele → Execution Report în ledger."""
+    cfg = await get_config()
+    if not cfg["enabled"] and not cfg["nurture_enabled"]:
+        return {"ran": False, "reason": "disabled"}
+    t0 = time.monotonic()
+    gate = await _email_gate()
+    blocked = None if gate["live"] else (gate.get("reason") or "email_blocked")
+    results = []
+    if cfg["enabled"]:
+        results.append(await _run_sequence(cfg, dry_run=False, blocked_reason=blocked,
+                                           **_sequence_args(cfg, "warm_48h")))
+    if cfg["nurture_enabled"]:
+        results.append(await _run_sequence(cfg, dry_run=False, blocked_reason=blocked,
+                                           **_sequence_args(cfg, "nurture_7d")))
+    totals = {k: sum(r.get(k, 0) for r in results) for k in ("candidates", "sent", "failed", "queued")}
+    duration_ms = int((time.monotonic() - t0) * 1000)
+    now = datetime.now(timezone.utc).isoformat()
+    run_doc = {"run_id": uuid.uuid4().hex, "trigger": trigger, "autonomy_level": "L2",
+               "email_live": gate["live"], "blocked_by": blocked, **totals,
+               "sequences": results, "duration_ms": duration_ms, "at": now}
+    if totals["candidates"] or trigger == "manual":
+        await db.lead_followup_runs.insert_one(dict(run_doc))
+    if totals["sent"] or totals["failed"] or totals["queued"]:
+        from learning_engine import ledger_entry
+        reco = (f"Follow-up autonom lead-uri stagnante: {totals['sent']} trimise, "
+                f"{totals['queued']} în coadă (email blocat), {totals['failed']} eșuate "
+                f"din {totals['candidates']} candidați")
+        entry = ledger_entry(
+            "autonomous_execution", "lead_followup_engine", reco,
+            "EXECUTION ORDER 001 · D156 L2 — lead-uri stage=new fără follow-up (>48h warm / >7z nurture)",
+            action="auto_executed", approved_by="EXECUTION_ORDER_001",
+            extra={"execution_report": {
+                "reason": "Lead-uri stagnante fără follow-up — risc de pierdere a venitului",
+                "evidence": totals,
+                "expected_benefit": "Reactivare lead-uri → consultanțe programate → venit",
+                "rollback_plan": "PUT /api/admin/leads/followup/config {\"enabled\": false}",
+                "execution_time_ms": duration_ms,
+                "risk_score": "low",
+                "email_gate": gate,
+            }})
+        await db.ai_decision_ledger.insert_one(entry)
+    return run_doc
+
+
+async def get_status() -> dict:
+    """Stare completă pentru Operations Center: config, gate, candidați, istoricul rulărilor."""
+    cfg = await get_config()
+    gate = await _email_gate()
+    pending = {}
+    for seq in ("warm_48h", "nurture_7d"):
+        args = _sequence_args(cfg, seq)
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=args["delay_hours"])).isoformat()
+        pending[seq] = await db.leads.count_documents({
+            "segment": {"$in": args["segments"]}, "stage": "new", "email": {"$nin": ["", None]},
+            "created_at": {"$lt": cutoff}, args["sent_field"]: {"$exists": False},
+        })
+    since = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    log_30d = {}
+    async for d in db.lead_followup_log.aggregate([
+        {"$match": {"at": {"$gt": since}}},
+        {"$group": {"_id": "$status", "n": {"$sum": 1}}},
+    ]):
+        log_30d[d["_id"]] = d["n"]
+    last_runs = await db.lead_followup_runs.find({}, {"_id": 0}).sort("at", -1).to_list(5)
+    return {"config": cfg, "email_gate": gate, "pending": pending,
+            "log_30d": log_30d, "last_runs": last_runs}

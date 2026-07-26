@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   ClipboardList, Loader2, RefreshCcw, Phone, Mail, MessageCircle, Banknote,
-  AlertTriangle, Trophy, Users, TrendingUp, CheckCircle2, StickyNote
+  AlertTriangle, Trophy, Users, TrendingUp, CheckCircle2, StickyNote, Bot, Zap
 } from "lucide-react";
 import axios from "axios";
 import { OpsGapsPanel } from "./OpsGapsPanel";
@@ -92,6 +92,49 @@ const PendingOrderRow = ({ order, methods, onPay, busy }) => {
   );
 };
 
+const AutonomousFollowupPanel = () => {
+  const [st, setSt] = useState(null);
+  const [running, setRunning] = useState(false);
+  const load = useCallback(async () => {
+    try { const r = await axios.get(`${API}/api/admin/leads/followup/status`, { withCredentials: true }); setSt(r.data); } catch (e) { console.error(e); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const runNow = async () => {
+    setRunning(true);
+    try {
+      const r = await axios.post(`${API}/api/admin/leads/followup/run-cycle`, {}, { withCredentials: true });
+      alert(`Ciclu executat: ${r.data.sent || 0} trimise · ${r.data.queued || 0} în coadă · ${r.data.failed || 0} eșuate`);
+      await load();
+    } catch (e) { alert(e?.response?.data?.detail || "Eroare"); } finally { setRunning(false); }
+  };
+  if (!st) return null;
+  const active = st.config?.enabled || st.config?.nurture_enabled;
+  const live = st.email_gate?.live;
+  const lastRun = st.last_runs?.[0];
+  return (
+    <div className="bg-[#0e0e10] rounded-2xl border border-emerald-500/20 p-5 mb-8" data-testid="ops-autonomous-followup">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Bot className="w-4 h-4 text-emerald-400" />
+          <span className="font-serif text-lg">Follow-up Autonom Lead-uri</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full border ${active ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : "bg-stone-500/10 border-stone-500/30 text-stone-400"}`} data-testid="af-status-badge">{active ? "AUTONOMIE L2 ACTIVĂ" : "INACTIV"}</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full border ${live ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : "bg-amber-500/10 border-amber-500/30 text-amber-300"}`} data-testid="af-email-gate">{live ? "EMAIL LIVE" : "EMAIL BLOCAT (DNS Resend) — lead-urile intră în coadă"}</span>
+        </div>
+        <button onClick={runNow} disabled={running} className="pm-btn pm-btn-secondary pm-btn-sm" data-testid="af-run-now">
+          {running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />} Rulează ciclul acum
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-x-8 gap-y-2 mt-3 text-xs text-stone-400">
+        <div data-testid="af-pending-warm">Candidați warm 48h: <span className="text-white font-medium">{st.pending?.warm_48h ?? 0}</span></div>
+        <div data-testid="af-pending-nurture">Candidați nurture 7z: <span className="text-white font-medium">{st.pending?.nurture_7d ?? 0}</span></div>
+        <div data-testid="af-sent-30d">Trimise 30z: <span className="text-emerald-300 font-medium">{st.log_30d?.sent || 0}</span></div>
+        <div data-testid="af-queued-30d">În coadă 30z: <span className="text-amber-300 font-medium">{st.log_30d?.queued_blocked || 0}</span></div>
+        <div data-testid="af-last-run">Ultimul ciclu: <span className="text-stone-200">{lastRun ? new Date(lastRun.at).toLocaleString("ro-RO") : "—"}</span></div>
+      </div>
+    </div>
+  );
+};
+
 export default function OperationsCenter() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -170,6 +213,9 @@ export default function OperationsCenter() {
           <div><span className="text-stone-400 text-xs uppercase tracking-wide">Bottleneck:</span> <span className="text-amber-300">{c.biggest_bottleneck}</span></div>
           <div><span className="text-stone-400 text-xs uppercase tracking-wide">Acțiunea #1:</span> <span className="text-[#d4ff3a]">{c.top_founder_action}</span></div>
         </div>
+
+        {/* Autonomie L2 — EXECUTION ORDER 001 */}
+        <AutonomousFollowupPanel />
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Pipeline */}

@@ -129,9 +129,8 @@ scheduler = AsyncIOScheduler(timezone=pytz.timezone(BUCHAREST_TZ_NAME))
 
 
 async def _lead_followup_tick():
-    from lead_followup import run_followup_scan, run_nurture_scan
-    await run_followup_scan()
-    await run_nurture_scan()
+    from lead_followup import run_autonomous_cycle
+    await run_autonomous_cycle(trigger="scheduler")
 
 
 async def _specialist_followup_tick():

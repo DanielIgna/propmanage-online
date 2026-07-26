@@ -1,3 +1,20 @@
+## 🤖 EXECUTION ORDER 001 · P1 — Autonomous Lead Follow-up L2 + Reorganizare Enterprise Memory (Iun 26, 2026)
+
+**Memory reorganizată** conform structurii impuse de Fondator: `/app/memory/{constitution,board(+directives/),strategy,governance,metrics,prompts}` + `INDEX.md` + `MEMORY_RULES.md` (Memory Rule 001: guvernanță VERBATIM, fără rezumare). Directivele 010–157 mutate în `board/directives/` cu index. Salvate verbatim: `board/EXECUTION_ORDER_001.md` (6 priorități, „no additional features"). **7 documente în așteptarea retransmiterii verbatim de la Founder** (pierdute la fork): Resolution 004, Executive Constitution, Operating Philosophy, Century Manifesto, Grand Strategy 2035, Enterprise Evolution Engine (doc strategic), Exponential Growth Engine — placeholder-e marcate `PENDING VERBATIM`.
+
+**Autonomous Lead Follow-up — Level 2 (D156) ACTIV** — reuse motorul existent `lead_followup.py`, extins:
+- `run_autonomous_cycle()` — ciclu orar (scheduler `lead_followup_hourly`): gate email → warm_48h + nurture_7d → Execution Report D156 în `ai_decision_ledger` (type=`autonomous_execution`, approved_by=`EXECUTION_ORDER_001`, rollback plan, risk=low) + run history în `lead_followup_runs`.
+- **Email gate de siguranță**: DNS Resend neverificat → lead-urile intră în coadă O SINGURĂ DATĂ (`followup.queued_{seq}`, status `queued_blocked`, nu ard attempts, idempotent); când Founder repară DNS → trimitere LIVE automată, zero intervenție.
+- Config activat: `enabled=true`, `nurture_enabled=true`, `autonomy_level=L2` (namespace `leads_followup`).
+- API nou: `GET /api/admin/leads/followup/status` + `POST /run-cycle` (admin).
+- UI: panou „Follow-up Autonom Lead-uri" în Operations Center (`ops-autonomous-followup`, badge-uri L2/gate, candidați, buton „Rulează ciclul acum").
+- **Testat E2E (curl+screenshot)**: 23 lead-uri stagnante puse în coadă (8 warm + 15 nurture), rularea 2 idempotentă (queued=0), ledger entry corect, UI validat cu login admin.
+
+**EXECUTION ORDER 001 status**: P1 ✅ · P2 Stripe LIVE (Founder) · P3 Resend DNS (Founder) · P4 e-Factura · P5 Case Library · P6 Market Expansion.
+
+---
+
+
 ## 🧭 COO Mode + ROT activat (Iul 26, 2026, Part 5)
 Directivele COO Mode + 111 (Return On Time) + Foundation Declaration salvate (`BOARD_DIRECTIVE_111_COO_ROT_FOUNDATION.md`). Agent = **Chief Operating Intelligence**: review zilnic War Room/M100/funnel/CRM, recomandări în format D111 (problemă/cauză/impact/ROT), ZERO cod fără impact măsurabil. `EXECUTIVE_DAILY_BRIEF.md` rescris în format COO cu snapshot live (M100: 0,8%, funnel 7d: 59 vizitatori→2 leads). Recomandările zilei: R1 Stripe+DNS (Founder), R2 primul test de trafic (1 postare FB → măsurare 48h), R3 decizia executantului de audit. Niciun cod scris — corect per directive.
 
