@@ -53,7 +53,13 @@ export default function EnterpriseHealthPage() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  if (loading || !data) return <div className="min-h-screen bg-[#0a0a0b] flex items-center justify-center text-stone-400"><Loader2 className="w-6 h-6 animate-spin mr-2" /> Se calculează Enterprise Health...</div>;
+  if (loading) return <div className="min-h-screen bg-[#0a0a0b] flex items-center justify-center text-stone-400"><Loader2 className="w-6 h-6 animate-spin mr-2" /> Se calculează Enterprise Health...</div>;
+  if (!data) return (
+    <div className="min-h-screen bg-[#0a0a0b] flex flex-col items-center justify-center text-stone-400 gap-4" data-testid="eh-error">
+      <span>Nu am putut calcula Enterprise Health.</span>
+      <button onClick={load} className="pm-btn pm-btn-secondary"><RefreshCcw className="w-3.5 h-3.5" /> Încearcă din nou</button>
+    </div>
+  );
 
   const o = data.overall;
 

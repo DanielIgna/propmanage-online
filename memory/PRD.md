@@ -3281,3 +3281,36 @@ pytest 22/22 (test_operations_center_iter128.py) + testing agent frontend 100%
 **Next**: P3 e-Factura RO (obligatoriu legal B2B) → P4 SEO Engine landing pages orașe →
 Directive 112-114 (Case Library / Customer Voice / Learning engines) când Board-ul le
 prioritizează → P5 Verified Properties flow diagram.
+
+---
+
+## ✅ ENTERPRISE HEALTH ENGINE + FORMULA REGISTRY (26 Iul 2026, iteration 129)
+Directive noi salvate: 115-151 (37 directive: AI UX Intelligence, Platform Audit, Principal
+Architect, Compounding Company, Market Expansion, Enterprise Intelligence, Decision Center,
+Enterprise Health, Cognitive Engine, Meta Reasoning, Knowledge Graph, Property Genome,
+Simulation, Resilience, Innovation, Orchestrator, Opportunity, Memory, Adaptation, Copilot,
+Evolution, Purpose, Focus, Compounding Value, Antifragile, Legacy, Governance, Ethics,
+Capital, Time, Wisdom, Synthesis, Founder Legacy, Consciousness, Alignment, Living
+Enterprise, Formula Registry) — toate în /app/memory/BOARD_DIRECTIVE_*.md.
+Implementat (Directiva 122 + 151, idee explicită Founder):
+1. **Backend `/app/backend/routes/enterprise_health.py`** — GET /api/admin/enterprise-health:
+   scor general 0-100 + 11 domenii (Product, UX, Operations, Growth, Marketplace, Customer
+   Trust, Knowledge, Revenue, Automation, Technical Debt, AI Learning), toate calculate DOAR
+   din dovezi reale (properties DNA/twin, design_audit_cache, leads/gaps, reviews, dispute,
+   ai_documents/memories/case_library, venit REAL încasat, autonomy_snapshots,
+   smoke_test_runs, ai_outcomes/ledger). Benzi de culoare D122 (World Class→Critical).
+   Snapshot zilnic → enterprise_health_history (trend 30z).
+2. **Alert Engine**: domeniu < prag warning → cauză (contributori negativi), impact business,
+   top 3 acțiuni cu +puncte estimate per acțiune, efect total estimat. Rule-based, evidence-only.
+3. **Formula Registry (D151)**: colecția eh_formulas — 11 formule seeded idempotent, fiecare cu
+   inputs/weights/surse/praguri/versiune/status. GET /formulas, GET /formulas/{key}/explain
+   (pași de calcul, contribuții, contributori ±, confidence), PATCH (editare ponderi/praguri cu
+   MOTIV obligatoriu → versiune nouă + audit în eh_formula_audit), POST /rollback, GET /audit.
+4. **UI `/admin/enterprise-health`** (EnterpriseHealthPage.jsx + EhDomainCard.jsx + meniu
+   admin D122): scor mare central, 11 carduri sortate crescător cu bare/benzi/trend, expand →
+   explain + editor formule inline, secțiune alerte cu acțiuni. Stare de eroare cu retry.
+**VALIDAT**: pytest 13/13 (test_enterprise_health_iter129.py) + testing agent frontend 100%
+(iteration_129.json), zero probleme, registry curat. Scor actual REAL: 59/100 Critical —
+Revenue 9 (450 RON vs țintă 5000), Knowledge 30, Product 49 → alertele arată exact acțiunile.
+**Next**: Directiva 119 Market Expansion Engine (pagini recrutare din gaps — propus, așteaptă
+confirmare) → e-Factura RO → SEO Engine → Case Library (D112) / Customer Voice (D113).
