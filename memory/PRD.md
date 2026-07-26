@@ -3152,3 +3152,37 @@ GI-4a (venit atribuit vizibil în /admin/learning).
 **Next (decizie Board)**: GI-5P Sprint 2 (DNA v2 straturi critice cu provenance, Health decay
 temporal, Risk Engine tehnic+întreținere+juridic) SAU GI-4b AI Memory SAU arhitectura GI-5D
 (Interior Intelligence — permisă DOAR după GI-5P MVP complet).
+
+---
+
+## ✅ SPRINT GI-5P 2 (R0.8-S1) — DNA v2 + HEALTH DECAY + RISK ENGINE (Iun 2026, EXECUTION MODE 034)
+Directive noi salvate: 019-026 (BIOS, Command Center, Mission Mode, Adaptive Autonomy,
+Constituție AI OS, Autonomy Evolution, Executive Advisor, Business Digital Twin),
+027-035 (Roadmap PMO, Commercial Readiness, Executive Mission, Execution Mode, Guardian,
+Final Optimization, Scaling, Challenge Mode). Documente strategice:
+/app/docs/MASTER_ROADMAP_2026.md, /app/docs/EXECUTION_MASTER_PLAN.md,
+/app/docs/EXECUTION_DASHBOARD.md, /app/docs/SCALING_ROADMAP_3Y.md.
+Implementat (extensie pură pe property_intelligence.py):
+1. **DNA v2 atribute cu provenance**: 5 atribute critice (year_built, structure_type,
+   insulation_type, roof_type, heating_type) în properties.dna_attributes cu
+   {value, source, confidence, last_updated, updated_by}. GET/PATCH
+   /api/properties/{id}/dna-attributes (validări int/enum, surse per rol).
+2. **Health Decay temporal**: apply_health_decay — −1 pct/component/lună după 183 zile fără
+   eveniment dovedit (last_enriched_at / hh_evaluations), podea 25, idempotent lunar
+   (health_decay.last_applied), istoric în health_history, event health.decayed.
+   Rulat în scan_property_throttled (cron zilnic Revenue Hunter — reuse).
+3. **Risk Engine 3 categorii**: compute_risks — Tehnic (active EOL overdue 85 / attention 60),
+   Întreținere (audit >24 luni = 50, decay activ = 40), Juridic&Documente (identitate 45,
+   documents_health<50 = 42). Fiecare: probabilitate, impact, dovezi, mitigare CTA
+   (audit/wizard/edit_property). Profil persistat (properties.risk_profile) + risk_summary
+   pentru CEO (property_risks în /api/admin/ceo).
+4. **UI Cartea Casei**: PropertyRisksCard (max 3 riscuri, badge categorie+Estimat, scor,
+   dovezi, buton mitigare → accept audit opp / wizard) + DnaAttributesCard (5 rânduri
+   editabile, selector sursă, badge confidence per atribut).
+5. **CEO Dashboard**: subtitlu riscuri active în tile-ul Twin Maturity.
+**VALIDAT**: pytest 11/11 (test_gi5p_sprint2_iter125.py) + regresie 18/18 (iter124) +
+testing agent frontend 100% (iteration_125.json), zero regresii.
+**GI-5P MVP = COMPLET** (Sprint 1 + Sprint 2). Resend diagnostics live
+(GET /api/admin/integrations/resend/diagnostics) — DNS încă BLOCAT pe user (Rackhost).
+**Next (Execution Master Plan)**: R0.8-S2 Resend (după DNS user) → R0.9-S1 Commercial
+hardening (după Stripe LIVE user) → R0.9-S2 Integration Control Center → R1.0 e-Factura+launch.

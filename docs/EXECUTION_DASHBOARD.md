@@ -4,7 +4,7 @@ Ultima actualizare: Iun 2026 (creare)
 ## STATUS SPRINTURI
 | ID | Sprint | Status | Credite est. | Credite folosite | Note |
 |----|--------|--------|--------------|------------------|------|
-| R0.8-S1 | GI-5P Sprint 2 (DNA v2 + Decay + Risk) | ⏳ WAITING (aprobare start) | 16 | — | spec aprobat ca format |
+| R0.8-S1 | GI-5P Sprint 2 (DNA v2 + Decay + Risk) | ✅ COMPLETED (iter125, 100%) | 16 | ~14 | livrat |
 | R0.8-S2 | Resend live | 🚫 BLOCKED (USER: DNS Rackhost) | 2 | — | diagnostics endpoint gata ✅ |
 | R0.9-S1 | Commercial hardening + Stripe LIVE | 🚫 BLOCKED (USER: claim Stripe) | 10 | — | |
 | R0.9-S2 | Integration Control Center | 📋 PLANNED | 12 | — | |
