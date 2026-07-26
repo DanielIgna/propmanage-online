@@ -1,3 +1,17 @@
+## 🏛️ Enterprise Value Office + Guvernanță finală 069–087 (Iul 26, 2026, Part 2)
+
+**Directivele 069–087 salvate** în `/app/memory/` (4 fișiere consolidate: `_069_070_ENTERPRISE_VALUE_OFFICE`, `_071_075_EXECUTIVE_SYSTEMS`, `_076_081_STRATEGIC_OFFICES`, `_082_087_CHARTERS`). Faza Foundation+Governance ÎNCHISĂ oficial (D082). Agent = **Executive Intelligence System** cu autonomie proactivă (D081). Cadre decizionale active: Time Horizons H1/H2/H3 (D084), Cashflow First (D085), Founder's Compass (3 întrebări + matrice), Covenant Founder–AI.
+
+**Livrabile Stream B (Stripe/DNS blocate extern → conform D085 s-a continuat automat)**:
+- `/app/docs/ENTERPRISE_VALUE_OFFICE.md` (CONFIDENȚIAL) — inventar factual (181k LOC, 149 module API, 203 pagini, 126 iterații QA, 653 commits), echipă echivalentă ~13 FTE × 14 luni ≈ €1,68M, replacement cost 3 scenarii (€650k / €1,4–1,7M / €2,3M), IP Register 13 active ≈ €1,5M, evaluare onestă pre-revenue (Conservator €195k / Realist €540–650k / Strategic €1,2–1,8M PROIECȚIE), readiness scorecard (Tech 82% · Commercial 72% · Operational 68% · Franchise 38%), toate cu metodologie+confidence+marjă conform Valuation Governance.
+- `/app/docs/EXECUTIVE_DAILY_BRIEF.md` (D071) — formatul standard + snapshot 26 Iul: venit real 0, 5/9 milestones (demo), top 5 acțiuni Founder.
+- `/app/docs/DECISION_REGISTER.md` (D072) — 6 decizii înregistrate (D-001…D-006) cu motive/ROI/lecții.
+- `/app/docs/TECHNICAL_DEBT_LEDGER.md` (D073) — 6 intrări; alarme: TD-02 (seeds demo de retras la lansare, P1) + TD-06 (Resend DNS, P0 extern) + TD-04 (e-Factura, P1 legal).
+
+**Decizie EVO (D-005)**: livrat ca documente, NU dashboard in-app (Founder's Compass: doar Q3=DA → efort minim). Reevaluare automată la milestone „prima plată reală".
+
+---
+
 ## 💰 FAZA A — Verified Properties Commercial Engine + First Revenue War Room (Iul 26, 2026)
 
 **Context Board**: Directivele 054–068 salvate (`/app/memory/BOARD_DIRECTIVE_05*.md`, `_060_067_`, `_068_`). Audit executiv complet fără cod: `/app/docs/VERIFIED_PROPERTIES_AUDIT_2026.md` + review Board per-executive: `/app/docs/BOARD_REVIEW_VERIFIED_PROPERTIES_EPIC.md`. Founder GO: „Continue Phase A" (Board Confidence 92%). **EXECUTION MODE activ (D068): un singur obiectiv — prima plată reală.**
