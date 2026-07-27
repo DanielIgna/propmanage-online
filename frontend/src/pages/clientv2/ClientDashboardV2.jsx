@@ -18,6 +18,8 @@ import DigitalTwinViewer from "../../components/DigitalTwinViewer";
 import { RequestTimelineModal } from "../ActivityTimeline";
 import { SettingsPanel } from "../SettingsPanel";
 import HouseHealthCard from "../HouseHealthCard";
+import { HelpButton } from "../../components/HelpButton";
+import { BetaFeedbackEntry } from "../../components/BetaFeedbackWidget";
 
 const NAV = [[Home, "Acasă", "home"], [Wrench, "Lucrări", "jobs"], [Plus, "Solicită", "request"], [Building2, "Propr.", "property"], [Settings, "Setări", "settings"]];
 const TITLES = { home: null, jobs: "Lucrările mele", property: "Proprietatea mea", settings: "Setări" };
@@ -93,6 +95,8 @@ export default function ClientDashboardV2() {
   const prop = properties.find(p => p.id === selectedPropId) || properties[0];
   const activeReq = requests.filter(r => r.status !== "confirmed")[0];
   const unread = notifs.filter(n => !n.read).length;
+  // PPOS P3a-M8: while a payment/confirmation is pending, the hero owns the ONLY primary CTA
+  const txActive = requests.some(r => (r.status === "assigned" && !r.escrow_amount) || r.status === "completed");
 
   useEffect(() => {
     if (activeReq?.status === "open") {
@@ -154,6 +158,7 @@ export default function ClientDashboardV2() {
             <Bell style={{ width: 18, height: 18 }} className="text-slate-600" />
             {unread > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full text-white text-[9px] font-black flex items-center justify-center" style={{ background: GREEN }} data-testid="v2-bell-badge">{unread}</span>}
           </button>
+          <HelpButton light />
           <ThemeSwitcher />
         </div>
         {/* Desktop: taburi mari + CTA „Solicită ofertă" proeminent (Legea lui Hick) */}
@@ -165,8 +170,10 @@ export default function ClientDashboardV2() {
             </button>
           ))}
           <button onClick={() => actions.openWizard()} data-testid="v2-desktop-cta"
-            className="ml-auto flex items-center gap-2 px-6 py-3 rounded-full text-sm font-black text-black shadow-[0_12px_36px_-12px_rgba(204,255,0,0.55)] hover:scale-[1.02] transition-transform"
-            style={{ background: "#ccff00" }}>
+            className={`ml-auto flex items-center gap-2 px-6 py-3 rounded-full text-sm font-black transition-transform ${txActive
+              ? "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
+              : "text-black shadow-[0_12px_36px_-12px_rgba(204,255,0,0.55)] hover:scale-[1.02]"}`}
+            style={txActive ? undefined : { background: "#ccff00" }}>
             <Plus style={{ width: 18, height: 18 }} strokeWidth={2.6} /> {prop ? "Solicită ofertă" : "Adaugă proprietatea"}
           </button>
         </div>
@@ -178,6 +185,7 @@ export default function ClientDashboardV2() {
         {tab === "property" && <div className="lg:max-w-3xl"><PropertyHubV2 user={user} prop={prop} properties={properties} setSelectedPropId={setSelectedPropId} actions={actions} /></div>}
         {tab === "settings" && (
           <div className="px-5 pb-8 space-y-2 lg:max-w-3xl" data-testid="v2-settings-view">
+            <BetaFeedbackEntry light />
             <button onClick={() => setShow2FA(true)} data-testid="v2-set-2fa"
               className="w-full flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm text-left">
               <span className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center"><Shield className="w-5 h-5 text-slate-500" /></span>

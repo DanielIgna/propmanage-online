@@ -4,6 +4,9 @@ Status: Draft v1.0 · Owner: Product Council
 ## Gate-ul suprem
 Nicio funcționalitate nouă până ce fluxul existent nu are **≥95/100** (claritate, simplitate, mobil). Sub 95 → redesign din nou.
 
+## NO REGRESSION RULE (Fondator, Iun 2026)
+Nicio implementare nu are voie să reducă: **UX Score · Desktop Score · Mobile Score · Performance · Accessibility · Trust**. Dacă ORICE metrică scade la re-audit, implementarea EȘUEAZĂ automat și modificarea respectivă se face rollback imediat. Verificarea se face DUPĂ FIECARE fază (Audit → Implement → Re-audit → doar apoi faza următoare — niciodată trei faze implementate și verificate la final).
+
 ## Scoring per pagină (9 dimensiuni)
 Claritate · Simplitate · Accesibilitate · Mobil · Performanță · Consistență · Sarcină cognitivă · Impact venit · Încredere → Overall ≥95.
 

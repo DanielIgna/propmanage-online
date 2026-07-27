@@ -281,11 +281,14 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
   };
 
   // carduri contextuale REALE — apar doar când condiția e adevărată
+  // PPOS P3a-M8: acțiunea afișată deja în hero NU se repetă în „Noutăți"
   const contextual = [];
   if (activeReq?.status === "open" && offersCount > 0) contextual.push({ icon: Star, text: `${offersCount} oferte la «${activeReq.title}»`, cta: "Compară", onClick: () => navigate(`/client/requests/${activeReq.id}/offers`), tid: "v2-ctx-offers" });
-  const payReq = requests.find(r => r.status === "assigned" && !r.escrow_amount);
+  const heroPayId = activeReq && activeReq.status === "assigned" && !activeReq.escrow_amount ? activeReq.id : null;
+  const heroConfirmId = activeReq && activeReq.status === "completed" ? activeReq.id : null;
+  const payReq = requests.find(r => r.status === "assigned" && !r.escrow_amount && r.id !== heroPayId);
   if (payReq) contextual.push({ icon: CreditCard, text: `Plată în așteptare pentru «${payReq.title}»`, cta: "Plătește", onClick: () => actions.payEscrow(payReq.id), tid: "v2-ctx-pay" });
-  const doneReq = requests.find(r => r.status === "completed");
+  const doneReq = requests.find(r => r.status === "completed" && r.id !== heroConfirmId);
   if (doneReq) contextual.push({ icon: ShieldCheck, text: `«${doneReq.title}» a fost finalizată — confirmă lucrarea`, cta: "Confirmă", onClick: () => actions.confirmRequest(doneReq.id, doneReq), tid: "v2-ctx-confirm" });
   if (contextual.length < 2 && unread[0]) contextual.push({ icon: Bell, text: unread[0].title, cta: "Vezi", onClick: actions.openNotifs, tid: "v2-ctx-notif" });
 

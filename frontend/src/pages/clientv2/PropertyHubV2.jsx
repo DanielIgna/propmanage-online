@@ -126,11 +126,11 @@ const PropertyDnaCard = ({ propId }) => {
         <div className="mt-3 pt-3 border-t border-slate-100" data-testid="dna-timeline">
           <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Ultimele evenimente</div>
           <div className="mt-2 space-y-2">
-            {dna.timeline.slice(0, 5).map((ev, i) => (
+            {groupTimeline(dna.timeline).slice(0, 5).map((ev, i) => (
               <div key={i} className="flex items-start gap-2.5" data-testid={`dna-timeline-item-${i}`}>
                 <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 bg-[#166534]" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-semibold text-slate-700 leading-snug truncate">{ev.title}</div>
+                  <div className="text-xs font-semibold text-slate-700 leading-snug truncate">{ev.label}{ev.count > 1 ? ` ×${ev.count}` : ""}</div>
                   <div className="text-[10px] text-slate-400">{timeAgo(ev.timestamp)}</div>
                 </div>
               </div>
@@ -142,6 +142,34 @@ const PropertyDnaCard = ({ propId }) => {
     </div>
   );
 };
+
+// PPOS P3a-M6 — evenimentele de sistem se traduc în limbaj uman (fără jargon EN)
+const EVENT_LABELS_RO = [
+  [/twin\s*dna|dna attribute/i, "Detalii actualizate în cartea casei"],
+  [/recommendation created/i, "Recomandare nouă pentru casa ta"],
+  [/recommendation/i, "Recomandare actualizată"],
+  [/document/i, "Document adăugat în cartea casei"],
+  [/audit/i, "Audit tehnic actualizat"],
+  [/twin/i, "Digital Twin actualizat"],
+  [/sensor/i, "Senzor actualizat"],
+];
+function humanEventTitle(title) {
+  if (!title) return "Actualizare în cartea casei";
+  const hit = EVENT_LABELS_RO.find(([re]) => re.test(title));
+  if (hit) return hit[1];
+  if (/_/.test(title) || /\b(updated|created|deleted|added|changed|status)\b/i.test(title)) return "Actualizare în cartea casei";
+  return title;
+}
+function groupTimeline(items) {
+  const out = [];
+  (items || []).forEach((ev) => {
+    const label = humanEventTitle(ev.title);
+    const last = out[out.length - 1];
+    if (last && last.label === label) { last.count += 1; }
+    else out.push({ ...ev, label, count: 1 });
+  });
+  return out;
+}
 
 // ── GI-5P Sprint 1 — Twin Maturity L0-L5 (Audit First, Directiva 014) ─────────
 const CONF_LABELS = {

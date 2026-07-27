@@ -25,6 +25,7 @@ export default function PublicPassportPage() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(false);
   const [showTrust, setShowTrust] = useState(false);
+  const [showAllHistory, setShowAllHistory] = useState(false);
 
   useEffect(() => {
     axios.get(`${API}/api/public/passport/${slug}`)
@@ -71,6 +72,14 @@ export default function PublicPassportPage() {
   const p = data.property;
   const trust = data.scores.trust;
   const earned = data.badges.filter(b => b.earned);
+  // PPOS P3a-M7: intrările consecutive identice se grupează; istoricul e colapsat la 5
+  const groupedMilestones = [];
+  (data.milestones || []).forEach((m) => {
+    const last = groupedMilestones[groupedMilestones.length - 1];
+    if (last && last.title === m.title && last.detail === m.detail) last.count += 1;
+    else groupedMilestones.push({ ...m, count: 1 });
+  });
+  const visibleMilestones = showAllHistory ? groupedMilestones : groupedMilestones.slice(0, 5);
   const hl = data.document_highlights;
   const hlItems = hl ? [
     ["Planuri tehnice", hl.plans], ["Manuale", hl.manuals], ["Garanții", hl.warranties],
@@ -177,21 +186,27 @@ export default function PublicPassportPage() {
         </section>
 
         {/* milestones */}
-        {data.milestones.length > 0 && (
+        {groupedMilestones.length > 0 && (
           <section className="mt-8" data-testid="passport-timeline">
             <h2 className="text-base font-medium text-stone-200">Istoricul casei</h2>
             <div className="mt-3 space-y-0">
-              {data.milestones.map((m, i) => (
+              {visibleMilestones.map((m, i) => (
                 <div key={i} className="flex gap-3 pb-4 relative">
-                  {i < data.milestones.length - 1 && <div className="absolute left-[7px] top-5 bottom-0 w-px bg-white/10" />}
+                  {i < visibleMilestones.length - 1 && <div className="absolute left-[7px] top-5 bottom-0 w-px bg-white/10" />}
                   <span className="mt-1 w-3.5 h-3.5 rounded-full shrink-0 border-2 border-[#0a0a0b]" style={{ background: m.type === "work" ? "#d4ff3a" : "#57866b" }} />
                   <div>
-                    <div className="text-sm font-medium text-stone-200">{m.title}</div>
+                    <div className="text-sm font-medium text-stone-200">{m.title}{m.count > 1 ? <span className="ml-1.5 text-[10px] font-bold text-stone-500">×{m.count}</span> : null}</div>
                     <div className="text-[11px] text-stone-500">{m.detail} · {fmtDate(m.date)}</div>
                   </div>
                 </div>
               ))}
             </div>
+            {!showAllHistory && groupedMilestones.length > 5 && (
+              <button onClick={() => setShowAllHistory(true)} data-testid="passport-timeline-more"
+                className="mt-1 inline-flex items-center gap-1.5 px-4 py-2 rounded-full glass text-xs font-medium text-stone-300 hover:text-white transition-colors">
+                Vezi tot istoricul ({groupedMilestones.length}) <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+            )}
           </section>
         )}
 

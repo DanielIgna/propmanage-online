@@ -10,6 +10,7 @@ import { VoucherExpiryAlert } from "../lib/VoucherExpiryAlert";
 import { EmailVerificationBanner } from "../components/EmailVerificationBanner";
 import { PendingReviewsWidget } from "../components/MultiDimReviews";
 import { GettingStartedWidget } from "../components/GettingStartedWidget";
+import { HelpButton } from "../components/HelpButton";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 
 export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -208,6 +209,7 @@ export const DashLayout = ({ children, role, title, bottomNav }) => {
                 <span className="hidden md:inline">Schimbă la </span>{switchTargetLabel}
               </button>
             )}
+            <HelpButton />
             <ThemeToggle />
             <NotificationsBell />
             {(role === "client" || role === "specialist") && <VoucherExpiryAlert />}
@@ -218,7 +220,7 @@ export const DashLayout = ({ children, role, title, bottomNav }) => {
               <div className="text-sm font-medium truncate max-w-[160px]">{user.name}</div>
               <div className="text-[10px] text-stone-500 truncate max-w-[160px] flex items-center gap-1 justify-end">
                 <span className="truncate">{user.email}</span>
-                {(role === "client" || role === "specialist") && <TierBadgeMini tier={user.experience_tier || "junior"} />}
+                {role === "client" && <TierBadgeMini tier={user.experience_tier || "junior"} />}
               </div>
             </div>
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-stone-600 to-stone-800 flex items-center justify-center font-medium text-sm overflow-hidden" data-testid="dash-avatar">
@@ -240,7 +242,7 @@ export const DashLayout = ({ children, role, title, bottomNav }) => {
       </header>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-24">
         {title && <h1 className="xos-display font-light tracking-tight text-4xl sm:text-5xl mb-6 sm:mb-8" data-testid="dash-title">{title}</h1>}
-        {(role === "client" || role === "specialist") && <GettingStartedWidget role={role} />}
+        {role === "client" && <GettingStartedWidget role={role} />}
         {(role === "client" || role === "specialist") && (
           <div className="mb-6"><PendingReviewsWidget /></div>
         )}

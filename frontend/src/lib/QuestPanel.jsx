@@ -7,7 +7,7 @@ import { Award, Gift, Loader2, ChevronDown, ChevronUp, Sparkles, Copy, CheckCirc
 const API = process.env.REACT_APP_BACKEND_URL;
 const ax = axios.create({ baseURL: API, withCredentials: true });
 
-export const QuestPanel = () => {
+export const QuestPanel = ({ hideActive = false }) => {
   const [quests, setQuests] = useState([]);
   const [vouchers, setVouchers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,8 +32,10 @@ export const QuestPanel = () => {
   }, []);
 
   const activeVouchers = vouchers.filter(v => v.status === "active");
-  const inProgress = quests.filter(q => !q.completed);
-  const done = quests.filter(q => q.completed);
+  // PPOS P3a-M4: mature accounts never see onboarding quests that contradict reality
+  const visibleQuests = hideActive ? quests.filter(q => q.completed) : quests;
+  const inProgress = visibleQuests.filter(q => !q.completed);
+  const done = visibleQuests.filter(q => q.completed);
 
   const copy = (code) => {
     navigator.clipboard.writeText(code);
@@ -42,7 +44,7 @@ export const QuestPanel = () => {
   };
 
   if (loading) return null;
-  if (quests.length === 0 && vouchers.length === 0) return null;
+  if (visibleQuests.length === 0 && vouchers.length === 0) return null;
 
   return (
     <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl p-4 mb-4" data-testid="quest-panel">
@@ -54,7 +56,7 @@ export const QuestPanel = () => {
           <div className="text-left">
             <div className="text-sm font-semibold text-stone-900 dark:text-white">Quest-uri & Recompense</div>
             <div className="text-[10px] text-stone-500 dark:text-stone-400">
-              {inProgress.length} active · {done.length} completate
+              {hideActive ? `${done.length} completate` : `${inProgress.length} active · ${done.length} completate`}
               {activeVouchers.length > 0 && <span className="text-lime-600 dark:text-lime-300"> · {activeVouchers.length} voucher(e)</span>}
             </div>
           </div>

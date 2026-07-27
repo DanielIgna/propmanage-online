@@ -5,7 +5,6 @@ import axios from "axios";
 import { motion } from "framer-motion";
 import { Building2, Star, CheckCircle2, Search, Filter, ArrowLeft, Shield, QrCode, Copy, Check, Calendar, Wrench, AlertTriangle, CreditCard, MapPin } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
-import { HealthScoreBadge } from "../components/HealthScoreBadge";
 import { useSEO } from "../hooks/useSEO";
 import { PMCard, PMPillButton, PMChip, PMSectionHeader, PMEmptyState } from "../components/pm";
 
@@ -55,6 +54,12 @@ export const PublicMarketplace = () => {
       .finally(() => setLoading(false));
   }, [filters]);
 
+  // PPOS P3a-M5 — prezentare defensivă publică: statusurile de moderare nu se afișează niciodată
+  const visibleSpecialists = specialists.filter(
+    s => !["REJECTED", "SUSPENDED", "BLOCKED"].includes(String(s.tier || "").toUpperCase())
+  );
+  const PUBLIC_TIERS = ["VERIFIED", "ADVANCED", "PREMIUM", "TOP"];
+
   return (
     <div className="pm-page-bg">
       <header className="pm-topbar">
@@ -102,10 +107,10 @@ export const PublicMarketplace = () => {
           </select>
         </div>
 
-        <div className="text-xs text-stone-500 mb-4">{loading ? "Se încarcă..." : `${specialists.length} specialiști`}</div>
+        <div className="text-xs text-stone-500 mb-4">{loading ? "Se încarcă..." : `${visibleSpecialists.length} specialiști`}</div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 pm-fade-in-delay-2">
-          {specialists.map((s, i) => (
+          {visibleSpecialists.map((s, i) => (
             <motion.div key={s.id}
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
               <PMCard className="hover:!border-[var(--pm-primary)]/30 transition-all group h-full flex flex-col" testid={`mkt-card-${s.id}`}>
@@ -121,16 +126,17 @@ export const PublicMarketplace = () => {
                     <div className="text-xs text-stone-400 capitalize">{s.specialty || "Specialist"}</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-xs mb-3 flex-wrap">
-                  <div className="flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 text-amber-300 px-2.5 py-1 rounded-full">
-                    <Star className="w-3 h-3 fill-current" />
-                    <span className="font-semibold">{s.rating || "—"}</span>
-                    <span className="opacity-70">({s.reviews_count})</span>
-                  </div>
-                  {s.tier && <PMChip variant="primary">{s.tier}</PMChip>}
-                </div>
-                <div className="mb-4 flex-1">
-                  <HealthScoreBadge health={s.health} size="sm" />
+                <div className="flex items-center gap-2 text-xs mb-4 flex-wrap flex-1">
+                  {(s.reviews_count || 0) >= 1 ? (
+                    <div className="flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 text-amber-300 px-2.5 py-1 rounded-full">
+                      <Star className="w-3 h-3 fill-current" />
+                      <span className="font-semibold">{s.rating || "—"}</span>
+                      <span className="opacity-70">({s.reviews_count})</span>
+                    </div>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-stone-400" data-testid={`mkt-new-${s.id}`}>Nou pe platformă</span>
+                  )}
+                  {PUBLIC_TIERS.includes(String(s.tier || "").toUpperCase()) && <PMChip variant="primary">{s.tier}</PMChip>}
                 </div>
                 <Link to={`/specialists/${s.id}`} className="block" data-testid={`mkt-view-${s.id}`}>
                   <PMPillButton variant="ghost" className="w-full">

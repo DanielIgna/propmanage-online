@@ -10,8 +10,6 @@ import {
   CheckCircle2, ShieldCheck, ChevronRight, Inbox, TrendingUp, Layers,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
-import { WelcomeChecklist } from "../components/WelcomeChecklist";
-import { MaturityCard } from "../components/MaturityCard";
 import { ChatPanel } from "./ChatPanel";
 import { OpenDisputeModal, SpecialistDocumentsModal } from "./AdminModals";
 import { ProposePhaseModal } from "./InteriorDesign";
@@ -22,7 +20,6 @@ import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
 import { RequestTimelineModal, ScheduleProposalModal, LastActionBanner } from "./ActivityTimeline";
 import { TierCelebrationBanner } from "../lib/TierCelebrationBanner";
-import { TierToolsPanel } from "../lib/TierToolsPanel";
 import { QuestPanel } from "../lib/QuestPanel";
 import { SpecialistCockpit } from "./SpecialistCockpit";
 import { useTier } from "../lib/useTier";
@@ -30,7 +27,8 @@ import {
   PMCard, PMCardPrimary, PMStatCard, PMPillButton, PMChip,
   PMSectionHeader, PMEmptyState,
 } from "../components/pm";
-import { TierProgressWidget } from "../components/TierProgressWidget";
+import { SpecialistProgressCard } from "../components/SpecialistProgressCard";
+import { BetaFeedbackEntry } from "../components/BetaFeedbackWidget";
 import { SpecialistEntryHome } from "./dashboard/SpecialistEntryHome";
 
 export const SpecialistDashboard = () => {
@@ -149,9 +147,16 @@ export const SpecialistDashboard = () => {
             </div>
           ),
           cockpit: <SpecialistCockpit onGo={(dest) => (dest === "opportunities" ? window.scrollTo({ top: 0 }) : setTab(dest))} />,
-          quests: tierInfo.canSeeQuests ? <QuestPanel /> : null,
-          tier_tools: tierInfo.canSeeStats ? <TierToolsPanel role="specialist" /> : null,
-          tier_progress: <TierProgressWidget className="mb-4" />,
+          quests: tierInfo.canSeeQuests ? <QuestPanel hideActive={mine.length > 0 || (user?.jobs_completed || 0) > 0} /> : null,
+          tier_tools: null,
+          tier_progress: (
+            <SpecialistProgressCard
+              user={user}
+              mine={mine}
+              onGoLeads={() => document.querySelector('[data-tour="specialist-leads"]')?.scrollIntoView({ behavior: "smooth" })}
+              className="mb-4"
+            />
+          ),
         };
         const order = xosLayout || [
           { id: "today_summary", enabled: true }, { id: "cockpit", enabled: true },
@@ -166,8 +171,7 @@ export const SpecialistDashboard = () => {
           onVerify={() => setShowDocs(true)} onGoJobs={() => setTab("jobs")}
           onSwitchFull={() => { localStorage.setItem("pm_spec_full", "1"); setEntryFull(true); }} />
       )}
-      {!entryMode && <WelcomeChecklist />}
-      {!entryMode && <MaturityCard />}
+      {/* PPOS P3a-M4: MaturityCard eliminat — al doilea sistem de progres; unicul e SpecialistProgressCard */}
       <TierCelebrationBanner />
       {!entryMode && !user?.verified && (
         <PMCard accent="warning" className="mb-6 !bg-amber-500/5 !border-amber-500/30 pm-fade-in" testid="verify-banner">
@@ -428,7 +432,12 @@ export const SpecialistDashboard = () => {
         </div>
       )}
 
-      {tab === "settings" && <SettingsPanel />}
+      {tab === "settings" && (
+        <>
+          <div className="max-w-2xl mx-auto mb-4"><BetaFeedbackEntry /></div>
+          <SettingsPanel />
+        </>
+      )}
 
       {chatRequest && <ChatPanel requestId={chatRequest} onClose={() => setChatRequest(null)} />}
       {showDocs && <SpecialistDocumentsModal onClose={() => setShowDocs(false)} />}

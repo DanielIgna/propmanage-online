@@ -152,7 +152,7 @@ const ListingCard = ({ item }) => (
       <div className="flex items-center justify-between text-xs text-stone-400 mb-4">
         <span className="flex items-center gap-1"><Bed className="w-3.5 h-3.5" /> {item.rooms} cam.</span>
         <span className="flex items-center gap-1"><Maximize2 className="w-3.5 h-3.5" /> {item.surface_sqm} m²</span>
-        <span className="flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" /> {item.recommendations_pct}% reco</span>
+        <span className="flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" /> recomandări {item.recommendations_pct}%</span>
       </div>
       <div className="flex items-center justify-between pt-4 border-t border-white/5">
         <div>
