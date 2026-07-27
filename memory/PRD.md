@@ -1,3 +1,15 @@
+## 🌱 PM-100 ECOSYSTEM ENGINE + PM-107 SELF GROWTH — DESIGN CANONIC LIVRAT (27 Iun 2026)
+
+**Ordin Fondator**: proiectarea ecosistemului auto-susținut + regula NVA („orice funcționalitate trebuie să genereze următoarea acțiune valoroasă, altfel nu se implementează"). Salvat verbatim: `memory/board/PM_100_107_ECOSYSTEM_ENGINE_VERBATIM.md`.
+
+**Livrabil**: **`/app/docs/PPOS/PM-100-ECOSYSTEM-ENGINE.md`** — design complet, FĂRĂ implementare (feature freeze War Room respectat):
+- §0 Legea NVA + corolare · §1 flywheel-ul central · §2 lifecycle proprietate Ziua 0→Anul 5 · §3 lifecycle specialist ENTRY→AUTHORITY cu formula trust transparentă + garanții anti-pay-to-win · §4 Owner Engagement Engine (8 surse de valoare ierarhizate, reguli anti-spam) · §5 Marketplace inteligent (anti-cold-start, ranking organic public, pachete de zonă, anti-spam ofertare) · §6 Ecosystem Dashboard (15 KPI de sănătate + graful de influență + „Ecosystem Momentum") · §7 **105 bucle naturale** în 7 categorii + 7 bucle RESPINSE explicit (fake engagement) · §8 gap analysis (ce există deja validat vs. roadmap post-beta P0/P1/P2 prin filtrul NVA).
+
+**Guvernare**: nimic din PM-100 nu se implementează în War Room; după 2-4 săpt. de beta, datele reale ordonează roadmap-ul. P0 post-beta desemnat: Calendar mentenanță (CX-4) + Ecosystem Dashboard + rebooking.
+
+---
+
+
 ## 🔍 RELEASE CANDIDATE REVIEW — CONSULTANT EXTERN (27 Iun 2026)
 
 **Ordin Fondator**: STOP BUILDING — challenge brutal al produsului pe 6 personas. Livrat în chat (fără documente noi, conform directivei).
