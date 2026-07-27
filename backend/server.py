@@ -607,6 +607,15 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=7200,
         )
+        # PM-AI-REPAIR-001: Health Repair Engine — zilnic 06:20 (detect → repair → validate)
+        from health_repair import repair_cycle_cron
+        scheduler.add_job(
+            repair_cycle_cron,
+            CronTrigger(hour=6, minute=20, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="health_repair_daily",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
         # CIP-A: Category Visibility Gate — daily 04:30 (via Orchestrator playbook)
         scheduler.add_job(
             construction_visibility_cron,

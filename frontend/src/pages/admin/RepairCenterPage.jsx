@@ -1,0 +1,180 @@
+// RepairCenterPage — Health Repair Engine (PM-AI-REPAIR-001).
+// Fiecare domeniu sub prag: Detector → Reparator → Validator, cu scor before/after.
+// Route: /admin/repair-center
+import React, { useEffect, useState, useCallback } from "react";
+import { Link } from "react-router-dom";
+import axios from "axios";
+import {
+  Wrench, ChevronLeft, Loader2, Play, CheckCircle2, AlertTriangle,
+  Activity, ArrowRight, HeartPulse, History,
+} from "lucide-react";
+
+const API = process.env.REACT_APP_BACKEND_URL;
+const ax = axios.create({ baseURL: API, withCredentials: true });
+
+const scoreColor = (s) => (s >= 80 ? "text-emerald-300" : s >= 60 ? "text-amber-300" : "text-rose-300");
+const scoreBg = (s) => (s >= 80 ? "bg-emerald-500/10 border-emerald-500/30" : s >= 60 ? "bg-amber-500/10 border-amber-500/30" : "bg-rose-500/10 border-rose-500/30");
+
+const DomainCard = ({ d, onRepair, busy }) => (
+  <div className={`rounded-2xl border p-4 flex flex-col gap-3 ${scoreBg(d.score)}`} data-testid={`repair-domain-${d.domain}`}>
+    <div className="flex items-center gap-2">
+      <span className="text-sm font-semibold text-white">{d.label}</span>
+      <div className="flex-1" />
+      <span className={`text-2xl font-black ${scoreColor(d.score)}`} data-testid={`repair-score-${d.domain}`}>{Math.round(d.score)}</span>
+    </div>
+    <div className="text-[11px] text-stone-400">
+      {d.last_repair ? (
+        <>Ultima reparație: {d.last_repair.problems} probleme · {d.last_repair.actions} acțiuni
+          {typeof d.last_repair.delta === "number" && d.last_repair.delta !== 0 && (
+            <span className={d.last_repair.delta > 0 ? "text-emerald-300" : "text-rose-300"}> · Δ{d.last_repair.delta > 0 ? "+" : ""}{d.last_repair.delta}</span>
+          )}
+        </>
+      ) : "Nicio reparație încă"}
+    </div>
+    <button
+      onClick={() => onRepair(d.domain)}
+      disabled={busy}
+      className="mt-auto px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-xs font-medium flex items-center justify-center gap-1.5"
+      data-testid={`repair-run-${d.domain}`}
+    >
+      {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />} Detectează & Repară
+    </button>
+  </div>
+);
+
+const RunResult = ({ r }) => (
+  <div className="border border-stone-800 rounded-2xl p-4 bg-stone-900/30" data-testid={`repair-result-${r.domain}`}>
+    <div className="flex items-center gap-2 flex-wrap mb-2">
+      <span className="text-sm font-semibold text-white capitalize">{r.domain.replace("_", " ")}</span>
+      <span className="text-[11px] px-2 py-0.5 rounded-lg bg-stone-800 text-stone-300">
+        scor {Math.round(r.score_before)} <ArrowRight className="w-3 h-3 inline -mt-0.5" /> {Math.round(r.score_after ?? r.score_before)}
+      </span>
+      {typeof r.delta === "number" && r.delta !== 0 && (
+        <span className={`text-[11px] font-bold ${r.delta > 0 ? "text-emerald-300" : "text-rose-300"}`}>Δ{r.delta > 0 ? "+" : ""}{r.delta}</span>
+      )}
+    </div>
+    {r.problems.map((p, i) => (
+      <div key={i} className="flex items-start gap-2 text-xs mt-1.5">
+        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
+        <div>
+          <span className="text-stone-300">{p.detail}</span>
+          <span className="text-stone-500"> — {p.root_cause} · </span>
+          <code className="text-[10px] text-cyan-300/70">{p.source}</code>
+        </div>
+      </div>
+    ))}
+    {r.actions.map((a, i) => (
+      <div key={i} className="flex items-start gap-2 text-xs mt-1.5">
+        {a.ok ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
+          : <AlertTriangle className="w-3.5 h-3.5 text-rose-400 mt-0.5 shrink-0" />}
+        <div><span className="text-stone-200 font-medium">{a.action}</span><span className="text-stone-500"> — {a.detail}</span></div>
+      </div>
+    ))}
+  </div>
+);
+
+export default function RepairCenterPage() {
+  const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [lastRun, setLastRun] = useState(null);
+  const [msg, setMsg] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await ax.get("/api/admin/repair-center/status");
+      setStatus(r.data);
+      setLastRun(r.data.last_run);
+    } catch (e) {
+      setMsg(`❌ ${e?.response?.data?.detail || e.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const run = async (domain) => {
+    setBusy(true);
+    setMsg(null);
+    const prevTs = lastRun?.ts;
+    try {
+      await ax.post("/api/admin/repair-center/run", domain ? { domains: [domain] } : {});
+      setMsg("⏳ Ciclul rulează în fundal (detect → repair → validate)...");
+      for (let i = 0; i < 60; i++) {
+        await new Promise(res => setTimeout(res, 3000));
+        const s = await ax.get("/api/admin/repair-center/status").catch(() => null);
+        const nr = s?.data?.last_run;
+        if (nr && nr.ts !== prevTs) {
+          setStatus(s.data);
+          setLastRun(nr);
+          setMsg(`✅ Ciclu finalizat: ${nr.domains_repaired} domenii · ${nr.total_problems} probleme detectate · ${nr.total_actions} acțiuni executate.`);
+          break;
+        }
+      }
+    } catch (e) {
+      setMsg(`❌ ${e?.response?.data?.detail || e.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-stone-950 p-4 lg:p-8" data-testid="repair-center-page">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-center gap-3 flex-wrap mb-6">
+          <Link to="/admin" className="text-stone-500 hover:text-white flex items-center gap-1 text-sm" data-testid="repair-back-link">
+            <ChevronLeft className="w-4 h-4" /> Admin
+          </Link>
+          <span className="text-stone-700">·</span>
+          <HeartPulse className="w-5 h-5 text-violet-400" />
+          <h1 className="text-xl lg:text-2xl font-bold text-white">Health Repair Engine</h1>
+          <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/30">Detect → Repair → Validate</span>
+          <div className="flex-1" />
+          <Link to="/admin/enterprise-health" className="px-3 py-1.5 text-xs rounded-lg border border-stone-700 text-stone-300 hover:text-white flex items-center gap-1.5" data-testid="repair-to-health">
+            <Activity className="w-3.5 h-3.5" /> Enterprise Health
+          </Link>
+          <button onClick={() => run(null)} disabled={busy}
+            className="px-4 py-1.5 text-xs rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-semibold flex items-center gap-1.5"
+            data-testid="repair-run-all">
+            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />} Rulează ciclul complet
+          </button>
+        </div>
+
+        {msg && <div className="mb-4 px-4 py-2.5 rounded-xl bg-stone-900/60 border border-stone-700 text-sm text-stone-200" data-testid="repair-message">{msg}</div>}
+
+        {loading && !status ? (
+          <div className="p-16 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-stone-500" /></div>
+        ) : status && (
+          <>
+            <div className="text-xs font-bold uppercase tracking-wider text-stone-500 mb-3">
+              Domenii · fiecare scor are Detector + Reparator + Validator ({status.runs_total} cicluri rulate)
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8" data-testid="repair-domains-grid">
+              {status.domains.map(d => <DomainCard key={d.domain} d={d} onRepair={run} busy={busy} />)}
+            </div>
+
+            {lastRun && (lastRun.results || []).length > 0 && (
+              <>
+                <div className="flex items-center gap-2 mb-3">
+                  <History className="w-3.5 h-3.5 text-stone-500" />
+                  <div className="text-xs font-bold uppercase tracking-wider text-stone-500">
+                    Ultima rulare · {new Date(lastRun.ts).toLocaleString("ro-RO")} · trigger: {lastRun.trigger}
+                  </div>
+                </div>
+                <div className="space-y-3" data-testid="repair-last-run">
+                  {lastRun.results.map(r => <RunResult key={r.domain} r={r} />)}
+                </div>
+              </>
+            )}
+            {lastRun && (lastRun.results || []).length === 0 && (
+              <div className="p-10 text-center text-sm text-stone-500 border border-dashed border-stone-800 rounded-2xl" data-testid="repair-no-results">
+                Toate domeniile sunt peste prag — nimic de reparat în ultima rulare.
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
