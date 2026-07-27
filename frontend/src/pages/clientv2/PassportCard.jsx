@@ -93,6 +93,7 @@ export const PassportCard = ({ prop }) => {
             className="mt-3 flex items-center gap-1 text-xs font-bold text-slate-500">
             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showPrivacy ? "rotate-180" : ""}`} /> Confidențialitate — ce e vizibil public
           </button>
+          {showPrivacy && (
             <div className="mt-2 space-y-1.5" data-testid="passport-privacy-list">
               {Object.entries(data.privacy_labels).map(([k, label]) => (
                 <label key={k} className="flex items-center gap-2 text-xs font-bold text-slate-600">

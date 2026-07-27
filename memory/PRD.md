@@ -1,3 +1,20 @@
+## ✅ EO-026 GO-LIVE GATE — Passport Analytics + Beta Cockpit + Production Readiness (27 Iun 2026)
+
+**Ordin salvat VERBATIM**: `board/EXECUTION_ORDER_026_PUBLIC_BETA_GATE.md` (Learn Before Scale — validare cu utilizatori reali înainte de orice feature major).
+
+**Livrat (testat iteration_136: backend 24/24 PASS, frontend 100% după fix)**:
+- **Passport Analytics** (`routes/passport_analytics.py`): POST `/api/public/passport/{slug}/track` (view/leave/share/cta_click; GDPR-safe: IP doar hash, țară best-effort ip-api+cache `geo_ip_cache`, device/browser/os din UA server-side, boții EXCLUȘI); POST `/api/track/passport-conversion` (auth, first-touch → `user.acquisition.slug`, dedupe); GET `/api/properties/{id}/passport/analytics` (owner: views/unici/QR/share/CTA/registers/properties_created/timp mediu/bounce/surse/device/țări/browsere/daily). QR encodează `?src=qr`; redirect `/api/p/{slug}` păstrează `?src=`; boții OG loghează `og_fetch`. Frontend: `lib/passportTracker.js` (view+leave beacon, ref 30 zile `pm_passport_ref`), `Auth.jsx` → `sendPassportConversion()` după register, PassportCard cu panou „Statistici" (6 metrici + surse, testids `passport-stat-*`), share copy/WA cu `?src=link|wa` + event share.
+- **Beta Cockpit** (`routes/beta_cockpit.py` + `/admin/beta-cockpit`, superAdminOnly): GET `/api/admin/beta/overview?days=` — funnel proprietari 6 pași pe utilizatori REALI (excluși @propmanage.io/test/demo/founder via `INTERNAL_RE`), funnel specialiști 5 pași, TTFV median, conversie vizitatori (analytics_sessions), rollup pașapoarte, cereri suport, **cele 4 gate-uri EO-026 (80/70/50/50)** cu passed/actual. VoC: POST `/api/feedback/beta` (6 întrebări Fondator, dedupe user+zi, colecția `beta_feedback`) + GET admin; widget plutitor `BetaFeedbackWidget.jsx` pe /client|/specialist (dismiss sesiune, done permanent localStorage).
+- **Production Readiness**: `rate_limit.py` — 120 req/min/IP pe `/api/public|/api/p|/api/track|/api/go` (TD-07 ÎNCHIS, verificat 120×200+10×429); **SEED_DEMO_DATA gating** (seed.py + server.py: fără flag=true NU se mai creează date demo — producția e safe la restart; preview are `SEED_DEMO_DATA=true` în .env); **POST `/api/admin/beta/purge-demo`** {master_code 0108, dry_run implicit TRUE} — șterge userii @propmanage.io (minus admin) + cascada (props/requests/docs/twins/portfolio); dry-run preview: 181 users/52 props. ⚠️ NU rula dry_run:false în PREVIEW. Checklist complet: `/app/docs/PRODUCTION_READINESS_CHECKLIST.md` (16 iteme; blocate pe Fondator: Stripe LIVE, Resend DNS, redeploy fără SEED_DEMO_DATA + purge în prod).
+- Fix post-test: PassportCard.jsx wrapper `{showPrivacy && (` pierdut la editare (text `)}` vizibil + privacy mereu deschis) — reparat + verificat vizual.
+
+**PRODUCTION deployed**: https://propmanage.ro (user a făcut deploy; preview separat).
+
+**URMEAZĂ (EO-026 Phase 2-6)**: Fondator: Stripe LIVE + Resend DNS + redeploy cu purge demo → invită 10-20 proprietari + 5-10 specialiști reali → 1 ciclu beta complet → **AI Product Review 2.0** pe date reale → decizia CX-4 vs pivot roadmap.
+
+---
+
+
 ## ✅ SPRINT CX-3 ÎNCHIS — Property Passport („Pașaportul Casei") + AI PRODUCT REVIEW 1.0 (27 Iun 2026)
 
 **Livrat CX-3**: Pașaport public per proprietate (`routes/property_passport.py`): activare 1-click din Property Hub (`PassportCard.jsx` în PropertyHubV2 L547), slug permanent, pagina publică `/p/{slug}` (`PublicPassportPage.jsx` — hero+QR+3 scoruri+trust explainer+8 badge-uri+timeline+CTA viral→/register), QR PNG (`/api/public/passport/{slug}/qr.png`, cache 24h), 5 privacy toggles server-side (adresă ASCUNSĂ implicit), Trust Score 100% verificabil (7 factori cu `why` public: documente verificate/twin/audit/lucrări/garanții/mentenanță/DNA). **Social previews**: rută OG `GET /api/p/{slug}` — boți (FB/WhatsApp/LinkedIn UA regex) → HTML cu og:tags + fallback `og-passport.jpg`; oameni → 307 la `/p/{slug}`; `share_url` = link OG. SEO: title dinamic, canonical, JSON-LD Accommodation.
