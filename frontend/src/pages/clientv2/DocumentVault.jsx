@@ -207,11 +207,11 @@ const DocSheet = ({ docId, onClose, onChanged }) => {
         </dl>
       ) : (
         <div className="mt-4 space-y-2" data-testid="vault-doc-edit">
-          <input defaultValue={d.title} onChange={e => setEdit({ ...edit, title: e.target.value })} data-testid="vault-edit-title"
+          <input value={edit.title ?? d.title} onChange={e => setEdit({ ...edit, title: e.target.value })} data-testid="vault-edit-title"
             className="w-full px-3 py-2.5 rounded-2xl border-2 border-slate-200 text-sm" placeholder="Denumire" />
-          <input defaultValue={d.room || ""} onChange={e => setEdit({ ...edit, room: e.target.value })}
+          <input value={edit.room ?? (d.room || "")} onChange={e => setEdit({ ...edit, room: e.target.value })}
             className="w-full px-3 py-2.5 rounded-2xl border-2 border-slate-200 text-sm" placeholder="Cameră" />
-          <textarea defaultValue={d.notes || ""} onChange={e => setEdit({ ...edit, notes: e.target.value })}
+          <textarea value={edit.notes ?? (d.notes || "")} onChange={e => setEdit({ ...edit, notes: e.target.value })}
             className="w-full px-3 py-2.5 rounded-2xl border-2 border-slate-200 text-sm" rows={2} placeholder="Note" />
           <div className="flex gap-2">
             <button onClick={save} className="flex-1 py-2.5 rounded-full text-sm font-black text-black" style={{ background: "#d4ff3a" }} data-testid="vault-edit-save">Salvează</button>

@@ -1,3 +1,18 @@
+## ✅ SPRINT CX-2 ÎNCHIS — Property DNA & Document Vault („Cartea casei") (27 Iun 2026)
+
+**Livrat**: Document Vault per proprietate pe Emergent Object Storage (`storage_client.py` + `routes/property_documents.py`): upload multipart (PDF/imagini/video, max 25MB, 12 categorii RO) cu metadate structurate D015 (sistem/cameră/dată/firmă/garanție/etichete/legături + proveniență declared/documented + verification_status), listă cu căutare pe cunoaștere + facets, detaliu cu istoric IMUTABIL (history append-only), versiuni (v2 supersedes v1), soft-delete, securitate strictă (owner+admin; 403/401 validate). **Property Completeness Score 0–100** din 14 semnale REALE (`/properties/{id}/completeness`): documente pe categorii + twin + active + atribute DNA + lucrări + garanții + mentenanță + audit; missing items + next_step cu expected_gain. **Timeline**: evenimente `document.uploaded`/`warranty.registered` în DNA timeline (event_bus) + property_timeline. **DNA reparat**: `capabilities.documents` REAL (era proxy pe twin_assets) + `maintenance` real (era hardcodat False). **UX**: card „Cartea casei" în Property Hub (scor + next step + un CTA), UploadSheet cu progressive disclosure, VaultSheet, DocSheet cu trust badges, **celebrare semnătură „Casa ta are acum memorie."** la primul document, **HeroDoc „Pasul 2 din 3"** în onboarding (înainte pasul 2 era marketplace). PVI card redenumit „Valoarea casei (PVI)" (duplicat de nume). Fix bug real: modalul de proprietate se închide automat la PRIMA proprietate → HeroDoc apare instant (validat fără reload).
+
+**Testare**: iteration_134 — backend 12/12 pytest (100%), frontend E2E complet pe cont nou (mobile 390): flux register→proprietate→upload→celebrare→scor→căutare→edit. Fix-uri post-test: modal auto-close (RCA: hero ascuns sub overlay), DocSheet inputs controlate. **Experience Audit CX-2**: `/app/docs/CX2_EXPERIENCE_AUDIT.md` — toate ecranele noi ≥90/100 desktop+mobile (gate EO CX-2 trecut; O8 din Owner Journey: 0→92, dead end eliminat).
+
+**Directivă activă (Fondator)**: Property DNA = Single Source of Truth — orice feature viitor consumă/îmbogățește acest model, fără istoric duplicat.
+
+**Conturi test noi**: cx2.audit.final@propmanage.io / CxAudit2026! (Casa Verde, 0 documente — bun pt demo HeroDoc); cx.audit.nophone@propmanage.io are 1 doc + prop „Test Casa".
+
+**URMEAZĂ (roadmap aprobat)**: CX-3 = Property Passport + QR + share (S3) · apoi CX-4 calendar mentenanță (S4) · CX-5 specialist experience · CX-6 transfer + Owner AI. Blockere externe: Stripe LIVE, Resend DNS (Founder).
+
+---
+
+
 ## ✅ SPRINT CX-1 ÎNCHIS — funnel conversie + re-audit cu gate 90 (27 Iun 2026)
 
 **Livrat (F1–F11 + U29/U30 + 2 bug-uri reale găsite pe parcurs)**: cifre fabricate eliminate (sursa reală era `DEFAULT_CMS` în `admin_console.py` L59 — CMS-ul suprascrie i18n prin `/api/cms/public`!), banner Demo Mode public eliminat, hero nou „Cartea de service a casei tale." cu UN CTA→/register (înainte CTA-ul ducea la #problem), trust chips umane (`TrustStrip.jsx`), telefon opțional la register clienți (`auth.py` + `Auth.jsx`, cu fix suplimentar: „abc"→400), 1-click adăugare proprietate (`Components.jsx` L123 auto-open form), /auth→/login redirect, `/devino-specialist`: CTA primar + **bug temă reparat** (pagina light moștenea dark: CSS `html:not([data-theme=light]) .cv2-scope` — fix: forțare data-theme=light on mount) + imagini pe featured cards + grid desktop expandat, „1 minut" copy, discover cards 1 pentru first-run, CTA context-aware, 696 notificări demo curățate.

@@ -156,6 +156,7 @@ export const PropertyManagerModal = ({ properties, onClose, onChange, onOpenTwin
   
   const save = async () => {
     try {
+      const isFirst = !editing && (properties || []).length === 0;
       if (editing) {
         await axios.put(`${API}/properties/${editing}`, form);
       } else {
@@ -164,6 +165,7 @@ export const PropertyManagerModal = ({ properties, onClose, onChange, onOpenTwin
       await refresh();
       setEditing(null); setShowAdd(false);
       setForm({ name: "", address: "", type: "apartment", surface: 50, rooms: 2 });
+      if (isFirst) onClose();
     } catch (e) { alert(formatApiError(e)); }
   };
   
