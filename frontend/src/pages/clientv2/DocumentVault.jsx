@@ -373,7 +373,7 @@ export const DocumentVaultCard = ({ prop }) => {
         <button onClick={() => nextStep.action?.startsWith("upload") ? openUploadFor(nextStep.action) : setShowVault(true)}
           data-testid="vault-next-step"
           className="mt-3 w-full flex items-center gap-2 p-3 rounded-2xl bg-[#F0FBF4] border border-[#D2F2DC] text-left">
-          <Sparkles className="w-4 h-4 shrink-0" style={{ color: GREEN }} />
+          <Sparkles className="w-4 h-4 shrink-0 text-[#166534]" />
           <span className="flex-1 text-xs font-bold text-slate-700">Pasul următor: {nextStep.label}</span>
           <span className="shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full text-black" style={{ background: "#d4ff3a" }}>+{nextStep.expected_gain}%</span>
         </button>

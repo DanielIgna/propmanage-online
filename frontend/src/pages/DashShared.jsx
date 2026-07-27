@@ -86,7 +86,7 @@ export const NotificationsBell = () => {
 
   return (
     <div className="relative" data-tour="notifications-bell">
-      <button onClick={() => setOpen(!open)} className="relative p-2 hover:bg-white/5 rounded-lg" data-testid="notif-bell">
+      <button onClick={() => setOpen(!open)} aria-label="Notificări" className="relative p-2 hover:bg-white/5 rounded-lg" data-testid="notif-bell">
         <Bell className="w-4 h-4 text-stone-400" />
         {unread > 0 && (
           <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#d4ff3a] text-black text-[9px] font-bold rounded-full flex items-center justify-center">
@@ -234,7 +234,7 @@ export const DashLayout = ({ children, role, title, bottomNav }) => {
                 />
               ) : (user.name?.[0] || "U").toUpperCase()}
             </div>
-            <button onClick={handleLogout} className="hidden sm:block p-2 hover:bg-white/5 rounded-lg" data-testid="dash-logout">
+            <button onClick={handleLogout} aria-label="Deconectare" className="hidden sm:block p-2 hover:bg-white/5 rounded-lg" data-testid="dash-logout">
               <LogOut className="w-4 h-4 text-stone-400" />
             </button>
           </div>

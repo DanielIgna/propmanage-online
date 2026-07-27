@@ -950,3 +950,22 @@ html:not([data-theme="light"]) .cv2-scope .text-slate-300 { color: #737373 !impo
 html:not([data-theme="light"]) .cv2-scope .bg-slate-200 { background-color: #262626 !important; }
 html:not([data-theme="light"]) .cv2-scope .bg-slate-300 { background-color: #333333 !important; }
 html:not([data-theme="light"]) .cv2-scope .border-slate-300 { border-color: #2e2e2e !important; }
+
+/* ============================================================
+   PPOS SPRINT — P5/A11y: contrast dark pt. cardurile verzi-pale (Pasul următor)
+   + focus vizibil pentru navigarea cu tastatura (WCAG 2.4.7)
+   ============================================================ */
+html:not([data-theme="light"]) .cv2-scope .bg-\[\#F0FBF4\] { background-color: rgba(204, 255, 0, 0.08) !important; }
+html:not([data-theme="light"]) .cv2-scope .border-\[\#D2F2DC\] { border-color: rgba(204, 255, 0, 0.28) !important; }
+html:not([data-theme="light"]) .cv2-scope .bg-\[\#F6FEE7\] { background-color: rgba(204, 255, 0, 0.08) !important; }
+
+button:focus-visible, a:focus-visible, [role="button"]:focus-visible, select:focus-visible {
+  outline: 2px solid rgba(212, 255, 58, 0.95);
+  outline-offset: 2px;
+}
+html[data-theme="light"] button:focus-visible,
+html[data-theme="light"] a:focus-visible,
+html[data-theme="light"] [role="button"]:focus-visible,
+html[data-theme="light"] select:focus-visible {
+  outline-color: #166534;
+}

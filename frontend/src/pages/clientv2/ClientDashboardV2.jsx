@@ -154,7 +154,7 @@ export default function ClientDashboardV2() {
               </button>
             )}
           </div>
-          <button onClick={() => setShowNotifs(true)} className="ml-auto relative w-10 h-10 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0" data-testid="v2-bell">
+          <button onClick={() => setShowNotifs(true)} aria-label="Notificări" className="ml-auto relative w-10 h-10 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0" data-testid="v2-bell">
             <Bell style={{ width: 18, height: 18 }} className="text-slate-600" />
             {unread > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full text-white text-[9px] font-black flex items-center justify-center" style={{ background: GREEN }} data-testid="v2-bell-badge">{unread}</span>}
           </button>

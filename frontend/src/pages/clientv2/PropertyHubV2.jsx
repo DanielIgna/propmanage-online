@@ -575,7 +575,7 @@ const HouseStatusPanel = ({ prop, onNextStep }) => {
         <button onClick={onNextStep} data-testid="hub-status-next-step"
           className="mt-3 w-full text-left rounded-2xl bg-[#F0FBF4] border border-[#D2F2DC] p-3 transition-transform hover:-translate-y-0.5">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 shrink-0" style={{ color: GREEN }} />
+            <Sparkles className="w-4 h-4 shrink-0 text-[#166534]" />
             <span className="flex-1 text-xs font-bold text-slate-700 leading-snug">Pasul următor: {compl.next_step.label}</span>
             <span className="shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full text-black" style={{ background: "#d4ff3a" }}>+{compl.next_step.expected_gain}%</span>
           </div>

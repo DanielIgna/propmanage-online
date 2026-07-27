@@ -341,8 +341,9 @@ export const SpecialistDashboard = () => {
               <ProjectListSection title="Proiectele tale de coordonare" />
             </div>
           )}
-          <FilterBar searchQ={searchQ} setSearchQ={setSearchQ} urgentOnly={urgentOnly} setUrgentOnly={setUrgentOnly} urgentCount={open.filter(r => r.priority === "urgent").length} />
-          <div className="space-y-3 mt-4 max-w-3xl mx-auto">
+          <FilterBar searchQ={searchQ} setSearchQ={setSearchQ} urgentOnly={urgentOnly} setUrgentOnly={setUrgentOnly} urgentCount={open.filter(r => r.priority === "urgent").length} placeholder="Caută în lucrările tale..." />
+          {/* PPOS Desktop Polish: densitate — 2 coloane pe desktop, stivă pe mobil */}
+          <div className="mt-4 max-w-3xl mx-auto lg:max-w-none lg:mx-0">
             <PMSectionHeader title={`${filtered(mine).length} lucrări`} />
             {filtered(mine).length === 0 && (
               <PMEmptyState
@@ -351,6 +352,7 @@ export const SpecialistDashboard = () => {
                 description="Acceptă o oportunitate pentru a începe."
               />
             )}
+            <div className="space-y-3 mt-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 lg:items-start">
             {filtered(mine).map(r => (
               <PMCard key={r.id} accent={r.disputed ? "warning" : r.status === "in_progress" ? "primary" : "default"} testid={`mine-${r.id}`}>
                 <div className="flex justify-between items-start mb-2 gap-3">
@@ -397,6 +399,7 @@ export const SpecialistDashboard = () => {
                 )}
               </PMCard>
             ))}
+            </div>
           </div>
         </>
       )}
@@ -527,14 +530,14 @@ const NewProjectModal = ({ onClose }) => {
   );
 };
 
-const FilterBar = ({ searchQ, setSearchQ, urgentOnly, setUrgentOnly, urgentCount = 0 }) => (
+const FilterBar = ({ searchQ, setSearchQ, urgentOnly, setUrgentOnly, urgentCount = 0, placeholder = "Caută oportunități..." }) => (
   <div className="max-w-3xl mx-auto sticky top-[72px] z-10">
     <div className="pm-card-glass !p-3">
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
           <input
-            type="text" placeholder="Caută oportunități..." value={searchQ} onChange={e => setSearchQ(e.target.value)}
+            type="text" placeholder={placeholder} value={searchQ} onChange={e => setSearchQ(e.target.value)}
             className="w-full bg-white/5 border border-white/10 rounded-full pl-10 pr-3 py-2.5 text-sm focus:outline-none focus:border-[var(--pm-primary)]/50 transition-colors"
             data-testid="spec-search"
           />
