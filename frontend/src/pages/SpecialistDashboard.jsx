@@ -158,13 +158,13 @@ export const SpecialistDashboard = () => {
                   { label: "Încasări luna aceasta", value: monthlyEarnings.toLocaleString("ro"), suffix: "RON", accent: true, onClick: () => setTab("jobs"), testid: "spec-today-earnings" },
                 ].map(({ label, value, suffix, accent, onClick, testid }) => (
                   <button key={testid} onClick={onClick} data-testid={testid}
-                    className="text-left rounded-2xl border p-4 transition-transform duration-300 hover:-translate-y-1"
+                    className="text-left rounded-2xl border p-4 lg:p-5 transition-transform duration-300 hover:-translate-y-1"
                     style={{
                       background: accent ? "rgba(204,255,0,0.07)" : "var(--pm-surface)",
                       borderColor: accent ? "rgba(204,255,0,0.3)" : "var(--pm-outline)",
                     }}>
                     <div className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "var(--pm-text-muted)" }}>{label}</div>
-                    <div className="mt-2 xos-num text-3xl leading-none" style={{ color: accent ? "var(--pm-accent-ink)" : "var(--pm-text)" }}>
+                    <div className="mt-2 xos-num text-3xl lg:text-4xl leading-none" style={{ color: accent ? "var(--pm-accent-ink)" : "var(--pm-text)" }}>
                       {value}{suffix && <span className="text-sm font-semibold ml-1.5 align-baseline" style={{ color: "var(--pm-text-variant)" }}>{suffix}</span>}
                     </div>
                   </button>

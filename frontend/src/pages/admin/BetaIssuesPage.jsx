@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
+import { Link } from "react-router-dom";
 import { ClipboardList, Loader2, Plus, Bug, Lightbulb, MessageSquare, RefreshCcw } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -53,14 +54,16 @@ export default function BetaIssuesPage() {
     } catch (e) { alert(e?.response?.data?.detail || "Eroare la actualizare"); }
   };
 
-  if (!data) return <div className="flex items-center justify-center py-24"><Loader2 className="w-6 h-6 animate-spin text-stone-500" /></div>;
+  if (!data) return <div className="min-h-screen bg-[#0a0a0b] flex items-center justify-center py-24"><Loader2 className="w-6 h-6 animate-spin text-stone-500" /></div>;
   const c = data.counts;
 
   return (
-    <div className="space-y-5" data-testid="beta-issues-page">
+    <div className="pm-shell min-h-screen bg-[#0a0a0b] text-stone-100 p-4 lg:p-8">
+    <div className="max-w-6xl mx-auto space-y-5" data-testid="beta-issues-page">
+      <Link to="/admin" className="text-xs text-stone-400 hover:text-white inline-block" data-testid="issues-back-admin">← Înapoi la Admin</Link>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-stone-100 flex items-center gap-2"><ClipboardList className="w-5 h-5 text-[#d4ff3a]" /> Beta Issues · Prioritization Board</h1>
+          <h1 className="text-xl lg:text-4xl font-bold tracking-tight text-stone-100 flex items-center gap-3"><ClipboardList className="w-5 h-5 lg:w-8 lg:h-8 text-[#d4ff3a]" /> Beta Issues · Prioritization Board</h1>
           <p className="text-xs text-stone-500 mt-1">P0 = blocant beta (fix &lt;24h) · P1 = major (fix &lt;72h) · P2/P3 = batch săptămânal. Workflow: nou → triat → în lucru → rezolvat → livrat.</p>
         </div>
         <button onClick={load} className="p-2 rounded-full bg-white/5 text-stone-400" data-testid="issues-refresh"><RefreshCcw className="w-4 h-4" /></button>
@@ -70,7 +73,7 @@ export default function BetaIssuesPage() {
         {[["Deschise", c.open, "issues-kpi-open"], ["P0 deschise", c.open_p0, "issues-kpi-p0"], ["P1 deschise", c.open_p1, "issues-kpi-p1"], ["Rezolvate", c.fixed, "issues-kpi-fixed"]].map(([l, v, tid]) => (
           <div key={l} className="rounded-2xl border border-white/10 bg-white/[0.02] p-4" data-testid={tid}>
             <div className="text-xs text-stone-400">{l}</div>
-            <div className="mt-1 text-2xl font-semibold text-stone-100">{v}</div>
+            <div className="mt-1 text-2xl lg:text-3xl font-semibold text-stone-100">{v}</div>
           </div>
         ))}
       </div>
@@ -129,6 +132,7 @@ export default function BetaIssuesPage() {
           );
         })}
       </div>
+    </div>
     </div>
   );
 }

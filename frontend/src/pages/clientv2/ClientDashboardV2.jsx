@@ -180,7 +180,7 @@ export default function ClientDashboardV2() {
           )}
         </div>
 
-        {TITLES[tab] && <h1 className="px-5 pb-3 xos-display text-2xl lg:text-3xl font-medium tracking-tight text-slate-900">{TITLES[tab]}</h1>}
+        {TITLES[tab] && <h1 className="px-5 pb-3 xos-display text-2xl lg:text-[38px] font-medium lg:font-bold tracking-tight text-slate-900">{TITLES[tab]}</h1>}
 
         {tab === "home" && (!loaded ? <HomeSkeleton /> : <HomeV2 user={user} prop={prop} properties={properties} requests={requests} notifs={notifs} offersCount={offersCount} go={setTab} actions={actions} />)}
         {tab === "jobs" && <div className="lg:max-w-3xl"><JobsV2 requests={requests} actions={actions} /></div>}

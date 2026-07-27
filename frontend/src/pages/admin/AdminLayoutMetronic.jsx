@@ -979,7 +979,7 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
   );
 
   return (
-    <div className={`min-h-screen flex ${dark ? "bg-slate-950" : "bg-slate-50"}`} data-testid="admin-console-root">
+    <div className={`admin-shell min-h-screen flex ${dark ? "bg-slate-950" : "bg-slate-50"}`} data-testid="admin-console-root">
       {sidebar}
       {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
       <div className="flex-1 min-w-0 flex flex-col">
@@ -1016,8 +1016,8 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
         <main className={`flex-1 p-4 lg:p-8 ${dark ? "text-slate-100" : "text-slate-900"}`}>
           {title && (
             <div className="mb-6">
-              <h1 className={`text-2xl lg:text-3xl font-bold tracking-tight ${dark ? "text-white" : "text-slate-900"}`}>{title}</h1>
-              {subtitle && <p className={`mt-1 text-sm ${dark ? "text-slate-400" : "text-slate-500"}`}>{subtitle}</p>}
+              <h1 className={`text-2xl lg:text-4xl font-bold tracking-tight ${dark ? "text-white" : "text-slate-900"}`}>{title}</h1>
+              {subtitle && <p className={`mt-1.5 text-sm lg:text-base ${dark ? "text-slate-400" : "text-slate-500"}`}>{subtitle}</p>}
             </div>
           )}
           {children}

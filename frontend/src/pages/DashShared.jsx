@@ -176,7 +176,7 @@ export const DashLayout = ({ children, role, title, bottomNav }) => {
   const avatarSrc = user.avatar || user.picture || null;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0b] text-stone-100">
+    <div className="pm-shell min-h-screen bg-[#0a0a0b] text-stone-100">
       <EmailVerificationBanner />
       <header className="border-b border-white/5 sticky top-0 z-40 bg-[#0a0a0b]/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
@@ -241,7 +241,7 @@ export const DashLayout = ({ children, role, title, bottomNav }) => {
         </div>
       </header>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-24">
-        {title && <h1 className="xos-display font-light tracking-tight text-4xl sm:text-5xl mb-6 sm:mb-8" data-testid="dash-title">{title}</h1>}
+        {title && <h1 className="xos-display font-light lg:font-bold tracking-tight text-4xl sm:text-5xl lg:text-[40px] mb-6 sm:mb-8" data-testid="dash-title">{title}</h1>}
         {role === "client" && <GettingStartedWidget role={role} />}
         {(role === "client" || role === "specialist") && (
           <div className="mb-6"><PendingReviewsWidget /></div>

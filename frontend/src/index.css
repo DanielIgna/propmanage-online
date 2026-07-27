@@ -969,3 +969,45 @@ html[data-theme="light"] [role="button"]:focus-visible,
 html[data-theme="light"] select:focus-visible {
   outline-color: #166534;
 }
+
+/* ============================================================
+   PPOS-011 — ENTERPRISE VISUAL DESIGN SYSTEM (desktop ≥1024px)
+   Tipografie mai mare, ierarhie mai puternică, contrast mai bun.
+   Never tiny text on desktop. Scope-uri: .cv2-scope (client V2),
+   .pm-shell (specialist), .admin-shell (admin Metronic).
+   ============================================================ */
+:root {
+  --pm-outline: rgba(255, 255, 255, 0.13);
+  --pm-outline-strong: rgba(255, 255, 255, 0.24);
+}
+
+@media (min-width: 1024px) {
+  /* — Client V2 — */
+  .cv2-scope .text-\[9px\] { font-size: 11px; }
+  .cv2-scope .text-\[10px\] { font-size: 12px; }
+  .cv2-scope .text-\[11px\] { font-size: 13px; }
+  .cv2-scope .text-xs { font-size: 0.875rem; line-height: 1.35rem; }
+  .cv2-scope .text-sm { font-size: 0.96875rem; line-height: 1.45rem; }
+
+  /* — Specialist shell — */
+  .pm-shell .text-\[9px\] { font-size: 11px; }
+  .pm-shell .text-\[10px\] { font-size: 12px; }
+  .pm-shell .text-\[11px\] { font-size: 13px; }
+  .pm-shell .text-xs { font-size: 0.875rem; line-height: 1.35rem; }
+  .pm-shell .text-sm { font-size: 0.96875rem; line-height: 1.45rem; }
+  .pm-shell .pm-stat-label { font-size: 0.8rem; }
+
+  /* — Admin Metronic — */
+  .admin-shell .text-\[10px\] { font-size: 11.5px; }
+  .admin-shell .text-\[11px\] { font-size: 12.5px; }
+  .admin-shell .text-xs { font-size: 0.84375rem; line-height: 1.3rem; }
+  .admin-shell .text-sm { font-size: 0.9375rem; line-height: 1.4rem; }
+  .admin-shell table { font-size: 15px; }
+  .admin-shell th { font-size: 12.5px; letter-spacing: 0.05em; }
+  .admin-shell th, .admin-shell td { padding-top: 0.7rem; padding-bottom: 0.7rem; }
+  .admin-shell tbody tr { transition: background-color 0.15s ease; }
+  .admin-shell tbody tr:hover { background-color: rgba(255, 255, 255, 0.03); }
+
+  /* Ritm vertical mai generos între secțiunile majore din admin */
+  .admin-shell main .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 2rem; }
+}
