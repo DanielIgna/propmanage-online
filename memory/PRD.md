@@ -1,5 +1,7 @@
 ## 🔁 GBOS SPRINT 2 — REBOOKING 1-CLICK + CALENDAR MENTENANȚĂ · LIVRAT & TESTAT 100% (27 Iul 2026)
 
+**PM-001 UPDATE (același sprint): POST-JOB GROWTH LOOP — lanțul canonic al Fondatorului IMPLEMENTAT.** Constituția ZERO EXCUSES/CEO MODE/HOME GRAPH salvată verbatim: `memory/board/PM_ZERO_EXCUSES_CEO_CONSTITUTION_VERBATIM.md`. Implementare: `components/PostJobGrowthLoop.jsx` — după trimiterea recenziei (ReviewModal → onSubmitted în ClientDashboardV2), sheet „Mulțumim! Ce urmează?" cu lanțul complet: ✅ specialistul e în „Specialiștii tăi" (rebook 0 lei) → 📅 1-tap „Adaugă în calendar" revizia categoriei lucrării (template match ex. hvac→Revizie centrală termică, dedupe 409 tratat) → 📲 Recomandă profilul verificat (WhatsApp + copy, link /specialists/{id}) → 🏠 Cartea casei actualizată automat. Analytics: trackIntent growth_loop_shown/maintenance_added/share_whatsapp/share_copied. Testat E2E cu screenshot (review→sheet→add calendar→done state, WhatsApp OK); date de test curățate. Testids: pjl-sheet, pjl-trusted, pjl-maintenance(-add), pjl-share(-wa/-copy), pjl-twin, pjl-done.
+
 **Aprobare Fondator**: ambele, în ordine, cu testare; rebooking cu cerere DIRECTĂ la specialist (fără licitație).
 
 **A) „Specialiștii mei de încredere" + Rebooking 1-click (venit din repetare)**:

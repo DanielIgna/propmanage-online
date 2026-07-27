@@ -23,6 +23,7 @@ import { BetaFeedbackEntry } from "../../components/BetaFeedbackWidget";
 import { ReferralHub, claimPendingInvite } from "../../components/ReferralHub";
 import { TrustedSpecialists } from "../../components/TrustedSpecialists";
 import { MaintenanceCalendar } from "../../components/MaintenanceCalendar";
+import { PostJobGrowthLoop } from "../../components/PostJobGrowthLoop";
 
 const NAV = [[Home, "Acasă", "home"], [Wrench, "Lucrări", "jobs"], [Plus, "Solicită", "request"], [Building2, "Propr.", "property"], [Settings, "Setări", "settings"]];
 const TITLES = { home: null, jobs: "Lucrările mele", property: "Proprietatea mea", settings: "Setări" };
@@ -47,6 +48,7 @@ export default function ClientDashboardV2() {
   const [twinOverride, setTwinOverride] = useState(null);
   const [chatRequest, setChatRequest] = useState(null);
   const [reviewFor, setReviewFor] = useState(null);
+  const [growthLoopFor, setGrowthLoopFor] = useState(null);
   const [disputeFor, setDisputeFor] = useState(null);
   const [timelineRequestId, setTimelineRequestId] = useState(null);
   const [propTimelineFor, setPropTimelineFor] = useState(null);
@@ -274,7 +276,8 @@ export default function ClientDashboardV2() {
         })()}
         {chatRequest && <ChatPanel requestId={chatRequest} onClose={() => setChatRequest(null)} />}
         {reviewFor && <ReviewModal requestId={reviewFor.id} specialistName={reviewFor.specialist_name} onClose={() => setReviewFor(null)}
-          onSubmitted={async () => { await refreshUser(); loadRequests(); }} />}
+          onSubmitted={async () => { await refreshUser(); loadRequests(); if (reviewFor?.specialist_id) setGrowthLoopFor(reviewFor); }} />}
+        {growthLoopFor && <PostJobGrowthLoop job={growthLoopFor} onClose={() => setGrowthLoopFor(null)} />}
         {disputeFor && <OpenDisputeModal requestId={disputeFor.id} requestTitle={disputeFor.title} onClose={() => setDisputeFor(null)} onOpened={() => loadRequests()} />}
         {timelineRequestId && <RequestTimelineModal requestId={timelineRequestId} onClose={() => setTimelineRequestId(null)} />}
         {propTimelineFor && <PropertyTimelineModal propertyId={propTimelineFor} onClose={() => setPropTimelineFor(null)} />}
