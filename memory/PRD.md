@@ -1,3 +1,36 @@
+## 🚀 GBOS v1.0 — EXECUTION MODE · TRUST GROWTH ENGINE IMPLEMENTAT & TESTAT (27 Iun 2026)
+
+**Directive Fondator**: PM-000 Business First + GBOS v1.0 Constituție (salvate verbatim: `memory/board/PPOS_GBOS_V1_CONSTITUTION_VERBATIM.md` — vezi nota; documentele APPROVED Growth/Core = specificații de cod, nu documentație). Feature freeze RIDICAT pentru P0 business.
+
+**AUDIT ROI (master, sortat după ROI — starea reală)**:
+| Feature | Status | Revenue 30z? | Verdict |
+|---|---|---|---|
+| P0.4 Cereri în <2 min | ✅ EXISTĂ (wizard, E2E 138) | DA | done |
+| P0.5 Oferte+notificări | ✅ EXISTĂ | DA | done |
+| P0.6 Twin update la finalizare | ✅ EXISTĂ (value_loop: garanție+twin.enriched+PVI) | indirect | done |
+| P0.3 Trust (rebook/recommend/rollup) | ✅ **IMPLEMENTAT ACUM** | DA (conversie) | done |
+| P0.1 Invitații cu recomandare | ✅ **IMPLEMENTAT ACUM** | DA (ofertă) | done |
+| P0.2 Referral pe roluri | ✅ **IMPLEMENTAT ACUM** (exista baza ref=uid) | DA (users) | done |
+| Marketplace early-access (RC P0-3) | ✅ **IMPLEMENTAT ACUM** | DA (trust) | done |
+| P1: My Trusted Specialists + rebooking | ⏳ next | DA | P0 next |
+| P1: Reputation Score complet + badges | ⏳ | indirect | P1 |
+| P1: Calendar mentenanță (CX-4) | ⏳ | DA (cereri recurente) | P0 next |
+| P2: e-Factura, portofoliu B2B, neighbourhood | ⏳ | NU în 30z | P2 |
+
+**Implementat end-to-end în acest sprint (cod nou)**:
+- **Backend** `routes/trust_growth.py` (colecții noi aditive `referral_invites`, `recommendations`): POST /api/referrals/invite (rol client/specialist, email best-effort gated, link cu invite+ref+role+category) · GET /api/referrals/mine (stats+link-uri) · POST /api/referrals/claim (idempotent, 409 dublu, creează recomandare din testimonialul ownerului la specialist invitat, notify inviter) · POST /api/referrals/recommend/{id} (dedupe, 400 self, notify, source worked_together/declared) · GET /api/marketplace/specialists/{id}/trust (rebook rollup, show doar ≥5 — onestitate PM-200) · GET .../recommendations (doar prenume — privacy).
+- **Reviews extinse**: `would_hire_again` (yes/no/not_sure) + `would_recommend` în v1 (`requests.py` + models.ReviewIn) și v2 (`reviews_v2.py`).
+- **Marketplace public** (`marketplace.py`): batch trust rollup pe fiecare card.
+- **Frontend**: ReviewModal cu 2 întrebări noi (review-hire-*, review-recommend-*) · Marketplace chips „❤️ X% ar angaja din nou"+„N proprietari recomandă" + **early-access hero** când lista e goală fără filtre (mkt-early-access) · SpecialistProfile chips (profile-rebook/profile-recommenders) · **ReferralHub.jsx** dual-variant în Setări client (light) + specialist (dark) cu invitație personală+WhatsApp+copy · claimPendingInvite din ?invite= (Auth→localStorage→dashboards) · FRONTEND_URL setat în backend/.env preview (fallback propmanage.ro pt prod).
+- **Fix-uri post-test**: self-recommend 400 înainte de 404; PAGEERROR terț „sequence" logat pe Beta Issues Board (P2).
+
+**Testare**: iteration_144 — backend 14/15 (1 skip condițional), frontend 100%; flux invite→register→claim→recomandare pe profil verificat și manual prin curl. Test file: `/app/backend/tests/test_trust_growth_iter144.py`.
+
+**REVENUE ROADMAP (următoarele sprinturi, în ordine)**: 1) My Trusted Specialists + rebooking 1-click (venit direct din repetare) · 2) Calendar mentenanță CX-4 (cereri recurente automate) · 3) Reputation Score + badges (conversie marketplace) · 4) Contracte mentenanță (venit predictibil). Toate trec filtrul NVA.
+
+---
+
+
 ## 🤝 PM-200 TRUST MARKETPLACE + TRUST MANIFESTO — DESIGN CANONIC LIVRAT (27 Iun 2026)
 
 **Ordin Fondator**: Trust Layer peste marketplace (conceptul rămâne, se întărește) + poziționare nouă: „Marketplace-ul profesioniștilor recomandați de proprietari" / „cea mai de încredere rețea de proprietari și profesioniști din România". Verbatim: `memory/board/PM_200_TRUST_MARKETPLACE_VERBATIM.md`.

@@ -217,14 +217,14 @@ async def claim_invite(body: dict = Body(...), user: dict = Depends(get_current_
 @router.post("/referrals/recommend/{specialist_id}")
 async def recommend_specialist(specialist_id: str, body: dict = Body(default={}), user: dict = Depends(require_role("client"))):
     """Un proprietar recomandă un specialist EXISTENT cu care a lucrat. Dedupe 1/owner/specialist."""
+    if specialist_id == user["id"]:
+        raise HTTPException(400, "Auto-recomandarea nu este permisă")
     try:
         spec = await db.users.find_one({"_id": ObjectId(specialist_id), "role": "specialist"})
     except Exception:
         spec = None
     if not spec:
         raise HTTPException(404, "Specialist inexistent")
-    if specialist_id == user["id"]:
-        raise HTTPException(400, "Auto-recomandarea nu este permisă")
     exists = await db.recommendations.find_one({"owner_id": user["id"], "specialist_id": specialist_id})
     if exists:
         raise HTTPException(409, "Ai recomandat deja acest specialist")
