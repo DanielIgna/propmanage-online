@@ -51,6 +51,7 @@ export const PublicMarketplace = () => {
     setLoading(true);
     axios.get(`${API}/marketplace/specialists?${params}`)
       .then(r => setSpecialists(r.data))
+      .catch(() => setSpecialists([]))
       .finally(() => setLoading(false));
   }, [filters]);
 

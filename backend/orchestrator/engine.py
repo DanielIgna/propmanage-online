@@ -139,6 +139,49 @@ async def emit_signal(kind: str, payload: dict = None) -> dict:
         })
         return {"handled": False, "reason": "playbook_disabled"}
 
+    # ── Authority Engine (PM-AI-003): nivel 1-5 + Confidence gate ──────────
+    from orchestrator.governance import (
+        get_authority, compute_confidence, resolve_execution_mode, record_decision,
+    )
+    authority = await get_authority(pb["id"])
+    confidence = await compute_confidence(pb["id"])
+    exec_mode = resolve_execution_mode(authority, confidence)
+
+    if exec_mode in ("observe", "recommend"):
+        outcome = "observed" if exec_mode == "observe" else "recommended"
+        entry = await write_ledger({
+            "signal_kind": kind,
+            "playbook_id": pb["id"],
+            "playbook_name": pb["name"],
+            "steps": [{"action": "governance_gate", "ok": True,
+                       "detail": f"Nivel autoritate {authority} / încredere {confidence['score']} → mod '{exec_mode}'. Handler NEEXECUTAT."}],
+            "outcome": outcome,
+            "minutes_saved": 0,
+            "escalated": False,
+            "authority_level": authority,
+            "execution_mode": exec_mode,
+            "confidence": confidence["score"],
+            "test": bool(payload.get("test")),
+        })
+        await record_decision({
+            "signal_kind": kind, "playbook_id": pb["id"], "playbook_name": pb["name"],
+            "authority_level": authority, "execution_mode": exec_mode,
+            "confidence": confidence["score"], "decided": outcome,
+            "outcome": outcome, "escalated": False,
+            "context": {k: str(v)[:200] for k, v in list(payload.items())[:8]},
+            "test": bool(payload.get("test")),
+        })
+        if exec_mode == "recommend":
+            reason = ("autoritate nivel 2 (Consilier)" if authority == 2
+                      else f"încredere scăzută ({confidence['score']}) — downgrade automat")
+            await notify_admins(
+                f"🤖 Recomandare AI: {pb['name']}",
+                f"Semnalul '{kind}' a fost primit dar NU executat automat ({reason}). "
+                f"Aprobă manual sau ridică nivelul de autoritate în Orchestrator.",
+                link="/admin/orchestrator",
+            )
+        return {"handled": True, "ledger": entry, "execution_mode": exec_mode}
+
     try:
         result = await pb["handler"](payload)
     except Exception as e:  # noqa: BLE001
@@ -161,8 +204,28 @@ async def emit_signal(kind: str, payload: dict = None) -> dict:
         "outcome": result.get("outcome") or "unknown",
         "minutes_saved": result.get("minutes_saved") or 0,
         "escalated": escalated,
+        "authority_level": authority,
+        "execution_mode": exec_mode,
+        "confidence": confidence["score"],
         "test": bool(payload.get("test")),
     })
+    await record_decision({
+        "signal_kind": kind, "playbook_id": pb["id"], "playbook_name": pb["name"],
+        "authority_level": authority, "execution_mode": exec_mode,
+        "confidence": confidence["score"], "decided": "executed",
+        "outcome": result.get("outcome") or "unknown", "escalated": escalated,
+        "context": {k: str(v)[:200] for k, v in list(payload.items())[:8]},
+        "test": bool(payload.get("test")),
+    })
+
+    if exec_mode == "execute_notify" and not escalated:
+        try:
+            await notify_admins(
+                f"🤖 Executat (supravegheat): {pb['name']}",
+                f"Semnalul '{kind}' → rezultat: {result.get('outcome')}. Nivel autoritate 3 — notificare la fiecare rulare.",
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     if escalated:
         try:

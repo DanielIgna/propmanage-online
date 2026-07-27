@@ -18,6 +18,6 @@ export const fetchSiteContent = () => {
 
 export const useSiteContent = () => {
   const [content, setContent] = useState(_cache);
-  useEffect(() => { fetchSiteContent().then(setContent); }, []);
+  useEffect(() => { fetchSiteContent().then(setContent).catch(() => {}); }, []);
   return content;
 };

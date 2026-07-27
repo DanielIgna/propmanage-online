@@ -11,7 +11,7 @@ export const AdminVerification = () => {
   const [pending, setPending] = useState([]);
   const [detailId, setDetailId] = useState(null);
 
-  const load = () => axios.get(`${API}/admin/specialists/pending`).then(r => setPending(r.data));
+  const load = () => axios.get(`${API}/admin/specialists/pending`).then(r => setPending(r.data)).catch(() => {});
   useEffect(() => { load(); }, []);
 
   return (

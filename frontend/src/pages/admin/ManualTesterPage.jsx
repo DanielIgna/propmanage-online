@@ -396,7 +396,7 @@ const TrendsPanel = () => {
   useEffect(() => {
     setLoading(true);
     axios.get(`${API}/admin/manual-tester/trends`, { params: { days } })
-      .then((r) => setData(r.data))
+      .then((r) => setData(r.data)).catch(() => {})
       .finally(() => setLoading(false));
   }, [days]);
 

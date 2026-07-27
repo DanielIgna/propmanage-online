@@ -24,6 +24,7 @@ const HouseHealthUpgradePage = () => {
     axios
       .get(`${API}/house-health/plans`)
       .then((r) => setPlans(r.data?.items || []))
+      .catch(() => setPlans([]))
       .finally(() => setLoading(false));
   }, []);
 

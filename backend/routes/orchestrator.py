@@ -125,3 +125,62 @@ async def simulate_signal(kind: str, user=Depends(require_role("admin"))):
 @router.post("/retry-tick")
 async def force_retry_tick(user=Depends(require_role("admin"))):
     return await orchestrator_retry_tick()
+
+
+# ============================================================================
+# GUVERNANȚĂ AI (PM-AI-003): Authority Engine + Decision Memory + Self-Healing
+# ============================================================================
+@router.get("/governance")
+async def get_governance(user=Depends(require_role("admin"))):
+    from orchestrator.governance import (
+        AUTHORITY_LEVELS, get_authority, compute_confidence, governance_snapshot,
+    )
+    playbooks = []
+    for kind, pb in PLAYBOOKS.items():
+        level = await get_authority(pb["id"])
+        conf = await compute_confidence(pb["id"])
+        playbooks.append({
+            "id": pb["id"], "signal_kind": kind, "name": pb["name"],
+            "authority_level": level,
+            "authority": AUTHORITY_LEVELS[level],
+            "confidence": conf["score"], "confidence_runs": conf["runs"],
+            "enabled": await is_playbook_enabled(pb["id"]),
+        })
+    return {
+        "levels": AUTHORITY_LEVELS,
+        "playbooks": playbooks,
+        "snapshot": await governance_snapshot(),
+    }
+
+
+@router.post("/playbooks/{playbook_id}/authority")
+async def set_playbook_authority(playbook_id: str, payload: dict = Body(...), user=Depends(require_role("admin"))):
+    from orchestrator.governance import set_authority
+    valid_ids = {pb["id"] for pb in PLAYBOOKS.values()}
+    if playbook_id not in valid_ids:
+        raise HTTPException(404, "Playbook inexistent")
+    level = payload.get("level")
+    if not isinstance(level, int) or not 1 <= level <= 5:
+        raise HTTPException(400, "level trebuie să fie întreg între 1 și 5")
+    new_level = await set_authority(playbook_id, level, by=user.get("email") or "")
+    return {"id": playbook_id, "authority_level": new_level}
+
+
+@router.get("/decisions")
+async def get_decisions(limit: int = 50, playbook_id: str = None, user=Depends(require_role("admin"))):
+    limit = max(1, min(int(limit), 200))
+    q = {"playbook_id": playbook_id} if playbook_id else {}
+    items = [d async for d in db.orchestrator_decisions.find(q, {"_id": 0}).sort("ts", -1).limit(limit)]
+    return {"items": items, "total": await db.orchestrator_decisions.count_documents(q)}
+
+
+@router.post("/watchdog-tick")
+async def force_watchdog_tick(user=Depends(require_role("admin"))):
+    from orchestrator.governance import governance_watchdog_tick
+    return await governance_watchdog_tick()
+
+
+@router.post("/decision-review")
+async def force_decision_review(user=Depends(require_role("admin"))):
+    from orchestrator.governance import decision_review_cron
+    return await decision_review_cron()

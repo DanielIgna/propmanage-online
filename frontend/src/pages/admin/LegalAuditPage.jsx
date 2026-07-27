@@ -31,7 +31,7 @@ const ContractsModal = ({ email, onClose }) => {
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     ax.get(`/api/admin/legal/contracts/${encodeURIComponent(email)}`)
-      .then(r => setItems(r.data?.items || []))
+      .then(r => setItems(r.data?.items || [])).catch(() => {})
       .finally(() => setLoading(false));
   }, [email]);
   return (

@@ -12,7 +12,7 @@ export const WhatsAppTab = ({ period }) => {
 
   useEffect(() => {
     setData(null);
-    axios.get(`${API}/admin/analytics/whatsapp?period=${period}`).then(r => setData(r.data));
+    axios.get(`${API}/admin/analytics/whatsapp?period=${period}`).then(r => setData(r.data)).catch(() => {});
   }, [period]);
 
   if (!data) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>;

@@ -14,7 +14,7 @@ export const HeatmapTab = ({ period, clarityId }) => {
       .then(r => {
         setData(r.data);
         if (!path && r.data.pages.length) setPath(r.data.pages[0].path);
-      })
+      }).catch(() => {})
       .finally(() => setLoading(false));
   }, [period, path]);
 

@@ -194,6 +194,18 @@ async def ceo_briefing(user=Depends(require_role("admin"))):
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[CEO Briefing] autonomous report failed: {e}")
 
+    # ── Guvernanță AI (PM-AI-003) — decizii, încredere, self-healing ────────
+    ai_governance = None
+    try:
+        from orchestrator.governance import governance_snapshot
+        ai_governance = await governance_snapshot()
+        snapshot.append({"key": "ai_governance", "label": "Guvernanță AI",
+                         "line": f"{ai_governance['decisions_24h']} decizii 24h · {ai_governance['executed_24h']} executate · "
+                                 f"{ai_governance['recommended_24h']} recomandate · încredere medie {ai_governance['avg_confidence'] or '—'}",
+                         "score": None, "color": "#d4ff3a"})
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[CEO Briefing] governance snapshot failed: {e}")
+
     briefing = {
         "day": today,
         "generated_at": now.isoformat(),
@@ -203,6 +215,7 @@ async def ceo_briefing(user=Depends(require_role("admin"))):
         "one_thing": one_thing,
         "autonomous_execution": autonomous_execution,
         "launch": launch,
+        "ai_governance": ai_governance,
         "snapshot": snapshot,
         "top_risks": risks,
         "top_opportunities": opportunities,

@@ -48,7 +48,7 @@ export const SettingsPanel = () => {
 
   useEffect(() => {
     if (!pushSupported()) return;
-    ensureServiceWorker().then(() => getPushStatus().then(setPushStatus));
+    ensureServiceWorker().then(() => getPushStatus().then(setPushStatus)).catch(() => {});
   }, []);
 
   useEffect(() => {

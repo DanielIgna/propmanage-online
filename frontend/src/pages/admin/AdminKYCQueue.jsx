@@ -207,7 +207,7 @@ const KYCDetailModal = ({ kycId, onClose, onDecision }) => {
             {/* AI Verification panel */}
             <AIVerificationPanel doc={doc} kycId={kycId} onRerun={() => {
               setDoc(null);
-              axios.get(`${API}/kyc/admin/${kycId}`).then((r) => setDoc(r.data));
+              axios.get(`${API}/kyc/admin/${kycId}`).then((r) => setDoc(r.data)).catch(() => {});
             }} />
 
             {["uploaded", "reviewing"].includes(doc.status) && (

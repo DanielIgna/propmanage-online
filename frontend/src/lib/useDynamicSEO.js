@@ -48,7 +48,7 @@ export function useDynamicSEO(pageKey, fallback = {}) {
       const description = seo[`${pageKey}_description`] || fallback.description || "";
       const ogImage = seo.og_image || fallback.ogImage || "";
       applyMeta(title, description, ogImage);
-    });
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, [pageKey, fallback.title, fallback.description, fallback.ogImage]);
 }

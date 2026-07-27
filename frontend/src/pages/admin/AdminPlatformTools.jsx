@@ -16,7 +16,7 @@ export const AdminTrustWeights = () => {
     axios.get(`${API}/admin/trust-weights`).then(r => {
       const { is_default, updated_at, ...weights } = r.data;
       setW(weights);
-    });
+    }).catch(() => {});
   }, []);
 
   const total = Object.values(w).reduce((s, v) => s + v, 0);
@@ -87,7 +87,7 @@ export const AdminPlatformSettings = () => {
   const [saving, setSaving] = useState(false);
   const [copyMsg, setCopyMsg] = useState("");
 
-  const load = () => axios.get(`${API}/admin/settings`).then(r => { setS(r.data); setDirty({}); });
+  const load = () => axios.get(`${API}/admin/settings`).then(r => { setS(r.data); setDirty({}); }).catch(() => {});
   useEffect(() => { load(); }, []);
 
   const set = (k, v) => setDirty(d => ({ ...d, [k]: v }));
@@ -270,7 +270,7 @@ export const AdminPlatformSettings = () => {
 export const AdminFinance = () => {
   const [data, setData] = useState(null);
 
-  useEffect(() => { axios.get(`${API}/admin/finance/overview`).then(r => setData(r.data)); }, []);
+  useEffect(() => { axios.get(`${API}/admin/finance/overview`).then(r => setData(r.data)).catch(() => {}); }, []);
 
   const txTotal = (data?.tx_by_type || []).reduce((s, t) => s + t.count, 0);
   const topTx = [...(data?.tx_by_type || [])].sort((a, b) => b.total - a.total)[0];
@@ -342,7 +342,7 @@ export const AdminProjects = () => {
   useEffect(() => {
     const params = {};
     if (status) params.status = status;
-    axios.get(`${API}/admin/projects`, { params }).then(r => setData(r.data));
+    axios.get(`${API}/admin/projects`, { params }).then(r => setData(r.data)).catch(() => {});
   }, [status]);
 
   return (
@@ -392,7 +392,7 @@ export const AdminProjects = () => {
 export const AdminActivityFull = () => {
   const [events, setEvents] = useState([]);
   useEffect(() => {
-    const load = () => axios.get(`${API}/admin/activity-feed-live?limit=50`).then(r => setEvents(r.data));
+    const load = () => axios.get(`${API}/admin/activity-feed-live?limit=50`).then(r => setEvents(r.data)).catch(() => {});
     load();
     const interval = setInterval(load, 10000);
     return () => clearInterval(interval);
@@ -426,7 +426,7 @@ const LandingPresetsCard = ({ currentFlags, onApply, onPersistedApply }) => {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
 
-  const load = () => axios.get(`${API}/admin/landing-presets`).then(r => setPresets(r.data));
+  const load = () => axios.get(`${API}/admin/landing-presets`).then(r => setPresets(r.data)).catch(() => {});
   useEffect(() => { load(); }, []);
 
   const flash = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
@@ -580,7 +580,7 @@ const SchedulesSection = ({ presets }) => {
   const [toast, setToast] = useState("");
   const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 3000); };
 
-  const load = () => axios.get(`${API}/admin/preset-schedules`).then(r => setSchedules(r.data));
+  const load = () => axios.get(`${API}/admin/preset-schedules`).then(r => setSchedules(r.data)).catch(() => {});
   useEffect(() => { load(); }, []);
 
   const toggleDay = (d) => setForm(f => ({
@@ -737,7 +737,7 @@ const ScheduleHistorySection = ({ presets }) => {
     const params = { limit: 50 };
     if (filterPreset) params.preset_id = filterPreset;
     axios.get(`${API}/admin/schedule-history`, { params })
-      .then(r => setHistory(r.data))
+      .then(r => setHistory(r.data)).catch(() => {})
       .finally(() => setLoading(false));
   };
 

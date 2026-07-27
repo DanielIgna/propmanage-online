@@ -27,7 +27,7 @@ export const AbTestingTab = () => {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: "", page_path: "/", goal: "account_created", hypothesis: "" });
 
-  const load = () => axios.get(`${API}/admin/analytics/ab`).then(r => setItems(r.data.items));
+  const load = () => axios.get(`${API}/admin/analytics/ab`).then(r => setItems(r.data.items)).catch(() => {});
   useEffect(() => { load(); }, []);
 
   const create = async () => {

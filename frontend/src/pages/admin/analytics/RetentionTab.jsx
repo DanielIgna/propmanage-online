@@ -8,7 +8,7 @@ const cellBg = (pct) => `rgba(59,130,246,${Math.min(0.9, 0.08 + pct / 110)})`;
 export const RetentionTab = () => {
   const [data, setData] = useState(null);
   useEffect(() => {
-    axios.get(`${API}/admin/analytics/retention?weeks=8`).then(r => setData(r.data));
+    axios.get(`${API}/admin/analytics/retention?weeks=8`).then(r => setData(r.data)).catch(() => {});
   }, []);
 
   if (!data) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>;

@@ -590,6 +590,23 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=300,
         )
+        # PM-AI-003: Self-Healing Watchdog — la 30 min repornește joburile cron moarte
+        from orchestrator.governance import governance_watchdog_tick, decision_review_cron
+        scheduler.add_job(
+            governance_watchdog_tick,
+            CronTrigger(minute="7,37", timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="governance_watchdog",
+            replace_existing=True,
+            misfire_grace_time=900,
+        )
+        # PM-AI-003: Decision Review — zilnic 05:30, degradează autoritatea playbook-urilor cu eșecuri
+        scheduler.add_job(
+            decision_review_cron,
+            CronTrigger(hour=5, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="decision_review_daily",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
         # CIP-A: Category Visibility Gate — daily 04:30 (via Orchestrator playbook)
         scheduler.add_job(
             construction_visibility_cron,

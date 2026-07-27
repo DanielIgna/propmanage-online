@@ -146,7 +146,7 @@ const TwinOrchestratorPage = () => {
             <div className="mt-6 bg-cyan-500/5 border border-cyan-500/20 rounded-xl p-3 text-xs text-cyan-100 flex items-start gap-2">
               <Brain className="w-3.5 h-3.5 shrink-0 mt-0.5 text-cyan-300" />
               <div>
-                Pentru a genera <strong>AI insights</strong> per twin (Claude Sonnet), activează feature flag <code className="bg-white/10 px-1 rounded">enable_twin_orchestrator</code> în <Link to="/admin/settings" className="underline">Admin Settings</Link>.
+                Pentru a genera <strong>AI insights</strong> per twin (Claude Sonnet), activează feature flag <code className="bg-white/10 px-1 rounded">enable_twin_orchestrator</code> în <Link to="/admin/settings-control" className="underline">Admin Settings</Link>.
                 Cache: 6h per twin. Cost: ~0.012€/insight (~0.50€/lună la 40 twins active).
               </div>
             </div>
