@@ -88,6 +88,71 @@ const TrustScoreCard = ({ specialistId }) => {
   );
 };
 
+const CapabilitiesCard = ({ specialistId }) => {
+  const [cap, setCap] = useState(null);
+  useEffect(() => {
+    axios.get(`${API}/specialists/${specialistId}/capabilities`).then(r => setCap(r.data)).catch(() => {});
+  }, [specialistId]);
+  if (!cap || (!cap.capabilities?.length && !cap.software?.length)) return null;
+  const comp = cap.compatibility || {};
+  const prog = cap.progression || {};
+  const byPhase = {};
+  (cap.capabilities || []).forEach(c => { (byPhase[c.phase] = byPhase[c.phase] || []).push(c); });
+  return (
+    <div className="glass-strong rounded-3xl p-6 mb-6" data-testid="capabilities-card">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+        <h2 className="font-serif text-2xl flex items-center gap-2">
+          <Shield className="w-5 h-5 text-[#d4ff3a]" />Capabilități & Compatibilitate
+        </h2>
+        <div className="flex items-center gap-2">
+          {prog.level && (
+            <span className="inline-flex items-center gap-1 bg-white/5 border border-white/10 px-3 py-1 rounded-full text-[10px] uppercase tracking-wider" data-testid="sp-progression-level">
+              <Award className="w-3 h-3 text-[#d4ff3a]" /> Nivel {prog.level}/7 · {prog.name}
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1 bg-[#d4ff3a]/15 border border-[#d4ff3a]/30 text-[#d4ff3a] px-3 py-1 rounded-full text-xs font-bold" data-testid="sp-compatibility-score">
+            {comp.score ?? 0}/100 compatibilitate
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-1.5 mb-4">
+        {(comp.badges || []).filter(b => b.earned).map(b => (
+          <span key={b.id} className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-white/5 border border-white/10 text-stone-300" data-testid={`sp-badge-${b.id}`}>
+            ✓ {b.label}
+          </span>
+        ))}
+      </div>
+      <div className="space-y-3">
+        {Object.entries(byPhase).map(([phase, caps]) => (
+          <div key={phase}>
+            <div className="text-[10px] uppercase tracking-wider text-stone-500 mb-1.5">{phase}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {caps.map(c => (
+                <span key={c.id} className="bg-white/5 px-3 py-1.5 rounded-full text-xs" data-testid={`sp-cap-${c.id}`}>
+                  {c.label} <span className="text-stone-500">· {c.level_label}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+        {(cap.software || []).length > 0 && (
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-stone-500 mb-1.5">Software & formate</div>
+            <div className="flex flex-wrap gap-1.5">
+              {cap.software.map(s => (
+                <span key={s.id} className="bg-white/[0.03] border border-white/5 px-2.5 py-1 rounded-full text-[11px] text-stone-400">{s.label}</span>
+              ))}
+            </div>
+          </div>
+        )}
+        {(cap.languages || []).length > 0 && (
+          <div className="text-xs text-stone-500">Limbi: {cap.languages.join(" · ")}</div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const SpecialistProfile = () => {
   const { id } = useParams();
   const [data, setData] = useState(null);
@@ -206,6 +271,9 @@ export const SpecialistProfile = () => {
             </div>
           )}
         </motion.div>
+
+        {/* Capabilities & Compatibility (Capability Engine D1) */}
+        <CapabilitiesCard specialistId={id} />
 
         {/* Trust Score */}
         <TrustScoreCard specialistId={id} />

@@ -17,6 +17,13 @@ router = APIRouter(prefix="/api", tags=["portfolio"])
 MAX_PORTFOLIO_ITEMS = 30
 MAX_IMAGE_SIZE_BYTES = 5_500_000  # ~4MB base64
 
+EXTENDED_FIELDS = ["project_type", "services", "role", "budget_range", "tags", "before_image",
+                   "after_image", "video_url", "tour_url", "awards", "client_review", "is_public"]
+
+
+def _extended(data) -> dict:
+    return {k: getattr(data, k, None) for k in EXTENDED_FIELDS}
+
 def _validate_image_payload(b64_or_url: str) -> bool:
     if not b64_or_url:
         return False
@@ -63,6 +70,7 @@ async def add_portfolio_item(data: PortfolioItemIn, user: dict = Depends(require
         "completion_date": data.completion_date,
         "location": data.location,
         "surface": data.surface,
+        **_extended(data),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     res = await db.portfolio.insert_one(doc)
@@ -92,6 +100,7 @@ async def update_portfolio_item(item_id: str, data: PortfolioItemIn, user: dict 
             "completion_date": data.completion_date,
             "location": data.location,
             "surface": data.surface,
+            **_extended(data),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }}
     )

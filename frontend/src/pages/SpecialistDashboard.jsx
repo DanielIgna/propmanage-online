@@ -7,7 +7,7 @@ import {
   Wallet, Star, Briefcase, Award, Sparkles, FileCheck, MessageSquare, AlertTriangle,
   Palette, Plus, Image as ImageIcon, Target, ClipboardCheck, Bell,
   Settings as SettingsIcon, Search, RefreshCw, Clock, Crown, MapPin, Flame,
-  CheckCircle2, ShieldCheck, ChevronRight, Inbox, TrendingUp,
+  CheckCircle2, ShieldCheck, ChevronRight, Inbox, TrendingUp, Layers,
 } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { WelcomeChecklist } from "../components/WelcomeChecklist";
@@ -207,11 +207,16 @@ export const SpecialistDashboard = () => {
                     <span>{user?.reviews_count || 0} recenzii</span>
                   </div>
                 </div>
-                {user?.tier === "PREMIUM" && (
-                  <Link to="/specialist/premium-profile" data-testid="link-premium-profile">
-                    <PMPillButton variant="on-container" icon={Crown}>Editează Profil Premium</PMPillButton>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Link to="/specialist/capabilities" data-testid="link-capabilities">
+                    <PMPillButton variant="on-container" icon={Layers}>Capabilitățile mele</PMPillButton>
                   </Link>
-                )}
+                  {user?.tier === "PREMIUM" && (
+                    <Link to="/specialist/premium-profile" data-testid="link-premium-profile">
+                      <PMPillButton variant="on-container" icon={Crown}>Editează Profil Premium</PMPillButton>
+                    </Link>
+                  )}
+                </div>
               </div>
             </PMCardPrimary>
           )}

@@ -223,3 +223,15 @@ class PortfolioItemIn(BaseModel):
     completion_date: Optional[str] = None
     location: Optional[str] = None
     surface: Optional[float] = None
+    project_type: Optional[str] = Field(default=None, max_length=60)
+    services: Optional[List[str]] = Field(default=None, max_length=20)
+    role: Optional[str] = Field(default=None, max_length=60)
+    budget_range: Optional[str] = Field(default=None, max_length=40)
+    tags: Optional[List[str]] = Field(default=None, max_length=25)
+    before_image: Optional[str] = None
+    after_image: Optional[str] = None
+    video_url: Optional[str] = Field(default=None, max_length=300)
+    tour_url: Optional[str] = Field(default=None, max_length=300)
+    awards: Optional[str] = Field(default=None, max_length=200)
+    client_review: Optional[str] = Field(default=None, max_length=1000)
+    is_public: bool = True
