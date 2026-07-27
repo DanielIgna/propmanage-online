@@ -21,6 +21,8 @@ import HouseHealthCard from "../HouseHealthCard";
 import { HelpButton } from "../../components/HelpButton";
 import { BetaFeedbackEntry } from "../../components/BetaFeedbackWidget";
 import { ReferralHub, claimPendingInvite } from "../../components/ReferralHub";
+import { TrustedSpecialists } from "../../components/TrustedSpecialists";
+import { MaintenanceCalendar } from "../../components/MaintenanceCalendar";
 
 const NAV = [[Home, "Acasă", "home"], [Wrench, "Lucrări", "jobs"], [Plus, "Solicită", "request"], [Building2, "Propr.", "property"], [Settings, "Setări", "settings"]];
 const TITLES = { home: null, jobs: "Lucrările mele", property: "Proprietatea mea", settings: "Setări" };
@@ -185,9 +187,12 @@ export default function ClientDashboardV2() {
         {TITLES[tab] && <h1 className="px-5 pb-3 xos-display text-2xl lg:text-[38px] font-medium lg:font-bold tracking-tight text-slate-900">{TITLES[tab]}</h1>}
 
         {tab === "home" && (!loaded ? <HomeSkeleton /> : <HomeV2 user={user} prop={prop} properties={properties} requests={requests} notifs={notifs} offersCount={offersCount} go={setTab} actions={actions} />)}
-        {tab === "jobs" && <div className="lg:max-w-3xl"><JobsV2 requests={requests} actions={actions} /></div>}
+        {tab === "jobs" && <div className="lg:max-w-3xl"><JobsV2 requests={requests} actions={actions} /><TrustedSpecialists properties={properties} onRebooked={loadRequests} /></div>}
         {/* PPOS P3d: Property Hub folosește tot spațiul pe desktop (record page) */}
-        {tab === "property" && <PropertyHubV2 user={user} prop={prop} properties={properties} setSelectedPropId={setSelectedPropId} actions={actions} />}
+        {tab === "property" && (<>
+          <PropertyHubV2 user={user} prop={prop} properties={properties} setSelectedPropId={setSelectedPropId} actions={actions} />
+          <MaintenanceCalendar properties={properties} prop={prop} onRequestCreated={loadRequests} />
+        </>)}
         {tab === "settings" && (
           <div className="px-5 pb-8 space-y-2 lg:max-w-3xl" data-testid="v2-settings-view">
             <ReferralHub variant="light" />

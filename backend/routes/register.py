@@ -150,6 +150,8 @@ from routes.passport_analytics import router as passport_analytics_router
 from routes.beta_cockpit import router as beta_cockpit_router
 from routes.beta_issues import router as beta_issues_router
 from routes.trust_growth import router as trust_growth_router
+from routes.trusted_specialists import router as trusted_specialists_router
+from routes.maintenance_calendar import router as maintenance_calendar_router
 from routes.capability_engine import router as capability_engine_router
 from routes.property_intelligence import router as property_intelligence_router
 from routes.resend_diagnostics import router as resend_diagnostics_router
@@ -311,6 +313,8 @@ ALL_ROUTERS = (
     beta_cockpit_router,
     beta_issues_router,
     trust_growth_router,
+    trusted_specialists_router,
+    maintenance_calendar_router,
     capability_engine_router,
     opportunities_router,
     growth_intelligence_router,

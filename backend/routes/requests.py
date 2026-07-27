@@ -87,8 +87,11 @@ async def list_requests(
         if user.get("active_view") == "client" and user.get("dual_role_enabled"):
             query = {"client_id": user["id"]}
         else:
-            # show open requests + assigned to this specialist
-            query = {"$or": [{"status": "open"}, {"specialist_id": user["id"]}]}
+            # show open requests (publice sau directe către mine) + assigned to this specialist
+            query = {"$or": [
+                {"status": "open", "direct_specialist_id": {"$in": [None, user["id"]]}},
+                {"specialist_id": user["id"]},
+            ]}
     else:  # admin/operator
         query = {}
     
@@ -173,16 +176,21 @@ async def accept_request(req_id: str, data: Optional[AcceptRequestIn] = None, us
     if req.get("status") != "open":
         raise HTTPException(400, "Request not available")
 
-    LEAD_FEE = 45.0
+    direct_id = req.get("direct_specialist_id")
+    if direct_id and direct_id != user["id"]:
+        raise HTTPException(403, "Cerere directă adresată altui specialist")
+    fee_waived = bool(direct_id == user["id"] and req.get("lead_fee_waived"))
+    LEAD_FEE = 0.0 if fee_waived else 45.0
     specialist = await db.users.find_one({"_id": ObjectId(user["id"])})
     if (specialist.get("wallet_balance") or 0) < LEAD_FEE:
         raise HTTPException(400, f"Insufficient balance. Need {LEAD_FEE} RON")
 
-    # Deduct lead fee
-    await db.users.update_one(
-        {"_id": ObjectId(user["id"])},
-        {"$inc": {"wallet_balance": -LEAD_FEE}}
-    )
+    # Deduct lead fee (0 pentru rebooking direct — recompensă de loialitate)
+    if LEAD_FEE > 0:
+        await db.users.update_one(
+            {"_id": ObjectId(user["id"])},
+            {"$inc": {"wallet_balance": -LEAD_FEE}}
+        )
     update = {
         "status": "assigned",
         "specialist_id": user["id"],
@@ -205,13 +213,14 @@ async def accept_request(req_id: str, data: Optional[AcceptRequestIn] = None, us
         update["schedule_proposal"] = proposed
     await db.requests.update_one({"_id": ObjectId(req_id)}, {"$set": update})
     # Log transaction
-    await db.transactions.insert_one({
-        "user_id": user["id"],
-        "type": "lead_fee",
-        "amount": -LEAD_FEE,
-        "request_id": req_id,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    })
+    if LEAD_FEE > 0:
+        await db.transactions.insert_one({
+            "user_id": user["id"],
+            "type": "lead_fee",
+            "amount": -LEAD_FEE,
+            "request_id": req_id,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
     # Notify client
     schedule_msg = ""
     if proposed.get("start_date"):

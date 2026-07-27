@@ -148,6 +148,11 @@ async def _tenant_selfheal_tick():
     await backfill_tier1_tenant_data(force=True)
 
 
+async def _maintenance_due_tick():
+    from routes.maintenance_calendar import maintenance_due_tick
+    await maintenance_due_tick()
+
+
 @app.on_event("startup")
 async def startup():
     await seed()
@@ -242,6 +247,14 @@ async def startup():
             run_daily_digests,
             CronTrigger(hour=19, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="daily_digest",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        # CX-4: remindere mentenanță (09:00) — taskuri scadente în ≤7 zile
+        scheduler.add_job(
+            _maintenance_due_tick,
+            CronTrigger(hour=9, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="maintenance_due_daily",
             replace_existing=True,
             misfire_grace_time=3600,
         )

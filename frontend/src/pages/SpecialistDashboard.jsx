@@ -77,11 +77,11 @@ export const SpecialistDashboard = () => {
     }
   }, [user]);
 
-  const openAccept = (r) => setAcceptingReq({ id: r.id, title: r.title });
+  const openAccept = (r) => setAcceptingReq({ id: r.id, title: r.title, feeWaived: !!r.lead_fee_waived && r.direct_specialist_id === user?.id });
   const start = async (id) => { try { await axios.post(`${API}/requests/${id}/start`); load(); } catch (e) { alert(formatApiError(e)); } };
   const complete = async (id) => { try { await axios.post(`${API}/requests/${id}/complete`); load(); } catch (e) { alert(formatApiError(e)); } };
 
-  const open = requests.filter(r => r.status === "open");
+  const open = requests.filter(r => r.status === "open").sort((a, b) => (b.direct_specialist_id === user?.id ? 1 : 0) - (a.direct_specialist_id === user?.id ? 1 : 0));
   const mine = requests.filter(r => r.specialist_id === user?.id);
   const filtered = (list) => {
     let out = list;
@@ -298,6 +298,7 @@ export const SpecialistDashboard = () => {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       {r.priority === "urgent" && <PMChip variant="error" icon={Flame}>URGENT</PMChip>}
+                      {r.direct_specialist_id === user?.id && <PMChip variant="success" icon={Star} testid={`direct-chip-${r.id}`}>Re-angajare directă · 0 RON</PMChip>}
                       <span className="text-[11px] text-stone-500">{r.client_name} · {r.property_name}</span>
                     </div>
                     <div className="font-semibold text-sm md:text-base">{r.title}</div>
@@ -307,7 +308,7 @@ export const SpecialistDashboard = () => {
                 <div className="flex justify-between items-center gap-2 flex-wrap">
                   <div className="text-xs text-stone-400">Estimat: <span className="text-white font-semibold">{r.budget_estimate} RON</span></div>
                   <PMPillButton variant="primary" size="sm" onClick={() => openAccept(r)} testid={`accept-${r.id}`}>
-                    Acceptă · 45 RON
+                    {r.direct_specialist_id === user?.id ? "Acceptă · GRATUIT" : "Acceptă · 45 RON"}
                   </PMPillButton>
                 </div>
               </PMCard>
@@ -449,7 +450,7 @@ export const SpecialistDashboard = () => {
       {disputeFor && <OpenDisputeModal requestId={disputeFor.id} requestTitle={disputeFor.title} onClose={() => setDisputeFor(null)} onOpened={() => load()} />}
       {proposePhaseFor && <ProposePhaseModal requestId={proposePhaseFor} onClose={() => setProposePhaseFor(null)} onProposed={() => load()} />}
       {showPortfolio && <PortfolioManagerModal onClose={() => setShowPortfolio(false)} />}
-      {acceptingReq && <ScheduleProposalModal requestId={acceptingReq.id} requestTitle={acceptingReq.title} onClose={() => setAcceptingReq(null)} onAccepted={async () => { await refreshUser(); load(); }} />}
+      {acceptingReq && <ScheduleProposalModal requestId={acceptingReq.id} requestTitle={acceptingReq.title} feeWaived={acceptingReq.feeWaived} onClose={() => setAcceptingReq(null)} onAccepted={async () => { await refreshUser(); load(); }} />}
       {timelineRequestId && <RequestTimelineModal requestId={timelineRequestId} onClose={() => setTimelineRequestId(null)} />}
       {showNewProject && <NewProjectModal onClose={() => setShowNewProject(false)} />}
     </DashLayout>
