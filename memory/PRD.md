@@ -1,3 +1,21 @@
+## ✅ SPRINT MODE (EO v5.0) — P4→POLISH→BETA CANDIDATE v0.9 · LIVRAT & TESTAT (27 Iun 2026)
+
+**Directive**: SPRINT MODE + EXECUTIVE ORDER v5.0 salvate VERBATIM (`board/PPOS_SPRINT_MODE_EXECUTIVE_ORDER_V5.md`) — execuție continuă fără aprobări până la Beta Candidate v0.9.
+
+**Livrat în sprint (exclusiv presentation layer)**:
+- **P4 Navigație**: verificat — o navigație per device peste tot (client: top tabs desktop + bottom nav/FAB mobil; specialist: dock desktop + bottom nav mobil); tile-urile duplicat fuseseră eliminate în P3b. ÎNCHIS.
+- **P5 Mobile + A11y + Contrast**: fix contrast dark-theme pe cardurile „Pasul următor" (override CSS `bg-[#F0FBF4]`/`border-[#D2F2DC]` + Sparkles pe clasa temabilă `text-[#166534]` în DocumentVault + HouseStatusPanel); **focus-visible global** (lime pe dark / verde închis pe light, WCAG 2.4.7); aria-labels pe butoanele icon-only (v2-bell, notif-bell, dash-logout; HelpButton/ThemeSwitcher aveau deja).
+- **Desktop Workspace Polish**: „Lucrările mele" specialist = grid 2 coloane pe desktop (stivă pe mobil); FilterBar cu placeholder contextual („Caută în lucrările tale...").
+- **Empty states**: audit — toate există (jobs client+specialist, notificări, property empty, marketplace) — fără lipsuri.
+- **BETA CANDIDATE v0.9**: pachet complet livrat în **`/app/docs/PPOS/BETA_CANDIDATE_V09.md`** (readiness report, checklists Founder/journey/desktop/mobile/perf/a11y, top 20 riscuri cu mitigări, plan lansare beta 4 săptămâni, roadmap post-beta). Verdict: **BETA CANDIDATE READY funcțional** — blocante rămase = doar acțiunile Fondatorului (Stripe LIVE, Resend DNS, purge+redeploy).
+
+**Testare**: iteration_142 — **frontend 100% PASS, zero regresii** (grid jobs desktop/mobil, contrast ambele teme verificat programatic, logout redirect fix confirmat, aria+focus validate, regresie P3b/c/d verde).
+
+**URMEAZĂ**: acțiunile Fondatorului din Founder Checklist → beta reală → AI Product Review 2.0 pe date reale + audit complet la 5 faze (gate 95).
+
+---
+
+
 ## ✅ PPOS P3b + P3c + P3d — DESKTOP OS ROLLOUT · IMPLEMENTAT & TESTAT (27 Iun 2026)
 
 **Directive noi**: FINAL DIRECTIVE v4.0 salvată VERBATIM (`board/PPOS_BETA_EXECUTION_FINAL_DIRECTIVE_V4.md`) — FAST EXECUTION continuu până la Beta Candidate, release note max 10 rânduri/fază, audit complet DOAR la 5 faze/Beta/Production/la cerere; STOP doar HIGH-RISK (DB/API/auth/billing/Twin core/security).
