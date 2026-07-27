@@ -23,6 +23,7 @@ import { BetaFeedbackEntry } from "../../components/BetaFeedbackWidget";
 import { ReferralHub, claimPendingInvite } from "../../components/ReferralHub";
 import { TrustedSpecialists } from "../../components/TrustedSpecialists";
 import { MaintenanceCalendar } from "../../components/MaintenanceCalendar";
+import { BuildingHub } from "../../components/BuildingHub";
 import { PostJobGrowthLoop } from "../../components/PostJobGrowthLoop";
 
 const NAV = [[Home, "Acasă", "home"], [Wrench, "Lucrări", "jobs"], [Plus, "Solicită", "request"], [Building2, "Propr.", "property"], [Settings, "Setări", "settings"]];
@@ -194,6 +195,7 @@ export default function ClientDashboardV2() {
         {tab === "property" && (<>
           <PropertyHubV2 user={user} prop={prop} properties={properties} setSelectedPropId={setSelectedPropId} actions={actions} />
           <MaintenanceCalendar properties={properties} prop={prop} onRequestCreated={loadRequests} />
+          <BuildingHub properties={properties} onRequestsChanged={loadRequests} />
         </>)}
         {tab === "settings" && (
           <div className="px-5 pb-8 space-y-2 lg:max-w-3xl" data-testid="v2-settings-view">

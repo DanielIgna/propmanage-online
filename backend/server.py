@@ -153,6 +153,11 @@ async def _maintenance_due_tick():
     await maintenance_due_tick()
 
 
+async def _campaign_detection_tick():
+    from routes.community_buildings import campaign_detection_tick
+    await campaign_detection_tick()
+
+
 @app.on_event("startup")
 async def startup():
     await seed()
@@ -255,6 +260,14 @@ async def startup():
             _maintenance_due_tick,
             CronTrigger(hour=9, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="maintenance_due_daily",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        # PM-002/PM-003: detecție automată campanii comune (08:30)
+        scheduler.add_job(
+            _campaign_detection_tick,
+            CronTrigger(hour=8, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="campaign_detection_daily",
             replace_existing=True,
             misfire_grace_time=3600,
         )

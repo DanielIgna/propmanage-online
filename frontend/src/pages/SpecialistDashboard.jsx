@@ -28,6 +28,7 @@ import {
   PMSectionHeader, PMEmptyState,
 } from "../components/pm";
 import { SpecialistProgressCard } from "../components/SpecialistProgressCard";
+import { SpecialistCampaigns } from "../components/SpecialistCampaigns";
 import { BetaFeedbackEntry } from "../components/BetaFeedbackWidget";
 import { SpecialistEntryHome } from "./dashboard/SpecialistEntryHome";
 
@@ -277,6 +278,8 @@ export const SpecialistDashboard = () => {
           )}
 
           <FilterBar searchQ={searchQ} setSearchQ={setSearchQ} urgentOnly={urgentOnly} setUrgentOnly={setUrgentOnly} urgentCount={open.filter(r => r.priority === "urgent").length} />
+
+          <SpecialistCampaigns />
 
           <div className="space-y-3 mt-4 max-w-3xl pm-fade-in-delay-2" data-tour="specialist-leads">
             <PMSectionHeader title={`${filtered(open).length} oportunități`} />
