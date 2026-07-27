@@ -253,21 +253,6 @@ export const HomeSkeleton = () => (
   </div>
 );
 
-// Bento pe desktop: hero 7 col / copilot 5 col; mobil rămâne stivă (mobile-first)
-const WIDGET_SPAN = {
-  hero: "lg:col-span-7",
-  quick_actions: "lg:col-span-7",
-  opportunities: "lg:col-span-7",
-  copilot: "lg:col-span-5 lg:row-span-2",
-  contextual: "lg:col-span-7",
-  discover: "lg:col-span-12",
-};
-
-const DEFAULT_LAYOUT = [
-  { id: "hero", enabled: true }, { id: "quick_actions", enabled: true }, { id: "opportunities", enabled: true },
-  { id: "copilot", enabled: true }, { id: "contextual", enabled: true }, { id: "discover", enabled: true },
-];
-
 // PPOS P3b — Dashboard OS: ordinea sloturilor e LEGE (Hero → Alerts → Progress → Optional).
 // Onboarding (J0/J1): DOAR hero-ul ghidat. Desktop: workspace 8+4 cu Right Context Panel.
 export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, go, actions }) => {

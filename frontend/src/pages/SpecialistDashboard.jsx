@@ -194,7 +194,9 @@ export const SpecialistDashboard = () => {
           .map(w => <React.Fragment key={w.id}>{xosWidgets[w.id] || null}</React.Fragment>);
         return (
         <div className="lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start" data-testid="spec-workspace">
-          <div className="lg:col-span-8 min-w-0 order-1">
+          {/* Mobil: KPI-urile „Astăzi ai" primele (task-first). Desktop: rail dreapta sticky. */}
+          <aside className="lg:col-span-4 lg:col-start-9 lg:row-start-1 lg:sticky lg:top-6" data-testid="spec-context-panel">{rail}</aside>
+          <div className="lg:col-span-8 lg:col-start-1 lg:row-start-1 min-w-0">
           {/* Welcome hero (only ADVANCED+) */}
           {user?.verified && tierInfo.canSeeBentoHero && user?.tier && user.tier !== "ENTRY" && (
             <PMCardPrimary className="mb-6 pm-fade-in">
@@ -311,7 +313,6 @@ export const SpecialistDashboard = () => {
             ))}
           </div>
           </div>
-          <aside className="lg:col-span-4 lg:sticky lg:top-6 order-2 mt-8 lg:mt-0" data-testid="spec-context-panel">{rail}</aside>
         </div>
         );
       })()}

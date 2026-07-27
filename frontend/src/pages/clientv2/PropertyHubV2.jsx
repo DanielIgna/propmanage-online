@@ -541,7 +541,52 @@ const DnaAttributesCard = ({ propId }) => {
   );
 };
 
+// PPOS P3d — Property Hub „Casa mea": desktop = record page (left sub-nav + main + right panel sticky); mobil = stivă neschimbată.
+const HUB_SECTIONS = [
+  { id: "rezumat", label: "Rezumat", icon: Building2 },
+  { id: "carte", label: "Cartea casei", icon: FileText },
+  { id: "twin", label: "Twin & Active", icon: Box },
+  { id: "istoric", label: "Istoric & Riscuri", icon: Clock },
+  { id: "pasaport", label: "Pașaport & Partajare", icon: Share2 },
+];
+
+// Right Context Panel: UN scor + pasul următor, permanent vizibil la scroll (PPOS-005 §4.2)
+const HouseStatusPanel = ({ prop, onNextStep }) => {
+  const [compl, setCompl] = useState(null);
+  useEffect(() => {
+    const load = () => axios.get(`${API}/properties/${prop.id}/completeness`).then(r => setCompl(r.data)).catch(() => {});
+    load();
+    window.addEventListener("propmanage:doc-uploaded", load);
+    return () => window.removeEventListener("propmanage:doc-uploaded", load);
+  }, [prop.id]);
+  if (!compl) return null;
+  return (
+    <div className="rounded-3xl border border-slate-100 bg-white shadow-sm p-4" data-testid="hub-status-panel">
+      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Sănătatea casei</div>
+      <div className="mt-2 flex items-end gap-1">
+        <span className="xos-num text-5xl leading-none text-slate-900" data-testid="hub-status-score">{compl.score}</span>
+        <span className="text-sm font-bold text-slate-400 mb-0.5">/100</span>
+      </div>
+      <div className="mt-2.5 h-2 rounded-full bg-slate-100 overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${compl.score}%`, background: "linear-gradient(90deg, #34C759, #d4ff3a)" }} />
+      </div>
+      <div className="mt-1.5 text-[10px] text-slate-400">{compl.docs_count ?? 0} documente în cartea casei</div>
+      {compl.next_step && (
+        <button onClick={onNextStep} data-testid="hub-status-next-step"
+          className="mt-3 w-full text-left rounded-2xl bg-[#F0FBF4] border border-[#D2F2DC] p-3 transition-transform hover:-translate-y-0.5">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 shrink-0" style={{ color: GREEN }} />
+            <span className="flex-1 text-xs font-bold text-slate-700 leading-snug">Pasul următor: {compl.next_step.label}</span>
+            <span className="shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full text-black" style={{ background: "#d4ff3a" }}>+{compl.next_step.expected_gain}%</span>
+          </div>
+        </button>
+      )}
+    </div>
+  );
+};
+
 export const PropertyHubV2 = ({ user, prop, properties, setSelectedPropId, actions }) => {
+  const [section, setSection] = useState("rezumat");
   if (!prop) {
     return (
       <div className="px-6 py-16 text-center" data-testid="v2-property-empty">
@@ -552,11 +597,14 @@ export const PropertyHubV2 = ({ user, prop, properties, setSelectedPropId, actio
       </div>
     );
   }
+  // Pe mobil toate secțiunile rămân stivuite (clasa nu are efect sub lg); pe desktop se vede DOAR secțiunea activă
+  const sec = (id) => (section === id ? "" : "lg:hidden");
+  const goSection = (id) => { setSection(id); window.scrollTo({ top: 0 }); };
   return (
     <div className="px-5 pb-8 cv2-fade" data-testid="v2-property-view">
       <div className="rounded-3xl overflow-hidden border border-slate-100 bg-white shadow-sm">
-        <div className="h-24 flex items-center justify-center" style={{ background: "linear-gradient(135deg, #E9F9EE 0%, #D2F2DC 100%)" }}>
-          <Building2 className="w-9 h-9" style={{ color: GREEN }} />
+        <div className="h-24 lg:h-16 flex items-center justify-center" style={{ background: "linear-gradient(135deg, #E9F9EE 0%, #D2F2DC 100%)" }}>
+          <Building2 className="w-9 h-9 lg:w-7 lg:h-7" style={{ color: GREEN }} />
         </div>
         <div className="p-4">
           <div className="flex items-center gap-2">
@@ -571,14 +619,57 @@ export const PropertyHubV2 = ({ user, prop, properties, setSelectedPropId, actio
           {prop.address && <div className="mt-0.5 text-[11px] text-slate-400">{prop.address}</div>}
         </div>
       </div>
-      <DocumentVaultCard prop={prop} />
-      <PassportCard prop={prop} />
-      <PropertyDnaCard propId={prop.id} />
-      <TwinMaturityCard propId={prop.id} actions={actions} />
-      <PropertyRisksCard propId={prop.id} actions={actions} />
-      <PropertyAssetsCard propId={prop.id} actions={actions} />
-      <DnaAttributesCard propId={prop.id} />
-      <div className="mt-4 space-y-2">
+
+      <div className="lg:mt-6 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start">
+        {/* Left sub-nav — doar desktop (record page) */}
+        <nav className="hidden lg:block lg:col-span-2 lg:sticky lg:top-6 space-y-0.5" data-testid="hub-subnav">
+          {HUB_SECTIONS.map(({ id, label, icon: Icon }) => (
+            <button key={id} onClick={() => goSection(id)} data-testid={`hub-subnav-${id}`}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[12px] font-bold text-left transition-colors ${section === id ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"}`}>
+              <Icon style={{ width: 15, height: 15 }} className="shrink-0" /> {label}
+            </button>
+          ))}
+          <div className="!mt-4 pt-3 border-t border-slate-100 space-y-0.5">
+            <button onClick={actions.openWallet} data-testid="hub-subnav-wallet"
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] font-bold text-slate-400 hover:bg-slate-100 text-left">
+              <Wallet style={{ width: 14, height: 14 }} className="shrink-0" /> Plăți & Portofel
+            </button>
+            <button onClick={actions.openPropManager} data-testid="hub-subnav-manage"
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] font-bold text-slate-400 hover:bg-slate-100 text-left">
+              <Settings2 style={{ width: 14, height: 14 }} className="shrink-0" /> Administrează
+            </button>
+          </div>
+        </nav>
+
+        {/* Main workspace — pe mobil stiva completă, pe desktop secțiunea activă */}
+        <div className="lg:col-span-7 min-w-0">
+          <div className={sec("carte")}><DocumentVaultCard prop={prop} /></div>
+          <div className={sec("pasaport")}><PassportCard prop={prop} /></div>
+          <div className={sec("rezumat")}><PropertyDnaCard propId={prop.id} /></div>
+          <div className={sec("twin")}><TwinMaturityCard propId={prop.id} actions={actions} /></div>
+          <div className={sec("istoric")}><PropertyRisksCard propId={prop.id} actions={actions} /></div>
+          <div className={sec("twin")}>
+            <PropertyAssetsCard propId={prop.id} actions={actions} />
+            <DnaAttributesCard propId={prop.id} />
+          </div>
+          {/* Acces rapid per secțiune — doar desktop */}
+          <div className={`hidden ${section === "twin" ? "lg:block" : ""} mt-4 space-y-2`} data-testid="hub-twin-links">
+            <ListItem icon={Box} label="Digital Twin" sub="locuința ta în 3D" onClick={() => { import("../../lib/analytics").then(({ trackIntent }) => trackIntent("twin_viewed")).catch(() => {}); actions.openTwin(); }} testid="v2-hub-twin-desktop" />
+            <ListItem icon={HeartPulse} label="House Health" sub="scor + recomandări" onClick={() => { import("../../lib/analytics").then(({ trackIntent }) => trackIntent("audit_viewed")).catch(() => {}); actions.openHealth(); }} testid="v2-hub-health-desktop" />
+          </div>
+          <div className={`hidden ${section === "istoric" ? "lg:block" : ""} mt-4`} data-testid="hub-istoric-links">
+            <ListItem icon={Clock} label="Timeline" sub="istoricul complet al proprietății" onClick={actions.openPropTimeline} testid="v2-hub-timeline-desktop" />
+          </div>
+        </div>
+
+        {/* Right Context Panel — doar desktop, sticky */}
+        <aside className="hidden lg:block lg:col-span-3 lg:sticky lg:top-6" data-testid="hub-context-panel">
+          <HouseStatusPanel prop={prop} onNextStep={() => goSection("carte")} />
+        </aside>
+      </div>
+
+      {/* Acces rapid — doar mobil (desktopul are sub-nav + panou) */}
+      <div className="mt-4 space-y-2 lg:hidden">
         <ListItem icon={Box} label="Digital Twin" sub="locuința ta în 3D" onClick={() => { import("../../lib/analytics").then(({ trackIntent }) => trackIntent("twin_viewed")).catch(() => {}); actions.openTwin(); }} testid="v2-hub-twin" />
         <ListItem icon={HeartPulse} label="House Health" sub="scor + recomandări" onClick={() => { import("../../lib/analytics").then(({ trackIntent }) => trackIntent("audit_viewed")).catch(() => {}); actions.openHealth(); }} testid="v2-hub-health" />
         <ListItem icon={Clock} label="Timeline" sub="istoricul proprietății" onClick={actions.openPropTimeline} testid="v2-hub-timeline" />

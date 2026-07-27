@@ -184,7 +184,8 @@ export default function ClientDashboardV2() {
 
         {tab === "home" && (!loaded ? <HomeSkeleton /> : <HomeV2 user={user} prop={prop} properties={properties} requests={requests} notifs={notifs} offersCount={offersCount} go={setTab} actions={actions} />)}
         {tab === "jobs" && <div className="lg:max-w-3xl"><JobsV2 requests={requests} actions={actions} /></div>}
-        {tab === "property" && <div className="lg:max-w-3xl"><PropertyHubV2 user={user} prop={prop} properties={properties} setSelectedPropId={setSelectedPropId} actions={actions} /></div>}
+        {/* PPOS P3d: Property Hub folosește tot spațiul pe desktop (record page) */}
+        {tab === "property" && <PropertyHubV2 user={user} prop={prop} properties={properties} setSelectedPropId={setSelectedPropId} actions={actions} />}
         {tab === "settings" && (
           <div className="px-5 pb-8 space-y-2 lg:max-w-3xl" data-testid="v2-settings-view">
             <BetaFeedbackEntry light />
