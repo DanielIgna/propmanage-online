@@ -145,6 +145,7 @@ const PartnerDashboard = lazy(() => import("./pages/partner/PartnerDashboard"));
 const ClientJuniorDashboard = lazy(() => import("./pages/dashboard/ClientJuniorDashboard"));
 const ClientV2Wireframe = lazy(() => import("./pages/dashboard/ClientV2Wireframe"));
 const ClientDashboardSwitch = lazy(() => import("./pages/clientv2/ClientDashboardSwitch"));
+const AdministratorWorkspace = lazy(() => import("./pages/AdministratorWorkspace"));
 const ContractPage = lazy(() => import("./pages/ContractPage"));
 const PreturiIndex = lazy(() => import("./pages/PreturiIndex"));
 const PreturiPage = lazy(() => import("./pages/PreturiPage"));
@@ -1695,6 +1696,7 @@ function App() {
               <Route path="/help/:token" element={<HelpPage />} />
               <Route path="/specialists/:id" element={<SpecialistProfile />} />
               <Route path="/client" element={<ClientDashboardSwitch />} />
+              <Route path="/administrator" element={<AdministratorWorkspace />} />
               <Route path="/specialist" element={<SpecialistDashboard />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/auth-health" element={<AdminAuthHealthPage />} />

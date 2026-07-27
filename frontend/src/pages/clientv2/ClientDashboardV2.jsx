@@ -66,6 +66,14 @@ export default function ClientDashboardV2() {
     // Deep-link taburi (onboarding checklist etc.): /client?tab=home|jobs|property|settings|request
     const params = new URLSearchParams(window.location.search);
     const wantedTab = params.get("tab");
+    const bInvite = params.get("binvite");
+    if (bInvite) {
+      localStorage.setItem("pm_building_invite", bInvite);
+      params.delete("binvite");
+      setTab("property");
+      const rest0 = params.toString();
+      window.history.replaceState(null, "", `/client${rest0 ? `?${rest0}` : ""}`);
+    }
     if (wantedTab) {
       if (wantedTab === "request") setShowWizard(true);
       else if (["home", "jobs", "property", "settings"].includes(wantedTab)) setTab(wantedTab);

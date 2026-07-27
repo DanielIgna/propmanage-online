@@ -148,12 +148,40 @@ const CampaignCard = ({ c, myPropIds, onJoin, onAccept, userId }) => {
 export const BuildingHub = ({ properties = [], onRequestsChanged }) => {
   const [data, setData] = useState(null);
   const [showConnect, setShowConnect] = useState(false);
+  const [invitePreview, setInvitePreview] = useState(null);
+  const [joinPropId, setJoinPropId] = useState("");
+  const [copiedInvite, setCopiedInvite] = useState(null);
 
   const load = () => axios.get(`${API}/buildings/mine`).then(r => setData(r.data)).catch(() => {});
   useEffect(() => { load(); }, []);
 
+  useEffect(() => {
+    const bid = localStorage.getItem("pm_building_invite");
+    if (!bid || !data) return;
+    if ((data.buildings || []).some(b => b.id === bid)) { localStorage.removeItem("pm_building_invite"); return; }
+    axios.get(`${API}/buildings/${bid}/preview`).then(r => {
+      setInvitePreview(r.data);
+      setJoinPropId(properties[0]?.id || "");
+    }).catch(() => localStorage.removeItem("pm_building_invite"));
+  }, [data, properties]);
+
   if (!data || properties.length === 0) return null;
   const buildings = data.buildings || [];
+
+  const acceptInvite = async () => {
+    try {
+      await axios.post(`${API}/buildings/${invitePreview.id}/join`, { property_id: joinPropId });
+      trackIntent("building_invite_claimed");
+      localStorage.removeItem("pm_building_invite");
+      setInvitePreview(null);
+      load();
+    } catch (e) { alert(formatApiError(e)); }
+  };
+  const copyInviteLink = async (b) => {
+    const link = `${window.location.origin}/register?binvite=${b.id}`;
+    try { await navigator.clipboard.writeText(`Blocul nostru e pe PropManage — conectează-ți apartamentul: ${link}`); setCopiedInvite(b.id); setTimeout(() => setCopiedInvite(null), 2000); } catch {}
+    trackIntent("building_invite_shared");
+  };
 
   const joinCampaign = async (c, building) => {
     const pid = building.my_property_ids[0];
@@ -187,6 +215,24 @@ export const BuildingHub = ({ properties = [], onRequestsChanged }) => {
       <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-400 px-1 flex items-center gap-1.5">
         <Building2 className="w-3.5 h-3.5" style={{ color: GREEN }} /> Blocul meu
       </h3>
+      {invitePreview && (
+        <div className="mt-3 rounded-3xl border-2 border-[#34C759]/40 bg-[#34C759]/5 p-4" data-testid="bh-invite-banner">
+          <div className="text-sm font-black text-slate-900">Ai fost invitat în „{invitePreview.name}"</div>
+          <p className="mt-1 text-xs text-slate-500">{invitePreview.address} · {invitePreview.members_count} {invitePreview.members_count === 1 ? "vecin conectat" : "vecini conectați"}. Conectează-ți apartamentul pentru anunțuri, calendar comun și campanii de grup.</p>
+          <div className="mt-3 flex gap-2 items-center flex-wrap">
+            {properties.length > 1 && (
+              <select value={joinPropId} onChange={e => setJoinPropId(e.target.value)} data-testid="bh-invite-property"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold">
+                {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            )}
+            <button onClick={acceptInvite} data-testid="bh-invite-accept"
+              className="px-5 py-2.5 rounded-full text-xs font-black text-white" style={{ background: GREEN }}>Mă alătur blocului</button>
+            <button onClick={() => { localStorage.removeItem("pm_building_invite"); setInvitePreview(null); }} data-testid="bh-invite-dismiss"
+              className="px-4 py-2.5 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-500">Nu acum</button>
+          </div>
+        </div>
+      )}
       {buildings.length === 0 ? (
         <button onClick={() => setShowConnect(true)} data-testid="bh-empty-cta"
           className="mt-3 w-full rounded-3xl border-2 border-dashed border-slate-200 bg-white p-5 text-left">
@@ -202,7 +248,29 @@ export const BuildingHub = ({ properties = [], onRequestsChanged }) => {
               <div className="text-sm font-black text-slate-900 truncate">{b.name}</div>
               <div className="text-[11px] text-slate-400 flex items-center gap-1"><Users className="w-3 h-3" /> {b.members_count} {b.members_count === 1 ? "vecin conectat" : "vecini conectați"} · {b.properties_count} apartamente</div>
             </div>
+            <button onClick={() => copyInviteLink(b)} data-testid={`bh-share-${b.id}`}
+              className="shrink-0 px-3 py-2 rounded-full bg-slate-50 border border-slate-100 text-[10px] font-bold text-slate-500 flex items-center gap-1">
+              {copiedInvite === b.id ? <Check className="w-3 h-3" style={{ color: GREEN }} /> : <Plus className="w-3 h-3" />}
+              {copiedInvite === b.id ? "Copiat" : "Invită vecini"}
+            </button>
           </div>
+          {b.is_admin && (
+            <a href="/administrator" data-testid={`bh-admin-link-${b.id}`}
+              className="mt-3 flex items-center justify-between rounded-2xl bg-slate-900 px-4 py-3 text-white">
+              <span className="text-xs font-black">🏢 Administrare bloc — dashboard, locatari, anunțuri</span>
+              <span className="text-xs font-black">→</span>
+            </a>
+          )}
+          {(b.announcements || []).length > 0 && (
+            <div className="mt-3 space-y-1.5" data-testid={`bh-announcements-${b.id}`}>
+              {b.announcements.map(a => (
+                <div key={a.id} className="rounded-xl bg-slate-50 px-3 py-2">
+                  <div className="text-[11px] font-black text-slate-800">📢 {a.title}</div>
+                  <div className="text-[10px] text-slate-500 line-clamp-2">{a.body}</div>
+                </div>
+              ))}
+            </div>
+          )}
           {(b.opportunities || []).length > 0 && (
             <div className="mt-3 space-y-2">
               {b.opportunities.map(opp => (

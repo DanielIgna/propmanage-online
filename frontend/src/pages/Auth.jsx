@@ -178,6 +178,9 @@ export const RegisterPage = () => {
   // GBOS P0.1 — invitație personală: codul se revendică după primul login (claimPendingInvite)
   const _inviteCode = _params.get("invite");
   if (_inviteCode) localStorage.setItem("pm_invite_code", _inviteCode);
+  // PM-PILOT-001 — invitație de bloc: /register?binvite=<buildingId>, revendicată în BuildingHub
+  const _bInvite = _params.get("binvite");
+  if (_bInvite) localStorage.setItem("pm_building_invite", _bInvite);
   // Recruitment funnel (CIP-A): /register?role=specialist&category=<legacy>
   const _inviteCategory = _params.get("category");
   const _inviteRole = _params.get("role");

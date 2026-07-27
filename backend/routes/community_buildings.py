@@ -119,6 +119,7 @@ async def create_building(data: BuildingIn, user: dict = Depends(require_role("c
     if dup:
         raise HTTPException(409, "Blocul există deja — folosește căutarea și alătură-te")
     doc = {"name": data.name, "address": data.address, "city": data.city,
+           "administrator_id": user["id"],
            "created_by": user["id"], "created_by_name": user["name"], "created_at": _now()}
     res = await db.buildings.insert_one(doc)
     bid = str(res.inserted_id)
@@ -168,13 +169,19 @@ async def my_buildings(user: dict = Depends(require_role("client"))):
         campaigns = [_serialize_campaign(c, user["id"]) async for c in
                      db.community_campaigns.find({"building_id": bid, "status": {"$in": ["open", "scheduled"]}})
                      .sort("created_at", -1).limit(10)]
+        announcements = [{"id": str(a["_id"]), "title": a["title"], "body": a["body"],
+                          "author_name": a.get("author_name"), "created_at": a["created_at"]}
+                         async for a in db.building_announcements.find({"building_id": bid})
+                         .sort("created_at", -1).limit(3)]
         out.append({
             "id": bid, "name": b["name"], "address": b.get("address"), "city": b.get("city"),
             "members_count": len(owners),
             "properties_count": len(await _building_property_ids(bid)),
             "my_property_ids": [str(p["_id"]) for p in my_props if p.get("building_id") == bid],
+            "is_admin": b.get("administrator_id") == user["id"] or b.get("created_by") == user["id"],
             "opportunities": await detect_opportunities(bid),
             "campaigns": campaigns,
+            "announcements": announcements,
         })
     return {"buildings": out, "me": user["id"],
             "my_properties": [{"id": str(p["_id"]), "name": p.get("name"),
