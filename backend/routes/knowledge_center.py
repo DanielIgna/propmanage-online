@@ -267,14 +267,25 @@ async def knowledge_tree(user=Depends(require_role("admin"))):
             "categories": [{"name": c, "count": len(cats[c]), "docs": cats[c]} for c in ordered]}
 
 
+_TITLES_CACHE = {"key": None, "counter": Counter()}
+
+
+def _title_counts(ctx: dict) -> Counter:
+    files = list(_all_files())
+    key = (len(files), max((p.stat().st_mtime for p, _ in files), default=0))
+    if _TITLES_CACHE["key"] != key:
+        _TITLES_CACHE["counter"] = Counter(_doc_meta(p, rel, ctx)["title"] for p, rel in files)
+        _TITLES_CACHE["key"] = key
+    return _TITLES_CACHE["counter"]
+
+
 @router.get("/doc")
 async def knowledge_doc(path: str = Query(...), user=Depends(require_role("admin"))):
     _require_owner(user)
     p = _safe_resolve(path)
     ctx = _reg_ctx()
     meta = _doc_meta(p, path, ctx)
-    docs_titles = Counter(m["title"] for m in (_doc_meta(pp, rr, ctx) for pp, rr in _all_files()))
-    gate = _quality_gate(meta, docs_titles)
+    gate = _quality_gate(meta, _title_counts(ctx))
     if meta["status"] == "Active" and not gate["passed"]:
         meta["status"] = "Review"
     return {"meta": meta, "gate": gate,

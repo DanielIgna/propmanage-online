@@ -1,3 +1,18 @@
+## 🚀 EO-004 PRODUCT FIRST + EO-005A Digital Twin Gap Analysis (Iun 26, 2026)
+
+**PIVOT MAJOR (Fondator)**: EO-004 „PRODUCT FIRST" ACTIVE — OS-ul Enterprise devine fabrica, nu produsul. Prioritate: valoare client (Faza 1 Digital Twin → Marketplace → Verified Properties → ...). Salvate VERBATIM: `board/EXECUTION_ORDER_004_PRODUCT_FIRST.md`, `board/EXECUTION_ORDER_005_DIGITAL_TWIN_GAP_ANALYSIS.md` (+ decizia cu 2 workstreams), `board/ENTERPRISE_OS_MATURITY_DECLARATION.md`, `board/EO_OS_MISSIONS_INSPECTOR_V2_AND_TOOLING.md` (8 misiuni OS — Inspector V2, CTRL+K, Impact Analysis, Command Center, Deploy Gate, Auto-doc, Self-Audit → statusul de execuție decis de Fondator, recomandat BACKLOG per Product Decision Filter), `constitution/PROPMANAGE_PRODUCT_CONSTITUTION.md` (ACTIVE), `constitution/PRODUCT_MANIFESTO.md`, `governance/PRODUCT_DECISION_FILTER.md`.
+
+**WORKSTREAM A — EO-002 ÎNCHIS ✅ (iter. 132: backend 17/17, frontend 100%, zero probleme critice)**: Knowledge Center IDE (3 panouri: categorii/documente/inspector + timeline), Lifecycle automat R2/R3 (Draft/Review/Active/Archived derivat DOAR din evidență — 184 docs: 33 Active/132 Review/18 Draft/1 Archived), Health Score R4, Quality Gate R8, Founder Review Mode R7, Dependency Map v2 R1/R6 (zoom, culori pe tip relație, edges clickabile cu evidență, vedere Matrice 44 celule, fade 15%, glow, fullscreen). Fix-uri post-test aplicate: guard `critical_failed`, error state RegistryGraph (`rg-error`), cache `_title_counts` cu invalidare pe mtime (`/doc`: ~1s → ~120ms, verificat curl). Backlog tehnic acceptat: mini-map + Force/Sankey/Timeline views (irelevante la 46 noduri), AbortController InspectorPane, toggle label fullscreen.
+
+**WORKSTREAM B — EO-005A LIVRAT ✅ (audit fără cod, Truth Engine)**: `/app/docs/DIGITAL_TWIN_GAP_ANALYSIS_2026.md` — Founder Decision Pack complet (9 pași): Capability Matrix (14✅/4🟡/8⛔/7❌/1❓ cu evidență fișier:linie), Customer Journey cu dead-ends, Maturitate ~45/100 pe 15 subsisteme, Gap-uri G1–G20 (CRITICAL: G1 Document Vault inexistent, G2 fragmentarea celor **4 sisteme twin separate** — properties/DNA · twins operator · digital_twin_projects Pro · hh_* House Health (HH cere proiect DT Pro, NU twin-ul validat!), G3 Timeline incomplet, G4 Transfer proprietate = 0 linii de cod deși e promisiunea constituțională), Blueprint per gap, **Sprint Roadmap S1–S6** (S1 Document Vault+foto · S2 Twin unificat+fix HH lock · S3 Property Passport+QR · S4 Calendar mentenanță→marketplace · S5 Transfer cu istoric · S6 Owner AI), MVP plătibil = twin+documente+audit+pașaport, review competitiv. Alte dovezi cheie: DNA `maintenance`/`sensors` hardcodate False deși `maintenance_logs`+validare operator există; `twins.model_url` = placeholder; PropertyIn fără foto.
+
+**AȘTEAPTĂ DECIZIA FONDATORULUI (EO-005B)**: 1) aprobă roadmap S1–S6 (recomandare: start S1)? 2) aprobă repoziționarea House Health pe twin-ul real (un singur gating)? 3) confirmă monetizarea (twin gratuit + audit plătit + un abonament)? — implementarea NU începe fără aprobare explicită (regulă EO-005).
+
+**Blockere externe neschimbate (Founder)**: Stripe LIVE · Resend DNS (Rackhost).
+
+---
+
+
 ## 🗺️ EXECUTION ORDER 002 · V2+V3 — Dashboard Inspector + Enterprise Explorer + Architecture Navigator (Iun 26, 2026)
 
 **Decizie Fondator**: EO-001 rămâne SUPREM; EO-003 (32 misiuni, salvat verbatim în `board/EXECUTION_ORDER_003_MISSION_BACKLOG.md` + gap analysis în `docs/BOARD_REVIEW_EXECUTION_ORDER_003.md`) → BACKLOG. Continuă doar scope-ul Enterprise Visibility aprobat. Conflict rută rezolvat: `/admin/war-room` rămâne Mission 100; viitorul incidents war room va fi `/admin/incidents-war-room` (backlog).

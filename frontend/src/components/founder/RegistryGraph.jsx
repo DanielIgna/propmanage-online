@@ -65,6 +65,7 @@ const EdgeDetail = ({ edge, names, onClose }) => (
 
 export const RegistryGraph = ({ typeFilter = null, search = "", onOpenDoc = null }) => {
   const [reg, setReg] = useState(null);
+  const [regErr, setRegErr] = useState(null);
   const [sel, setSel] = useState(null);
   const [selEdge, setSelEdge] = useState(null);
   const [hoverEdge, setHoverEdge] = useState(null);
@@ -75,7 +76,8 @@ export const RegistryGraph = ({ typeFilter = null, search = "", onOpenDoc = null
 
   useEffect(() => {
     axios.get(`${API}/api/founder/knowledge/registry`, { withCredentials: true })
-      .then(r => setReg(r.data)).catch(() => {});
+      .then(r => setReg(r.data))
+      .catch(e => setRegErr(e?.response?.status === 403 ? "Registrul este disponibil exclusiv Fondatorului." : "Registrul nu a putut fi încărcat."));
   }, []);
 
   const viewData = useMemo(() => {
@@ -110,6 +112,7 @@ export const RegistryGraph = ({ typeFilter = null, search = "", onOpenDoc = null
     return { lvl1, lvl2 };
   }, [reg, sel]);
 
+  if (regErr) return <div className="text-sm text-red-300 border border-red-500/20 bg-red-500/5 rounded-xl p-4" data-testid="rg-error">{regErr}</div>;
   if (!reg || !viewData) return <div className="flex items-center gap-2 text-stone-400 text-sm p-6"><Loader2 className="w-4 h-4 animate-spin" /> Se încarcă registrul...</div>;
   const names = Object.fromEntries(reg.nodes.map(n => [n.id, n]));
   const selEdges = sel ? reg.edges.filter(e => e.source === sel.id || e.target === sel.id) : [];

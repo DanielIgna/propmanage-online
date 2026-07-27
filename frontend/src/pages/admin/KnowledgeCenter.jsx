@@ -111,7 +111,7 @@ const InspectorPane = ({ path, onOpen }) => {
               <HealthBar label="Implementare" value={h.implementation} max={25} />
               <HealthBar label="Evidență" value={h.evidence} max={20} />
               <HealthBar label="Completitudine" value={h.completeness} max={20} />
-              <div className="text-[10px] text-stone-500">Confidence: {h.confidence} · Quality Gate: <span className={data.gate.passed ? "text-emerald-300" : "text-amber-300"}>{data.gate.passed ? "PASSED" : `REVIEW (${data.gate.critical_failed.join(", ")})`}</span> · Quality {data.gate.quality_score}%</div>
+              <div className="text-[10px] text-stone-500">Confidence: {h.confidence} · Quality Gate: <span className={data.gate.passed ? "text-emerald-300" : "text-amber-300"}>{data.gate.passed ? "PASSED" : `REVIEW (${(data.gate.critical_failed || []).join(", ")})`}</span> · Quality {data.gate.quality_score}%</div>
             </div>
           </div>
           {(data.relationships?.depends_on?.length > 0 || data.relationships?.used_by?.length > 0) && (
