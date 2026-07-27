@@ -140,7 +140,7 @@ const CopilotCard = ({ go, actions, hasProps }) => {
           </p>
         )}
         <div className="mt-3 space-y-2">
-          {data.actions.map((a) => (
+          {data.actions.slice(0, 2).map((a) => (
             <button key={a.kind} onClick={() => run(a)} data-testid={`v2-copilot-action-${a.kind}`}
               className="w-full flex items-center gap-2.5 rounded-2xl border border-slate-100 bg-white p-3 text-left active:scale-[0.98] transition-transform">
               <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-[#166534]" />
@@ -149,7 +149,32 @@ const CopilotCard = ({ go, actions, hasProps }) => {
             </button>
           ))}
         </div>
+        <button onClick={actions.openAI} data-testid="v2-copilot-ask-ai"
+          className="mt-2.5 w-full flex items-center gap-2 rounded-2xl p-2.5 text-left text-[11px] font-bold text-slate-500 hover:text-slate-700 transition-colors">
+          <MessageCircle className="w-3.5 h-3.5 text-violet-500 shrink-0" /> Întreabă AI — asistent 24/7 <ChevronRight className="w-3.5 h-3.5 ml-auto text-slate-300" />
+        </button>
       </div>
+    </div>
+  );
+};
+
+// PPOS P3b — Right Context Panel: starea casei, mereu vizibilă pe desktop
+const PropertyStatusCard = ({ prop, docsCount, go }) => {
+  if (!prop) return null;
+  return (
+    <div className="mx-5 mt-6 lg:mx-0 lg:mt-0 cv2-fade cv2-d1" data-testid="v2-property-status">
+      <button onClick={() => go("property")} className="w-full rounded-3xl border border-slate-100 bg-white p-4 shadow-sm text-left hover:-translate-y-0.5 transition-transform">
+        <div className="flex items-center gap-3">
+          <span className="w-10 h-10 rounded-xl bg-[#166534]/5 flex items-center justify-center shrink-0">
+            <Building2 className="w-5 h-5 text-[#166534]" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-black text-slate-900 truncate">{prop.name}</div>
+            <div className="text-[10px] text-slate-400 truncate">{prop.address || "cartea casei"}{docsCount != null ? ` · ${docsCount} documente` : ""}</div>
+          </div>
+          <span className="text-[11px] font-black text-[#166534] shrink-0 flex items-center">Casa mea <ChevronRight className="w-3.5 h-3.5" /></span>
+        </div>
+      </button>
     </div>
   );
 };
@@ -243,18 +268,12 @@ const DEFAULT_LAYOUT = [
   { id: "copilot", enabled: true }, { id: "contextual", enabled: true }, { id: "discover", enabled: true },
 ];
 
+// PPOS P3b — Dashboard OS: ordinea sloturilor e LEGE (Hero → Alerts → Progress → Optional).
+// Onboarding (J0/J1): DOAR hero-ul ghidat. Desktop: workspace 8+4 cu Right Context Panel.
 export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, go, actions }) => {
   const navigate = useNavigate();
-  const [layout, setLayout] = useState(DEFAULT_LAYOUT);
   const [hidden, setHidden] = useState([]);
   useEffect(() => {
-    axios.get(`${API}/xos/layout/client_home`).then(r => {
-      if (r.data.items?.length) {
-        const items = r.data.items;
-        const merged = [...items, ...DEFAULT_LAYOUT.filter(d => !items.find(i => i.id === d.id))];
-        setLayout(merged);
-      }
-    }).catch(() => {});
     axios.get(`${API}/ui-rules/my`).then(r => setHidden(r.data.hidden || [])).catch(() => {});
   }, []);
   const activeReqs = requests.filter(r => r.status !== "confirmed");
@@ -292,82 +311,81 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
   if (doneReq) contextual.push({ icon: ShieldCheck, text: `«${doneReq.title}» a fost finalizată — confirmă lucrarea`, cta: "Confirmă", onClick: () => actions.confirmRequest(doneReq.id, doneReq), tid: "v2-ctx-confirm" });
   if (contextual.length < 2 && unread[0]) contextual.push({ icon: Bell, text: unread[0].title, cta: "Vezi", onClick: actions.openNotifs, tid: "v2-ctx-notif" });
 
-  // XOS: widget-uri randate în ordinea/vizibilitatea din Layout Builder + UI Rules
-  const widgets = {
-    hero: (
-      <div className="cv2-fade" key="hero">
-        {properties.length === 0 ? <HeroA onAddProperty={actions.openPropManager} />
-          : activeReq ? <HeroC req={activeReq} offersCount={offersCount} onCta={heroCta} />
-          : docsCount === 0 ? <HeroDoc prop={prop} onOpen={() => go("property")} />
-          : <HeroB prop={prop} confirmedCount={confirmedCount} onRequest={actions.openWizard} />}
+  // PPOS: stadiile de onboarding primesc DOAR pasul lor — nimic altceva
+  const onboarding = properties.length === 0 || (!activeReq && docsCount === 0);
+  const txActive = requests.some(r => (r.status === "assigned" && !r.escrow_amount) || r.status === "completed");
+  const show = (id) => !hidden.includes(`widget:${id}`);
+
+  const hero = show("hero") && (
+    <div className="cv2-fade" key="hero">
+      {properties.length === 0 ? <HeroA onAddProperty={actions.openPropManager} />
+        : activeReq ? <HeroC req={activeReq} offersCount={offersCount} onCta={heroCta} />
+        : docsCount === 0 ? <HeroDoc prop={prop} onOpen={() => go("property")} />
+        : <HeroB prop={prop} confirmedCount={confirmedCount} onRequest={actions.openWizard} />}
+    </div>
+  );
+
+  if (onboarding) {
+    return (
+      <div className="lg:px-5 lg:max-w-3xl" data-testid="v2-home-onboarding">
+        {hero}
       </div>
-    ),
-    quick_actions: (
-      <div key="quick_actions" className="mx-5 mt-5 lg:mx-0 lg:mt-0 grid grid-cols-2 lg:grid-cols-4 gap-3 cv2-fade cv2-d1" data-testid="v2-actions">
-        {[
-          [Plus, "Solicită", "serviciu nou", actions.openWizard, "v2-action-request", "text-[#166534]", false],
-          [Building2, "Proprietatea", prop ? prop.name : "adaugă prima", () => go("property"), "v2-action-property", "text-sky-600", false],
-          [Wrench, "Lucrări", activeReqs.length ? `${activeReqs.length} active` : "istoric", () => go("jobs"), "v2-action-jobs", "text-amber-600", false],
-          [MessageCircle, "Întreabă AI", "asistent 24/7", actions.openAI, "v2-action-ai", "text-violet-600", true],
-        ].map(([Icon, label, sub, onClick, tid, color, aiGlow]) => (
-          <button key={label} onClick={onClick} data-testid={tid}
-            className={`rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm min-h-[104px] transition-transform duration-300 hover:-translate-y-1 active:scale-[0.97] ${aiGlow ? "xos-ai-glow" : ""}`}>
-            <Icon className={`w-5 h-5 ${color}`} strokeWidth={1.9} />
-            <div className="mt-3 text-sm font-black text-slate-900">{label}</div>
-            <div className="text-[10px] text-slate-400 font-medium truncate">{sub}</div>
+    );
+  }
+
+  const contextualEl = show("contextual") && contextual.length > 0 && (
+    <div key="contextual" className="mx-5 mt-6 lg:mx-0 lg:mt-0 cv2-fade cv2-d2" data-testid="v2-contextual">
+      <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 px-1">Noutăți pentru tine</h3>
+      <div className="mt-2 space-y-2">
+        {contextual.slice(0, 2).map(({ icon: Icon, text, cta, onClick, tid }) => (
+          <button key={tid} onClick={onClick} data-testid={tid}
+            className="w-full flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm text-left active:scale-[0.98] transition-transform">
+            <Icon className="w-4.5 h-4.5 shrink-0 text-[#166534]" style={{ width: 18, height: 18 }} />
+            <span className="text-xs font-semibold text-slate-700 flex-1 leading-snug">{text}</span>
+            <span className="text-[11px] font-black flex items-center shrink-0 text-[#166534]">{cta}<ChevronRight className="w-3.5 h-3.5" /></span>
           </button>
         ))}
       </div>
-    ),
-    copilot: <CopilotCard key="copilot" go={go} actions={actions} hasProps={properties.length > 0} />,
-    opportunities: <OpportunitiesCard key="opportunities" actions={actions} go={go} />,
-    contextual: contextual.length > 0 ? (
-      <div key="contextual" className="mx-5 mt-6 lg:mx-0 lg:mt-0 cv2-fade cv2-d2" data-testid="v2-contextual">
-          <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 px-1">Noutăți pentru tine</h3>
-          <div className="mt-2 space-y-2">
-            {contextual.slice(0, 2).map(({ icon: Icon, text, cta, onClick, tid }) => (
-              <button key={tid} onClick={onClick} data-testid={tid}
-                className="w-full flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm text-left active:scale-[0.98] transition-transform">
-                <Icon className="w-4.5 h-4.5 shrink-0 text-[#166534]" style={{ width: 18, height: 18 }} />
-                <span className="text-xs font-semibold text-slate-700 flex-1 leading-snug">{text}</span>
-                <span className="text-[11px] font-black flex items-center shrink-0 text-[#166534]">{cta}<ChevronRight className="w-3.5 h-3.5" /></span>
-              </button>
-            ))}
-          </div>
-        </div>
-    ) : null,
-    discover: (
-      <div key="discover" className="mt-7 lg:mt-2 pb-8 cv2-fade cv2-d3" data-testid="v2-discover">
-        <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 px-6 lg:px-1">Descoperă</h3>
-        <div className="mt-2 flex gap-3 overflow-x-auto px-5 lg:px-0 lg:grid lg:grid-cols-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {(prop ? [
-            ["Digital Twin", "locuința ta în 3D", IMG_TWIN, actions.openTwin],
-            ["House Health", "scorul casei tale", IMG_HEALTH, actions.openHealth],
-            ["Ghid întreținere", "sfaturi sezoniere", IMG_GUIDE, actions.openAI],
-          ] : [
-            ["Digital Twin", "locuința ta în 3D", IMG_TWIN, actions.openTwin],
-          ]).map(([l, s, img, onClick]) => (
-            <button key={l} onClick={onClick}
-              className="group relative shrink-0 w-44 h-28 lg:w-full lg:h-36 rounded-2xl overflow-hidden text-left shadow-sm transition-transform duration-300 hover:-translate-y-1">
-              <img src={img} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-              <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" aria-hidden="true" />
-              <span className="relative z-10 flex h-full flex-col justify-end p-3.5">
-                <span className="text-xs lg:text-sm font-black xos-on-image">{l}</span>
-                <span className="text-[10px] xos-on-image-muted">{s}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-    ),
-  };
+    </div>
+  );
 
-  const visible = layout.filter(w => w.enabled && !hidden.includes(`widget:${w.id}`) && widgets[w.id]);
+  const discoverEl = show("discover") && (
+    <div key="discover" className="mt-7 lg:mt-0 pb-8 cv2-fade cv2-d3" data-testid="v2-discover">
+      <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 px-6 lg:px-1">Descoperă</h3>
+      <div className="mt-2 flex gap-3 overflow-x-auto px-5 lg:px-0 lg:grid lg:grid-cols-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {[
+          ["Digital Twin", "locuința ta în 3D", IMG_TWIN, actions.openTwin],
+          ["House Health", "scorul casei tale", IMG_HEALTH, actions.openHealth],
+          ["Ghid întreținere", "sfaturi sezoniere", IMG_GUIDE, actions.openAI],
+        ].map(([l, s, img, onClick]) => (
+          <button key={l} onClick={onClick}
+            className="group relative shrink-0 w-44 h-28 lg:w-full lg:h-32 rounded-2xl overflow-hidden text-left shadow-sm transition-transform duration-300 hover:-translate-y-1">
+            <img src={img} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" aria-hidden="true" />
+            <span className="relative z-10 flex h-full flex-col justify-end p-3.5">
+              <span className="text-xs lg:text-sm font-black xos-on-image">{l}</span>
+              <span className="text-[10px] xos-on-image-muted">{s}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Desktop: workspace 8+4 (main + Right Context Panel). Mobil: stivă în ordinea PPOS.
   return (
-    <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:grid-flow-dense lg:items-start lg:px-5">
-      {visible.map(w => (
-        <div key={w.id} className={WIDGET_SPAN[w.id] || "lg:col-span-12"}>{widgets[w.id]}</div>
-      ))}
+    <div className="lg:px-5 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start" data-testid="v2-home-workspace">
+      <div className="lg:col-span-8 lg:space-y-6 min-w-0">
+        {hero}
+        {contextualEl}
+        {/* Upsell-ul nu concurează niciodată o tranzacție activă (PPOS) */}
+        {show("opportunities") && !txActive && <OpportunitiesCard key="opportunities" actions={actions} go={go} />}
+        {discoverEl}
+      </div>
+      <div className="lg:col-span-4 lg:space-y-6 lg:sticky lg:top-6">
+        <PropertyStatusCard prop={prop} docsCount={docsCount} go={go} />
+        {show("copilot") && <CopilotCard key="copilot" go={go} actions={actions} hasProps={properties.length > 0} />}
+      </div>
     </div>
   );
 };

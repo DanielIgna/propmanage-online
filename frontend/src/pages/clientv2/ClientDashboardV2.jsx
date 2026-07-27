@@ -169,6 +169,7 @@ export default function ClientDashboardV2() {
               <Icon style={{ width: 18, height: 18 }} /> {label === "Propr." ? "Proprietăți" : label}
             </button>
           ))}
+          {!(tab === "home" && properties.length === 0) && (
           <button onClick={() => actions.openWizard()} data-testid="v2-desktop-cta"
             className={`ml-auto flex items-center gap-2 px-6 py-3 rounded-full text-sm font-black transition-transform ${txActive
               ? "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
@@ -176,6 +177,7 @@ export default function ClientDashboardV2() {
             style={txActive ? undefined : { background: "#ccff00" }}>
             <Plus style={{ width: 18, height: 18 }} strokeWidth={2.6} /> {prop ? "Solicită ofertă" : "Adaugă proprietatea"}
           </button>
+          )}
         </div>
 
         {TITLES[tab] && <h1 className="px-5 pb-3 xos-display text-2xl lg:text-3xl font-medium tracking-tight text-slate-900">{TITLES[tab]}</h1>}

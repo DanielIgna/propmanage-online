@@ -118,54 +118,6 @@ export const SpecialistDashboard = () => {
 
   return (
     <DashLayout role="specialist" title={title} bottomNav={<BottomNav tabs={tabs} active={tab} onChange={setTab} dataPrefix="spec-tab" />}>
-      {/* Zona XOS (specialist_home): widget-uri ordonate/vizibile din Layout Builder + UI Rules */}
-      {!entryMode && tab === "opportunities" && (() => {
-        const xosWidgets = {
-          today_summary: (
-            <div className="mb-8 pm-fade-in" data-testid="spec-today-summary">
-              <h3 className="text-[11px] font-bold uppercase tracking-[0.22em] mb-4" style={{ color: "var(--pm-text-muted)" }}>Astăzi ai</h3>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-                {[
-                  { label: "Cereri noi", value: open.length, onClick: () => document.querySelector('[data-tour="specialist-leads"]')?.scrollIntoView({ behavior: "smooth" }), testid: "spec-today-open" },
-                  { label: "Lucrări în lucru", value: mine.filter(r => r.status !== "confirmed").length, onClick: () => setTab("jobs"), testid: "spec-today-active" },
-                  { label: "Notificări necitite", value: unreadNotifs, onClick: () => setTab("notifications"), testid: "spec-today-notifs" },
-                  { label: "Încasări luna aceasta", value: monthlyEarnings.toLocaleString("ro"), suffix: "RON", accent: true, onClick: () => setTab("jobs"), testid: "spec-today-earnings" },
-                ].map(({ label, value, suffix, accent, onClick, testid }) => (
-                  <button key={testid} onClick={onClick} data-testid={testid}
-                    className="text-left rounded-2xl border p-4 lg:p-5 transition-transform duration-300 hover:-translate-y-1"
-                    style={{
-                      background: accent ? "rgba(204,255,0,0.07)" : "var(--pm-surface)",
-                      borderColor: accent ? "rgba(204,255,0,0.3)" : "var(--pm-outline)",
-                    }}>
-                    <div className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "var(--pm-text-muted)" }}>{label}</div>
-                    <div className="mt-2.5 xos-num text-4xl lg:text-5xl leading-none" style={{ color: accent ? "var(--pm-accent-ink)" : "var(--pm-text)" }}>
-                      {value}{suffix && <span className="text-sm font-semibold ml-1.5 align-baseline" style={{ color: "var(--pm-text-variant)" }}>{suffix}</span>}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ),
-          cockpit: <SpecialistCockpit onGo={(dest) => (dest === "opportunities" ? window.scrollTo({ top: 0 }) : setTab(dest))} />,
-          quests: tierInfo.canSeeQuests ? <QuestPanel hideActive={mine.length > 0 || (user?.jobs_completed || 0) > 0} /> : null,
-          tier_tools: null,
-          tier_progress: (
-            <SpecialistProgressCard
-              user={user}
-              mine={mine}
-              onGoLeads={() => document.querySelector('[data-tour="specialist-leads"]')?.scrollIntoView({ behavior: "smooth" })}
-              className="mb-4"
-            />
-          ),
-        };
-        const order = xosLayout || [
-          { id: "today_summary", enabled: true }, { id: "cockpit", enabled: true },
-          { id: "quests", enabled: true }, { id: "tier_tools", enabled: true }, { id: "tier_progress", enabled: true },
-        ];
-        return order
-          .filter(w => w.enabled && !xosHidden.includes(`widget:${w.id}`))
-          .map(w => <React.Fragment key={w.id}>{xosWidgets[w.id] || null}</React.Fragment>);
-      })()}
       {entryMode && tab === "opportunities" && (
         <SpecialistEntryHome user={user} open={filtered(open)} mine={mine} onAccept={openAccept}
           onVerify={() => setShowDocs(true)} onGoJobs={() => setTab("jobs")}
@@ -192,8 +144,57 @@ export const SpecialistDashboard = () => {
         </PMCard>
       )}
 
-      {!entryMode && tab === "opportunities" && (
-        <>
+      {/* PPOS P3c — Mission Control: Main Workspace (8) + Right Context Panel (4) */}
+      {!entryMode && tab === "opportunities" && (() => {
+        const xosWidgets = {
+          today_summary: (
+            <div className="mb-6 pm-fade-in" data-testid="spec-today-summary">
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.22em] mb-3" style={{ color: "var(--pm-text-muted)" }}>Astăzi ai</h3>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: "Cereri noi", value: open.length, onClick: () => document.querySelector('[data-tour="specialist-leads"]')?.scrollIntoView({ behavior: "smooth" }), testid: "spec-today-open" },
+                  { label: "Lucrări în lucru", value: mine.filter(r => r.status !== "confirmed").length, onClick: () => setTab("jobs"), testid: "spec-today-active" },
+                  { label: "Notificări necitite", value: unreadNotifs, onClick: () => setTab("notifications"), testid: "spec-today-notifs" },
+                  { label: "Încasări luna aceasta", value: monthlyEarnings.toLocaleString("ro"), suffix: "RON", accent: true, onClick: () => setTab("jobs"), testid: "spec-today-earnings" },
+                ].map(({ label, value, suffix, accent, onClick, testid }) => (
+                  <button key={testid} onClick={onClick} data-testid={testid}
+                    className="text-left rounded-2xl border p-4 transition-transform duration-300 hover:-translate-y-1"
+                    style={{
+                      background: accent ? "rgba(204,255,0,0.07)" : "var(--pm-surface)",
+                      borderColor: accent ? "rgba(204,255,0,0.3)" : "var(--pm-outline)",
+                    }}>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "var(--pm-text-muted)" }}>{label}</div>
+                    <div className="mt-2 xos-num text-3xl leading-none" style={{ color: accent ? "var(--pm-accent-ink)" : "var(--pm-text)" }}>
+                      {value}{suffix && <span className="text-sm font-semibold ml-1.5 align-baseline" style={{ color: "var(--pm-text-variant)" }}>{suffix}</span>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ),
+          // PPOS: Cockpit-ul de pipeline se deblochează la ADVANCED+ (progressive disclosure)
+          cockpit: ["ADVANCED", "PREMIUM", "TOP"].includes(user?.tier) ? <SpecialistCockpit onGo={(dest) => (dest === "opportunities" ? window.scrollTo({ top: 0 }) : setTab(dest))} /> : null,
+          quests: tierInfo.canSeeQuests ? <QuestPanel hideActive={mine.length > 0 || (user?.jobs_completed || 0) > 0} /> : null,
+          tier_tools: null,
+          tier_progress: (
+            <SpecialistProgressCard
+              user={user}
+              mine={mine}
+              onGoLeads={() => document.querySelector('[data-tour="specialist-leads"]')?.scrollIntoView({ behavior: "smooth" })}
+              className="mb-4"
+            />
+          ),
+        };
+        const order = xosLayout || [
+          { id: "today_summary", enabled: true }, { id: "cockpit", enabled: true },
+          { id: "quests", enabled: true }, { id: "tier_tools", enabled: true }, { id: "tier_progress", enabled: true },
+        ];
+        const rail = order
+          .filter(w => w.enabled && !xosHidden.includes(`widget:${w.id}`))
+          .map(w => <React.Fragment key={w.id}>{xosWidgets[w.id] || null}</React.Fragment>);
+        return (
+        <div className="lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start" data-testid="spec-workspace">
+          <div className="lg:col-span-8 min-w-0 order-1">
           {/* Welcome hero (only ADVANCED+) */}
           {user?.verified && tierInfo.canSeeBentoHero && user?.tier && user.tier !== "ENTRY" && (
             <PMCardPrimary className="mb-6 pm-fade-in">
@@ -272,16 +273,9 @@ export const SpecialistDashboard = () => {
             </PMCard>
           )}
 
-          {user?.tier !== "PREMIUM" && tierInfo.canSeeStats && (
-            <div className="mb-4 text-xs text-stone-500 bg-white/3 rounded-xl px-4 py-2.5 inline-flex items-center gap-2" data-testid="premium-hint">
-              <Crown className="w-3.5 h-3.5 text-fuchsia-300" />
-              Profilul Premium se deblochează la tier PREMIUM (50+ joburi, rating ≥4.7). <Link to="/specialist/premium-profile" className="text-fuchsia-300 hover:underline">Preview editor</Link>
-            </div>
-          )}
-
           <FilterBar searchQ={searchQ} setSearchQ={setSearchQ} urgentOnly={urgentOnly} setUrgentOnly={setUrgentOnly} urgentCount={open.filter(r => r.priority === "urgent").length} />
 
-          <div className="space-y-3 mt-4 max-w-3xl mx-auto pm-fade-in-delay-2" data-tour="specialist-leads">
+          <div className="space-y-3 mt-4 max-w-3xl pm-fade-in-delay-2" data-tour="specialist-leads">
             <PMSectionHeader title={`${filtered(open).length} oportunități`} />
             {filtered(open).length === 0 && (
               <PMEmptyState
@@ -316,8 +310,11 @@ export const SpecialistDashboard = () => {
               </PMCard>
             ))}
           </div>
-        </>
-      )}
+          </div>
+          <aside className="lg:col-span-4 lg:sticky lg:top-6 order-2 mt-8 lg:mt-0" data-testid="spec-context-panel">{rail}</aside>
+        </div>
+        );
+      })()}
 
       {tab === "jobs" && (
         <>
