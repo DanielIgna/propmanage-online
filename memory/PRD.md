@@ -1,3 +1,16 @@
+## 🎯 EO-006/007/008/009 + Conversion Audit & Experience Architecture (27 Iun 2026)
+
+**Noi ordine salvate VERBATIM**: EO-006 Customer Experience First (v1+v2, ACTIVE ABSOLUTE), EO-007 AI CPO (agentul = Chief Product Officer), EO-008 Experience Architecture Dual Ecosystem (×2 versiuni, ACTIVE ABSOLUTE), EO-009 Zero Friction Marketplace, 16 misiuni-doctrină (M1–M16 în `board/EXPERIENCE_DOCTRINE_COMPANION_MISSIONS.md`), **North Star Metric = Trusted Properties** (`metrics/NORTH_STAR_TRUSTED_PROPERTIES.md`).
+
+**Pas 1 LIVRAT — Conversion Audit (EO-006)**: `/app/docs/CONVERSION_AUDIT_2026.md`. Metodă: cont client first-run REAL (cx.audit.owner@propmanage.io / CxAudit2026!) + capturi desktop 1920 & mobile 390 pe tot funnel-ul. **Nicio pagină nu trece gate-ul 90/100**: Landing 55d/45m (5 CTA-uri concurente, CTA A/B care schimbă ACȚIUNEA — i18n.js L54, jargon, banner Demo Mode public — App.js L1524), **„12.842 utilizatori" FABRICAT în i18n.js L82 (încălcare Truth Engine + risc legal)**, /login 85 (cel mai bun), register 60 (telefon OBLIGATORIU — auth.py), first-run client 78/80 (HeroA „Pasul 1 din 3" excelent, dar wizard-ul duce spre marketplace nu spre twin), **„Adaugă proprietatea" = 3 click-uri cu modal intermediar redundant (Components.jsx L183-203)**, /devino-specialist 75m/45d (desktop rupt — coloană mobilă pe 1920), dashboard specialist 72, `/auth` = rută fantomă (fallback silențios pe landing; ruta reală `/login`). **Fix-list F1–F11 prioritizat = Sprint CX-1 (1 sesiune)**.
+
+**EO-008 LIVRAT — Experience Architecture**: `/app/docs/EXPERIENCE_ARCHITECTURE_EO008.md` — Owner Journey 13 pași scorati (dead end-uri: O8 documente=0, O13 transfer=0), Specialist Journey 9 pași, Marketplace Journey (singurul lanț aproape complet), Blueprint țintă („Cartea Casei" = coloana vertebrală), Drop-off analysis, 47 UX improvements REALE (onestitate > „top 100" umplut), Conversion/Trust opportunities, Roadmap CX-1→CX-6 (aliniat cu EO-005B S1–S6).
+
+**AȘTEAPTĂ APROBAREA FONDATORULUI**: execuția Sprint CX-1 (F1–F11) → apoi CX-2=S1 Document Vault. Ambele rapoarte vizibile în Knowledge Center.
+
+---
+
+
 ## 🚀 EO-004 PRODUCT FIRST + EO-005A Digital Twin Gap Analysis (Iun 26, 2026)
 
 **PIVOT MAJOR (Fondator)**: EO-004 „PRODUCT FIRST" ACTIVE — OS-ul Enterprise devine fabrica, nu produsul. Prioritate: valoare client (Faza 1 Digital Twin → Marketplace → Verified Properties → ...). Salvate VERBATIM: `board/EXECUTION_ORDER_004_PRODUCT_FIRST.md`, `board/EXECUTION_ORDER_005_DIGITAL_TWIN_GAP_ANALYSIS.md` (+ decizia cu 2 workstreams), `board/ENTERPRISE_OS_MATURITY_DECLARATION.md`, `board/EO_OS_MISSIONS_INSPECTOR_V2_AND_TOOLING.md` (8 misiuni OS — Inspector V2, CTRL+K, Impact Analysis, Command Center, Deploy Gate, Auto-doc, Self-Audit → statusul de execuție decis de Fondator, recomandat BACKLOG per Product Decision Filter), `constitution/PROPMANAGE_PRODUCT_CONSTITUTION.md` (ACTIVE), `constitution/PRODUCT_MANIFESTO.md`, `governance/PRODUCT_DECISION_FILTER.md`.
