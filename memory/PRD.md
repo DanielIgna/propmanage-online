@@ -1,4 +1,17 @@
-## 🏛️ EXECUTION ORDER 002 · V1 — Enterprise Knowledge Center (Founder-only) (Iun 26, 2026)
+## 🗺️ EXECUTION ORDER 002 · V2+V3 — Dashboard Inspector + Enterprise Explorer + Architecture Navigator (Iun 26, 2026)
+
+**Decizie Fondator**: EO-001 rămâne SUPREM; EO-003 (32 misiuni, salvat verbatim în `board/EXECUTION_ORDER_003_MISSION_BACKLOG.md` + gap analysis în `docs/BOARD_REVIEW_EXECUTION_ORDER_003.md`) → BACKLOG. Continuă doar scope-ul Enterprise Visibility aprobat. Conflict rută rezolvat: `/admin/war-room` rămâne Mission 100; viitorul incidents war room va fi `/admin/incidents-war-room` (backlog).
+
+**LIVRAT + TESTAT (iter. 131 — backend 14/14, frontend 100%)**:
+- **V2 Dashboard Inspector**: `data/widget_inspector.json` (6 widgeturi curate: ceo.enterprise_status, ceo.one_thing, ceo.autonomous_execution, health.overall, ops.autonomous_followup, warroom.mission100) + `GET /api/founder/knowledge/inspector/{id}` (rezolvă nodurile din registry + dependențe cu evidență). Frontend: `components/founder/InspectorButton.jsx` (ⓘ + drawer cu Scop/Valoare/Inputs→Outputs/Powered by/Database/Cron/Documente→link KC/Truth D161/Dependențe) + `useFounderAccess.js` (cache modul). Butoane ⓘ pe CEO Briefing (3), Enterprise Health, Operations, War Room — vizibile DOAR pentru Founder.
+- **V3 Enterprise Explorer** `/admin/explorer`: `components/founder/RegistryGraph.jsx` (graf refolosibil cu filtre pe tip + căutare instant nod+vecini + panou evidență). 
+- **V3 Architecture Navigator** `/admin/architecture`: `data/architecture_blocks.json` (11 blocuri System Zero→Client, doar fișiere reale din repo) + `GET /api/founder/knowledge/architecture`; moduri Flux/Dependențe, drawer per bloc cu fișiere/rute/API/DB + linkuri KC/Explorer.
+- KnowledgeCenter: suport `?doc=` (deep-link din Inspector/Architecture). Sidebar: 2 iteme noi `ownerOnly`. Securitate validată: admin normal nu vede nimic (403 + iteme ascunse).
+- Note minore raportate (nu blocante): a11y ESC/focus-trap la drawere, cookie banner interceptează primul click, validare schemă JSON la boot — backlog tehnic.
+
+---
+
+
 
 **Ordinul „Enterprise Visibility"** (+ Phase 2 Control Center 14 module + specs Interactive Manual / X-Ray / Enterprise Digital Twin / Story Mode + Relationship Registry spec + Capital Allocation & companion rules) salvate VERBATIM în `board/`. Fazare aprobată: **V1 (livrat) → V2 Dashboard Inspector → V3 Enterprise Explorer/X-Ray/Twin/Story**.
 
