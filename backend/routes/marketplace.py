@@ -181,20 +181,31 @@ async def public_marketplace(
             t[row["_id"]["a"]] = row["n"]
         async for r in db.reviews.find({"specialist_id": {"$in": spec_ids},
                                         "direction": {"$ne": "specialist_to_client"},
-                                        "would_recommend": True}, {"specialist_id": 1, "client_id": 1}):
-            trust_map.setdefault(r["specialist_id"], {"yes": 0, "no": 0, "not_sure": 0, "recommenders": set()})["recommenders"].add(r.get("client_id"))
+                                        "would_recommend": {"$in": [True, False]}}, {"specialist_id": 1, "client_id": 1, "would_recommend": 1}):
+            t = trust_map.setdefault(r["specialist_id"], {"yes": 0, "no": 0, "not_sure": 0, "recommenders": set(), "rec_yes": 0, "rec_no": 0})
+            t.setdefault("rec_yes", 0); t.setdefault("rec_no", 0)
+            if r.get("would_recommend") is True:
+                t["rec_yes"] += 1
+                t["recommenders"].add(r.get("client_id"))
+            else:
+                t["rec_no"] += 1
         async for r in db.recommendations.find({"specialist_id": {"$in": spec_ids}}, {"specialist_id": 1, "owner_id": 1}):
-            trust_map.setdefault(r["specialist_id"], {"yes": 0, "no": 0, "not_sure": 0, "recommenders": set()})["recommenders"].add(r.get("owner_id"))
+            trust_map.setdefault(r["specialist_id"], {"yes": 0, "no": 0, "not_sure": 0, "recommenders": set(), "rec_yes": 0, "rec_no": 0})["recommenders"].add(r.get("owner_id"))
 
     def _trust(sid):
         t = trust_map.get(sid)
         if not t:
-            return {"rebook_pct": None, "rebook_total": 0, "rebook_show": False, "recommenders": 0}
+            return {"rebook_pct": None, "rebook_total": 0, "rebook_show": False,
+                    "recommend_pct": None, "recommend_total": 0, "recommend_show": False, "recommenders": 0}
         total = t["yes"] + t["no"] + t["not_sure"]
+        rec_total = t.get("rec_yes", 0) + t.get("rec_no", 0)
         return {
             "rebook_pct": round(t["yes"] * 100 / total) if total else None,
             "rebook_total": total,
             "rebook_show": total >= 5,
+            "recommend_pct": round(t.get("rec_yes", 0) * 100 / rec_total) if rec_total else None,
+            "recommend_total": rec_total,
+            "recommend_show": rec_total >= 5,
             "recommenders": len([x for x in t["recommenders"] if x]),
         }
 

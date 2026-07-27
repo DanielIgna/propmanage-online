@@ -42,6 +42,25 @@ async def rebook_rollup(specialist_id: str) -> dict:
             "total": total, "pct": pct, "show": total >= REBOOK_MIN_SHOW}
 
 
+async def recommend_rollup(specialist_id: str) -> dict:
+    """% 'l-ai recomanda altui proprietar?' din recenzii verificate."""
+    yes = no = 0
+    async for row in db.reviews.aggregate([
+        {"$match": {"specialist_id": specialist_id,
+                    "direction": {"$ne": "specialist_to_client"},
+                    "would_recommend": {"$in": [True, False]}}},
+        {"$group": {"_id": "$would_recommend", "n": {"$sum": 1}}},
+    ]):
+        if row["_id"] is True:
+            yes = row["n"]
+        else:
+            no = row["n"]
+    total = yes + no
+    return {"yes": yes, "no": no, "total": total,
+            "pct": round(yes * 100 / total) if total else None,
+            "show": total >= REBOOK_MIN_SHOW}
+
+
 async def recommenders_rollup(specialist_id: str) -> int:
     """Proprietari DISTINCȚI care recomandă: din recenzii (would_recommend) + recomandări directe."""
     ids = set()
@@ -66,11 +85,13 @@ async def specialist_trust(specialist_id: str):
     if not spec:
         raise HTTPException(404, "Specialist inexistent")
     rebook = await rebook_rollup(specialist_id)
+    recommend = await recommend_rollup(specialist_id)
     recommenders = await recommenders_rollup(specialist_id)
     completed = await db.requests.count_documents({"specialist_id": specialist_id, "status": "confirmed"})
     return {
         "specialist_id": specialist_id,
         "rebook": rebook,
+        "recommend": recommend,
         "recommenders": recommenders,
         "completed_jobs": completed,
         "rating": spec.get("rating"),
