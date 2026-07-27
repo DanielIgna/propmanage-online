@@ -205,7 +205,7 @@ export default function ClientDashboardV2() {
               <ChevronRight className="w-4 h-4 text-slate-300" />
             </button>
             <div className="pt-2 rounded-3xl bg-stone-900 p-4" data-testid="v2-settings-legacy-panel"><SettingsPanel /></div>
-            <button onClick={logout} data-testid="v2-logout"
+            <button onClick={async () => { await logout(); window.location.href = "/login"; }} data-testid="v2-logout"
               className="w-full py-3.5 rounded-full border-2 border-rose-100 text-sm font-bold text-rose-500 bg-white active:scale-[0.98] transition-transform">
               Deconectare
             </button>

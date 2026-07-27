@@ -1,3 +1,20 @@
+## ✅ PPOS P3b + P3c + P3d — DESKTOP OS ROLLOUT · IMPLEMENTAT & TESTAT (27 Iun 2026)
+
+**Directive noi**: FINAL DIRECTIVE v4.0 salvată VERBATIM (`board/PPOS_BETA_EXECUTION_FINAL_DIRECTIVE_V4.md`) — FAST EXECUTION continuu până la Beta Candidate, release note max 10 rânduri/fază, audit complet DOAR la 5 faze/Beta/Production/la cerere; STOP doar HIGH-RISK (DB/API/auth/billing/Twin core/security).
+
+**Implementat (exclusiv presentation layer)**:
+- **P3b Client Dashboard OS** (`HomeV2.jsx`, `ClientDashboardV2.jsx`): onboarding gate — J0/J1 văd DOAR hero-ul ghidat (`v2-home-onboarding`); desktop workspace 8+4 (`v2-home-workspace`): main = hero+Noutăți+Descoperă, right panel sticky = `PropertyStatusCard` (starea casei→Casa mea) + Copilot (max 2 acțiuni + `v2-copilot-ask-ai`); upsell ascuns când există tranzacție activă; CTA desktop ascuns pe home fără proprietăți; XOS layout mort eliminat (WIDGET_SPAN/DEFAULT_LAYOUT).
+- **P3c Specialist Mission Control** (`SpecialistDashboard.jsx`): split view 8+4 (`spec-workspace`): main = capabilități+filtre+listă oportunități; right rail sticky (`spec-context-panel`) = KPI „Astăzi ai" 2×2 + `SpecialistProgressCard`; Cockpit pipeline DOAR ADVANCED+ (progressive disclosure); premium-hint eliminat; pe mobil KPI-urile rămân PRIMELE (aside primul în DOM, plasare pe grid desktop).
+- **P3d Property Hub record page** (`PropertyHubV2.jsx`): desktop = Notion record: left sub-nav 5 secțiuni (Rezumat/Cartea casei/Twin & Active/Istoric & Riscuri/Pașaport) + linkuri secundare (Portofel/Administrează), main = DOAR secțiunea activă (helper `sec()` cu lg:hidden — mobilul rămâne stivă completă neschimbată), right panel sticky `HouseStatusPanel` (UN scor Sănătatea casei + pasul următor → comută la Cartea casei); `lg:max-w-3xl` eliminat de pe tab-ul property (folosea ~31% din 1920px).
+- **Bugfix** (găsit de testing agent, pre-existent): `v2-logout` nu redirecționa la /login — fix `await logout(); window.location.href="/login"` (verificat cu screenshot).
+
+**Testare**: testing agent frontend E2E `/app/test_reports/iteration_141.json` — **~97% PASS, zero regresii noi** (desktop 1920 + mobil 390, client+specialist+onboarding cont nou); singura problemă = logout redirect (fixată + verificată). NO REGRESSION: PASS.
+
+**URMEAZĂ**: P4 Navigație (mare parte absorbit de P3b/c — rămâne un pass de verificare duplicat), P5 Mobile polish (re-test 390 deja verde în iteration_141), apoi **audit complet la 5 faze** (P3a→P5) înainte de Beta Candidate (PPOS-010 gate 95).
+
+---
+
+
 ## ✅ PPOS P3a — IGIENĂ & ONESTITATE · IMPLEMENTAT & TESTAT 100% (27 Iun 2026)
 
 **GO Fondator primit** (+ reguli noi salvate: NO REGRESSION RULE în PPOS-010; verificare după FIECARE fază: Audit→P3a→Re-audit→P3b→...; STOP pe recomandarea P3c — următoarea fază este P3b).
