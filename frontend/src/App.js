@@ -17,6 +17,7 @@ import { EmailVerifyPage } from "./pages/EmailVerifyPage";
 import { ClientRequestOffersPage } from "./pages/ClientRequestOffersPage";
 import { PremiumProfileEditorPage } from "./pages/PremiumProfileEditorPage";
 import { CookieBanner } from "./components/CookieBanner";
+import { BetaFeedbackWidget } from "./components/BetaFeedbackWidget";
 import { AssistantDock } from "./components/AssistantDock";
 import { ThemeToggle } from "./pages/DashShared";
 const ClientDashboard = lazy(() => import("./pages/Dashboards").then(m => ({ default: m.ClientDashboard })));
@@ -88,6 +89,7 @@ const FinancialCockpitPage = lazy(() => import("./pages/admin/FinancialCockpitPa
 const AutomationCenterPage = lazy(() => import("./pages/admin/AutomationCenterPage"));
 const CEODashboardPage = lazy(() => import("./pages/admin/CEODashboardPage"));
 const FirstRevenueWarRoom = lazy(() => import("./pages/admin/FirstRevenueWarRoom"));
+const BetaCockpitPage = lazy(() => import("./pages/admin/BetaCockpitPage"));
 const OperationsCenter = lazy(() => import("./pages/admin/OperationsCenter"));
 const KnowledgeCenter = lazy(() => import("./pages/admin/KnowledgeCenter"));
 const EnterpriseExplorer = lazy(() => import("./pages/admin/EnterpriseExplorer"));
@@ -1637,6 +1639,7 @@ function App() {
               <Route path="/admin/automation" element={<AutomationCenterPage />} />
               <Route path="/admin/ceo" element={<CEODashboardPage />} />
               <Route path="/admin/war-room" element={<FirstRevenueWarRoom />} />
+              <Route path="/admin/beta-cockpit" element={<BetaCockpitPage />} />
               <Route path="/admin/operations" element={<OperationsCenter />} />
               <Route path="/admin/knowledge-center" element={<KnowledgeCenter />} />
               <Route path="/admin/explorer" element={<EnterpriseExplorer />} />
@@ -1702,6 +1705,7 @@ function App() {
             <RoleTour />
             <AIConciergeBubble />
             <CookieBanner />
+            <BetaFeedbackWidget />
             <AssistantDock />
             <LegalGate />
             </ErrorBoundary>

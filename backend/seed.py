@@ -24,6 +24,11 @@ async def seed():
         {"email": "operator@propmanage.io", "password": "Op123!", "name": "Lucian Stan", "role": "operator", "phone": ""},
     ]
 
+    # EO-026: fără date demo în producție — doar contul admin (SEED_DEMO_DATA != true)
+    seed_demo = (os.environ.get("SEED_DEMO_DATA") or "").strip().lower() == "true"
+    if not seed_demo:
+        demo_users = [u for u in demo_users if u["email"] == "admin@propmanage.io"]
+
     user_ids = {}
     for u in demo_users:
         existing = await db.users.find_one({"email": u["email"]})
@@ -182,7 +187,7 @@ async def seed():
                 await db.twins.insert_one(twin_doc)
 
     # Seed portfolio (idempotent)
-    if await db.portfolio.count_documents({}) == 0:
+    if seed_demo and await db.portfolio.count_documents({}) == 0:
         spec1 = await db.users.find_one({"email": "specialist@propmanage.io"})
         spec2 = await db.users.find_one({"email": "specialist2@propmanage.io"})
         if spec1 and spec2:

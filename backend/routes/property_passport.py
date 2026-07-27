@@ -264,11 +264,22 @@ async def passport_share_link(slug: str, request: Request):
     """Link scurt de share: boții social primesc HTML cu Open Graph, oamenii redirect la /p/{slug}."""
     prop = await _prop_by_slug(slug)
     base = _base_url(request)
-    target = f"{base}/p/{slug}"
+    src = request.query_params.get("src", "")
+    src_q = f"?src={src}" if re.fullmatch(r"[a-z_]{1,12}", src or "") else ""
+    target = f"{base}/p/{slug}{src_q}"
     if not BOT_UA.search(request.headers.get("user-agent", "")):
         return RedirectResponse(target, status_code=307)
 
     prop_id = str(prop["_id"])
+    try:  # EO-026: fiecare preview social generat = semnal de share măsurabil
+        await db.passport_events.insert_one({
+            "event_id": secrets.token_hex(12), "slug": slug, "property_id": prop_id,
+            "type": "og_fetch", "src": src if src_q else "bot",
+            "ua": request.headers.get("user-agent", "")[:160],
+            "day": datetime.now(timezone.utc).isoformat()[:10],
+            "ts": datetime.now(timezone.utc).isoformat()})
+    except Exception:  # noqa: BLE001
+        pass
     privacy = {**DEFAULT_PRIVACY, **(prop.get("passport", {}).get("privacy") or {})}
     trust = await _trust_score(prop_id)
     docs_count = await db.property_documents.count_documents(
@@ -318,7 +329,7 @@ async def passport_qr(slug: str, request: Request):
     prop = await _prop_by_slug(slug)
     import qrcode
     from qrcode.image.pil import PilImage
-    url = f"{_base_url(request)}/p/{prop['passport']['slug']}"
+    url = f"{_base_url(request)}/p/{prop['passport']['slug']}?src=qr"
     qr = qrcode.QRCode(box_size=10, border=2)
     qr.add_data(url)
     qr.make(fit=True)

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Building2, ArrowRight, Sparkles, Languages } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { useI18n } from "../i18n";
+import { sendPassportConversion } from "../lib/passportTracker";
 
 const Backdrop = () => (
   <div className="fixed inset-0 -z-10">
@@ -244,8 +245,8 @@ export const RegisterPage = () => {
       if (form.role === "specialist" && !phoneDigits) throw new Error("Numărul de telefon este obligatoriu pentru specialiști");
       if (phoneDigits && !/^\+?\d{8,15}$/.test(phoneDigits)) throw new Error("Format telefon invalid. Folosește +40 7XX XXX XXX sau 07XX XXX XXX");
       if (!form.terms_accepted) throw new Error("Trebuie să accepți Termenii și Condițiile");
-      if (!form.privacy_policy_accepted) throw new Error("Trebuie să accepți Politica de Confidențialitate");
-      const u = await register({ ...form, phone: phoneDigits });
+      if (!form.privacy_policy_accepted) throw new Error("Trebuie să accepți Politica de Confidențialitate");      const u = await register({ ...form, phone: phoneDigits });
+      sendPassportConversion();
       navigate(`/${u.role}`);
     } catch (err) {
       setError(err.message || formatApiError(err));

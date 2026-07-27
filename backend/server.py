@@ -97,6 +97,10 @@ app.add_middleware(
 # Admin-scope HTTP middleware (Milestone 2): URL-pattern → required-scope map
 app.middleware("http")(admin_scope_middleware)
 
+# Rate limiting pe endpoint-urile publice (TD-07, EO-026 Phase 1)
+from rate_limit import rate_limit_middleware  # noqa: E402
+app.middleware("http")(rate_limit_middleware)
+
 
 @app.middleware("http")
 async def _demo_activity_middleware(request, call_next):
@@ -160,19 +164,22 @@ async def startup():
         await hh_seed_default_plans()
     except Exception as e:
         logger.warning(f"House Health plans seed failed: {e}")
-    try:
-        await seed_verified_estate_demo()
-    except Exception as e:
-        logger.warning(f"Verified Estate demo seed failed: {e}")
-    try:
-        await seed_community_demo()
-    except Exception as e:
-        logger.warning(f"Community demo seed failed: {e}")
-    try:
-        from tier_demo_seed import seed_tier_demo_users
-        await seed_tier_demo_users()
-    except Exception as e:
-        logger.warning(f"Tier demo seed failed: {e}")
+    # Demo seeds — DOAR când SEED_DEMO_DATA=true (EO-026: producția rulează fără date demo)
+    seed_demo = (os.environ.get("SEED_DEMO_DATA") or "").strip().lower() == "true"
+    if seed_demo:
+        try:
+            await seed_verified_estate_demo()
+        except Exception as e:
+            logger.warning(f"Verified Estate demo seed failed: {e}")
+        try:
+            await seed_community_demo()
+        except Exception as e:
+            logger.warning(f"Community demo seed failed: {e}")
+        try:
+            from tier_demo_seed import seed_tier_demo_users
+            await seed_tier_demo_users()
+        except Exception as e:
+            logger.warning(f"Tier demo seed failed: {e}")
     # GDPR Phase 1 — backfill existing users with consent + verification fields (idempotent)
     try:
         from consent_backfill import run_consent_backfill
@@ -198,11 +205,12 @@ async def startup():
     except Exception as e:
         logger.warning(f"Price observatory bootstrap failed: {e}")
     # Sub-admin RBAC — seed demo scoped admins (testing/frontend/backend/security)
-    try:
-        from sub_admin_seed import seed_sub_admins
-        await seed_sub_admins()
-    except Exception as e:
-        logger.warning(f"Sub-admin seed failed: {e}")
+    if seed_demo:
+        try:
+            from sub_admin_seed import seed_sub_admins
+            await seed_sub_admins()
+        except Exception as e:
+            logger.warning(f"Sub-admin seed failed: {e}")
     try:
         await seed_default_legal_documents()
     except Exception as e:

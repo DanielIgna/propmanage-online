@@ -5,6 +5,7 @@ import {
   ShieldCheck, BadgeCheck, FileText, Home, CalendarClock, Printer, ChevronDown,
   Sparkles, Lock, Ruler, DoorOpen, Flame, Layers, ArrowRight, CircleHelp,
 } from "lucide-react";
+import { initPassportTracking, trackPassport } from "../lib/passportTracker";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -30,6 +31,10 @@ export default function PublicPassportPage() {
       .then(r => setData(r.data))
       .catch(() => setErr(true));
   }, [slug]);
+
+  useEffect(() => {
+    if (data?.slug) return initPassportTracking(data.slug);
+  }, [data?.slug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!data) return;
@@ -81,7 +86,7 @@ export default function PublicPassportPage() {
           <button onClick={() => window.print()} className="p-2.5 rounded-full glass" title="Versiune printabilă" data-testid="passport-print">
             <Printer className="w-4 h-4" />
           </button>
-          <Link to="/register" className="px-4 py-2.5 rounded-full bg-[#d4ff3a] text-black text-xs font-bold" data-testid="passport-viral-cta-top">
+          <Link to="/register" onClick={() => trackPassport(slug, "cta_click")} className="px-4 py-2.5 rounded-full bg-[#d4ff3a] text-black text-xs font-bold" data-testid="passport-viral-cta-top">
             Creează pașaportul casei tale
           </Link>
         </div>
@@ -210,7 +215,7 @@ export default function PublicPassportPage() {
           <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/60">Ce înseamnă acest pașaport</div>
           <h2 className="mt-2 font-serif text-2xl sm:text-3xl font-medium leading-snug">Această proprietate are identitate, istoric și dovezi — nu doar promisiuni.</h2>
           <p className="mt-2 text-sm text-black/70">Fiecare document, lucrare și garanție rămâne înregistrată permanent. Casa ta merită la fel.</p>
-          <Link to="/register" className="mt-5 inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-black text-[#d4ff3a] text-sm font-bold" data-testid="passport-viral-cta">
+          <Link to="/register" onClick={() => trackPassport(slug, "cta_click")} className="mt-5 inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-black text-[#d4ff3a] text-sm font-bold" data-testid="passport-viral-cta">
             Creează gratuit pașaportul casei tale <ArrowRight className="w-4 h-4" />
           </Link>
         </section>

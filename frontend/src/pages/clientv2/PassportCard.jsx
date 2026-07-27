@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
-import { IdCard, Copy, Check, ExternalLink, Share2, QrCode, ChevronDown } from "lucide-react";
+import { IdCard, Copy, Check, ExternalLink, Share2, QrCode, ChevronDown, BarChart3 } from "lucide-react";
 import { API } from "../DashShared";
 import { formatApiError } from "../../auth";
+import { trackPassport } from "../../lib/passportTracker";
 import { GREEN } from "./ui";
 
 export const PassportCard = ({ prop }) => {
@@ -10,6 +11,8 @@ export const PassportCard = ({ prop }) => {
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [stats, setStats] = useState(null);
 
   const load = useCallback(() => {
     axios.get(`${API}/properties/${prop.id}/passport`).then(r => setData(r.data)).catch(() => {});
@@ -26,12 +29,19 @@ export const PassportCard = ({ prop }) => {
       .then(r => setData(r.data)).catch(e => alert(formatApiError(e)));
   };
   const copy = () => {
-    navigator.clipboard?.writeText(data.share_url);
+    navigator.clipboard?.writeText(`${data.share_url}?src=link`);
+    trackPassport(data.slug, "share", { src: "link" });
     setCopied(true); setTimeout(() => setCopied(false), 1500);
   };
   const shareWa = () => {
-    const text = `Pașaportul casei mele pe PropManage — identitate, istoric și dovezi: ${data.share_url}`;
+    trackPassport(data.slug, "share", { src: "wa" });
+    const text = `Pașaportul casei mele pe PropManage — identitate, istoric și dovezi: ${data.share_url}?src=wa`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+  };
+  const toggleStats = () => {
+    const next = !showStats;
+    setShowStats(next);
+    if (next) axios.get(`${API}/properties/${prop.id}/passport/analytics`).then(r => setStats(r.data)).catch(() => {});
   };
 
   if (!data) return null;
@@ -83,7 +93,6 @@ export const PassportCard = ({ prop }) => {
             className="mt-3 flex items-center gap-1 text-xs font-bold text-slate-500">
             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showPrivacy ? "rotate-180" : ""}`} /> Confidențialitate — ce e vizibil public
           </button>
-          {showPrivacy && (
             <div className="mt-2 space-y-1.5" data-testid="passport-privacy-list">
               {Object.entries(data.privacy_labels).map(([k, label]) => (
                 <label key={k} className="flex items-center gap-2 text-xs font-bold text-slate-600">
@@ -95,6 +104,30 @@ export const PassportCard = ({ prop }) => {
               ))}
               <button onClick={() => patch({ enabled: false })} data-testid="passport-disable-btn"
                 className="mt-1 text-[11px] font-bold text-red-400 underline">Dezactivează pașaportul public</button>
+            </div>
+          )}
+
+          <button onClick={toggleStats} data-testid="passport-stats-toggle"
+            className="mt-2 flex items-center gap-1 text-xs font-bold text-slate-500">
+            <BarChart3 className="w-3.5 h-3.5" /> Statistici — cine ți-a văzut pașaportul
+          </button>
+          {showStats && stats && (
+            <div className="mt-2" data-testid="passport-stats-panel">
+              <div className="grid grid-cols-3 gap-2">
+                {[["views", "Vizualizări", stats.views], ["visitors", "Vizitatori", stats.unique_visitors], ["qr", "Scanări QR", stats.qr_scans],
+                  ["shares", "Share-uri", stats.shares], ["registers", "Conturi create", stats.registers], ["time", "Timp mediu", stats.avg_read_s ? `${stats.avg_read_s}s` : "—"],
+                ].map(([k, l, v]) => (
+                  <div key={k} className="rounded-2xl bg-slate-50 p-2 text-center">
+                    <div className="text-sm font-black text-slate-900" data-testid={`passport-stat-${k}`}>{v}</div>
+                    <div className="text-[9px] font-bold uppercase tracking-wide text-slate-400">{l}</div>
+                  </div>
+                ))}
+              </div>
+              {stats.sources?.length > 0 && (
+                <div className="mt-1.5 text-[10px] text-slate-400" data-testid="passport-stat-sources">
+                  Surse: {stats.sources.map(s => `${s.key} (${s.count})`).join(" · ")}
+                </div>
+              )}
             </div>
           )}
         </>
