@@ -145,6 +145,7 @@ from routes.lead_followup import router as lead_followup_router
 from routes.specialist_followup import router as specialist_followup_router
 from routes.property_dna import router as property_dna_router
 from routes.property_documents import router as property_documents_router
+from routes.property_passport import router as property_passport_router, public_router as passport_public_router
 from routes.property_intelligence import router as property_intelligence_router
 from routes.resend_diagnostics import router as resend_diagnostics_router
 from routes.first_revenue import router as first_revenue_router
@@ -299,6 +300,8 @@ ALL_ROUTERS = (
     specialist_followup_router,
     property_dna_router,
     property_documents_router,
+    property_passport_router,
+    passport_public_router,
     opportunities_router,
     growth_intelligence_router,
     lead_intelligence_router,

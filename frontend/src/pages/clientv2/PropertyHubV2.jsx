@@ -5,6 +5,7 @@ import { API } from "../DashShared";
 import { formatApiError } from "../../auth";
 import { GREEN, GREEN_SOFT, ListItem, Sheet, CTA, AmountInput } from "./ui";
 import { DocumentVaultCard } from "./DocumentVault";
+import { PassportCard } from "./PassportCard";
 
 export const WalletSheet = ({ user, onClose }) => {
   const [amount, setAmount] = useState("");
@@ -543,6 +544,7 @@ export const PropertyHubV2 = ({ user, prop, properties, setSelectedPropId, actio
         </div>
       </div>
       <DocumentVaultCard prop={prop} />
+      <PassportCard prop={prop} />
       <PropertyDnaCard propId={prop.id} />
       <TwinMaturityCard propId={prop.id} actions={actions} />
       <PropertyRisksCard propId={prop.id} actions={actions} />
