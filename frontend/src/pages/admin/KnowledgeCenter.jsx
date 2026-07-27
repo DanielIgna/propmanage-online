@@ -2,7 +2,7 @@
 // Module 1: repository pe categorii · Module 2: căutare globală · Module 3/11: Dependency Map
 // din Enterprise Relationship Registry (doar relații VERIFIED — Truth Engine D161).
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import axios from "axios";
 import ReactMarkdown from "react-markdown";
 import {
@@ -211,6 +211,7 @@ const DependencyMap = ({ onOpenDoc }) => {
 };
 
 export default function KnowledgeCenter() {
+  const location = useLocation();
   const [tree, setTree] = useState(null);
   const [denied, setDenied] = useState(false);
   const [cat, setCat] = useState(null);
@@ -226,6 +227,10 @@ export default function KnowledgeCenter() {
       .catch(e => { if (e?.response?.status === 403) setDenied(true); });
   }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const doc = new URLSearchParams(location.search).get("doc");
+    if (doc) setOpenPath(doc);
+  }, [location.search]);
 
   const doSearch = async (e) => {
     e?.preventDefault();

@@ -90,6 +90,8 @@ const CEODashboardPage = lazy(() => import("./pages/admin/CEODashboardPage"));
 const FirstRevenueWarRoom = lazy(() => import("./pages/admin/FirstRevenueWarRoom"));
 const OperationsCenter = lazy(() => import("./pages/admin/OperationsCenter"));
 const KnowledgeCenter = lazy(() => import("./pages/admin/KnowledgeCenter"));
+const EnterpriseExplorer = lazy(() => import("./pages/admin/EnterpriseExplorer"));
+const ArchitectureNavigator = lazy(() => import("./pages/admin/ArchitectureNavigator"));
 const EnterpriseHealthPage = lazy(() => import("./pages/admin/EnterpriseHealthPage"));
 const CeoBriefingPage = lazy(() => import("./pages/admin/CeoBriefingPage"));
 const EvolutionCouncilPage = lazy(() => import("./pages/admin/EvolutionCouncilPage"));
@@ -1662,6 +1664,8 @@ function App() {
               <Route path="/admin/war-room" element={<FirstRevenueWarRoom />} />
               <Route path="/admin/operations" element={<OperationsCenter />} />
               <Route path="/admin/knowledge-center" element={<KnowledgeCenter />} />
+              <Route path="/admin/explorer" element={<EnterpriseExplorer />} />
+              <Route path="/admin/architecture" element={<ArchitectureNavigator />} />
               <Route path="/admin/enterprise-health" element={<EnterpriseHealthPage />} />
               <Route path="/admin/ceo-briefing" element={<CeoBriefingPage />} />
               <Route path="/admin/evolution-council" element={<EvolutionCouncilPage />} />

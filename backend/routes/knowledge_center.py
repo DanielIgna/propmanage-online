@@ -21,6 +21,8 @@ OWNER_EMAILS = {e.strip().lower() for e in os.environ.get("OWNER_EMAIL", "").spl
 MEMORY_ROOT = Path("/app/memory")
 DOCS_ROOT = Path("/app/docs")
 REGISTRY_PATH = Path(__file__).resolve().parent.parent / "data" / "enterprise_registry.json"
+WIDGETS_PATH = Path(__file__).resolve().parent.parent / "data" / "widget_inspector.json"
+ARCH_PATH = Path(__file__).resolve().parent.parent / "data" / "architecture_blocks.json"
 
 CATEGORY_ORDER = [
     "System Zero", "Constitution", "Board Directives", "Board Resolutions", "Execution Orders",
@@ -230,3 +232,45 @@ async def knowledge_registry(user=Depends(require_role("admin"))):
         by_type[n["type"]] = by_type.get(n["type"], 0) + 1
     return {**reg, "stats": {"nodes": len(reg["nodes"]), "edges": len(reg["edges"]),
                              "edges_by_status": by_status, "nodes_by_type": by_type}}
+
+
+@router.get("/inspector/{widget_id}")
+async def inspector_widget(widget_id: str, user=Depends(require_role("admin"))):
+    """Dashboard Inspector (Module 4): explică un widget cu evidență din Relationship Registry."""
+    _require_owner(user)
+    try:
+        widgets = json.loads(WIDGETS_PATH.read_text(encoding="utf-8"))["widgets"]
+    except Exception:  # noqa: BLE001
+        raise HTTPException(500, "Inspector Registry indisponibil.")
+    w = next((x for x in widgets if x["id"] == widget_id), None)
+    if not w:
+        raise HTTPException(404, "Widget necunoscut în Inspector Registry.")
+    reg = _load_registry()
+    names = {n["id"]: n for n in reg["nodes"]}
+
+    def node(nid):
+        return names.get(nid, {"id": nid, "name": nid, "type": None, "ref": None}) if nid else None
+    out = dict(w)
+    engine_id = w.get("engine")
+    out["engine"] = node(engine_id)
+    out["api"] = node(w.get("api"))
+    out["prompt"] = node(w.get("prompt"))
+    for key in ("database", "documents", "related_dashboards"):
+        out[key] = [node(i) for i in w.get(key, [])]
+    deps = []
+    for e in reg["edges"]:
+        if engine_id and (e["source"] == engine_id or e["target"] == engine_id):
+            deps.append({**e, "source_name": names.get(e["source"], {}).get("name", e["source"]),
+                         "target_name": names.get(e["target"], {}).get("name", e["target"])})
+    out["dependencies"] = deps
+    return out
+
+
+@router.get("/architecture")
+async def architecture_blocks(user=Depends(require_role("admin"))):
+    """Architecture Navigator: blocurile platformei, cu fișiere reale din repo."""
+    _require_owner(user)
+    try:
+        return json.loads(ARCH_PATH.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        raise HTTPException(500, "Architecture Registry indisponibil.")

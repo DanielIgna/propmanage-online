@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { HeartPulse, Loader2, RefreshCcw, AlertTriangle, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import axios from "axios";
 import { EhDomainCard } from "./EhDomainCard";
+import { InspectorButton } from "../../components/founder/InspectorButton";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -101,6 +102,7 @@ export default function EnterpriseHealthPage() {
             )}
             <div>{data.alerts.length} {data.alerts.length === 1 ? "domeniu sub prag" : "domenii sub prag"}</div>
             <div className="mt-1">Actualizat: {String(data.generated_at).slice(0, 16).replace("T", " ")}</div>
+            <div className="mt-2 flex justify-end"><InspectorButton widgetId="health.overall" /></div>
           </div>
         </div>
 

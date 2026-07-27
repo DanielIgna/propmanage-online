@@ -5,6 +5,7 @@ import {
   CreditCard, Mail, ShoppingCart, Banknote, TrendingUp, User, Wrench, Sun
 } from "lucide-react";
 import axios from "axios";
+import { InspectorButton } from "../../components/founder/InspectorButton";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -128,7 +129,7 @@ export default function FirstRevenueWarRoom() {
         {/* Mission 100 — D109 */}
         <div className="bg-[#0e0e10] rounded-3xl border border-white/10 p-6 mb-10" data-testid="mission-100">
           <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
-            <h2 className="font-serif text-2xl flex items-center gap-2"><Target className="w-5 h-5 text-[#d4ff3a]" /> Mission 100</h2>
+            <h2 className="font-serif text-2xl flex items-center gap-2"><Target className="w-5 h-5 text-[#d4ff3a]" /> Mission 100 <InspectorButton widgetId="warroom.mission100" /></h2>
             <div className="text-sm text-stone-400">Progres global: <span className="text-[#d4ff3a] font-semibold" data-testid="mission-100-progress">{data.mission_100?.progress_pct ?? 0}%</span></div>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">

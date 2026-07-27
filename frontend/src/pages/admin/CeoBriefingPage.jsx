@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Crown, Loader2, RefreshCcw, Target, AlertTriangle, Sparkles, EyeOff, Users2, Fingerprint } from "lucide-react";
 import axios from "axios";
+import { InspectorButton } from "../../components/founder/InspectorButton";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -52,11 +53,12 @@ export default function CeoBriefingPage() {
             )}
             <Link to="/admin/enterprise-health" className="text-xs text-[#d4ff3a] hover:underline">Enterprise Health →</Link>
           </div>
+          <InspectorButton widgetId="ceo.enterprise_status" />
         </div>
 
         {/* ONE THING */}
         <div className="bg-[#d4ff3a]/5 rounded-3xl border-2 border-[#d4ff3a]/30 p-7 mb-8" data-testid="ceo-brief-one-thing">
-          <div className="flex items-center gap-2 text-[#d4ff3a] text-xs uppercase tracking-widest mb-3"><Target className="w-4 h-4" /> Dacă faci UN SINGUR lucru azi</div>
+          <div className="flex items-center gap-2 text-[#d4ff3a] text-xs uppercase tracking-widest mb-3"><Target className="w-4 h-4" /> Dacă faci UN SINGUR lucru azi <InspectorButton widgetId="ceo.one_thing" className="ml-auto" /></div>
           <div className="font-serif text-2xl leading-snug mb-3" data-testid="ceo-brief-action">{ot.action}</div>
           <p className="text-sm text-stone-300 mb-4">{ot.why}</p>
           <div className="flex flex-wrap gap-2 text-xs">
@@ -82,6 +84,7 @@ export default function CeoBriefingPage() {
             <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
               <h2 className="font-serif text-xl">Execuție autonomă · ultimele 24h <span className="text-[10px] align-middle ml-2 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">L2</span></h2>
               {!b.autonomous_execution.email_live && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300" data-testid="ceo-brief-auto-blocked">EMAIL BLOCAT (DNS Resend)</span>}
+              <InspectorButton widgetId="ceo.autonomous_execution" />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 text-center">
               {[

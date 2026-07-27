@@ -6,6 +6,7 @@ import {
   ClipboardList, Loader2, RefreshCcw, Phone, Mail, MessageCircle, Banknote,
   AlertTriangle, Trophy, Users, TrendingUp, CheckCircle2, StickyNote, Bot, Zap
 } from "lucide-react";
+import { InspectorButton } from "../../components/founder/InspectorButton";
 import axios from "axios";
 import { OpsGapsPanel } from "./OpsGapsPanel";
 import { OpsPaymentsPanel } from "./OpsPaymentsPanel";
@@ -119,6 +120,7 @@ const AutonomousFollowupPanel = () => {
           <span className="font-serif text-lg">Follow-up Autonom Lead-uri</span>
           <span className={`text-[10px] px-2 py-0.5 rounded-full border ${active ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : "bg-stone-500/10 border-stone-500/30 text-stone-400"}`} data-testid="af-status-badge">{active ? "AUTONOMIE L2 ACTIVĂ" : "INACTIV"}</span>
           <span className={`text-[10px] px-2 py-0.5 rounded-full border ${live ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : "bg-amber-500/10 border-amber-500/30 text-amber-300"}`} data-testid="af-email-gate">{live ? "EMAIL LIVE" : "EMAIL BLOCAT (DNS Resend) — lead-urile intră în coadă"}</span>
+          <InspectorButton widgetId="ops.autonomous_followup" />
         </div>
         <button onClick={runNow} disabled={running} className="pm-btn pm-btn-secondary pm-btn-sm" data-testid="af-run-now">
           {running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />} Rulează ciclul acum
