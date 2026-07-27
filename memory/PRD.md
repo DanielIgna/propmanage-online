@@ -1,3 +1,23 @@
+## ✅ TRACK B / FAZA D1 — UNIVERSAL CAPABILITY ENGINE (27 Iun 2026)
+
+**Context**: Fondatorul a emis misiunile Design Partner Ecosystem + Professional OS + Industry OS + EO-043 EXECUTION MODE + Anti-Vanity + Dual Track Execution (toate salvate VERBATIM: `board/DESIGN_PARTNER_ECOSYSTEM_MISSIONS.md`, `board/EXECUTION_ORDER_043_EXECUTION_MODE.md`, `board/ECOSYSTEM_PRINCIPLES_AND_DUAL_TRACK_MISSIONS.md`). Architecture Review efectuat: `/app/docs/ARCHITECTURE_REVIEW_DESIGN_ECOSYSTEM.md` (fazare D0-D5 pe dovezi; G2 twin unificat = pre-condiție pt D3+). **Fondatorul a ales opțiunea B**: D1 acum pe Track B, Track A (GO LIVE) rămâne prioritatea absolută.
+
+**Livrat D1 (testat iteration_137: backend 15/15 PASS, frontend 100%)**:
+- `routes/capability_engine.py` — motor GENERIC (capabilități, nu profesii; zero hardcodare pe profesie): catalog configurabil în DB (`capability_catalog`, seed idempotent versionat CATALOG_VERSION): 5 faze, 45 capabilități, **7 rezervate PropManage** (technical_audit, installation_mapping, digital_twin_infrastructure, construction_management, quality_inspection, final_acceptance, house_health), 27 software/formate, 4 niveluri (beginner→expert), 4 niveluri de responsabilitate (LEAD/CO_PARTNER/SUPPORT/CONSULTANT).
+- Endpoints: GET `/api/capabilities/catalog` · GET `/api/capabilities/responsibility-matrix` (matricea standard per capabilitate) · PUT+GET `/api/professional/capabilities` (validare strictă: rezervate→400) · GET `/api/specialists/{id}/capabilities` (public, metrics ascunse) · GET `/api/capabilities/find?capability=&software=&min_score=` (căutare pe Compatibility Score — fundația Best Match).
+- **Compatibility Score 0-100** stocat pe user (căutabil): BIM 20 + Twin 15 + IFC 15 + DWG/CAD 10 + Matterport 10 + PointCloud 10 + 3D/Render 10 + Verified 10.
+- **Progresie data-driven 7 niveluri** (Înregistrat→Verificat→De încredere→Premium→Expert→Master Partner→PropManage Certified) — derivată EXCLUSIV din date existente (verified/tier/rating/recenzii/joburi confirmate/dispute/portofoliu/capabilități/scor), cu next_requirements explicate. Zero asignare manuală.
+- **Portofoliu extins** (PortfolioItemIn + portfolio.py `_extended`): project_type, services, role, budget_range, tags, before/after_image, video_url, tour_url, awards, client_review, is_public — opționale, regresie zero.
+- Frontend: `/specialist/capabilities` (CapabilityEditorPage — editor cu scor live, rezervatele afișate cu lacăt+badge PropManage), card „Capabilități & Compatibilitate" pe profilul PUBLIC `/specialists/{id}` (score+nivel+badge-uri+capabilități pe faze), acces din dashboard: link în hero (tier≥ADVANCED) + banner permanent `spec-capabilities-banner` pt tier-urile mici (fix post-testare).
+- Stare demo: specialist@propmanage.io are 5 capabilități + 5 software → score 90, Nivel 4 Premium.
+
+**Reguli D1 respectate**: fără duplicare (totul pe `users`/`portfolio` existente), configurabil (catalog=date în DB), reutilizabil de orice profesie, SSOT păstrat.
+
+**URMĂTOARELE FAZE (gate-uite pe dovezi, cf. Architecture Review)**: D2 AI Designer Matching + Team Builder (gate: ≥5 proiecte design reale) · D3 Proiecte colaborative + Responsibility Matrix pe proiect (gate: G2 twin unificat + cerere reală) · D4 Professional/Company Twin + Reputation Intelligence · D5 Knowledge Graph public + Material Intelligence + AI Copilot.
+
+---
+
+
 ## ✅ EO-026 GO-LIVE GATE — Passport Analytics + Beta Cockpit + Production Readiness (27 Iun 2026)
 
 **Ordin salvat VERBATIM**: `board/EXECUTION_ORDER_026_PUBLIC_BETA_GATE.md` (Learn Before Scale — validare cu utilizatori reali înainte de orice feature major).

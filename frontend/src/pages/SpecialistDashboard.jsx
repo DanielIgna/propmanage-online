@@ -221,6 +221,26 @@ export const SpecialistDashboard = () => {
             </PMCardPrimary>
           )}
 
+          {/* Capability Engine — punct de acces permanent, indiferent de tier */}
+          {!(user?.verified && tierInfo.canSeeBentoHero && user?.tier && user.tier !== "ENTRY") && (
+            <PMCard className="mb-6 pm-fade-in" testid="spec-capabilities-banner">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-2xl bg-[var(--pm-primary-container)] flex items-center justify-center shrink-0">
+                    <Layers className="w-5 h-5 text-[var(--pm-primary)]" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-sm">Capabilitățile tale</div>
+                    <div className="text-xs text-stone-400">Alege serviciile pe care le stăpânești — clienții și AI-ul te găsesc pe compatibilitate.</div>
+                  </div>
+                </div>
+                <Link to="/specialist/capabilities" data-testid="link-capabilities-banner">
+                  <PMPillButton variant="primary" icon={Layers}>Configurează</PMPillButton>
+                </Link>
+              </div>
+            </PMCard>
+          )}
+
           {/* ENTRY/JUNIOR: friendly intro card for newcomers */}
           {!tierInfo.canSeeStats && (
             <PMCard className="mb-6 pm-fade-in" testid="spec-newcomer-intro">
