@@ -824,7 +824,9 @@ export const AdminLayoutMetronic = ({ active, onChange, children, title, subtitl
     const itemSection = NAV_SECTIONS.find(s => s.items.some(x => x.id === it.id));
     if (itemSection && itemSection.zone !== zone) switchZone(itemSection.zone);
     if (it.href) { navigate(it.href); setSidebarOpen(false); return; }
-    onChange(it.id); setSidebarOpen(false);
+    if (typeof onChange === "function") { onChange(it.id); setSidebarOpen(false); return; }
+    // Pagini standalone (fără onChange): itemii de consolă merg la /admin cu tabul cerut
+    navigate(`/admin?tab=${it.id}`); setSidebarOpen(false);
   };
 
   const renderItem = (it, sectionId) => {

@@ -1,5 +1,7 @@
 ## 🛟 FIRUL B (B+) — LAUNCH SENTINEL + MONEY-FLOW GUARD + SEMNALE ORCHESTRATOR · LIVRAT & TESTAT (27 Iul 2026)
 
+**BUGFIX (raportat de Fondator, 27 Iul)**: item-urile paletei ⌘K / sidebar admin fără `href` („Toți userii" + alte 25 taburi de consolă) erau moarte pe ~40 pagini admin standalone — `handleNavClick` apela `onChange(id)` cu `onChange` undefined. **Fix central** în `AdminLayoutMetronic.jsx`: fallback `navigate(/admin?tab={id})` (AdminConsole citea deja `?tab=`). Verificat E2E cu screenshot: din /admin/command-center, paleta → „Toți userii" → secțiunea se încarcă complet. Audit suplimentar: toate cele 76 href-uri au rute valide. **Nou**: `/app/scripts/ui_nav_audit.py` — audit determinist reproductibil (href vs rute + taburi vs TITLES), exit 1 la probleme; prima cărămidă a modulului de auto-verificare cerut de Fondator (auto-REPARARE = AI CTO, amânat post-lansare conform deciziei B+). NOTĂ: fix-ul e în preview — necesită REDEPLOY pentru propmanage.ro.
+
 **Decizie Fondator**: varianta B+ (Launch Sentinel + Money-Flow Guard + semnale orchestrator dacă <3h; Job Guardian și AI Maturity Index AMÂNATE post-lansare). Misiune: „fiecare agent AI trebuie să aibă impact măsurabil pe lansare, activare sau încasări."
 
 **Implementat** (`routes/launch_sentinel.py` + `orchestrator/playbooks_launch.py`, reutilizează integral infra existentă):
