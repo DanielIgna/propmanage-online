@@ -34,6 +34,9 @@ EVENT_TITLES = {
     "twin.requested": "Digital Twin solicitat",
     "twin.validated": "Digital Twin validat",
     "warranty.expiring": "Garanție aproape de expirare",
+    "warranty.registered": "Garanție înregistrată",
+    "document.uploaded": "Document adăugat în cartea casei",
+    "document.updated": "Document actualizat (versiune nouă)",
 }
 
 
@@ -82,6 +85,16 @@ async def property_dna(prop_id: str, user: dict = Depends(get_current_user)):
 
     # ── relations: Knowledge Graph ───────────────────────────────────────────
     kg_links = await db.entity_links.count_documents({"$or": [{"from_id": prop_id}, {"to_id": prop_id}]})
+
+    # ── documents: Document Vault (CX-2 — sursa reală) + mentenanță ─────────
+    doc_rows = await db.property_documents.find(
+        {"property_id": prop_id, "deleted": {"$ne": True}, "superseded": {"$ne": True}}, {"category": 1}
+    ).to_list(500)
+    docs_count = len(doc_rows)
+    docs_by_cat: dict = {}
+    for _d in doc_rows:
+        docs_by_cat[_d.get("category", "?")] = docs_by_cat.get(_d.get("category", "?"), 0) + 1
+    maint_count = await db.maintenance_logs.count_documents({"property_id": prop_id})
 
     # ── timeline: evenimente canonice + repere derivate din lucrări ─────────
     from event_bus import capability_of
@@ -146,14 +159,14 @@ async def property_dna(prop_id: str, user: dict = Depends(get_current_user)):
                      "confirmed_works": by_status.get("confirmed", 0), "warranties": warranties_active},
         },
         "documents": {
-            "populated": twin_assets > 0,
-            "data": {"twin_assets": twin_assets},
+            "populated": docs_count > 0,
+            "data": {"count": docs_count, "by_category": docs_by_cat, "twin_assets": twin_assets},
         },
         "relations": {
             "populated": kg_links > 0,
             "data": {"knowledge_graph_links": kg_links},
         },
-        "maintenance": {"populated": False, "data": {}},
+        "maintenance": {"populated": maint_count > 0, "data": {"logs": maint_count}},
         "sensors": {"populated": False, "data": {}},
         "recommendations": {
             "populated": active_opps > 0,

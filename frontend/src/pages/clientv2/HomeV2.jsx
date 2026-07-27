@@ -166,6 +166,19 @@ const HeroA = ({ onAddProperty }) => (
   </div>
 );
 
+// Hero D — cu proprietate, fără niciun document (Pasul 2: casa capătă memorie — CX-2)
+const HeroDoc = ({ prop, onOpen }) => (
+  <div className="mx-5 lg:mx-0 rounded-3xl p-5 lg:p-8 text-black shadow-[0_20px_60px_-20px_rgba(204,255,0,0.4)]" style={{ background: "linear-gradient(135deg, #b3e600 0%, #ccff00 100%)" }} data-testid="v2-hero-doc">
+    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-black/60"><Sparkles className="w-3.5 h-3.5" /> Pasul 2 din 3 · 30 secunde</div>
+    <h1 className="mt-2 xos-display text-2xl lg:text-4xl font-medium tracking-tight leading-snug">Dă-i o memorie casei: urcă primul document</h1>
+    <p className="mt-1.5 text-xs lg:text-sm text-black/60">Actul, o factură sau o poză a locuinței «{prop?.name}» — rămân salvate permanent în cartea casei.</p>
+    <div className="mt-3 h-1.5 rounded-full bg-black/15"><div className="h-full w-2/3 rounded-full bg-black" /></div>
+    <button onClick={onOpen} className="mt-4 w-full lg:w-auto lg:px-10 py-3.5 rounded-full bg-black text-[#ccff00] text-sm font-black active:scale-[0.98] transition-transform" data-testid="v2-hero-cta">
+      Adaugă primul document
+    </button>
+  </div>
+);
+
 // Hero B — cu proprietate, fără lucrare activă
 const HeroB = ({ prop, confirmedCount, onRequest }) => (
   <div className="mx-5 lg:mx-0 rounded-3xl p-5 lg:p-8 border border-slate-100 bg-white shadow-sm" data-testid="v2-hero-b">
@@ -249,6 +262,16 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
   const confirmedCount = requests.filter(r => r.status === "confirmed").length;
   const unread = notifs.filter(n => !n.read);
 
+  // CX-2: câte documente are proprietatea (Pasul 2 din onboarding = primul document)
+  const [docsCount, setDocsCount] = useState(null);
+  useEffect(() => {
+    if (!prop?.id) return;
+    const load = () => axios.get(`${API}/properties/${prop.id}/completeness`).then(r => setDocsCount(r.data.docs_count)).catch(() => {});
+    load();
+    window.addEventListener("propmanage:doc-uploaded", load);
+    return () => window.removeEventListener("propmanage:doc-uploaded", load);
+  }, [prop?.id]);
+
   const heroCta = () => {
     if (!activeReq) return;
     if (activeReq.status === "open" && offersCount > 0) navigate(`/client/requests/${activeReq.id}/offers`);
@@ -272,6 +295,7 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
       <div className="cv2-fade" key="hero">
         {properties.length === 0 ? <HeroA onAddProperty={actions.openPropManager} />
           : activeReq ? <HeroC req={activeReq} offersCount={offersCount} onCta={heroCta} />
+          : docsCount === 0 ? <HeroDoc prop={prop} onOpen={() => go("property")} />
           : <HeroB prop={prop} confirmedCount={confirmedCount} onRequest={actions.openWizard} />}
       </div>
     ),

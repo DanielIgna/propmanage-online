@@ -4,6 +4,7 @@ import { Building2, Box, HeartPulse, Clock, Wallet, Settings2, CreditCard, Dna, 
 import { API } from "../DashShared";
 import { formatApiError } from "../../auth";
 import { GREEN, GREEN_SOFT, ListItem, Sheet, CTA, AmountInput } from "./ui";
+import { DocumentVaultCard } from "./DocumentVault";
 
 export const WalletSheet = ({ user, onClose }) => {
   const [amount, setAmount] = useState("");
@@ -79,7 +80,7 @@ const PropertyDnaCard = ({ propId }) => {
           <Dna className="w-4.5 h-4.5 text-black" style={{ width: 18, height: 18 }} />
         </span>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-black text-slate-900 leading-none xos-display tracking-tight">Cartea Casei</div>
+          <div className="text-sm font-black text-slate-900 leading-none xos-display tracking-tight">Valoarea casei (PVI)</div>
           <div className="text-[10px] text-slate-400 mt-0.5">Property Value Index · valoarea documentată a locuinței</div>
         </div>
         <div className="text-right">
@@ -541,6 +542,7 @@ export const PropertyHubV2 = ({ user, prop, properties, setSelectedPropId, actio
           {prop.address && <div className="mt-0.5 text-[11px] text-slate-400">{prop.address}</div>}
         </div>
       </div>
+      <DocumentVaultCard prop={prop} />
       <PropertyDnaCard propId={prop.id} />
       <TwinMaturityCard propId={prop.id} actions={actions} />
       <PropertyRisksCard propId={prop.id} actions={actions} />
