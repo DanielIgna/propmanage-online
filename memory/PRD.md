@@ -1,3 +1,17 @@
+## 🎨 PPOS — PRODUCT OPERATING SYSTEM · FAZA 1 PRODUCT AUDIT LIVRAT (27 Iun 2026)
+
+**Pivot Fondator (misiuni verbatim: `board/PPOS_PRODUCT_OS_MASTER_DIRECTIVE_MISSIONS.md`)**: STOP dezvoltare incrementală UI + STOP feature development. Agent = Chief Product Designer / Product Council (6 roluri). Regulă nouă: nicio funcționalitate nouă până ce fluxul existent nu are ≥95/100 (claritate/simplitate/mobil). **Task-ul Trust Profile Engine (Levels 0-5) = SUSPENDAT** de acest ordin (rămâne în backlog; se reia doar cu GO explicit).
+
+**Livrat Faza 1 (AUDIT, zero cod de produs modificat — conform ordinului)**:
+- **`/app/docs/PRODUCT_AUDIT_PPOS_2026.md`** — audit complet pe 9 stări de rol REALE (login live: client.junior/verified/premium/client@ activ, spec.entry, specialist@ VERIFIED, anonim; desktop 1920 + mobil 390). Scor global: **68/100** vs gate 95. Scoruri/pagină: Landing 88 · Spec Entry Home 86 (MODELUL de urmat) · Pașaport 80 · Client nou 78 · Imobile Verificate 74 · Client activ 72 · **Marketplace public 58** (badge REJECTED public + ★5(0)!) · **Property Hub 55** (5 sisteme de scor concurente) · **Specialist Dashboard Verified+ 52** (4 sisteme de progres CONTRADICTORII: „Nivel JUNIOR"+„0/6 pași"+„primul lead 0/1" la un cont cu 27 lucrări).
+- **7 probleme sistemice** (S1-S7): războiul overlay-urilor la primul login (tur 5 pași+cookie+feedback+chat simultan; feedback beta SE SUPRAPUNE peste bottom nav pe mobil) · 6 scoruri concurente owner · progres contradictoriu specialist · locked features dominante (9 unelte cu lacăt listate) · CTA duplicat ×3 · jargon netradus („Twin dna attribute updated") · date imposibile publice.
+- **Structura `/app/memory/product/`** (cerută de Fondator): 00_CONSTITUTION → 09_AI_GOVERNANCE + roles/PRODUCT_COUNCIL_ROLES + audits/ (SCORECARD live, TEMPLATE, RELEASE_CHECKLIST, BETA_READINESS). IA nouă: `02_INFORMATION_ARCHITECTURE.md` + `03_DASHBOARD_OS.md` (RoleShell 6 sloturi) + `05_PROGRESSIVE_DISCLOSURE.md` (matrice client J0→P pe DOVEZI + specialist ENTRY→TOP cu UN progres).
+
+**FAZARE PROPUSĂ (AȘTEAPTĂ GO FONDATOR per fază)**: P3a Igienă & onestitate (overlays, fix contradicții specialist, marketplace defensiv, jargon — impact uriaș/efort mic) → P3b Client Dashboard OS → P3c Specialist Dashboard OS (extinde modelul Entry) → P3d Property Hub „Casa mea" 3 straturi → P4 Navigație → P5 Mobile → P6 Re-audit gate 95. Garanții: DOAR presentation layer, zero API/DB/permisiuni, feature flags rollback.
+
+---
+
+
 ## ✅ LAUNCH READINESS — FULL USER JOURNEY TESTING 100% (27 Iun 2026)
 
 **Misiune Fondator (set 3+4, salvate verbatim: `board/PROPERTY_OS_CONSTITUTION_AND_LAUNCH_READINESS_MISSIONS.md`, `board/FULL_E2E_LAUNCH_TESTING_MISSIONS.md`)**: „Nothing is allowed to end in a dead end. Launch only after every journey passes 100%."
