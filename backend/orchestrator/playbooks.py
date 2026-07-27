@@ -557,3 +557,6 @@ PLAYBOOKS = {
 
 from orchestrator.playbooks_sprint3 import SPRINT3_PLAYBOOKS  # noqa: E402
 PLAYBOOKS.update(SPRINT3_PLAYBOOKS)
+
+from orchestrator.playbooks_launch import LAUNCH_PLAYBOOKS  # noqa: E402
+PLAYBOOKS.update(LAUNCH_PLAYBOOKS)

@@ -153,6 +153,11 @@ async def join_building(building_id: str, body: dict, user: dict = Depends(requi
         {"_id": ObjectId(property_id), "owner_id": user["id"]}, {"$set": {"building_id": building_id}})
     if r.matched_count == 0:
         raise HTTPException(404, "Property not found")
+    try:
+        from orchestrator.engine import emit_signal
+        await emit_signal("resident_joined", {"building_id": building_id, "owner_id": user["id"]})
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[buildings] resident_joined signal failed: {e}")
     return {"ok": True}
 
 
@@ -366,6 +371,13 @@ async def accept_campaign_offer(campaign_id: str, body: dict, user: dict = Depen
     await notify(sid, f"🎉 Ai câștigat campania de grup: {c['title']}",
                  f"{len(participants)} lucrări directe (taxă lead 0) au fost create — le găsești în „Lucrările mele”.",
                  type_="campaign", link="/specialist?tab=jobs")
+    try:
+        from orchestrator.engine import emit_signal
+        await emit_signal("campaign_scheduled", {"campaign_id": campaign_id, "title": c["title"],
+                                                 "building_id": c["building_id"],
+                                                 "requests_created": len(created_requests)})
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[campaigns] campaign_scheduled signal failed: {e}")
     return {"ok": True, "requests_created": len(created_requests), "status": "scheduled"}
 
 

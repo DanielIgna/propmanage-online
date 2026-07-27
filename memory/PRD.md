@@ -1,3 +1,21 @@
+## 🛟 FIRUL B (B+) — LAUNCH SENTINEL + MONEY-FLOW GUARD + SEMNALE ORCHESTRATOR · LIVRAT & TESTAT (27 Iul 2026)
+
+**Decizie Fondator**: varianta B+ (Launch Sentinel + Money-Flow Guard + semnale orchestrator dacă <3h; Job Guardian și AI Maturity Index AMÂNATE post-lansare). Misiune: „fiecare agent AI trebuie să aibă impact măsurabil pe lansare, activare sau încasări."
+
+**Implementat** (`routes/launch_sentinel.py` + `orchestrator/playbooks_launch.py`, reutilizează integral infra existentă):
+- **Customer Success Sentinel** (tick zilnic 09:30): cele 6 detecții pe blocuri/administratori (onboarding neterminat, nimeni activ 7z, zero cereri 14z, acoperire mentenanță <50%, administrator tăcut 14z, abonament House Health inactiv) → notificări cu recomandări concrete către administratorul blocului (dedupe 72h per bloc+tip, în `cs_findings` cu resolve automat) + digest către adminii platformei la severitate high.
+- **Money-Flow Guard** (tick zilnic 07:45): probe Stripe mode (LIVE/TEST/DEMO — detectat corect DEMO acum), sender email sandbox (resend.dev), adâncime coadă retry, abonamente+lead fees 30z → alertă adminilor DOAR la schimbare de stare sau lunea; detectează **PRIMA PLATĂ REALĂ** (doar cu Stripe LIVE — guard anti-demo) → semnal orchestrator cu email de sărbătorire.
+- **Semnale orchestrator noi** (3 playbooks, total 14): `resident_joined` (administratorul află imediat + % activare), `campaign_scheduled` (conversie urmărită), `first_payment` — toate cu ledger + minutes_saved; emit din join_building și accept_campaign_offer.
+- **CEO Briefing compus**: linia „Lansare · Primii 13" în snapshot (funnel: blocuri·ap. conectate·locatari·abonamente·lead fees 30z), blocajele Money-Flow ca top risks (blocker), recomandările CS ca top opportunities + cheia `launch` completă. **Zero modificări frontend necesare** (pagina mapează generic).
+- Endpoints admin: GET /api/admin/launch-sentinel/overview · POST /run (forțează ambele ticks).
+
+**Testare**: self-test E2E complet prin curl (overview, tick cu 2 findings + dedupe la a 2-a rulare + resolve, semnal→playbook→ledger `launch_resident_welcome/notified/5min`, CEO briefing cu toate secțiunile) + screenshot pagina CEO Briefing (linia Lansare + riscul Money-Flow vizibile). Date de test curățate. Testing agent nefolosit (backend-only, verificat exhaustiv manual).
+
+**Amânate explicit (decizie Fondator)**: Job Guardian (retry generalizat cron) · AI Maturity Index expus — după primii clienți plătitori.
+
+---
+
+
 ## 🏢 PM-PILOT-001 / PM-ADMIN-001 — ADMINISTRATOR WORKSPACE + BUILDING HEALTH · LIVRAT & TESTAT 100% (27 Iul 2026)
 
 **Slice pilot livrat** (extinde PM-002, zero duplicare, criteriile Phase 10 acoperite pentru primul bloc real de 13 apartamente):

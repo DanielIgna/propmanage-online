@@ -158,6 +158,16 @@ async def _campaign_detection_tick():
     await campaign_detection_tick()
 
 
+async def _cs_sentinel_tick():
+    from routes.launch_sentinel import cs_sentinel_tick
+    await cs_sentinel_tick()
+
+
+async def _money_flow_tick():
+    from routes.launch_sentinel import money_flow_tick
+    await money_flow_tick()
+
+
 @app.on_event("startup")
 async def startup():
     await seed()
@@ -268,6 +278,22 @@ async def startup():
             _campaign_detection_tick,
             CronTrigger(hour=8, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="campaign_detection_daily",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        # Firul B: CS Sentinel (09:30) — remindere onboarding/activare pentru administratori
+        scheduler.add_job(
+            _cs_sentinel_tick,
+            CronTrigger(hour=9, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="cs_sentinel_daily",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        # Firul B: Money-Flow Guard (07:45) — Stripe/email/coadă retry + detecție prima plată
+        scheduler.add_job(
+            _money_flow_tick,
+            CronTrigger(hour=7, minute=45, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="money_flow_guard_daily",
             replace_existing=True,
             misfire_grace_time=3600,
         )

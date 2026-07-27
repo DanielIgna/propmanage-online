@@ -162,6 +162,18 @@ async def ceo_briefing(user=Depends(require_role("admin"))):
                               "action": "Cere review de la ultimii clienți — trust compounds (PR-006)."})
     opportunities = opportunities[:5]
 
+    # ── Launch Sentinel (Firul B) — funnel „Primii 13" + Money-Flow în briefing ──
+    launch = None
+    try:
+        from routes.launch_sentinel import launch_summary
+        launch = await launch_summary()
+        snapshot.insert(1, {"key": "launch", "label": "Lansare · Primii 13", "line": launch["line"],
+                            "score": None, "color": launch["color"]})
+        risks = (launch["risks"] + risks)[:5]
+        opportunities = (launch["opportunities"] + opportunities)[:5]
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[CEO Briefing] launch sentinel reuse failed: {e}")
+
     # ── Founder Focus ───────────────────────────────────────────────────────
     healthy = [k for k, v in domains.items() if v["score"] >= 80]
     focus = {
@@ -190,6 +202,7 @@ async def ceo_briefing(user=Depends(require_role("admin"))):
                               "enterprise_score": es["score"], "enterprise_score_band": es["band"]},
         "one_thing": one_thing,
         "autonomous_execution": autonomous_execution,
+        "launch": launch,
         "snapshot": snapshot,
         "top_risks": risks,
         "top_opportunities": opportunities,
