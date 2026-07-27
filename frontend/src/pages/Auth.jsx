@@ -90,7 +90,7 @@ export const LoginPage = () => {
             className="flex items-center justify-between gap-3 mb-6 p-3.5 rounded-2xl border border-[#d4ff3a]/30 bg-[#d4ff3a]/10 hover:bg-[#d4ff3a]/20 transition group">
             <div>
               <div className="text-sm font-bold text-[#d4ff3a]">Nou pe PropManage?</div>
-              <div className="text-xs text-stone-300">Creează cont gratuit în 2 minute — Cartea Casei, specialiști verificați, plăți protejate.</div>
+              <div className="text-xs text-stone-300">Creează cont gratuit într-un minut — Cartea Casei, specialiști verificați, plăți protejate.</div>
             </div>
             <ArrowRight className="w-4 h-4 text-[#d4ff3a] shrink-0 group-hover:translate-x-0.5 transition-transform" />
           </Link>
@@ -241,8 +241,8 @@ export const RegisterPage = () => {
         throw new Error("Selectează cel puțin o zonă de acoperire");
       }
       const phoneDigits = (form.phone || "").replace(/[^\d+]/g, "");
-      if (!phoneDigits) throw new Error("Numărul de telefon este obligatoriu");
-      if (!/^\+?\d{8,15}$/.test(phoneDigits)) throw new Error("Format telefon invalid. Folosește +40 7XX XXX XXX sau 07XX XXX XXX");
+      if (form.role === "specialist" && !phoneDigits) throw new Error("Numărul de telefon este obligatoriu pentru specialiști");
+      if (phoneDigits && !/^\+?\d{8,15}$/.test(phoneDigits)) throw new Error("Format telefon invalid. Folosește +40 7XX XXX XXX sau 07XX XXX XXX");
       if (!form.terms_accepted) throw new Error("Trebuie să accepți Termenii și Condițiile");
       if (!form.privacy_policy_accepted) throw new Error("Trebuie să accepți Politica de Confidențialitate");
       const u = await register({ ...form, phone: phoneDigits });
@@ -289,13 +289,13 @@ export const RegisterPage = () => {
                 data-testid="register-password" />
             </div>
             <div>
-              <label className="text-xs uppercase tracking-wider text-stone-400 mb-1.5 block">Telefon <span className="text-red-400">*</span></label>
+              <label className="text-xs uppercase tracking-wider text-stone-400 mb-1.5 block">Telefon {form.role === "specialist" ? <span className="text-red-400">*</span> : <span className="text-stone-500 lowercase">(opțional)</span>}</label>
               <input type="tel" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}
                 placeholder="+40 7XX XXX XXX sau 07XX XXX XXX"
-                required
+                required={form.role === "specialist"}
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#d4ff3a]/50"
                 data-testid="register-phone" />
-              <div className="text-[10px] text-stone-500 mt-1">Necesar pentru contactare directă (consultanță DigiTwin, suport, confirmare servicii)</div>
+              <div className="text-[10px] text-stone-500 mt-1">{form.role === "specialist" ? "Necesar pentru activare — te sunăm în 24h" : "Îl poți adăuga oricând mai târziu"}</div>
             </div>
             <div>
               <label className="text-xs uppercase tracking-wider text-stone-400 mb-1.5 block">{t("register.role")}</label>
@@ -402,7 +402,7 @@ export const RegisterPage = () => {
               </label>
             </div>
 
-            <button type="submit" disabled={loading || !form.terms_accepted || !form.privacy_policy_accepted || !form.phone || !form.name || !form.email} className="btn-accent w-full py-3 rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed" data-testid="register-submit">
+            <button type="submit" disabled={loading || !form.terms_accepted || !form.privacy_policy_accepted || (form.role === "specialist" && !form.phone) || !form.name || !form.email} className="btn-accent w-full py-3 rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed" data-testid="register-submit">
               {loading ? t("common.loading") : t("register.submit")}
             </button>
           </form>

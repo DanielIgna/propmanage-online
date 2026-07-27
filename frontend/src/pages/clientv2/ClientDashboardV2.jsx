@@ -167,7 +167,7 @@ export default function ClientDashboardV2() {
           <button onClick={() => actions.openWizard()} data-testid="v2-desktop-cta"
             className="ml-auto flex items-center gap-2 px-6 py-3 rounded-full text-sm font-black text-black shadow-[0_12px_36px_-12px_rgba(204,255,0,0.55)] hover:scale-[1.02] transition-transform"
             style={{ background: "#ccff00" }}>
-            <Plus style={{ width: 18, height: 18 }} strokeWidth={2.6} /> Solicită ofertă
+            <Plus style={{ width: 18, height: 18 }} strokeWidth={2.6} /> {prop ? "Solicită ofertă" : "Adaugă proprietatea"}
           </button>
         </div>
 

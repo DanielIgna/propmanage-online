@@ -120,7 +120,7 @@ export const ReviewModal = ({ requestId, specialistName, onClose, onSubmitted })
 export const PropertyManagerModal = ({ properties, onClose, onChange, onOpenTwin }) => {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ name: "", address: "", type: "apartment", surface: 50, rooms: 2 });
-  const [showAdd, setShowAdd] = useState(false);
+  const [showAdd, setShowAdd] = useState((properties || []).length === 0);
   const [twinIndex, setTwinIndex] = useState({}); // { property_id: { status, dt_project_id, model_url } }
 
   // Batch-load DT status across all owned properties so each row can show a colored

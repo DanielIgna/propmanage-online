@@ -47,14 +47,14 @@ const translations = {
     "cat.electric": "Electric", "cat.plumbing": "Sanitar", "cat.hvac": "HVAC",
     "cat.other": "Altele",
     // Landing - Hero
-    "hero.badge": "PROPERTY OPERATING SYSTEM • V4.2",
-    "hero.title1": "Proprietatea ta,", "hero.title2": "perfecționată", "hero.title3": "digital.",
-    "hero.subtitle": "PropManage creează un Digital Twin de înaltă fidelitate al locuinței tale, monitorizând starea structurală și performanța financiară în timp real. Liniștea structurată pentru proprietarul modern.",
-    "hero.cta1": "Explorează Demo", "hero.cta2": "Vezi Flux Complet",
-    "hero.cta1.variant_a": "Explorează Demo", "hero.cta1.variant_b": "Începe gratuit acum",
-    "hero.cta2.variant_a": "Vezi Flux Complet", "hero.cta2.variant_b": "Vezi cum funcționează în 2 min",
-    "hero.stat1": "Utilizatori activi", "hero.stat2": "Joburi în execuție",
-    "hero.stat3": "Specialiști verificați", "hero.stat4": "Sănătate portofoliu",
+    "hero.badge": "CARTEA DIGITALĂ A CASEI TALE",
+    "hero.title1": "Cartea de service", "hero.title2": "a casei", "hero.title3": "tale.",
+    "hero.subtitle": "Documentele, istoricul lucrărilor și specialiștii verificați ai casei tale — într-un singur loc. Știi mereu ce s-a făcut, cine a făcut și cât a costat.",
+    "hero.cta1": "Creează contul gratuit", "hero.cta2": "Vezi cum funcționează",
+    "hero.cta1.variant_a": "Creează contul gratuit", "hero.cta1.variant_b": "Creează contul gratuit",
+    "hero.cta2.variant_a": "Vezi cum funcționează", "hero.cta2.variant_b": "Vezi cum funcționează",
+    "hero.stat1": "banii se eliberează doar după ce confirmi lucrarea", "hero.stat2": "identitate și firmă verificate înainte de primul job",
+    "hero.stat3": "la fiecare lucrare finalizată prin platformă", "hero.stat4": "fiecare intervenție rămâne salvată permanent",
     // Sections
     "sec.problem": "Problemă", "sec.solution": "Soluție",
     "sec.experience": "Experiență Utilizator", "sec.specialist": "Experiență Specialist",
@@ -79,10 +79,10 @@ const translations = {
     // CTA
     "cta.badge": "GATA DE LANSARE",
     "cta.title1": "Gata să digitalizezi", "cta.title2": "tot ecosistemul?",
-    "cta.intro": "Alătură-te celor 12,842 de utilizatori care au transformat proprietățile lor în active digitale gestionabile, valoroase și liniștitoare.",
+    "cta.intro": "Contul e gratuit. Adaugi casa într-un minut, iar fiecare document și fiecare lucrare rămân în cartea casei — pentru totdeauna.",
     "cta.btn1": "Creează cont gratuit", "cta.btn2": "Vorbește cu un specialist",
-    "cta.btn1.variant_a": "Creează cont gratuit", "cta.btn1.variant_b": "Începe gratuit · 14 zile",
-    "cta.footer": "Fără card de credit · Anulezi oricând · Probă 14 zile",
+    "cta.btn1.variant_a": "Creează cont gratuit", "cta.btn1.variant_b": "Creează cont gratuit",
+    "cta.footer": "Fără card de credit · Contul rămâne gratuit",
   },
   en: {
     // Nav
@@ -158,7 +158,7 @@ const translations = {
     // CTA
     "cta.badge": "READY TO BUILD",
     "cta.title1": "Ready to digitize", "cta.title2": "your entire ecosystem?",
-    "cta.intro": "Join the 12,842 users who turned their properties into manageable, valuable, peace-of-mind digital assets.",
+    "cta.intro": "The account is free. Add your home in a minute — every document and every job stays in your home's logbook, forever.",
     "cta.btn1": "Create free account", "cta.btn2": "Talk to specialist",
     "cta.btn1.variant_a": "Create free account", "cta.btn1.variant_b": "Start free · 14 days",
     "cta.footer": "No credit card required · Cancel anytime · 14-day trial",

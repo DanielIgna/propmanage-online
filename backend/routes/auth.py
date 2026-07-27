@@ -99,14 +99,13 @@ async def register(data: RegisterIn, request: Request, response: Response):
         raise HTTPException(400, "Trebuie să accepți Termenii și Condițiile pentru a continua")
     if not data.privacy_policy_accepted:
         raise HTTPException(400, "Trebuie să accepți Politica de Confidențialitate pentru a continua")
-    # Phone required (validation only — verification via SMS deferred until Twilio)
+    # Phone: obligatoriu doar pentru specialiști (EO-006 F6 — progressive disclosure pentru clienți)
     phone_raw = (data.phone or "").strip()
-    if not phone_raw:
-        raise HTTPException(400, "Numărul de telefon este obligatoriu")
     import re
-    phone_digits = re.sub(r"[^\d+]", "", phone_raw)
-    # Accept: +40XXXXXXXXX (12 chars), 0XXXXXXXXX (10 digits), or +XXX... international (8-15 digits)
-    if not (re.match(r"^\+?\d{8,15}$", phone_digits)):
+    phone_digits = re.sub(r"[^\d+]", "", phone_raw) if phone_raw else ""
+    if data.role == "specialist" and not phone_digits:
+        raise HTTPException(400, "Numărul de telefon este obligatoriu pentru specialiști")
+    if phone_digits and not re.match(r"^\+?\d{8,15}$", phone_digits):
         raise HTTPException(400, "Format telefon invalid. Folosește +40 7XX XXX XXX sau 07XX XXX XXX")
     if await db.users.find_one({"email": email}):
         raise HTTPException(400, "Email already registered")

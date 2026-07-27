@@ -61,7 +61,7 @@ const Header = ({ title, onBack, onClose }) => (
 );
 
 const HomeView = ({ onPickTrade }) => {
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useState(() => typeof window !== "undefined" && window.innerWidth >= 768);
   return (
   <div className="pb-16" data-testid="se-home-view">
     <a href="#se-apply-start" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-white focus:px-4 focus:py-2 focus:rounded-full focus:text-sm focus:font-bold focus:text-[#166534] focus:shadow-lg" data-testid="se-skip-link">
@@ -78,6 +78,11 @@ const HomeView = ({ onPickTrade }) => {
     <div className="px-5 mt-4">
       <h1 className="text-2xl md:text-3xl font-black text-slate-900 leading-snug">Câștigă din meseria ta, fără să alergi după clienți</h1>
       <p className="mt-2 text-sm text-slate-500">Alege meseria, spune-ne 2 lucruri despre tine și te sunăm noi în 24h.</p>
+      <a href="#se-apply-start" data-testid="se-hero-cta"
+        className="mt-4 inline-flex w-full md:w-auto items-center justify-center min-h-[52px] px-8 rounded-full text-base font-bold text-white shadow-lg shadow-[#166534]/30 active:scale-[0.98] transition-transform"
+        style={{ background: CJ_GREEN }}>
+        Aplică gratuit — te sunăm în 24h
+      </a>
     </div>
     <TrustStrip items={SE_TRUST} />
     <div className="mt-7 px-5">
@@ -271,11 +276,23 @@ export default function SpecialistApplyPage() {
 
   useEffect(() => { track("se_view"); }, []);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const prevTheme = root.getAttribute("data-theme");
+    const hadDark = root.classList.contains("dark");
+    root.setAttribute("data-theme", "light");
+    root.classList.remove("dark");
+    return () => {
+      if (prevTheme) root.setAttribute("data-theme", prevTheme); else root.removeAttribute("data-theme");
+      if (hadDark) root.classList.add("dark");
+    };
+  }, []);
+
   const startFlow = (t) => { track("se_flow_start", { trade: t.id }); setTrade(t); setView("flow"); };
 
   return (
     <div className="min-h-screen bg-[#FAFBFA] cv2-scope" data-testid="specialist-apply-page">
-      <div className="max-w-md md:max-w-4xl mx-auto min-h-screen bg-white sm:border-x sm:border-slate-100">
+      <div className="max-w-md md:max-w-5xl mx-auto min-h-screen bg-white sm:border-x sm:border-slate-100 md:px-6 md:pt-6">
         {view === "flow" ? (
           <FlowView trade={trade} onDone={(n) => { setRequestNumber(n); setView("confirm"); }} onExit={() => setView("home")} />
         ) : view === "confirm" ? (

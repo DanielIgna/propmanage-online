@@ -157,7 +157,7 @@ const CopilotCard = ({ go, actions, hasProps }) => {
 // Hero A — fără proprietate
 const HeroA = ({ onAddProperty }) => (
   <div className="mx-5 lg:mx-0 rounded-3xl p-5 lg:p-8 text-black shadow-[0_20px_60px_-20px_rgba(204,255,0,0.4)]" style={{ background: "linear-gradient(135deg, #b3e600 0%, #ccff00 100%)" }} data-testid="v2-hero-a">
-    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-black/60"><Sparkles className="w-3.5 h-3.5" /> Pasul 1 din 3 · 2 minute</div>
+    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-black/60"><Sparkles className="w-3.5 h-3.5" /> Pasul 1 din 3 · 1 minut</div>
     <h1 className="mt-2 xos-display text-2xl lg:text-4xl font-medium tracking-tight leading-snug">Hai să pornim: adaugă prima ta proprietate</h1>
     <div className="mt-3 h-1.5 rounded-full bg-black/15"><div className="h-full w-1/3 rounded-full bg-black" /></div>
     <button onClick={onAddProperty} className="mt-4 w-full lg:w-auto lg:px-10 py-3.5 rounded-full bg-black text-[#ccff00] text-sm font-black active:scale-[0.98] transition-transform" data-testid="v2-hero-cta">
@@ -313,11 +313,13 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
       <div key="discover" className="mt-7 lg:mt-2 pb-8 cv2-fade cv2-d3" data-testid="v2-discover">
         <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 px-6 lg:px-1">Descoperă</h3>
         <div className="mt-2 flex gap-3 overflow-x-auto px-5 lg:px-0 lg:grid lg:grid-cols-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {[
+          {(prop ? [
             ["Digital Twin", "locuința ta în 3D", IMG_TWIN, actions.openTwin],
             ["House Health", "scorul casei tale", IMG_HEALTH, actions.openHealth],
             ["Ghid întreținere", "sfaturi sezoniere", IMG_GUIDE, actions.openAI],
-          ].map(([l, s, img, onClick]) => (
+          ] : [
+            ["Digital Twin", "locuința ta în 3D", IMG_TWIN, actions.openTwin],
+          ]).map(([l, s, img, onClick]) => (
             <button key={l} onClick={onClick}
               className="group relative shrink-0 w-44 h-28 lg:w-full lg:h-36 rounded-2xl overflow-hidden text-left shadow-sm transition-transform duration-300 hover:-translate-y-1">
               <img src={img} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />

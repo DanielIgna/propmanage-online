@@ -200,11 +200,11 @@ const Hero = () => {
         </p>
         
         <div className="flex flex-col sm:flex-row gap-4">
-          <a href="#problem" onClick={trackClick} className="btn-accent px-8 py-4 rounded-full font-medium inline-flex items-center gap-2 group" data-testid="hero-start-btn" data-ab-variant={variant}>
+          <Link to="/register" onClick={trackClick} className="btn-accent px-8 py-4 rounded-full font-medium inline-flex items-center justify-center gap-2 group" data-testid="hero-start-btn" data-ab-variant={variant}>
             {ctaText}
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </a>
-          <a href="#journey" onClick={trackClick2} className="glass px-8 py-4 rounded-full font-medium inline-flex items-center gap-2 hover:bg-white/10 transition-colors" data-testid="hero-journey-btn" data-ab-variant={variant2}>
+          </Link>
+          <a href="#journey" onClick={trackClick2} className="glass px-8 py-4 rounded-full font-medium inline-flex items-center justify-center gap-2 hover:bg-white/10 transition-colors" data-testid="hero-journey-btn" data-ab-variant={variant2}>
             <Play className="w-4 h-4" />
             {cta2Text}
           </a>
@@ -217,14 +217,14 @@ const Hero = () => {
         className="mt-24 grid grid-cols-2 md:grid-cols-4 gap-8 pt-12 border-t border-white/5"
       >
         {[
-          { v: "12,842", l: t("hero.stat1") },
-          { v: "856", l: t("hero.stat2") },
-          { v: "142", l: t("hero.stat3") },
-          { v: "94%", l: t("hero.stat4") },
+          { v: "Plăți protejate", l: t("hero.stat1") },
+          { v: "Specialiști verificați", l: t("hero.stat2") },
+          { v: "Garanție inclusă", l: t("hero.stat3") },
+          { v: "Istoric permanent", l: t("hero.stat4") },
         ].map((s, i) => (
           <div key={i} data-testid={`hero-stat-${i}`}>
-            <div className="font-serif text-4xl md:text-5xl font-medium">{s.v}</div>
-            <div className="text-xs uppercase tracking-wider text-stone-500 mt-2">{s.l}</div>
+            <div className="font-serif text-2xl md:text-3xl font-medium">{s.v}</div>
+            <div className="text-xs text-stone-500 mt-2 leading-relaxed">{s.l}</div>
           </div>
         ))}
       </motion.div>
@@ -1504,12 +1504,11 @@ const PromoBanner = () => {
 
 // ============= LANDING PAGE =============
 const LandingPage = () => {
-  useDynamicSEO("home", { title: "PropManage · Property Operating System" });
+  useDynamicSEO("home", { title: "PropManage · Cartea digitală a casei tale" });
   const { t, showSection, isPreview } = useI18n();
   const promoText = t("landing.promo_banner");
   const hasPromo = !!promoText && promoText !== "landing.promo_banner" && sessionStorage.getItem("pm_promo_dismissed") !== "1";
   const [demoOpen, setDemoOpen] = useState(false);
-  const [demoModeDismissed, setDemoModeDismissed] = useState(() => sessionStorage.getItem("pm_demo_mode_dismissed") === "1");
 
   React.useEffect(() => {
     const handler = () => setDemoOpen(true);
@@ -1518,26 +1517,9 @@ const LandingPage = () => {
   }, []);
 
   return (
-    <div className={`grain min-h-screen bg-[#0a0a0b] text-stone-100 ${(hasPromo || isPreview || !demoModeDismissed) ? "pt-9 sm:pt-10" : ""}`}>
+    <div className={`grain min-h-screen bg-[#0a0a0b] text-stone-100 ${(hasPromo || isPreview) ? "pt-9 sm:pt-10" : ""}`}>
       {isPreview && <PreviewBanner />}
-      {!isPreview && !demoModeDismissed && (
-        <div className="fixed top-0 left-0 right-0 z-[58] bg-stone-900/95 backdrop-blur border-b border-amber-500/30 text-amber-200" data-testid="demo-mode-banner">
-          <div className="flex items-center gap-2 px-3 sm:px-10 py-1.5 text-[11px] sm:text-xs">
-            <span className="opacity-80 truncate flex-1 sm:flex-none sm:text-center">
-              <span className="hidden sm:inline">🧪 Demo Mode · Plățile Stripe sunt în mod test, fără bani reali</span>
-              <span className="sm:hidden">🧪 Demo · Stripe test mode</span>
-            </span>
-            <button onClick={() => setDemoOpen(true)} className="underline hover:no-underline font-medium text-[#d4ff3a] shrink-0" data-testid="demo-mode-cta">
-              <span className="hidden sm:inline">Programează demo</span>
-              <span className="sm:hidden">Demo</span>
-            </button>
-            <button onClick={() => { sessionStorage.setItem("pm_demo_mode_dismissed", "1"); setDemoModeDismissed(true); }} className="shrink-0 w-7 h-7 -mr-1 flex items-center justify-center hover:bg-white/10 active:bg-white/15 rounded-full text-stone-300" aria-label="Închide banner demo" data-testid="demo-mode-dismiss">
-              <Minus className="w-4 h-4 rotate-45" />
-            </button>
-          </div>
-        </div>
-      )}
-      {!isPreview && demoModeDismissed && <PromoBanner />}
+      {!isPreview && <PromoBanner />}
       <AnnouncementBanner />
       <Nav />
       <Hero />
@@ -1554,15 +1536,6 @@ const LandingPage = () => {
       {showSection("landing_show_golden_path", true) && <GoldenPath />}
       <CTA />
       <Footer />
-      {/* Sticky "Book a Demo" floating CTA (bottom-left, doesn't fight Emergent badge) */}
-      <button
-        onClick={() => setDemoOpen(true)}
-        className="fixed bottom-6 left-6 z-[55] inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#d4ff3a] text-black font-semibold text-sm shadow-2xl shadow-lime-500/30 hover:scale-105 transition-transform"
-        data-testid="floating-book-demo"
-      >
-        <Sparkles className="w-4 h-4" />
-        Programează o demonstrație
-      </button>
       <BookDemoModal open={demoOpen} onClose={() => setDemoOpen(false)} />
     </div>
   );
@@ -1612,6 +1585,7 @@ function App() {
               <Route path="/components-v2" element={<ComponentsV2 />} />
               <Route path="/community" element={<CommunityPage />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/auth" element={<Navigate to="/login" replace />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/verify-email" element={<EmailVerifyPage />} />
               <Route path="/client/requests/:requestId/offers" element={<ClientRequestOffersPage />} />
