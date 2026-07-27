@@ -1,3 +1,19 @@
+## 🏛️ PPOS FAZA 1.5 — DESIGN SPECS + DESKTOP OS + PRODUCT COUNCIL (27 Iun 2026)
+
+**Ordine Fondator noi (verbatim: `board/PPOS_015_020_100_DESKTOP_OS_COUNCIL_MISSIONS.md`)**: implementarea NU e aprobată încă; fiecare fază cere Design Specification (10 puncte) aprobată fază-cu-fază; P3a detaliată production-ready; **PPOS-015 Desktop OS** (desktop ≠ mobile XL — audit separat + spec proprie); benchmark world-class; **PPOS-020 Product Council** (Jobs/Ive/Rams/Nielsen/Norman/Cagan/Stripe/Linear/Notion — review 10 puncte, unanimitate); regula 3 soluții A/B/C; PPOS-100 CEO mode; structura oficială `/docs/PPOS`.
+
+**Livrat (zero cod de produs)**:
+- **`/app/docs/PPOS/`** = standardul oficial (README_FIRST „PPOS wins", PPOS-000 Constituție → PPOS-010 Quality Gates, prompts/ Audit·Implementation·Guardian·Product_Council·CEO_Mode, PRODUCT_DECISIONS.md — PD-001/002 PROPUSE, COMPONENT_REGISTRY.md).
+- **`SPEC_DESIGN_ALL_PHASES.md`** — cele 10 puncte pentru P3a→P6 (P3b/c/d livrează acum desktop workspace + mobil separat).
+- **`SPEC_P3A_IMPLEMENTATION.md`** — spec completă production-ready: 8 modificări (M1 tur on-demand · M2 cookie compact · M3 feedback mutat din floating · M4 UN progres specialist, root cause găsit: UI citește `experience_tier` legacy vs `tier` canonic · M5 marketplace defensiv · M6 dicționar jargon · M7 timeline pașaport colapsat · M8 dedupe CTA plată), fiecare cu component/fișier, comportament nou, acceptance criteria, wireframe; Council Review UNANIM pe Soluția B (din A/B/C); riscuri+mitigări; efort 1 sesiune.
+- **PPOS-005 Desktop OS** — audit desktop SEPARAT cu măsurători: Property Hub folosește ~31% din 1920px, Specialist are bottom-nav de mobil pe desktop; scoruri desktop: PropHub 42 · Specialist 48 · Client 58-60 · media autentificat ~52. Workspace model (Top Command Bar/Left Nav/Main/Right Context Panel), reguli grid/tabele/panouri, redesign per pagină (Specialist=Mission Control split-view Linear-style; PropHub=Notion record; Client=main+context panel).
+- **`BENCHMARK_WORLD_CLASS.md`** — per pagină vs Stripe/Linear/Notion/GitHub/ClickUp/Monday/Airtable/Figma/Slack/M365 (principii de adoptat, nu copiere vizuală).
+
+**AȘTEAPTĂ**: aprobarea Fondatorului pe SPEC_P3A (primul gate). Apoi spec-uri extinse per fază la cerere (P3b→P6).
+
+---
+
+
 ## 🎨 PPOS — PRODUCT OPERATING SYSTEM · FAZA 1 PRODUCT AUDIT LIVRAT (27 Iun 2026)
 
 **Pivot Fondator (misiuni verbatim: `board/PPOS_PRODUCT_OS_MASTER_DIRECTIVE_MISSIONS.md`)**: STOP dezvoltare incrementală UI + STOP feature development. Agent = Chief Product Designer / Product Council (6 roluri). Regulă nouă: nicio funcționalitate nouă până ce fluxul existent nu are ≥95/100 (claritate/simplitate/mobil). **Task-ul Trust Profile Engine (Levels 0-5) = SUSPENDAT** de acest ordin (rămâne în backlog; se reia doar cu GO explicit).
