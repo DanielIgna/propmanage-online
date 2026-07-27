@@ -1,3 +1,16 @@
+## 🤝 PM-200 TRUST MARKETPLACE + TRUST MANIFESTO — DESIGN CANONIC LIVRAT (27 Iun 2026)
+
+**Ordin Fondator**: Trust Layer peste marketplace (conceptul rămâne, se întărește) + poziționare nouă: „Marketplace-ul profesioniștilor recomandați de proprietari" / „cea mai de încredere rețea de proprietari și profesioniști din România". Verbatim: `memory/board/PM_200_TRUST_MARKETPLACE_VERBATIM.md`.
+
+**Livrabile (design, ZERO cod — War Room freeze respectat)**:
+- **`/app/docs/PPOS/PM-200-TRUST-MARKETPLACE.md`**: repoziționare + Trust Layer profil (9 semnale, Rebook primul) · sistem recenzii 4 întrebări · **REBOOK SCORE** („❤️ 97% ar angaja din nou", > stele, afișat doar la ≥5 răspunsuri) · Trust OS 7 dimensiuni (câștigat/menținut/pierdut) · **Reputation Score transparent** (10 componente cu ponderi publice, anti-black-box, 54% termen lung) · Verified Experience (4 condiții) · verificare owneri L1–L5 cu ponderi trust · 8 trust badges cu criterii publice (se pierd când criteriul nu mai e îndeplinit) · graful de recomandări pe ani (doar agregate, anti-fraudă cluster) · pagina „Specialiștii mei de încredere" · Property Health Score consolidat · community challenges (contribuție reală, nu gamification) · **50 bucle de achiziție organică** în 5 categorii + bucle respinse · neighbourhood ecosystems în 3 faze · gap analysis cu secvențiere Val 1-3 post-beta (Val 1: colectarea rebook/recommend DIN PRIMA ZI de beta — se colectează, nu se afișează).
+- **`/app/docs/PPOS/TRUST-MANIFESTO.md`** (constituțional, 2 pagini): de ce contează încrederea/recomandările/twin/recenziile verificate/relațiile lungi, de ce respingem fake engagement + cele 6 Legi ale Încrederii nenegociabile.
+
+**Notă de implementare pentru post-beta**: singura schimbare mică recomandată ÎN beta (cu GO explicit): adăugarea întrebărilor 3–4 la formularul de recenzie existent, ca datele Rebook să se acumuleze de la primul user real.
+
+---
+
+
 ## 🌱 PM-100 ECOSYSTEM ENGINE + PM-107 SELF GROWTH — DESIGN CANONIC LIVRAT (27 Iun 2026)
 
 **Ordin Fondator**: proiectarea ecosistemului auto-susținut + regula NVA („orice funcționalitate trebuie să genereze următoarea acțiune valoroasă, altfel nu se implementează"). Salvat verbatim: `memory/board/PM_100_107_ECOSYSTEM_ENGINE_VERBATIM.md`.
