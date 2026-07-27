@@ -1,3 +1,17 @@
+## 🏢 PM-PILOT-001 / PM-ADMIN-001 — ADMINISTRATOR WORKSPACE + BUILDING HEALTH · LIVRAT & TESTAT 100% (27 Iul 2026)
+
+**Slice pilot livrat** (extinde PM-002, zero duplicare, criteriile Phase 10 acoperite pentru primul bloc real de 13 apartamente):
+- **Backend** `routes/building_admin.py`: buildings au `administrator_id` (creatorul devine administrator) · PATCH /api/buildings/{id} (an construcție, etaje, apartments_total — doar admin, 403 altfel) · **Building Health Score** `compute_building_health` — 5 componente ponderate cu explicații RO (Acoperire mentenanță 30%, Punctualitate revizii 25%, Reactivitate 20%, Activare digitală 15%, Activitate comunitară 10%; verde≥70/galben≥45/roșu<45) · GET /api/admin-workspace/portfolio (carduri blocuri + totals + 🟢🟡🔴) · GET /api/buildings/{id}/dashboard (admin+membri; apartamente cu doar prenume owner, mentenanță 90 zile agregată, oportunități, campanii, anunțuri, invite_link) · **Anunțuri** POST/GET /api/buildings/{id}/announcements (doar admin publică; toți locatarii notificați) · GET /buildings/{id}/preview (minimal, fără date sensibile — verificat explicit).
+- **Frontend**: pagina `/administrator` (`AdministratorWorkspace.jsx`, lazy) — portofoliu cu indicatori de status + drill-down Building Dashboard (health breakdown cu bare, apartamente, card invitație copy+WhatsApp, compozitor anunțuri live, mentenanță 90 zile, campanii) · `BuildingHub` extins: „Invită vecini" (link `/register?binvite={id}`), link negru „Administrare bloc" pentru admin, anunțuri pe card, **banner de invitație** (bh-invite-banner cu Mă alătur/Nu acum) · deep-link `?binvite=` capturat în Auth (localStorage pm_building_invite) și ClientDashboardV2 (comută pe tab Proprietăți).
+- **Bucla de creștere**: administrator creează blocul → link la avizier/WhatsApp → locatarii se conectează → activare digitală crește health → campanii comune → lucrări → twin per apartament.
+
+**Testare**: iteration_147 — backend **17/17 PASS**, frontend **F1-F4 100%** (inclusiv fluxul complet de invitație cu cont secundar). Zero issues. Suite: `tests/test_pm_pilot_admin_iter147.py`.
+
+**Directive Fondator rămase din pachetul PM-VISION/PM-CORE (backlog prioritizat)**: Import Excel/CSV apartamente+locatari (Onboarding Pipeline cu % activare) · Vot comunitar + raportare probleme (Community Center) · Building Digital Twin dedicat · PM-CORE (Module Registry, Permission Engine, Event Bus, Global Search, Timeline Engine) — de abordat incremental.
+
+---
+
+
 ## 🏢 PM-002 — COMMUNITY MAINTENANCE ENGINE v1 · LIVRAT & TESTAT 100% (27 Iul 2026)
 
 **Directivă Fondator**: PM-002/003/004 + PM-GROWTH-001→006 (Dual Growth Engine, Building OS, Campaign AI). Implementat cel mai mic slice complet cu ROI maxim: **Buildings + Campanii comune de mentenanță** (Engine B — comunități, pe aceeași infrastructură).
