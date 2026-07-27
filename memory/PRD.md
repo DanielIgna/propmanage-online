@@ -1,3 +1,19 @@
+## 🎨 PPOS-011 — ENTERPRISE VISUAL DESIGN SYSTEM · LIVRAT & TESTAT (27 Iun 2026)
+
+**Directivă Fondator**: Visual Design Review desktop enterprise (tipografie mare, ierarhie, contrast, densitate) — EXCLUSIV vizual, zero logică/API/navigație. Salvată ca standard canonic: `/app/docs/PPOS/PPOS-011-Enterprise-Visual-Design-System.md`.
+
+**Implementat**:
+- **Scale-up tipografic desktop (≥1024px)** prin CSS scoped în `index.css` §PPOS-011: `.cv2-scope` (client) + `.pm-shell` (specialist, clasă nouă pe DashLayout + paginile beta admin) + `.admin-shell` (nou pe root-ul AdminLayoutMetronic): 10px→12, 11px→13, xs→14, sm→15.5 (admin: 13.5/15, sidebar exceptat la 14); tabele admin 15px + row height + hover pe rânduri; ritm vertical admin space-y-6→32px.
+- **Titluri enterprise**: client 38px bold · specialist 40px bold (era 48 light) · admin 36px bold · Beta Cockpit/Issues 36px bold + frame standalone dark cu back-link (erau fără layout, lipite de marginea ecranului).
+- **Contrast**: `--pm-outline` 0.10→0.13, strong 0.18→0.24. **KPI executive**: specialist 4xl + p-5, admin KPI 3xl.
+- **Micro-fix-uri**: gate-cards cockpit icon aliniat sus (suprapunere), „Casa mea" adresa pe rând propriu + documente separat (trunchiere), sidebar admin protejat de clipping.
+- **Livrabil**: `/app/docs/PPOS/VISUAL_DESIGN_CHANGELOG.md` — toate schimbările + scoruri vizuale per pagină (toate paginile importante ≥90/100; singura sub 90: Client Lucrări 88).
+
+**Testare**: iteration_143 — regresie vizuală **100% PASS** (desktop 1920 toate rolurile + mobil 390 confirmat NEATINS — scale-up doar ≥1024px; smoke funcțional sub-nav hub + quick-add issues verde). Cele 2 polish-uri minore raportate — fixate. Date de test curățate.
+
+---
+
+
 ## 🛡️ BETA WAR ROOM ACTIVAT — Playbook + Issue Prioritization Board (27 Iun 2026)
 
 **Ordin Fondator**: Beta Candidate v0.9 ACCEPTAT → BETA WAR ROOM: freeze features non-critice; dezvoltarea condusă de comportamentul REAL al userilor.

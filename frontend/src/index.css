@@ -1007,6 +1007,8 @@ html[data-theme="light"] select:focus-visible {
   .admin-shell th, .admin-shell td { padding-top: 0.7rem; padding-bottom: 0.7rem; }
   .admin-shell tbody tr { transition: background-color 0.15s ease; }
   .admin-shell tbody tr:hover { background-color: rgba(255, 255, 255, 0.03); }
+  /* Sidebar-ul admin păstrează 14px ca să nu taie etichetele lungi */
+  .admin-shell nav .text-sm { font-size: 0.875rem; line-height: 1.3rem; }
 
   /* Ritm vertical mai generos între secțiunile majore din admin */
   .admin-shell main .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 2rem; }

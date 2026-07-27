@@ -170,7 +170,8 @@ const PropertyStatusCard = ({ prop, docsCount, go }) => {
           </span>
           <div className="min-w-0 flex-1">
             <div className="text-sm font-black text-slate-900 truncate">{prop.name}</div>
-            <div className="text-[10px] text-slate-400 truncate">{prop.address || "cartea casei"}{docsCount != null ? ` · ${docsCount} documente` : ""}</div>
+            <div className="text-[10px] text-slate-400 truncate" title={prop.address || ""}>{prop.address || "cartea casei"}</div>
+            {docsCount != null && <div className="text-[10px] text-slate-400">{docsCount} documente în cartea casei</div>}
           </div>
           <span className="text-[11px] font-black text-[#166534] shrink-0 flex items-center">Casa mea <ChevronRight className="w-3.5 h-3.5" /></span>
         </div>
