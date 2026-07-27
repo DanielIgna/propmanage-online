@@ -127,6 +127,19 @@ export const PublicMarketplace = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-xs mb-4 flex-wrap flex-1">
+                  {s.trust?.rebook_show && (
+                    <div className="flex items-center gap-1 bg-rose-500/15 border border-rose-500/30 text-rose-300 px-2.5 py-1 rounded-full" data-testid={`mkt-rebook-${s.id}`}>
+                      <span>❤️</span>
+                      <span className="font-semibold">{s.trust.rebook_pct}%</span>
+                      <span className="opacity-70">ar angaja din nou</span>
+                    </div>
+                  )}
+                  {(s.trust?.recommenders || 0) > 0 && (
+                    <div className="flex items-center gap-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-2.5 py-1 rounded-full" data-testid={`mkt-recommenders-${s.id}`}>
+                      <span className="font-semibold">{s.trust.recommenders}</span>
+                      <span className="opacity-70">{s.trust.recommenders === 1 ? "proprietar recomandă" : "proprietari recomandă"}</span>
+                    </div>
+                  )}
                   {(s.reviews_count || 0) >= 1 ? (
                     <div className="flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 text-amber-300 px-2.5 py-1 rounded-full">
                       <Star className="w-3 h-3 fill-current" />
@@ -149,11 +162,31 @@ export const PublicMarketplace = () => {
         </div>
 
         {specialists.length === 0 && !loading && (
-          <PMEmptyState
-            icon={Search}
-            title="Niciun specialist găsit"
-            description="Încearcă să ajustezi filtrele sau revino mai târziu."
-          />
+          (filters.category || filters.verified_only) ? (
+            <PMEmptyState
+              icon={Search}
+              title="Niciun specialist găsit"
+              description="Încearcă să ajustezi filtrele sau revino mai târziu."
+            />
+          ) : (
+            /* GBOS P0 — marketplace-ul nu arată niciodată „gol": early access onest */
+            <div className="pm-card-glass !p-8 sm:!p-12 text-center" data-testid="mkt-early-access">
+              <PMChip variant="primary" className="mb-4">EARLY ACCESS</PMChip>
+              <h2 className="font-serif text-3xl sm:text-4xl mb-3">Construim rețeaua de încredere, oraș cu oraș</h2>
+              <p className="text-stone-400 max-w-xl mx-auto mb-8">
+                Primii specialiști intră pe platformă prin recomandările proprietarilor — nu prin reclame.
+                Fiecare profil vine cu recenzii verificate din lucrări reale, plăți escrow și garanție.
+              </p>
+              <div className="flex flex-wrap justify-center gap-3">
+                <Link to="/register?role=specialist" data-testid="mkt-ea-specialist">
+                  <PMPillButton variant="primary">Sunt specialist — vreau primele cereri</PMPillButton>
+                </Link>
+                <Link to="/register" data-testid="mkt-ea-owner">
+                  <PMPillButton variant="ghost">Sunt proprietar — las prima cerere</PMPillButton>
+                </Link>
+              </div>
+            </div>
+          )
         )}
 
         {/* SEO internal-link block — surfaces all category/city landing pages */}

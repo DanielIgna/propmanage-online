@@ -18,7 +18,7 @@ import { ProjectListSection } from "./ProjectWorkspace";
 import { API, DashLayout, StatusBadge, NavigateButtons } from "./DashShared";
 import { BottomNav } from "./BottomNav";
 import { SettingsPanel } from "./SettingsPanel";
-import { RequestTimelineModal, ScheduleProposalModal, LastActionBanner } from "./ActivityTimeline";
+import { ReferralHub, claimPendingInvite } from "../components/ReferralHub";import { RequestTimelineModal, ScheduleProposalModal, LastActionBanner } from "./ActivityTimeline";
 import { TierCelebrationBanner } from "../lib/TierCelebrationBanner";
 import { QuestPanel } from "../lib/QuestPanel";
 import { SpecialistCockpit } from "./SpecialistCockpit";
@@ -69,6 +69,7 @@ export const SpecialistDashboard = () => {
   const loadNotifs = () => axios.get(`${API}/notifications`).then(r => setNotifs(r.data)).catch(() => {});
   useEffect(() => {
     if (user) {
+      claimPendingInvite();
       load();
       loadNotifs();
       const interval = setInterval(loadNotifs, 30000);
@@ -435,7 +436,10 @@ export const SpecialistDashboard = () => {
 
       {tab === "settings" && (
         <>
-          <div className="max-w-2xl mx-auto mb-4"><BetaFeedbackEntry /></div>
+          <div className="max-w-2xl mx-auto mb-4 space-y-4">
+            <ReferralHub variant="dark" />
+            <BetaFeedbackEntry />
+          </div>
           <SettingsPanel />
         </>
       )}

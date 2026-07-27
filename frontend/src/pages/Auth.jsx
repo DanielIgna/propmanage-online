@@ -175,6 +175,9 @@ export const RegisterPage = () => {
   const navigate = useNavigate();
   const _params = new URLSearchParams(window.location.search);
   const referrerId = _params.get("ref");
+  // GBOS P0.1 — invitație personală: codul se revendică după primul login (claimPendingInvite)
+  const _inviteCode = _params.get("invite");
+  if (_inviteCode) localStorage.setItem("pm_invite_code", _inviteCode);
   // Recruitment funnel (CIP-A): /register?role=specialist&category=<legacy>
   const _inviteCategory = _params.get("category");
   const _inviteRole = _params.get("role");

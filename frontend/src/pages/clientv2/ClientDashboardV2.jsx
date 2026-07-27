@@ -20,6 +20,7 @@ import { SettingsPanel } from "../SettingsPanel";
 import HouseHealthCard from "../HouseHealthCard";
 import { HelpButton } from "../../components/HelpButton";
 import { BetaFeedbackEntry } from "../../components/BetaFeedbackWidget";
+import { ReferralHub, claimPendingInvite } from "../../components/ReferralHub";
 
 const NAV = [[Home, "Acasă", "home"], [Wrench, "Lucrări", "jobs"], [Plus, "Solicită", "request"], [Building2, "Propr.", "property"], [Settings, "Setări", "settings"]];
 const TITLES = { home: null, jobs: "Lucrările mele", property: "Proprietatea mea", settings: "Setări" };
@@ -54,6 +55,7 @@ export default function ClientDashboardV2() {
 
   useEffect(() => {
     if (!user || user === false) return;
+    claimPendingInvite();
     Promise.all([loadProps(), loadRequests(), loadNotifs()]).finally(() => setLoaded(true));
     const interval = setInterval(loadNotifs, 30000);
     // Deep-link taburi (onboarding checklist etc.): /client?tab=home|jobs|property|settings|request
@@ -188,6 +190,7 @@ export default function ClientDashboardV2() {
         {tab === "property" && <PropertyHubV2 user={user} prop={prop} properties={properties} setSelectedPropId={setSelectedPropId} actions={actions} />}
         {tab === "settings" && (
           <div className="px-5 pb-8 space-y-2 lg:max-w-3xl" data-testid="v2-settings-view">
+            <ReferralHub variant="light" />
             <BetaFeedbackEntry light />
             <button onClick={() => setShow2FA(true)} data-testid="v2-set-2fa"
               className="w-full flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm text-left">

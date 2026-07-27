@@ -381,6 +381,8 @@ async def review_specialist(req_id: str, data: ReviewIn, user: dict = Depends(re
         "specialist_id": req["specialist_id"],
         "rating": data.rating,
         "comment": data.comment,
+        "would_hire_again": data.would_hire_again,
+        "would_recommend": data.would_recommend,
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     

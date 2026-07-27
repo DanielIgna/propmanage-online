@@ -128,6 +128,9 @@ class ReviewIn(BaseModel):
     job_id: Optional[str] = None
     rating: int = Field(ge=1, le=5)
     comment: Optional[str] = None
+    # GBOS P0.3 — Trust Marketplace (Rebook > stele)
+    would_hire_again: Optional[Literal["yes", "no", "not_sure"]] = None
+    would_recommend: Optional[bool] = None
 
 
 class DocumentIn(BaseModel):

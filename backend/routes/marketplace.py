@@ -168,6 +168,36 @@ async def public_marketplace(
             "portfolio_count": portfolio_counts.get(sid, 0) if docs else 0,
         }
 
+    # ===== GBOS P0.3 — Trust rollup (Rebook + Recomandări) batch =====
+    trust_map = {}
+    if docs:
+        async for row in db.reviews.aggregate([
+            {"$match": {"specialist_id": {"$in": spec_ids},
+                        "direction": {"$ne": "specialist_to_client"},
+                        "would_hire_again": {"$in": ["yes", "no", "not_sure"]}}},
+            {"$group": {"_id": {"s": "$specialist_id", "a": "$would_hire_again"}, "n": {"$sum": 1}}},
+        ]):
+            t = trust_map.setdefault(row["_id"]["s"], {"yes": 0, "no": 0, "not_sure": 0, "recommenders": set()})
+            t[row["_id"]["a"]] = row["n"]
+        async for r in db.reviews.find({"specialist_id": {"$in": spec_ids},
+                                        "direction": {"$ne": "specialist_to_client"},
+                                        "would_recommend": True}, {"specialist_id": 1, "client_id": 1}):
+            trust_map.setdefault(r["specialist_id"], {"yes": 0, "no": 0, "not_sure": 0, "recommenders": set()})["recommenders"].add(r.get("client_id"))
+        async for r in db.recommendations.find({"specialist_id": {"$in": spec_ids}}, {"specialist_id": 1, "owner_id": 1}):
+            trust_map.setdefault(r["specialist_id"], {"yes": 0, "no": 0, "not_sure": 0, "recommenders": set()})["recommenders"].add(r.get("owner_id"))
+
+    def _trust(sid):
+        t = trust_map.get(sid)
+        if not t:
+            return {"rebook_pct": None, "rebook_total": 0, "rebook_show": False, "recommenders": 0}
+        total = t["yes"] + t["no"] + t["not_sure"]
+        return {
+            "rebook_pct": round(t["yes"] * 100 / total) if total else None,
+            "rebook_total": total,
+            "rebook_show": total >= 5,
+            "recommenders": len([x for x in t["recommenders"] if x]),
+        }
+
     return [{
         "id": str(d["_id"]),
         "name": d.get("name"),
@@ -182,6 +212,7 @@ async def public_marketplace(
         "verified": d.get("verified", False),
         "availability_status": d.get("availability_status"),
         "health": _compute_health(d),
+        "trust": _trust(str(d["_id"])),
         "portfolio_count": _compute_health(d)["portfolio_count"],
     } for d in docs]
 

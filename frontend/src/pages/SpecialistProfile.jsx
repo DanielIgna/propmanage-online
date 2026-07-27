@@ -28,15 +28,35 @@ const FACTOR_LABELS = {
 
 const TrustScoreCard = ({ specialistId }) => {
   const [trust, setTrust] = useState(null);
+  const [rollup, setRollup] = useState(null);
   useEffect(() => {
     axios.get(`${API}/specialists/${specialistId}/trust-score`)
       .then(r => setTrust(r.data))
       .catch(() => setTrust(null));
+    axios.get(`${API}/marketplace/specialists/${specialistId}/trust`)
+      .then(r => setRollup(r.data))
+      .catch(() => setRollup(null));
   }, [specialistId]);
   if (!trust) return null;
   const lvl = LEVEL_LABELS[trust.level] || LEVEL_LABELS.new;
   return (
     <div className="glass-strong rounded-3xl p-6 mb-6" data-testid="trust-score-card">
+      {/* GBOS P0.3 — Rebook > stele */}
+      {rollup && (rollup.rebook?.show || rollup.recommenders > 0) && (
+        <div className="flex flex-wrap gap-2 mb-4" data-testid="profile-trust-chips">
+          {rollup.rebook?.show && (
+            <span className="flex items-center gap-1.5 bg-rose-500/15 border border-rose-500/30 text-rose-300 px-3 py-1.5 rounded-full text-sm font-semibold" data-testid="profile-rebook"
+              title={rollup.explain}>
+              ❤️ {rollup.rebook.pct}% ar angaja din nou <span className="opacity-60 font-normal">({rollup.rebook.total} răspunsuri)</span>
+            </span>
+          )}
+          {rollup.recommenders > 0 && (
+            <span className="flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-3 py-1.5 rounded-full text-sm font-semibold" data-testid="profile-recommenders">
+              Recomandat de {rollup.recommenders} {rollup.recommenders === 1 ? "proprietar" : "proprietari"}
+            </span>
+          )}
+        </div>
+      )}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <div className={`w-12 h-12 rounded-2xl bg-${lvl.color}-500/15 border border-${lvl.color}-500/40 flex items-center justify-center`}>
