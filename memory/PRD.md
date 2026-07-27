@@ -1,3 +1,14 @@
+## ✅ SPRINT CX-1 ÎNCHIS — funnel conversie + re-audit cu gate 90 (27 Iun 2026)
+
+**Livrat (F1–F11 + U29/U30 + 2 bug-uri reale găsite pe parcurs)**: cifre fabricate eliminate (sursa reală era `DEFAULT_CMS` în `admin_console.py` L59 — CMS-ul suprascrie i18n prin `/api/cms/public`!), banner Demo Mode public eliminat, hero nou „Cartea de service a casei tale." cu UN CTA→/register (înainte CTA-ul ducea la #problem), trust chips umane (`TrustStrip.jsx`), telefon opțional la register clienți (`auth.py` + `Auth.jsx`, cu fix suplimentar: „abc"→400), 1-click adăugare proprietate (`Components.jsx` L123 auto-open form), /auth→/login redirect, `/devino-specialist`: CTA primar + **bug temă reparat** (pagina light moștenea dark: CSS `html:not([data-theme=light]) .cv2-scope` — fix: forțare data-theme=light on mount) + imagini pe featured cards + grid desktop expandat, „1 minut" copy, discover cards 1 pentru first-run, CTA context-aware, 696 notificări demo curățate.
+
+**Validare (mandatul Fondatorului: re-audit + scoruri + capturi)**: iteration_133 — backend 8/8, frontend 100%. Re-scoring cu capturi noi în `CONVERSION_AUDIT_2026.md` (secțiunea RE-AUDIT): toate cele 9 pagini din scope au trecut de la 45–85 la **90–92** ✅. Transparent sub 90 și în afara scope-ului: Dashboard specialist 75 (CX-5), F7 pasul-2-document (CX-2).
+
+**URMEAZĂ (aprobat de Fondator): CX-2 = S1 Document Vault** („Casa ta are memorie"): upload documente+foto per proprietate cu tip+proveniență, integrare object storage (playbook Emergent), alimentează REAL capabilities.documents din DNA, pasul 2 din onboarding devine „adaugă primul document", momente de celebrare (U42/U43). Cont test first-run nou necesar (cx.audit.nophone are acum proprietate „Test Casa").
+
+---
+
+
 ## 🎯 EO-006/007/008/009 + Conversion Audit & Experience Architecture (27 Iun 2026)
 
 **Noi ordine salvate VERBATIM**: EO-006 Customer Experience First (v1+v2, ACTIVE ABSOLUTE), EO-007 AI CPO (agentul = Chief Product Officer), EO-008 Experience Architecture Dual Ecosystem (×2 versiuni, ACTIVE ABSOLUTE), EO-009 Zero Friction Marketplace, 16 misiuni-doctrină (M1–M16 în `board/EXPERIENCE_DOCTRINE_COMPANION_MISSIONS.md`), **North Star Metric = Trusted Properties** (`metrics/NORTH_STAR_TRUSTED_PROPERTIES.md`).

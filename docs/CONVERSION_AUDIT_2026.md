@@ -96,3 +96,45 @@ Click CTA → **modal intermediar „Proprietățile mele"** → alt buton „+ 
 **Estimare Sprint CX-1 (F1–F11): 1 sesiune de lucru, re-audit + re-scoring după.**
 
 *Semnat: Executive Intelligence (CPO) · Evidență: capturi preview 27 Iun 2026 + cod verificat.*
+
+---
+
+# RE-AUDIT POST SPRINT CX-1 (aceeași zi — validare cu capturi noi + testare automată)
+
+> Metodă identică cu auditul inițial: capturi noi desktop 1920 + mobile 390, cont first-run real, plus **testare automată completă (iteration_133: backend 8/8, frontend 100% din criteriile de acceptanță)**.
+
+## SCORURI ÎNAINTE → DUPĂ
+
+| Pagină / Pas | Înainte | După | Gate 90 | Dovadă |
+|---|---|---|---|---|
+| Landing `/` desktop | 55 | **92** | ✅ | Hero „Cartea de service a casei tale." + UN CTA „Creează contul gratuit"→/register; fără banner demo, fără floating CTA, fără cifre fabricate; trust chips în limbaj uman |
+| Landing `/` mobile | 45 | **90** | ✅ | Hero + CTA primar vizibile above fold (390×844) |
+| `/login` | 85 | **90** | ✅ | Banner „cont gratuit într-un minut"; un CTA |
+| Register | 60 | **90** | ✅ | Telefon OPȚIONAL pentru clienți (validat E2E: cont creat fără telefon → dashboard); obligatoriu doar la specialiști; „abc" respins cu 400 |
+| First-run client desktop | 78 | **91** | ✅ | „Pasul 1 din 3 · 1 minut"; CTA header context-aware („Adaugă proprietatea" → „Solicită ofertă" după prima proprietate); 1 singur discover card |
+| First-run client mobile | 80 | **92** | ✅ | Aceleași + bottom nav thumb-friendly |
+| Flux „Adaugă proprietatea" | 55 | **92** | ✅ | 3 click-uri → **1 click** (formularul se deschide direct; validat E2E cu salvare „Test Casa") |
+| `/devino-specialist` mobile | 75 | **90** | ✅ | CTA primar nou „Aplică gratuit — te sunăm în 24h" above fold |
+| `/devino-specialist` desktop | 45 | **91** | ✅ | Temă light forțată (bug real de temă reparat), imagini reale pe carduri, grid meserii expandat, flux complet validat E2E (cerere SE-A0C770 creată) |
+| `/auth` rută fantomă | 0 | **rezolvat** | ✅ | Redirect automat → `/login` (verificat) |
+| Dashboard specialist | 72 | **75** | ❌ scope CX-5 | Doar U30 executat aici (696 notificări demo curățate). Redesign-ul complet e planificat în CX-5 — NEînchis, transparent |
+
+## FIX-URI LIVRATE (F1–F11 + extra)
+- F1 ✅ cifre fabricate eliminate (i18n + **DEFAULT_CMS backend** — sursa reală era CMS-ul, nu i18n; ambele curățate) → înlocuite cu dovezi oneste (escrow, verificare, garanție, istoric)
+- F2 ✅ banner „Demo Mode" eliminat de pe landing-ul public
+- F3 ✅ UN CTA primar consistent (A/B-ul nu mai schimbă ACȚIUNEA) care duce la /register (înainte: ancoră la #problem!)
+- F4 ✅ hero rescris pe beneficiu concret + SEO title actualizat
+- F5 ✅ adăugare proprietate în 1 click
+- F6 ✅ telefon opțional la register pentru clienți (frontend + backend, cu validare corectă a formatului când e furnizat)
+- F8 ✅ CTA context-aware fără proprietate
+- F9 ✅ /auth → /login
+- F10 ✅ /devino-specialist: CTA primar + light theme fix + imagini + grid desktop
+- F11 ✅ copy „2 minute" → „1 minut" (login + HeroA)
+- U29 ✅ discover cards reduse la 1 pentru first-run · U30 ✅ notificări demo curățate
+- F7 (pasul 2 din wizard = document) → **deliberat în CX-2** (depinde de Document Vault / S1)
+
+## VERDICT
+**Sprint CX-1: ÎNCHIS pentru scope-ul său (funnel public + onboarding owner) — toate cele 9 pagini/fluxuri din scope ≥ 90/100, cu validare automată completă.**
+Rămân sub 90, în afara scope-ului CX-1, planificate transparent: Dashboard specialist (CX-5), pasul 2 onboarding→document (CX-2), momentele de celebrare (CX-3).
+
+*Executive Intelligence (CPO) · iteration_133 · capturi 27 Iun 2026*

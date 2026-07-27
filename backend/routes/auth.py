@@ -103,6 +103,8 @@ async def register(data: RegisterIn, request: Request, response: Response):
     phone_raw = (data.phone or "").strip()
     import re
     phone_digits = re.sub(r"[^\d+]", "", phone_raw) if phone_raw else ""
+    if phone_raw and not phone_digits:
+        raise HTTPException(400, "Format telefon invalid. Folosește +40 7XX XXX XXX sau 07XX XXX XXX")
     if data.role == "specialist" and not phone_digits:
         raise HTTPException(400, "Numărul de telefon este obligatoriu pentru specialiști")
     if phone_digits and not re.match(r"^\+?\d{8,15}$", phone_digits):
