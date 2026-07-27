@@ -12,9 +12,9 @@ Criterii de succes: …
 
 ---
 
-Decision #001 · Iun 2026 · status: PROPUS (așteaptă aprobarea Fondatorului pe SPEC_P3A)
+Decision #001 · Iun 2026 · status: **IMPLEMENTAT** (GO Fondator + Council unanim; testat 100% — iteration_140)
 Problema: primul ecran după login e blocat de 4 overlay-uri; specialistul matur vede 4 sisteme de progres contradictorii; marketplace public afișează stări imposibile.
-Soluția: Faza P3a „Igienă & onestitate" (8 modificări, doar presentation layer) — `SPEC_P3A_IMPLEMENTATION.md`.
+Soluția: Faza P3a „Igienă & onestitate" (8 modificări, doar presentation layer) — `SPEC_P3A_IMPLEMENTATION.md` · Rezultat: `P3A_BEFORE_AFTER_REPORT.md` (media 68→~75, zero regresii, NO REGRESSION PASS).
 Utilizatorul: toți (primul login) + specialiști VERIFIED+ + vizitatori marketplace.
 KPI: TTFV, activare J0→J1, bounce pe marketplace, VoC beta.
 Impact venit: indirect-mare (încrederea = conversie; time-to-cash pe plăți).

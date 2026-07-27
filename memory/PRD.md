@@ -1,3 +1,26 @@
+## ✅ PPOS P3a — IGIENĂ & ONESTITATE · IMPLEMENTAT & TESTAT 100% (27 Iun 2026)
+
+**GO Fondator primit** (+ reguli noi salvate: NO REGRESSION RULE în PPOS-010; verificare după FIECARE fază: Audit→P3a→Re-audit→P3b→...; STOP pe recomandarea P3c — următoarea fază este P3b).
+
+**Implementat (exclusiv presentation layer, backend NEATINS)**:
+- **M1** Tur on-demand: TutorialOverlay/RoleTour nu se mai autodeclanșează; buton „?" (`HelpButton.jsx`) în header client+specialist cu hint la primul login; ReplayTourButton → event `pm-open-tour`.
+- **M2** Cookie banner compact jos-stânga (`CookieBanner.jsx` rescris), butoane egale, nu acoperă nav-ul mobil.
+- **M3** Feedback beta scos din floating (acoperea bottom nav pe mobil) → intrare în Setări client (`ClientDashboardV2`) + specialist; panou pe event `pm-open-beta-feedback` (`BetaFeedbackWidget.jsx` rescris, `BetaFeedbackEntry`).
+- **M4** UN progres specialist: nou `SpecialistProgressCard.jsx` (tier canonic + `getNextTierProgress` + ≤2 pași reali + „Următoarea deblocare"); eliminate din prezentare: GettingStartedWidget (DashShared→doar client), WelcomeChecklist, MaturityCard, TierToolsPanel (lista 9 blocate), TierProgressWidget (înlocuit), TierBadgeMini legacy pt specialist; QuestPanel cu prop `hideActive` (voucherele/quest-urile backend INTACTE).
+- **M5** Marketplace defensiv (`Marketplace.jsx`): filtru REJECTED/SUSPENDED/BLOCKED, „Nou pe platformă" la 0 recenzii, fără HealthScoreBadge/scoruri interne public, tier chip doar VERIFIED+.
+- **M6** Dicționar jargon (`PropertyHubV2.jsx`: humanEventTitle + groupTimeline ×N; EstateBrowse „% reco"→„recomandări %").
+- **M7** Pașaport: timeline colapsat la 5 + „Vezi tot istoricul (N)" + grupare duplicate (`PublicPassportPage.jsx`).
+- **M8** CTA unic la plată (`HomeV2.jsx` dedupe hero vs Noutăți pe același request; header „Solicită ofertă" secundar când există tranzacție activă — `txActive`).
+
+**Testare**: testing agent frontend E2E `/app/test_reports/iteration_140.json` — **100% PASS, zero regresii**, 6 conturi, desktop 1920 + mobil 390. **NO REGRESSION CHECK: PASS** (niciun scor în scădere).
+**Re-audit scoruri**: Specialist 52→70 · Marketplace 58→76 · Pașaport 80→85 · Client activ 72→77 · PropHub 55→60 · media **68→~75** (scorecard actualizat). Raport complet: **`/app/docs/PPOS/P3A_BEFORE_AFTER_REPORT.md`**.
+**Bug de proces rezolvat**: 2 edit-uri au corupt temporar ClientDashboardV2/PropertyHubV2 (fragmente duplicate) — curățate, compile verde.
+
+**URMEAZĂ (secvența Fondatorului)**: specificația production-ready **P3b — Client Dashboard OS** (matricea J0→P + desktop workspace 8+4) → aștept GO pe spec → implementare → re-audit.
+
+---
+
+
 ## 🏛️ PPOS FAZA 1.5 — DESIGN SPECS + DESKTOP OS + PRODUCT COUNCIL (27 Iun 2026)
 
 **Ordine Fondator noi (verbatim: `board/PPOS_015_020_100_DESKTOP_OS_COUNCIL_MISSIONS.md`)**: implementarea NU e aprobată încă; fiecare fază cere Design Specification (10 puncte) aprobată fază-cu-fază; P3a detaliată production-ready; **PPOS-015 Desktop OS** (desktop ≠ mobile XL — audit separat + spec proprie); benchmark world-class; **PPOS-020 Product Council** (Jobs/Ive/Rams/Nielsen/Norman/Cagan/Stripe/Linear/Notion — review 10 puncte, unanimitate); regula 3 soluții A/B/C; PPOS-100 CEO mode; structura oficială `/docs/PPOS`.
