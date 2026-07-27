@@ -3850,3 +3850,35 @@ follow-up automation; D119; e-Factura. NU mai construim engine-uri noi fără ce
 **Next**: purge demo data pe prod + reseed pilot 13 apartamente (P0, blocat pe decizie
 founder), Stripe LIVE claim (user), Resend DNS (user), House Health Subscriptions UI (P1),
 code-splitting bundle 2.3MB (P2), unificare 4 sisteme Twin (P2).
+
+---
+
+## ✅ PM-AI-REPAIR-001 — HEALTH REPAIR ENGINE (27 Iul 2026)
+**Directiva: fiecare Health Score sub prag → Detector → Reparator → Validator (cod, nu rapoarte).**
+1. `/app/backend/health_repair.py`: DOMAIN_ENGINES pentru toate cele 11 domenii Enterprise
+   Health. Fiecare domeniu are detect() (cauze reale din date, cu sursă fișier/colecție) și
+   repair() (acțiuni de producție REALE, refolosind motoarele existente — zero duplicare):
+   - revenue → revenue_hunter_tick + lead_followup_scan + notificare comenzi pending
+   - operations/marketplace → execute_auto_match + category_visibility_refresh
+   - growth → nurture_scan + growth_intelligence_scan
+   - customer_trust → review nudges reale către clienți (notificări + flag pe requests)
+   - product → backfill health_score agregat din componente
+   - knowledge → generare drafturi Case Library din lucrări finalizate reale
+   - ux → re-rulare design audits (LLM cu fallback rule-based) pe 4 pagini cheie
+   - automation → governance_watchdog + retry_tick
+   - ai_learning → outcome_scan + decision_review
+   - technical_debt → creare automată indexuri MongoDB lipsă (10 specs)
+2. Bucla: run_repair_cycle → detect → repair → RE-măsoară scorul (score_before/after/delta),
+   persistă în db.health_repair_runs + ledger orchestrator + Decision Memory (nivel 4).
+3. API: GET/POST /api/admin/repair-center/{status,run,runs}. Run = background task cu lock
+   anti-concurență (409) + exception logging. Cron zilnic 06:20 (health_repair_daily).
+4. UI /admin/repair-center (+ meniu admin "Repair Engine"): 11 carduri cu scor + last repair
+   Δ, buton per-domeniu + ciclu complet, polling ieftin pe /runs, rezultate cu root cause +
+   sursă cod + acțiuni ✓/✗.
+**PRIMA RULARE REALĂ: Knowledge 29.5→53.5 (Δ+24, 8 studii de caz), UX 56.5→76.1 (Δ+19.6,
+4 audituri), 7 indexuri DB create, 7 review nudges, 6 oportunități revenue, 67 joburi verificate.**
+**VALIDAT: iteration_149.json — backend 9/9 PASS, frontend 100%. Fix-uri post-test aplicate:
+last_repair agregat per domeniu, lock concurență, polling ieftin.**
+**Notă onestă**: lead_followup emails eșuează în sandbox Resend (P0 blocat pe acțiunea
+userului — DNS). Scorurile revenue/product cer acțiuni umane (vânzare, onboarding) — motorul
+execută partea automatizabilă și escaladează restul.

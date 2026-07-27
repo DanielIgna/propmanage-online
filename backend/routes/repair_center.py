@@ -14,6 +14,7 @@ from health_repair import DOMAIN_ENGINES, run_repair_cycle
 
 logger = logging.getLogger("propmanage.repair_center")
 router = APIRouter(prefix="/api/admin/repair-center", tags=["repair-center"])
+_running_task = None
 
 
 @router.get("/status")
@@ -22,7 +23,12 @@ async def repair_status(user=Depends(require_role("admin"))):
     formulas = await _get_formulas()
     metrics = await _collect_metrics()
     last_run = await db.health_repair_runs.find_one({}, {"_id": 0}, sort=[("ts", -1)])
-    last_by_domain = {r["domain"]: r for r in (last_run or {}).get("results", [])}
+    # last_repair per domeniu — din cea mai recentă rulare care a atins domeniul
+    last_by_domain = {}
+    async for run in db.health_repair_runs.find({}, {"_id": 0, "ts": 1, "results": 1}).sort("ts", -1).limit(20):
+        for r in run.get("results", []):
+            if r["domain"] not in last_by_domain:
+                last_by_domain[r["domain"]] = {**r, "_run_ts": run["ts"]}
 
     domains = []
     for key in DOMAIN_ENGINES:
@@ -37,7 +43,7 @@ async def repair_status(user=Depends(require_role("admin"))):
             "score": res["score"],
             "warning_threshold": f.get("warning_threshold", 80),
             "has_engine": True,
-            "last_repair": {"ts": last_run["ts"], "problems": len(lr["problems"]),
+            "last_repair": {"ts": lr["_run_ts"], "problems": len(lr["problems"]),
                             "actions": len(lr["actions"]), "delta": lr.get("delta")} if lr else None,
         })
     domains.sort(key=lambda d: d["score"])
@@ -56,7 +62,17 @@ async def repair_run(payload: dict = Body(default={}), user=Depends(require_role
             raise HTTPException(400, f"Domenii invalide: {invalid}. Valide: {list(DOMAIN_ENGINES)}")
     # Rulare în background — ciclul complet poate depăși timeout-ul gateway-ului.
     import asyncio
-    asyncio.create_task(run_repair_cycle(domains=domains, trigger=f"manual:{user.get('email')}"))
+    global _running_task
+    if _running_task and not _running_task.done():
+        raise HTTPException(409, "Un ciclu de reparație rulează deja. Așteaptă finalizarea.")
+
+    async def _guarded():
+        try:
+            await run_repair_cycle(domains=domains, trigger=f"manual:{user.get('email')}")
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"[repair-center] background cycle failed: {e}", exc_info=True)
+
+    _running_task = asyncio.create_task(_guarded())
     return {"started": True, "domains": domains or "all"}
 
 

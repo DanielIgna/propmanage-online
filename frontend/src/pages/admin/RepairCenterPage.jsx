@@ -103,12 +103,13 @@ export default function RepairCenterPage() {
       setMsg("⏳ Ciclul rulează în fundal (detect → repair → validate)...");
       for (let i = 0; i < 60; i++) {
         await new Promise(res => setTimeout(res, 3000));
-        const s = await ax.get("/api/admin/repair-center/status").catch(() => null);
-        const nr = s?.data?.last_run;
+        const rr = await ax.get("/api/admin/repair-center/runs", { params: { limit: 1 } }).catch(() => null);
+        const nr = rr?.data?.items?.[0];
         if (nr && nr.ts !== prevTs) {
-          setStatus(s.data);
           setLastRun(nr);
           setMsg(`✅ Ciclu finalizat: ${nr.domains_repaired} domenii · ${nr.total_problems} probleme detectate · ${nr.total_actions} acțiuni executate.`);
+          const s = await ax.get("/api/admin/repair-center/status").catch(() => null);
+          if (s) setStatus(s.data);
           break;
         }
       }
