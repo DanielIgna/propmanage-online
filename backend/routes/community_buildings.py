@@ -5,6 +5,7 @@ Bucla: proprietăți în același bloc → scadențe comune detectate → campan
 lucrări directe (taxă lead 0) pentru fiecare apartament → twin actualizat per apartament.
 """
 import logging
+import re
 from datetime import datetime, timezone, date, timedelta
 from typing import Optional
 
@@ -113,8 +114,8 @@ async def detect_opportunities(building_id: str) -> list:
 
 @router.post("/buildings")
 async def create_building(data: BuildingIn, user: dict = Depends(require_role("client"))):
-    dup = await db.buildings.find_one({"name": {"$regex": f"^{data.name}$", "$options": "i"},
-                                       "address": {"$regex": f"^{data.address}$", "$options": "i"}})
+    dup = await db.buildings.find_one({"name": {"$regex": f"^{re.escape(data.name)}$", "$options": "i"},
+                                       "address": {"$regex": f"^{re.escape(data.address)}$", "$options": "i"}})
     if dup:
         raise HTTPException(409, "Blocul există deja — folosește căutarea și alătură-te")
     doc = {"name": data.name, "address": data.address, "city": data.city,
@@ -131,7 +132,7 @@ async def create_building(data: BuildingIn, user: dict = Depends(require_role("c
 async def search_buildings(q: str = "", user: dict = Depends(get_current_user)):
     if len(q.strip()) < 2:
         return {"buildings": []}
-    regex = {"$regex": q.strip(), "$options": "i"}
+    regex = {"$regex": re.escape(q.strip()), "$options": "i"}
     out = []
     async for b in db.buildings.find({"$or": [{"name": regex}, {"address": regex}]}).limit(10):
         bid = str(b["_id"])
@@ -243,7 +244,8 @@ async def my_campaigns(user: dict = Depends(get_current_user)):
             {"offers.specialist_id": user["id"]},
         ]}
         if not user.get("specialty"):
-            q = {"$or": [{"status": "open"}, {"offers.specialist_id": user["id"]}]}
+            # fără specialitate: doar campaniile unde a ofertat deja (nu expunem tot)
+            q = {"offers.specialist_id": user["id"]}
         out = [_serialize_campaign(c, user["id"]) async for c in
                db.community_campaigns.find(q).sort("created_at", -1).limit(20)]
         for c in out:

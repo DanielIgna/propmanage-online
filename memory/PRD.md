@@ -1,3 +1,21 @@
+## 🏢 PM-002 — COMMUNITY MAINTENANCE ENGINE v1 · LIVRAT & TESTAT 100% (27 Iul 2026)
+
+**Directivă Fondator**: PM-002/003/004 + PM-GROWTH-001→006 (Dual Growth Engine, Building OS, Campaign AI). Implementat cel mai mic slice complet cu ROI maxim: **Buildings + Campanii comune de mentenanță** (Engine B — comunități, pe aceeași infrastructură).
+
+**Backend** `routes/community_buildings.py` (colecții noi aditive: `buildings`, `community_campaigns`; properties primesc `building_id`):
+- POST /api/buildings (dedupe 409, regex escaped) · GET /buildings/search · POST /buildings/{id}/join · GET /buildings/mine (membri, apartamente, campanii active, **opportunities**: ≥2 proprietăți cu aceeași categorie de mentenanță scadentă în ≤60 zile, excluse categoriile cu campanie activă).
+- POST /api/campaigns (creator auto-înscris, 403 proprietate din alt bloc, 409 categorie duplicată; notifică ownerii blocului + specialiștii de încredere pe categorie sau verificați) · GET /campaigns/mine (role-aware: client=blocurile lui; specialist=open pe specialitate + unde a ofertat; fără specialitate NU vede tot) · POST /campaigns/{id}/join (dedupe 409) · POST /campaigns/{id}/offer (preț/apartament, resubmit înlocuiește) · POST /campaigns/{id}/accept-offer (doar creator/admin; creează per participant lucrare DIRECTĂ `status=assigned`, `lead_fee_waived=true`, `campaign_id`, buget=preț/ap; campania→scheduled; notificări toți).
+- `campaign_detection_tick()` — nightly 08:30 (scheduler): auto-campanii sursă „auto" la ≥3 apartamente cu aceeași scadență, idempotent.
+
+**Frontend**: `components/BuildingHub.jsx` (tab Proprietăți client V2: „Blocul meu" — conectare/creare bloc cu căutare, oportunități AI cu buton „Pornește", carduri campanie cu Particip/ofertă best/Acceptă X RON/ap., stare Programată) · `components/SpecialistCampaigns.jsx` (Oportunități specialist: carduri „CAMPANIE DE GRUP" + formular ofertă preț/apartament, „Oferta ta" la resubmit). Analytics: trackIntent building_created/joined, campaign_created/joined/offer_accepted.
+
+**Testare**: iteration_146 — backend **23/23 PASS**, frontend **100%** (F1-F4 multi-rol). Bug HIGH găsit de testing agent (regex injection în dedupe buildings → 500 la nume cu metacaractere) → **FIXAT** (re.escape) și verificat curl (200/409/search). Fix secundar: specialiștii fără specialitate nu mai văd toate campaniile. Suite regresie: `tests/test_community_buildings_iter146.py`.
+
+**Backlog din review**: notificări campanie în background task (blocuri mari) · cap creare buildings per user · unificare creare requests într-un service comun (P2).
+
+---
+
+
 ## 🔁 GBOS SPRINT 2 — REBOOKING 1-CLICK + CALENDAR MENTENANȚĂ · LIVRAT & TESTAT 100% (27 Iul 2026)
 
 **PM-001 UPDATE (același sprint): POST-JOB GROWTH LOOP — lanțul canonic al Fondatorului IMPLEMENTAT.** Constituția ZERO EXCUSES/CEO MODE/HOME GRAPH salvată verbatim: `memory/board/PM_ZERO_EXCUSES_CEO_CONSTITUTION_VERBATIM.md`. Implementare: `components/PostJobGrowthLoop.jsx` — după trimiterea recenziei (ReviewModal → onSubmitted în ClientDashboardV2), sheet „Mulțumim! Ce urmează?" cu lanțul complet: ✅ specialistul e în „Specialiștii tăi" (rebook 0 lei) → 📅 1-tap „Adaugă în calendar" revizia categoriei lucrării (template match ex. hvac→Revizie centrală termică, dedupe 409 tratat) → 📲 Recomandă profilul verificat (WhatsApp + copy, link /specialists/{id}) → 🏠 Cartea casei actualizată automat. Analytics: trackIntent growth_loop_shown/maintenance_added/share_whatsapp/share_copied. Testat E2E cu screenshot (review→sheet→add calendar→done state, WhatsApp OK); date de test curățate. Testids: pjl-sheet, pjl-trusted, pjl-maintenance(-add), pjl-share(-wa/-copy), pjl-twin, pjl-done.
