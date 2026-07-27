@@ -15,6 +15,7 @@ export const LegalGate = () => {
 
   useEffect(() => {
     let mounted = true;
+    if (!localStorage.getItem("pm_session_hint")) return undefined;
     ax.get("/api/legal/me/status")
       .then(r => { if (mounted) setStatus(r.data); })
       .catch(() => {});
