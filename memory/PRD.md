@@ -3815,3 +3815,38 @@ CEO Briefing (enterprise_status). UI: chip Enterprise Score pe ambele pagini.
 **VALIDAT (self-test)**: curl breakdown complet corect + screenshot (EH 59 + ES 61 vizibile).
 **Next**: per verdictul Consiliului — execuție comercială (leads), Case Library D112,
 follow-up automation; D119; e-Factura. NU mai construim engine-uri noi fără cerere explicită.
+
+---
+
+## ✅ PM-AI-003 GUVERNANȚĂ AI + PM-CTO-002 REPAIR ENGINE (27 Iul 2026)
+**PM-AI-003 — AI Governance & Self-Healing Pack (TESTAT 100%, iter 148):**
+1. `orchestrator/governance.py`: Authority Engine (niveluri 1-5: Observator/Consilier/
+   Supravegheat/Autonom/Autonomie totală), Confidence Engine (scor 0-1 din ultimele 30
+   rulări ledger, ponderat recență; downgrade automat la 'recommend' sub 0.35 cu ≥5 rulări),
+   Decision Memory (db.orchestrator_decisions, append-only, cap 6000), Decision Review Cron
+   (zilnic 05:30 — degradează autoritatea playbook-urilor cu ≥50% eșecuri/24h),
+   Self-Healing Watchdog (la 30 min — repornește joburi cron moarte via scheduler.resume,
+   detectează ≥3 erori/24h din agent_runs, deblochează retry-uri blocate >2h).
+2. `engine.py emit_signal`: gate de guvernanță — nivel 1→observe, 2→recommend (handler
+   NEEXECUTAT + notificare admini), 3→execute+notify, 4→execute, 5→execute silent.
+   Ledger îmbogățit cu authority_level/execution_mode/confidence.
+3. API: GET /api/admin/orchestrator/governance, POST /playbooks/{id}/authority,
+   GET /decisions, POST /watchdog-tick, POST /decision-review.
+4. Scheduler: governance_watchdog (min 7,37), decision_review_daily (05:30).
+5. CEO Briefing: secțiune `ai_governance` + linie în snapshot.
+6. UI /admin/orchestrator: 4 carduri guvernanță, select autoritate + badge încredere pe
+   fiecare playbook, panou Decision Memory, butoane Watchdog + Review decizii.
+**PM-CTO-002 — Autonomous Repair Engine (sweep global):**
+- Script audit: /app/scripts/ui_global_audit.py (link-uri moarte, butoane fără handler,
+  promisiuni netratate). Rezultate: 1 link mort reparat (TwinOrchestratorPage →
+  /admin/settings-control), 32 promisiuni `.then` fără `.catch` reparate global
+  (Marketplace, HouseHealthUpgrade, ProjectWorkspace, SettingsPanel, PremiumProfileEditor,
+  AdminPlatformTools ×8, analytics tabs ×5, lib/siteContent, lib/useDynamicSEO etc.),
+  TwinOrchestratorPage.jsx ȘTERSĂ (orfană, zero referințe — recuperabilă din git).
+- Butoanele fără onClick rămase = decorative (landing demo, wireframe V2, preview
+  design-system) sau cu handler pe părinte — NU sunt bug-uri.
+- Build producție: compilează curat (doar warning preexistent source-map mediapipe).
+**VALIDAT: iteration_148.json — backend 8/8 PASS, frontend 100%, zero regresii client.**
+**Next**: purge demo data pe prod + reseed pilot 13 apartamente (P0, blocat pe decizie
+founder), Stripe LIVE claim (user), Resend DNS (user), House Health Subscriptions UI (P1),
+code-splitting bundle 2.3MB (P2), unificare 4 sisteme Twin (P2).
