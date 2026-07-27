@@ -1,3 +1,24 @@
+## 🔁 GBOS SPRINT 2 — REBOOKING 1-CLICK + CALENDAR MENTENANȚĂ · LIVRAT & TESTAT 100% (27 Iul 2026)
+
+**Aprobare Fondator**: ambele, în ordine, cu testare; rebooking cu cerere DIRECTĂ la specialist (fără licitație).
+
+**A) „Specialiștii mei de încredere" + Rebooking 1-click (venit din repetare)**:
+- Backend `routes/trusted_specialists.py`: GET /api/trusted-specialists (agregare lucrări completed/confirmed pe specialist: jobs_together, my_rating, last_category, rebook rollup) · POST /api/trusted-specialists/{id}/rebook (cerere DIRECTĂ: `direct_specialist_id`, `lead_fee_waived=true`, `is_rebooking=true`; 403 dacă n-au lucrat împreună; notificare doar specialistului țintă).
+- `requests.py` modificat: list_requests specialiști exclud cererile directe ale altora (`direct_specialist_id $in [None, me]`); accept_request: 403 pentru alt specialist pe cerere directă + **taxă lead 0 RON la rebooking** (recompensă de loialitate; tranzacția nu se scrie la fee 0). Cererile normale rețin în continuare 45 RON (regresie verificată).
+- Frontend: `components/TrustedSpecialists.jsx` (secțiune în tab Lucrări client V2: carduri cu ❤️ rebook %, rating dat, nr. lucrări; RebookModal cu categorie/titlu/detalii/buget → succes). Specialist: chip „Re-angajare directă · 0 RON" (`direct-chip-*`), sortare direct-first, buton „Acceptă · GRATUIT", ScheduleProposalModal cu prop `feeWaived` („Acceptă (gratuit)").
+
+**B) Calendar mentenanță CX-4 (cereri recurente)**:
+- Backend `routes/maintenance_calendar.py` (colecție nouă aditivă `maintenance_tasks`): GET /templates (8 revizii standard RO) · CRUD /api/maintenance/tasks (dedupe 409, status overdue/due_soon/ok) · POST /tasks/{id}/complete (avansează next_due cu frequency_months) · POST /tasks/{id}/request (mode=open → cerere publică; mode=direct → cerere directă cu taxă 0 la specialistul de încredere, 403 dacă n-au lucrat) · `maintenance_due_tick()` — reminder zilnic 09:00 (scheduler în server.py, dedupe 6 zile/task, link /client?tab=property).
+- Frontend: `components/MaintenanceCalendar.jsx` în tab Proprietăți client V2: empty-state „Previne problemele scumpe", AddTaskSheet (template-uri 1-tap + task custom), carduri cu chip scadență, „Solicită ofertă" (RequestSheet cu opțiuni **Direct la specialistul de încredere (0 lei lead)** / Publică pentru oferte), „Am rezolvat-o", ștergere.
+- **Bucla de creștere compusă**: task scadent → reminder → cerere direct la specialistul de încredere → lucrare → review/rebook → trust ↑.
+
+**Testare**: iteration_145 — backend **17/17 PASS**, frontend **100%** (F1 rebook E2E, F2 calendar E2E, F3 specialist direct-accept gratuit cu sold neschimbat), regresie 45 RON OK, date de test curățate. Test regresie reutilizabil: `/app/backend/tests/test_gbos_growth_iter145.py`.
+
+**Backlog nou din code review**: surfacing `is_rebooking` count în growth metrics (P2).
+
+---
+
+
 ## 🚀 GBOS v1.0 — EXECUTION MODE · TRUST GROWTH ENGINE IMPLEMENTAT & TESTAT (27 Iun 2026)
 
 **Directive Fondator**: PM-000 Business First + GBOS v1.0 Constituție (salvate verbatim: `memory/board/PPOS_GBOS_V1_CONSTITUTION_VERBATIM.md` — vezi nota; documentele APPROVED Growth/Core = specificații de cod, nu documentație). Feature freeze RIDICAT pentru P0 business.
