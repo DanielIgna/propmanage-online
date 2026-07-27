@@ -4,14 +4,16 @@ Nu un PDF: cartea de identitate digitală a proprietății. Profil public de în
 partajabil (link + QR permanent), cu confidențialitate controlată de proprietar.
 Toate scorurile și badge-urile derivă EXCLUSIV din semnale reale (Truth Engine).
 """
+import html as _html
 import io
+import re
 import secrets
 from collections import Counter
 from datetime import datetime, timezone
 
 from bson import ObjectId
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from db import db
 from deps import get_current_user
@@ -168,7 +170,7 @@ async def _public_payload(prop: dict, request: Request) -> dict:
 
     return {
         "slug": slug,
-        "share_url": f"{_base_url(request)}/p/{slug}",
+        "share_url": f"{_base_url(request)}/api/p/{slug}",
         "property": {
             "name": prop.get("name"),
             "type": prop.get("type"),
@@ -242,7 +244,8 @@ async def owner_passport(prop_id: str, request: Request, user: dict = Depends(ge
     return {
         "enabled": bool(passport.get("enabled")),
         "slug": slug,
-        "share_url": f"{base}/p/{slug}",
+        "share_url": f"{base}/api/p/{slug}",
+        "page_url": f"{base}/p/{slug}",
         "qr_url": f"{base}/api/public/passport/{slug}/qr.png",
         "privacy": {**DEFAULT_PRIVACY, **(passport.get("privacy") or {})},
         "privacy_labels": PRIVACY_LABELS,
@@ -251,6 +254,59 @@ async def owner_passport(prop_id: str, request: Request, user: dict = Depends(ge
 
 
 # ── PUBLIC (fără autentificare) ──────────────────────────────────────────────
+BOT_UA = re.compile(
+    r"bot|crawl|spider|facebookexternalhit|whatsapp|slack|telegram|twitter|linkedin"
+    r"|pinterest|discord|skype|viber|vkshare|embed|preview|quora|redditbot", re.I)
+
+
+@public_router.get("/p/{slug}")
+async def passport_share_link(slug: str, request: Request):
+    """Link scurt de share: boții social primesc HTML cu Open Graph, oamenii redirect la /p/{slug}."""
+    prop = await _prop_by_slug(slug)
+    base = _base_url(request)
+    target = f"{base}/p/{slug}"
+    if not BOT_UA.search(request.headers.get("user-agent", "")):
+        return RedirectResponse(target, status_code=307)
+
+    prop_id = str(prop["_id"])
+    privacy = {**DEFAULT_PRIVACY, **(prop.get("passport", {}).get("privacy") or {})}
+    trust = await _trust_score(prop_id)
+    docs_count = await db.property_documents.count_documents(
+        {"property_id": prop_id, "deleted": {"$ne": True}, "superseded": {"$ne": True}})
+    has_photo = privacy["show_photo"] and await db.property_documents.count_documents(
+        {"property_id": prop_id, "category": "foto", "deleted": {"$ne": True}}) > 0
+    image = f"{base}/api/public/passport/{slug}/photo" if has_photo else f"{base}/og-passport.jpg"
+    name = _html.escape(prop.get("name") or "Proprietate")
+    title = f"{name} — Pașaportul Casei | PropManage"
+    desc = (f"Scor de încredere {trust['score']}/100 · {docs_count} documente în cartea casei. "
+            "Profil public de încredere: identitate, istoric și dovezi verificate — nu doar promisiuni.")
+    doc = f"""<!doctype html>
+<html lang="ro"><head>
+<meta charset="utf-8">
+<title>{title}</title>
+<meta name="description" content="{desc}">
+<link rel="canonical" href="{target}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="PropManage">
+<meta property="og:locale" content="ro_RO">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="{desc}">
+<meta property="og:url" content="{target}">
+<meta property="og:image" content="{image}">
+<meta property="og:image:width" content="1264">
+<meta property="og:image:height" content="848">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{title}">
+<meta name="twitter:description" content="{desc}">
+<meta name="twitter:image" content="{image}">
+<meta http-equiv="refresh" content="0;url={target}">
+</head><body>
+<p><a href="{target}">{title}</a></p>
+<script>location.replace({target!r});</script>
+</body></html>"""
+    return HTMLResponse(doc, headers={"Cache-Control": "public, max-age=300"})
+
+
 @public_router.get("/public/passport/{slug}")
 async def public_passport(slug: str, request: Request):
     prop = await _prop_by_slug(slug)

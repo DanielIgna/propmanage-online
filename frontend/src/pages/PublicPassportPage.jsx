@@ -37,6 +37,18 @@ export default function PublicPassportPage() {
     let m = document.querySelector('meta[name="description"]');
     if (!m) { m = document.createElement("meta"); m.name = "description"; document.head.appendChild(m); }
     m.content = `Profilul public de încredere al proprietății ${data.property.name}: documentație, istoric verificat și scoruri de încredere pe PropManage.`;
+    let c = document.querySelector('link[rel="canonical"]');
+    if (!c) { c = document.createElement("link"); c.rel = "canonical"; document.head.appendChild(c); }
+    c.href = `${window.location.origin}/p/${data.slug}`;
+    let ld = document.getElementById("passport-jsonld");
+    if (!ld) { ld = document.createElement("script"); ld.type = "application/ld+json"; ld.id = "passport-jsonld"; document.head.appendChild(ld); }
+    ld.textContent = JSON.stringify({
+      "@context": "https://schema.org", "@type": "Accommodation",
+      name: data.property.name, url: `${window.location.origin}/p/${data.slug}`,
+      ...(data.property.surface ? { floorSize: { "@type": "QuantitativeValue", value: data.property.surface, unitCode: "MTK" } } : {}),
+      ...(data.property.rooms ? { numberOfRooms: data.property.rooms } : {}),
+      additionalProperty: [{ "@type": "PropertyValue", name: "Scor de încredere PropManage", value: `${data.scores.trust.score}/100` }],
+    });
   }, [data]);
 
   if (err) return (
@@ -119,7 +131,7 @@ export default function PublicPassportPage() {
 
         {/* trust explainer */}
         <section className="mt-4 glass rounded-3xl p-5" data-testid="passport-trust-explainer">
-          <button onClick={() => setShowTrust(!showTrust)} className="w-full flex items-center gap-2 text-left" data-testid="passport-trust-toggle">
+          <button onClick={() => setShowTrust(!showTrust)} aria-expanded={showTrust} className="w-full flex items-center gap-2 text-left" data-testid="passport-trust-toggle">
             <CircleHelp className="w-4 h-4 text-[#d4ff3a] shrink-0" />
             <span className="flex-1 text-sm font-medium">De ce există acest scor?</span>
             <ChevronDown className={`w-4 h-4 text-stone-500 transition-transform ${showTrust ? "rotate-180" : ""}`} />
