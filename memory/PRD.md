@@ -1,3 +1,23 @@
+## 🔍 RELEASE CANDIDATE REVIEW — CONSULTANT EXTERN (27 Iun 2026)
+
+**Ordin Fondator**: STOP BUILDING — challenge brutal al produsului pe 6 personas. Livrat în chat (fără documente noi, conform directivei).
+
+**Verdict: B — READY AFTER SMALL FIXES** (încredere 82%). Dovezi: E2E 100% pe 4 rulări consecutive; UX enterprise; GDPR + escrow corecte.
+
+**P0 identificate (înainte de invitații)**:
+1. Emailuri sandbox (`onboarding@resend.dev`) — reset parolă nu ajunge la useri reali → DNS (Fondator).
+2. Stripe test mode → claim LIVE (Fondator).
+3. **Marketplace public: fake pe preview („OK Spec"×5) / GOL după purge pe prod** → necesită empty-state „Early access" condiționat de nr. specialiști reali (fix produs, 15 min, AȘTEAPTĂ GO — directiva a interzis building-ul în acest pas).
+4. Purge demo + redeploy fără SEED (Fondator, checklist existent).
+
+**P1**: pricing public absent (nici „gratuit în beta") · e-Factura (TD-04) · cold-start bilateral marketplace (operațional: un singur oraș, matchmaking manual val 1) · legendă relația scorurilor.
+**Personas neacoperite (asumat)**: administrator bloc (deloc), investitor (fără vedere portofoliu agregat) — nu se vinde acestor segmente în beta.
+**CTO concerns**: 4 sisteme twin neunificate (G2), main.js 2.3MB (admin split), lipsa CI repetabil, risc uman la purge/redeploy.
+**Recomandări cheie**: post-beta feature #1 = calendar mentenanță (CX-4); de eliminat = expunerea simultană a 4 scoruri în drill-down.
+
+---
+
+
 ## 🎨 PPOS-011 — ENTERPRISE VISUAL DESIGN SYSTEM · LIVRAT & TESTAT (27 Iun 2026)
 
 **Directivă Fondator**: Visual Design Review desktop enterprise (tipografie mare, ierarhie, contrast, densitate) — EXCLUSIV vizual, zero logică/API/navigație. Salvată ca standard canonic: `/app/docs/PPOS/PPOS-011-Enterprise-Visual-Design-System.md`.
