@@ -104,6 +104,7 @@ const NAV_SECTIONS = [
       { id: "evolution_council", label: "Evolution Council", icon: Trophy, badge: "AI 27", href: "/admin/evolution-council", superAdminOnly: true },
       { id: "war_room", label: "War Room · First Revenue", icon: Activity, badge: "💰 059", href: "/admin/war-room", superAdminOnly: true },
       { id: "beta_cockpit", label: "Beta Cockpit", icon: Activity, badge: "EO-026", href: "/admin/beta-cockpit", superAdminOnly: true },
+      { id: "beta_issues", label: "Beta Issues Board", icon: Inbox, badge: "WAR ROOM", href: "/admin/beta-issues", superAdminOnly: true },
       { id: "operations_center", label: "Operations Center", icon: Inbox, badge: "OPS", href: "/admin/operations", superAdminOnly: true },
       { id: "command_center", label: "AI Command Center", icon: Brain, badge: "TOP 5", href: "/admin/command-center" },
       { id: "notification_center", label: "Notification Center", icon: Sparkles, badge: "AI", href: "/admin/notification-center" },

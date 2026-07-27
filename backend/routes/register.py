@@ -148,6 +148,7 @@ from routes.property_documents import router as property_documents_router
 from routes.property_passport import router as property_passport_router, public_router as passport_public_router
 from routes.passport_analytics import router as passport_analytics_router
 from routes.beta_cockpit import router as beta_cockpit_router
+from routes.beta_issues import router as beta_issues_router
 from routes.capability_engine import router as capability_engine_router
 from routes.property_intelligence import router as property_intelligence_router
 from routes.resend_diagnostics import router as resend_diagnostics_router
@@ -307,6 +308,7 @@ ALL_ROUTERS = (
     passport_public_router,
     passport_analytics_router,
     beta_cockpit_router,
+    beta_issues_router,
     capability_engine_router,
     opportunities_router,
     growth_intelligence_router,

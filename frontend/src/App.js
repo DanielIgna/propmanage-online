@@ -90,6 +90,7 @@ const AutomationCenterPage = lazy(() => import("./pages/admin/AutomationCenterPa
 const CEODashboardPage = lazy(() => import("./pages/admin/CEODashboardPage"));
 const FirstRevenueWarRoom = lazy(() => import("./pages/admin/FirstRevenueWarRoom"));
 const BetaCockpitPage = lazy(() => import("./pages/admin/BetaCockpitPage"));
+const BetaIssuesPage = lazy(() => import("./pages/admin/BetaIssuesPage"));
 const CapabilityEditorPage = lazy(() => import("./pages/CapabilityEditorPage"));
 const OperationsCenter = lazy(() => import("./pages/admin/OperationsCenter"));
 const KnowledgeCenter = lazy(() => import("./pages/admin/KnowledgeCenter"));
@@ -1642,6 +1643,7 @@ function App() {
               <Route path="/admin/ceo" element={<CEODashboardPage />} />
               <Route path="/admin/war-room" element={<FirstRevenueWarRoom />} />
               <Route path="/admin/beta-cockpit" element={<BetaCockpitPage />} />
+              <Route path="/admin/beta-issues" element={<BetaIssuesPage />} />
               <Route path="/admin/operations" element={<OperationsCenter />} />
               <Route path="/admin/knowledge-center" element={<KnowledgeCenter />} />
               <Route path="/admin/explorer" element={<EnterpriseExplorer />} />

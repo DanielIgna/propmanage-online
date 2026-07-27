@@ -1,3 +1,17 @@
+## 🛡️ BETA WAR ROOM ACTIVAT — Playbook + Issue Prioritization Board (27 Iun 2026)
+
+**Ordin Fondator**: Beta Candidate v0.9 ACCEPTAT → BETA WAR ROOM: freeze features non-critice; dezvoltarea condusă de comportamentul REAL al userilor.
+
+**Livrat**:
+- **`/app/docs/BETA_WAR_ROOM_PLAYBOOK.md`** — toate cele 14 cerințe: Founder Launch Checklist pas-cu-pas, maparea sistemelor LIVE existente (Beta Cockpit /admin/beta-cockpit cu funnel+TTFV+gates+VoC · Passport/Growth analytics · User Timeline · Activation funnel · TTFV median), template Daily Beta Report (10 rânduri) + Weekly Beta Review, Critical Bug workflow (P0<24h), Feature Request workflow (P3→P2 doar cu ≥3 useri sau gate EO-026), tabelul Beta Success KPIs cu praguri și decizia post-beta.
+- **NOU: Issue Prioritization Board** — `routes/beta_issues.py` (colecție nouă aditivă `beta_issues`): POST/GET/PATCH `/api/admin/beta/issues` (tip bug/feature/feedback, severitate P0-P3, workflow new→triaged→in_progress→fixed→shipped|wont_fix, counts, validări 400, admin-only 401). UI: `/admin/beta-issues` (`BetaIssuesPage.jsx`, sidebar „Beta Issues Board" superAdminOnly, badge WAR ROOM): KPI-uri deschise/P0/P1/rezolvate, quick-add, filtre pe status, schimbare severitate/status inline (testids `issue-*`, `issues-*`).
+- **Testat**: curl full CRUD (create/list+counts/patch/validare status invalid 400/unauth 401) + UI E2E cu screenshot (add din formular → apare în listă cu counts corecte). Date de test curățate.
+
+**Reguli active**: feature freeze — cod nou DOAR dacă rezolvă o problemă reală din beta; orice fix API/DB rămâne HIGH-RISK (aprobare Fondator).
+
+---
+
+
 ## ✅ SPRINT MODE (EO v5.0) — P4→POLISH→BETA CANDIDATE v0.9 · LIVRAT & TESTAT (27 Iun 2026)
 
 **Directive**: SPRINT MODE + EXECUTIVE ORDER v5.0 salvate VERBATIM (`board/PPOS_SPRINT_MODE_EXECUTIVE_ORDER_V5.md`) — execuție continuă fără aprobări până la Beta Candidate v0.9.
