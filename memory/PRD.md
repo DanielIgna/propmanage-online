@@ -4278,3 +4278,41 @@ statistici, puncte de abandon, Process State Engine live per email. MentorWidget
 (flux requests: open→assigned→completed→confirmed→won; client real blocat în «assigned»,
 blocker «acționează specialistul»).
 **URMEAZĂ**: AIB-007 Recommendation Engine (pe baza proceselor reale), AIB-008 Memory.
+
+## ✅ AIB-007 — DECISION INTELLIGENCE ENGINE (28 Iul 2026)
+**Modul nou: ai_brain/decision.py** — AI Brain devine consilier decizional (FĂRĂ auto-execuție):
+- **Decision Engine**: candidați generați din starea REALĂ — tranziții de proces executabile
+  de rol (doar POST/PUT/PATCH; GET = efect de sistem, exclus), porniri de procese fără
+  dependențe lipsă, acțiuni mentor (AIB-004) convertite, iar pentru admin: aprobări restante
+  (by_status × tranziții admin) + task-uri Guardian Kernel.
+- **Decision Score** (0-100): 6 factori CALCULAȚI din date (urgency=blocaje reale/zile
+  stagnare, impact=conexiuni Knowledge Graph, unblocking=procese din aval dependente,
+  readiness=permisiuni+date, progress=pas/total, risk_of_inaction=rata reală de stagnare)
+  × ponderi transparente (WEIGHTS). Fiecare decizie: reasons, resolves, avoids_risk,
+  produces_impact, after, dependencies, actors, can_execute.
+- **Next Best Decision**: înlocuiește Next Best Action în mentor_advise — actions poartă
+  score, câmp nou «decisions»; fallback la next_best_actions dacă motorul e gol.
+- **Decision Explanation**: POST /decisions/explain — LLM ancorat pe decizie+factori+
+  simulare+stare proces+alternative, cache (kind=decision), fallback determinist complet.
+- **Decision Simulator**: POST /decisions/simulate — impact estimat FĂRĂ execuție:
+  module afectate (graf in_module), procese afectate (relations+flows_to), actori/utilizatori
+  afectați (tranziții următoare + owner fields reale), modificări de stare estimate
+  (from→to→next, terminal). Marcat explicit simulated=true, executed=false.
+- **Priority Engine**: GET /admin/.../decisions/priorities — procese blocate (stale/total),
+  guardian tasks, emailuri blocate — sortate după severitate reală.
+- **Transparență**: GET /admin/.../decisions/rules — generatoare + ponderi + factori.
+**Snapshot**: db.ai_brain_decisions per utilizator (explain/simulate pe decision_id);
+admin poate inspecta/explica/simula deciziile oricărui utilizator (param email, doar admin).
+**API**: GET /api/ai-brain/decisions · POST /decisions/{explain,simulate} ·
+GET /api/admin/ai-brain/decisions/{rules,priorities,inspect?email=}.
+**UI**: components/DecisionExplorer.jsx (tab nou în /admin/ai-brain) — Priority Engine,
+generare decizii per email, scoruri + bare factori + argumentație, butoane «Simulează
+impactul» și «De ce această decizie?», panou reguli & ponderi. MentorWidget: badge scor
+pe acțiuni.
+**Fix-uri de calitate în AIB-006** (descoperite în acest sprint): tranziții no-op excluse
+(to==current), stările doar-insert ordonate la începutul fluxului (initiated→open→
+completed→expired), tranziții GET marcate ca efecte de sistem în decizii.
+**TESTAT**: pytest iter163 12/12 nou + 43/43 regresie (iter160-162), screenshot Admin ✓
+(client: decizie scor 65 cu factori Urgență 67/Pregătire 100/Risc 100, simulare
+completed→expired cu module house-health/payments/wallet, «NIMIC NU A FOST EXECUTAT»).
+**URMEAZĂ**: AIB-008 Memory Engine, AIB-009 Multi-Agent Coordination.

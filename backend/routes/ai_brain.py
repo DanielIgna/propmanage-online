@@ -224,6 +224,70 @@ async def my_process_state(path: str = "", process_id: str = None, entity_id: st
 
 
 # ============================================================================
+# AIB-007 · Decision Intelligence Engine
+# ============================================================================
+@user_router.get("/decisions")
+async def my_decisions(path: str = "", user=Depends(get_current_user)):
+    from ai_brain.decision import next_best_decisions
+    return {"items": await next_best_decisions(user, path)}
+
+
+async def _decision_actor(payload: dict, user: dict) -> dict:
+    """Admin poate explica/simula deciziile altui utilizator (payload.email)."""
+    email = (payload.get("email") or "").strip().lower()
+    if email and email != user.get("email") and user.get("role") in ("admin", "super_admin"):
+        target = await db.users.find_one({"email": email})
+        if not target:
+            raise HTTPException(404, f"Utilizator inexistent: {email}")
+        target["id"] = target.get("id") or str(target["_id"])
+        return target
+    return user
+
+
+@user_router.post("/decisions/explain")
+async def decision_explain(payload: dict = Body(...), user=Depends(get_current_user)):
+    from ai_brain.decision import explain_decision
+    did = (payload.get("decision_id") or "").strip()
+    if not did:
+        raise HTTPException(400, "decision_id e obligatoriu")
+    actor = await _decision_actor(payload, user)
+    return await explain_decision(actor, did, question=(payload.get("question") or "").strip())
+
+
+@user_router.post("/decisions/simulate")
+async def decision_simulate(payload: dict = Body(...), user=Depends(get_current_user)):
+    from ai_brain.decision import simulate_decision
+    did = (payload.get("decision_id") or "").strip()
+    if not did:
+        raise HTTPException(400, "decision_id e obligatoriu")
+    actor = await _decision_actor(payload, user)
+    return await simulate_decision(actor, did)
+
+
+@router.get("/decisions/rules")
+async def decisions_rules(user=Depends(require_role("admin"))):
+    from ai_brain.decision import decision_rules
+    return decision_rules()
+
+
+@router.get("/decisions/priorities")
+async def decisions_priorities(user=Depends(require_role("admin"))):
+    from ai_brain.decision import platform_priorities
+    return {"items": await platform_priorities()}
+
+
+@router.get("/decisions/inspect")
+async def decisions_inspect(email: str, path: str = "", user=Depends(require_role("admin"))):
+    target = await db.users.find_one({"email": email.strip().lower()})
+    if not target:
+        raise HTTPException(404, f"Utilizator inexistent: {email}")
+    target["id"] = target.get("id") or str(target["_id"])
+    from ai_brain.decision import next_best_decisions
+    return {"email": email, "role": target.get("role"),
+            "items": await next_best_decisions(target, path)}
+
+
+# ============================================================================
 # AIB-002 · Context Inspector — admin analizează contextul oricărui utilizator
 # ============================================================================
 @router.get("/context/inspect")

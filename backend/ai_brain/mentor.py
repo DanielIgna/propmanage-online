@@ -164,12 +164,27 @@ async def mentor_advise(user: dict, path: str, replay: bool = False, include_gui
         process = await mentor_summary(user, path)
     except Exception:  # noqa: BLE001
         pass
+    # AIB-007 · Decision Intelligence: Next Best Decision (înlocuiește Next Best Action)
+    decisions = []
+    try:
+        from ai_brain.decision import next_best_decisions
+        decisions = await next_best_decisions(user, path)
+    except Exception:  # noqa: BLE001
+        pass
+    if decisions:
+        actions = [{"id": d["id"], "title": d["title"],
+                    "reason": (d["reasons"] or [d["resolves"]])[0],
+                    "cta_path": d["cta_path"], "priority": i + 1, "score": d["score"]}
+                   for i, d in enumerate(decisions[:3])]
+    else:
+        actions = await next_best_actions(user)
     return {
         "role": ctx["user"]["role"],
         "module": module,
         "path": path,
         "onboarding": {"show": show_onboarding, "guide": guide},
-        "actions": await next_best_actions(user),
+        "actions": actions,
+        "decisions": decisions[:3],
         "tips": await contextual_tips(user, path),
         "related_modules": related,
         "process": process,

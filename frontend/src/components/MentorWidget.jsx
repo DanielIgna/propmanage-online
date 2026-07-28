@@ -25,10 +25,14 @@ export const MentorActions = ({ actions, onNavigate }) => {
           <span className="mt-0.5 w-6 h-6 rounded-lg bg-[#d4ff3a]/10 border border-[#d4ff3a]/30 flex items-center justify-center shrink-0">
             <ArrowRight className="w-3 h-3 text-[#d4ff3a] group-hover:translate-x-0.5 transition-transform" />
           </span>
-          <span className="min-w-0">
+          <span className="min-w-0 flex-1">
             <span className="block text-[13px] font-bold text-white">{a.title}</span>
             <span className="block text-[11px] text-stone-400 mt-0.5">{a.reason}</span>
           </span>
+          {a.score != null && (
+            <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-[#d4ff3a]/10 text-[#d4ff3a] border border-[#d4ff3a]/25 shrink-0"
+              data-testid={`mentor-action-score-${a.id}`}>{a.score}</span>
+          )}
         </button>
       ))}
     </div>

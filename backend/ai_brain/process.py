@@ -288,7 +288,9 @@ async def build_processes(run_id: str = "") -> dict:
     for coll in sorted(proc_colls):
         p = found[coll]
         anchored, rest = _order_states(p["states"], p["initial"], p["transitions"])
-        steps = anchored + await _sort_by_data(coll, rest)
+        init_rest = [s for s in sorted(p["initial"]) if s in rest]
+        other_rest = [s for s in rest if s not in init_rest]
+        steps = init_rest + anchored + await _sort_by_data(coll, other_rest)
         terminal = _terminal_states(anchored, rest, p["transitions"])
         kind = "business" if (p["actors"] - ADMIN_ROLES) else "internal"
         procs.append({
@@ -414,9 +416,9 @@ async def _active_process(user: dict, path: str = ""):
 
 
 def _next_transitions(proc: dict, status: str) -> list:
-    nxt = [t for t in proc["transitions"] if t["from"] == status]
+    nxt = [t for t in proc["transitions"] if t["from"] == status and t["to"] != status]
     if not nxt and status in proc["steps"]:
-        later = set(proc["steps"][proc["steps"].index(status) + 1:])
+        later = set(proc["steps"][proc["steps"].index(status) + 1:]) - {status}
         nxt = [t for t in proc["transitions"]
                if t["from"] is None and t.get("op") == "update" and t["to"] in later]
     return nxt
