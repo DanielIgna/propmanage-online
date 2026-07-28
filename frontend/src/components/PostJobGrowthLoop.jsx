@@ -28,6 +28,20 @@ const Row = ({ icon: Icon, done, title, subtitle, action, testid }) => (
 // PM-001 lanțul canonic: recenzie → Specialiștii mei → plan mentenanță → recomandă → twin actualizat
 export const PostJobGrowthLoop = ({ job, onClose }) => {
   const [templates, setTemplates] = useState([]);
+  const [recSent, setRecSent] = useState(false);
+  const [recReason, setRecReason] = useState("");
+  const [recBusy, setRecBusy] = useState(false);
+
+  const sendRec = async () => {
+    setRecBusy(true);
+    try {
+      await axios.post(`${API}/benefits/recommendations`, {
+        request_id: job?.id || job?._id, targets: ["specialist", "lucrare"], reason: recReason,
+      });
+      setRecSent(true);
+    } catch { setRecSent(true); } finally { setRecBusy(false); }
+  };
+
   const [added, setAdded] = useState(false);
   const [adding, setAdding] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -78,6 +92,23 @@ export const PostJobGrowthLoop = ({ job, onClose }) => {
               className="px-4 py-2 rounded-full text-xs font-black text-white disabled:opacity-50" style={{ background: GREEN }}>
               {adding ? "..." : "Adaugă în calendar"}
             </button>
+          )} />
+        <Row icon={Heart} done={recSent} testid="pjl-recommend"
+          title={recSent ? "Recomandarea ta e în comunitate 🤝" : `Recomandă lucrarea lui ${firstName} comunității`}
+          subtitle={recSent
+            ? "Când recomandarea produce o lucrare confirmată, primești un Beneficiu Comunitate în portofel."
+            : "Spune de ce îl recomanzi — AI clasifică recomandarea, iar când produce o lucrare confirmată primești un Beneficiu Comunitate."}
+          action={!recSent && (
+            <div className="w-full space-y-2">
+              <textarea value={recReason} onChange={e => setRecReason(e.target.value)} rows={2}
+                placeholder="De ce îl recomanzi? (ex: punctual, lucrare de calitate, preț corect)"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-700"
+                data-testid="pjl-recommend-reason" />
+              <button onClick={sendRec} disabled={recBusy} data-testid="pjl-recommend-send"
+                className="px-4 py-2 rounded-full text-xs font-black text-white disabled:opacity-50" style={{ background: GREEN }}>
+                {recBusy ? "..." : "Trimite recomandarea"}
+              </button>
+            </div>
           )} />
         <Row icon={Share2} testid="pjl-share"
           title={`Recomandă-l pe ${firstName} unui vecin sau prieten`}

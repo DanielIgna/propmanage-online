@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
   Gift, ChevronLeft, Loader2, Plus, RefreshCw, HeartPulse, Globe2, Brain,
-  Megaphone, SlidersHorizontal, Play, Pencil, X, Handshake, Target,
+  Megaphone, SlidersHorizontal, Play, Pencil, X, Handshake, Target, TrendingUp,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -183,6 +183,49 @@ const ConfigPanel = () => {
   );
 };
 
+const GrowthPanel = () => {
+  const [g, setG] = useState(null);
+  useEffect(() => { ax.get("/api/admin/prop-benefits/community-growth").then(r => setG(r.data)).catch(() => {}); }, []);
+  if (!g) return <Loader2 className="w-4 h-4 animate-spin text-stone-500" />;
+  const Q = [
+    ["most_valuable_deal", "Care este cel mai valoros Deal?"],
+    ["negotiation_to_start", "Ce negociere trebuie pornită?"],
+    ["top_demand_category", "Ce categorie are cea mai mare cerere?"],
+    ["partner_to_contact", "Ce partener merită contactat?"],
+    ["active_ambassadors", "Care sunt ambasadorii activi?"],
+    ["retention_impact", "Care este impactul asupra retenției?"],
+  ];
+  return (
+    <div className="space-y-3" data-testid="pbadmin-growth">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {Q.map(([k, q]) => (
+          <div key={k} className="border border-stone-800 rounded-2xl p-3.5 bg-stone-900/40" data-testid={`pbadmin-growth-${k}`}>
+            <div className="text-[10px] font-black uppercase tracking-wider text-[#d4ff3a] mb-1">{q}</div>
+            <div className="text-xs text-stone-200 leading-snug">{g.answers[k]?.answer}</div>
+            {k === "active_ambassadors" && (g.answers[k]?.items || []).map(a => (
+              <div key={a.id} className="text-[11px] text-stone-400 mt-1">🏅 {a.name || a.email} · {a.validated} recomandări validate</div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="border border-stone-800 rounded-2xl p-3.5">
+        <div className="text-xs font-black uppercase tracking-wider text-stone-400 mb-2">Cererea pe Community Deals (prioritate negociere)</div>
+        {g.deals_demand.map(d => (
+          <div key={d.id} className="flex items-center gap-3 py-1.5 border-b border-stone-800/60 last:border-0 text-xs" data-testid={`pbadmin-demand-${d.id}`}>
+            <span className="text-stone-500 w-5">#{d.negotiation_priority}</span>
+            <span>{d.emoji}</span>
+            <span className="text-white font-bold flex-1 truncate">{d.title}</span>
+            <span className="text-stone-400">scor {d.demand_score}</span>
+            <span className="text-[10px] text-stone-500">S:{d.counts.sustin} · I:{d.counts.interesat} · O:{d.counts.vreau_oferta} · N:{d.counts.notifica_ma}</span>
+            <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${d.interest_level === "ridicat" ? "bg-emerald-500/10 text-emerald-300" : d.interest_level === "moderat" ? "bg-amber-500/10 text-amber-300" : "bg-stone-800 text-stone-400"}`}>{d.interest_level}</span>
+          </div>
+        ))}
+      </div>
+      <div className="text-[11px] text-stone-500">Recomandări: {g.recommendations.validated} validate · {g.recommendations.pending} în așteptarea efectului (contact → ofertă → lucrare → lucrare confirmată).</div>
+    </div>
+  );
+};
+
 const DealsPanel = () => {
   const [d, setD] = useState(null);
   const [nt, setNt] = useState("");
@@ -255,6 +298,7 @@ export default function PropBenefitsAdminPage() {
   const eco = ov?.ecosystem;
   const TABS = [
     { id: "campaigns", label: `Campanii (${camps.length})`, icon: Megaphone },
+    { id: "growth", label: "Community Growth", icon: TrendingUp },
     { id: "deals", label: "Community Deals", icon: Handshake },
     { id: "config", label: "Niveluri & Config", icon: SlidersHorizontal },
     { id: "health", label: "Subscription Health", icon: HeartPulse },
@@ -346,6 +390,8 @@ export default function PropBenefitsAdminPage() {
             ))}
           </div>
         )}
+
+        {tab === "growth" && <GrowthPanel />}
 
         {tab === "deals" && <DealsPanel />}
 

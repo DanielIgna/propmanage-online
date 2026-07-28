@@ -135,6 +135,31 @@ export const PublicMarketplace = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-xs mb-4 flex-wrap flex-1">
+                  {s.trust?.trust_score != null && (
+                    <div className="flex items-center gap-1 bg-[var(--pm-primary)]/10 border border-[var(--pm-primary)]/30 text-[var(--pm-primary)] px-2.5 py-1 rounded-full" data-testid={`mkt-trust-score-${s.id}`}>
+                      <span className="font-black">Trust {s.trust.trust_score}</span>
+                      <span className="opacity-70">/100</span>
+                    </div>
+                  )}
+                  {(s.trust?.confirmed_jobs || 0) > 0 && (
+                    <div className="flex items-center gap-1 bg-sky-500/15 border border-sky-500/30 text-sky-300 px-2.5 py-1 rounded-full" data-testid={`mkt-confirmed-${s.id}`}>
+                      <span className="font-semibold">{s.trust.confirmed_jobs}</span>
+                      <span className="opacity-70">lucrări confirmate</span>
+                    </div>
+                  )}
+                  {(s.trust?.ambassadors || 0) > 0 && (
+                    <div className="flex items-center gap-1 bg-violet-500/15 border border-violet-500/30 text-violet-300 px-2.5 py-1 rounded-full" data-testid={`mkt-ambassadors-${s.id}`}>
+                      <span>🏅</span>
+                      <span className="font-semibold">{s.trust.ambassadors}</span>
+                      <span className="opacity-70">{s.trust.ambassadors === 1 ? "ambasador" : "ambasadori"}</span>
+                    </div>
+                  )}
+                  {(s.trust?.community_value || 0) > 0 && (
+                    <div className="flex items-center gap-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-2.5 py-1 rounded-full" data-testid={`mkt-community-value-${s.id}`}>
+                      <span className="font-semibold">{s.trust.community_value} RON</span>
+                      <span className="opacity-70">beneficii generate comunității</span>
+                    </div>
+                  )}
                   {s.trust?.rebook_show && (
                     <div className="flex items-center gap-1 bg-rose-500/15 border border-rose-500/30 text-rose-300 px-2.5 py-1 rounded-full" data-testid={`mkt-rebook-${s.id}`}>
                       <span>❤️</span>

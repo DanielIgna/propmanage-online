@@ -22,6 +22,7 @@ def _points(ctx: dict, weights: dict) -> tuple:
     add("account_90days", ctx["account_days"] >= 90)
     add("email_verified", ctx["email_verified"])
     add("experience_tier_verified", ctx["experience_tier"] in ("verified", "pro"))
+    add("ambassador", ctx.get("is_ambassador"))
     total = sum(d["points"] for d in detail)
     return total, detail
 

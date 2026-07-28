@@ -65,6 +65,8 @@ async def user_context(user: dict) -> dict:
         "email_verified": bool(user.get("email_verified")),
         "experience_tier": user.get("experience_tier") or "junior",
         "account_days": account_days,
+        "is_ambassador": bool(user.get("pb_ambassador")),
+        "recommendations_validated": await db.recommendations.count_documents({"owner_id": uid, "status": "validated"}),
     }
 
 

@@ -83,6 +83,38 @@ async def success_manager(user: dict) -> dict:
                                "Când vecinul invitat își activează abonamentul sau primul serviciu, amândoi primiți un Beneficiu Comunitate.",
                                "/client?tab=settings", 6))
 
+    # PB-003: Community Trust — recomandă, devino ambasador, susține negocierile
+    try:
+        unrecommended = None
+        async for req in db.requests.find({"client_id": ctx["uid"], "status": {"$in": ["completed", "confirmed"]},
+                                           "specialist_id": {"$ne": None}}).sort("confirmed_at", -1).limit(3):
+            if not await db.recommendations.find_one({"request_id": str(req["_id"]), "owner_id": ctx["uid"]}, {"_id": 1}):
+                unrecommended = req
+                break
+        if unrecommended:
+            candidates.append(_act("recommend_specialist",
+                                   f"Recomandă specialistul care a lucrat la casa ta ({unrecommended.get('specialist_name') or 'specialistul tău'})",
+                                   "Recomandarea ta ajută comunitatea — iar când produce o lucrare confirmată, primești un Beneficiu Comunitate.",
+                                   "/client?tab=jobs", 7))
+        from propbenefits.trust_engine import ambassador_status, deals_demand
+        amb = await ambassador_status(ctx["uid"])
+        if not amb["is_ambassador"] and amb["validated"] > 0 and amb["remaining"] == 1:
+            candidates.append(_act("almost_ambassador",
+                                   "Mai ai un pas până la statutul de Community Ambassador",
+                                   "Încă o recomandare validată și primești badge-ul, beneficiul de ambasador și prioritate la campaniile exclusive.",
+                                   "/client?tab=benefits", 6))
+        demand = await deals_demand()
+        near = next((d for d in demand if d["status"] in ("negociere", "in_lucru")
+                     and 0 < (d.get("target_supporters") or 25) - d["counts"]["sustin"] <= 30), None)
+        if near:
+            need = (near.get("target_supporters") or 25) - near["counts"]["sustin"]
+            candidates.append(_act("support_deal",
+                                   f"Negocierea „{near['title']}” mai are nevoie de {need} susținători",
+                                   "Susținerea ta apropie comunitatea de un acord mai valoros pentru toți.",
+                                   "/client?tab=benefits", 5))
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[success_manager] trust candidates failed: {e}")
+
     candidates.sort(key=lambda a: -a["impact"])
     return {
         "health": {"score": health["score"], "status": health["status"]},

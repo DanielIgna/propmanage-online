@@ -192,14 +192,31 @@ async def public_marketplace(
         async for r in db.recommendations.find({"specialist_id": {"$in": spec_ids}}, {"specialist_id": 1, "owner_id": 1}):
             trust_map.setdefault(r["specialist_id"], {"yes": 0, "no": 0, "not_sure": 0, "recommenders": set(), "rec_yes": 0, "rec_no": 0})["recommenders"].add(r.get("owner_id"))
 
+    # ===== PB-003 — Community Trust Score batch (cache pb_trust_scores) =====
+    pb_trust = {}
+    if docs:
+        async for row in db.pb_trust_scores.find({"specialist_id": {"$in": spec_ids}},
+                                                 {"_id": 0, "specialist_id": 1, "score": 1, "recommendations": 1,
+                                                  "recommendations_validated": 1, "confirmed_jobs": 1,
+                                                  "ambassadors": 1, "community_value": 1}):
+            pb_trust[row["specialist_id"]] = row
+
     def _trust(sid):
+        pt = pb_trust.get(sid) or {}
+        base = {"trust_score": pt.get("score"),
+                "recommendations": pt.get("recommendations", 0),
+                "recommendations_validated": pt.get("recommendations_validated", 0),
+                "confirmed_jobs": pt.get("confirmed_jobs", 0),
+                "ambassadors": pt.get("ambassadors", 0),
+                "community_value": pt.get("community_value", 0)}
         t = trust_map.get(sid)
         if not t:
-            return {"rebook_pct": None, "rebook_total": 0, "rebook_show": False,
+            return {**base, "rebook_pct": None, "rebook_total": 0, "rebook_show": False,
                     "recommend_pct": None, "recommend_total": 0, "recommend_show": False, "recommenders": 0}
         total = t["yes"] + t["no"] + t["not_sure"]
         rec_total = t.get("rec_yes", 0) + t.get("rec_no", 0)
         return {
+            **base,
             "rebook_pct": round(t["yes"] * 100 / total) if total else None,
             "rebook_total": total,
             "rebook_show": total >= 5,

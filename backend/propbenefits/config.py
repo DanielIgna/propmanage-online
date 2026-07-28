@@ -27,6 +27,7 @@ DEFAULT_CONFIG = {
         "subscription_active": 25, "digital_twin": 15, "documents_5plus": 10,
         "house_health": 10, "completed_jobs_3plus": 15, "referrals_2plus": 10,
         "account_90days": 5, "email_verified": 5, "experience_tier_verified": 5,
+        "ambassador": 10,
     },
     "referral_benefit": {
         "enabled": True,
@@ -42,6 +43,18 @@ DEFAULT_CONFIG = {
         "campaigns": 10, "benefits_used": 10, "referrals": 10, "ai_usage": 10,
     },
     "notifications": {"success_manager_enabled": True, "max_per_week": 2},
+    "recommendation_reward": {
+        "enabled": True, "expires_days": 90,
+        "benefit": {"benefit_key": "recommendation_reward", "value_estimate": 20,
+                    "title": "Beneficiu Comunitate: recomandarea ta a produs o lucrare confirmată"},
+    },
+    "ambassador": {
+        "min_validated": 2, "badge": "Community Ambassador",
+        "perks": ["Prioritate la campaniile exclusive", "Acces anticipat la Community Deals",
+                  "Puncte de membru suplimentare"],
+        "benefit": {"benefit_key": "ambassador_welcome", "value_estimate": 40,
+                    "title": "Beneficiu Ambassador: evaluare House Health prioritară pentru casa ta"},
+    },
     "ecosystem_targets": {"subscriptions": 100, "twins": 100, "hh_subs": 50,
                           "campaigns_active": 5, "specialists_active": 25,
                           "city_partners": 5, "retention_pct": 60},
@@ -96,12 +109,17 @@ async def get_config() -> dict:
     if not doc:
         doc = {**DEFAULT_CONFIG, "updated_at": _now()}
         await db.pb_config.insert_one(doc)
+    # cheile noi din DEFAULT se completează automat pe config-urile existente
+    missing = {k: v for k, v in DEFAULT_CONFIG.items() if k not in doc}
+    if missing:
+        await db.pb_config.update_one({"_id": "pb_config"}, {"$set": missing})
+        doc.update(missing)
     return doc
 
 
 async def update_config(patch: dict, updated_by: str) -> dict:
     allowed = {"levels", "level_points", "referral_benefit", "subscription_health_weights",
-               "notifications", "ecosystem_targets"}
+               "notifications", "ecosystem_targets", "recommendation_reward", "ambassador"}
     clean = {k: v for k, v in patch.items() if k in allowed}
     if not clean:
         raise ValueError("Nicio cheie validă de configurare.")

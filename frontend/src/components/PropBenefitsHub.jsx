@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { Gift, Sparkles, Lock, Loader2, ChevronRight, BadgeCheck, Clock, CheckCircle2 } from "lucide-react";
 import { API } from "../pages/DashShared";
-import { CommunityDealsSection } from "./pb/PbEverywhere";
+import { CommunityDealsSection, AmbassadorCard } from "./pb/PbEverywhere";
 
 const LEVEL_COLORS = {
   explorer: "bg-slate-100 text-slate-600", bronze: "bg-amber-100 text-amber-700",
@@ -195,6 +195,9 @@ export const PropBenefitsHub = () => {
           </div>
         </div>
       )}
+
+      {/* Ambassador — statutul tău în comunitate */}
+      <AmbassadorCard />
 
       {/* Community Deals — negocierea comunității */}
       <CommunityDealsSection />

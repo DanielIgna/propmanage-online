@@ -214,40 +214,90 @@ const DEAL_STATUS = {
 export const CommunityDealsSection = () => {
   const [d, setD] = useState(null);
   const [busy, setBusy] = useState(null);
+  const [signaled, setSignaled] = useState({});
   const load = () => axios.get(`${API}/api/benefits/community-deals`).then(r => setD(r.data)).catch(() => {});
   useEffect(() => { load(); }, []);
   if (!d) return null;
-  const support = async (id) => {
-    setBusy(id);
-    try { await axios.post(`${API}/api/benefits/community-deals/${id}/support`); load(); } finally { setBusy(null); }
+  const signal = async (id, sig) => {
+    setBusy(id + sig);
+    try {
+      await axios.post(`${API}/api/benefits/community-deals/${id}/signal`, { signal: sig });
+      setSignaled(p => ({ ...p, [id + sig]: true }));
+      load();
+    } finally { setBusy(null); }
   };
+  const SIGNALS = [["sustin", "Susțin"], ["interesat", "Interesat"], ["vreau_oferta", "Vreau ofertă"], ["notifica_ma", "Notifică-mă"]];
   return (
     <div data-testid="pb-community-deals">
       <div className="text-xs font-black uppercase tracking-wider text-slate-400 mb-1">Community Deals — negocierea comunității</div>
-      <p className="text-[11px] text-slate-400 mb-2">Nu este doar negocierea ta — este negocierea întregii comunități PropManage. Susține ce contează pentru casa ta.</p>
+      <p className="text-[11px] text-slate-400 mb-2">Nu este doar negocierea ta — este negocierea întregii comunități PropManage. Semnalele tale decid prioritatea negocierilor.</p>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
         {d.items.map(deal => {
           const st = DEAL_STATUS[deal.status] || DEAL_STATUS.in_lucru;
           return (
-            <div key={deal.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm" data-testid={`pb-deal-${deal.id}`}>
-              <span className="text-xl shrink-0">{deal.emoji}</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-bold text-slate-900 truncate">{deal.title}</div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${st.cls}`}>{st.label}</span>
-                  <span className="text-[10px] text-slate-400">{deal.supporters} susținători</span>
+            <div key={deal.id} className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm" data-testid={`pb-deal-${deal.id}`}>
+              <div className="flex items-center gap-3">
+                <span className="text-xl shrink-0">{deal.emoji}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-bold text-slate-900 truncate">{deal.title}</div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${st.cls}`}>{st.label}</span>
+                    <span className="text-[10px] text-slate-400">{deal.supporters} susținători</span>
+                  </div>
                 </div>
               </div>
-              <button onClick={() => support(deal.id)} disabled={deal.supported_by_me || busy === deal.id}
-                className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-black ${deal.supported_by_me ? "bg-slate-50 text-slate-400" : "bg-slate-900 text-white"}`}
-                data-testid={`pb-deal-support-${deal.id}`}>
-                {deal.supported_by_me ? "Susținut ✓" : "Susțin"}
-              </button>
+              <div className="flex flex-wrap gap-1.5 mt-2.5">
+                {SIGNALS.map(([sig, label]) => {
+                  const done = signaled[deal.id + sig] || (sig === "sustin" && deal.supported_by_me);
+                  return (
+                    <button key={sig} onClick={() => signal(deal.id, sig)} disabled={done || busy === deal.id + sig}
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-black border ${done ? "bg-[#F0FBF4] text-[#166534] border-[#D2F2DC]" : "bg-white text-slate-500 border-slate-200"}`}
+                      data-testid={`pb-deal-${sig}-${deal.id}`}>
+                      {done ? `${label} ✓` : label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           );
         })}
       </div>
       <p className="text-[10px] text-slate-400 italic mt-2">{d.disclaimer}</p>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// CLIENT · Ambassador — progresul spre statutul de ambasador (PB-003)
+// ---------------------------------------------------------------------------
+export const AmbassadorCard = () => {
+  const [a, setA] = useState(null);
+  useEffect(() => {
+    axios.get(`${API}/api/benefits/ambassador`).then(r => setA(r.data)).catch(() => {});
+  }, []);
+  if (!a) return null;
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm" data-testid="pb-ambassador-card">
+      <div className="flex items-center gap-2 mb-1.5">
+        <BadgeCheck className="w-4 h-4" style={{ color: a.is_ambassador ? "#166534" : "#94a3b8", width: 16, height: 16 }} />
+        <span className="text-[13px] font-black text-slate-900">
+          {a.is_ambassador ? `Ești ${a.badge} 🏅` : "Community Ambassador"}
+        </span>
+      </div>
+      {a.is_ambassador ? (
+        <div className="text-[11px] text-slate-500">Recomandările tale confirmate construiesc comunitatea. {a.perks.join(" · ")}</div>
+      ) : (
+        <>
+          <div className="text-[11px] text-slate-500 mb-2">
+            {a.remaining === 1 ? "Mai ai un pas: încă o recomandare validată și devii ambasador."
+              : `Recomandă specialiști după lucrări — la ${a.threshold} recomandări validate devii ambasador cu beneficii exclusive.`}
+          </div>
+          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full rounded-full bg-[#166534]" style={{ width: `${Math.min(100, (a.validated / a.threshold) * 100)}%` }} />
+          </div>
+          <div className="text-[10px] text-slate-400 mt-1" data-testid="pb-ambassador-progress">{a.validated}/{a.threshold} recomandări validate{a.pending ? ` · ${a.pending} în așteptarea efectului` : ""}</div>
+        </>
+      )}
     </div>
   );
 };

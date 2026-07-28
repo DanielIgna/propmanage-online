@@ -118,6 +118,55 @@ async def support_community_deal(deal_id: str, user: dict = Depends(get_current_
 
 
 # ============================================================================
+# PB-003 · Community Trust & Recommendation Engine
+# ============================================================================
+@user_router.post("/recommendations")
+async def submit_rec(body: dict = Body(...), user: dict = Depends(get_current_user)):
+    from propbenefits.trust_engine import submit_recommendation
+    result = await submit_recommendation(user, body)
+    if result.get("error"):
+        raise HTTPException(result.get("code", 400), result["error"])
+    return result
+
+
+@user_router.get("/recommendations/mine")
+async def my_recs(user: dict = Depends(get_current_user)):
+    from propbenefits.trust_engine import my_recommendations
+    return await my_recommendations(user["id"])
+
+
+@user_router.get("/ambassador")
+async def my_ambassador(user: dict = Depends(get_current_user)):
+    from propbenefits.trust_engine import ambassador_status
+    return await ambassador_status(user["id"])
+
+
+@user_router.post("/community-deals/{deal_id}/signal")
+async def signal_community_deal(deal_id: str, body: dict = Body(...), user: dict = Depends(get_current_user)):
+    from propbenefits.trust_engine import signal_deal
+    result = await signal_deal(deal_id, user["id"], str(body.get("signal", "")))
+    if result.get("error"):
+        raise HTTPException(result.get("code", 400), result["error"])
+    return result
+
+
+@user_router.get("/community-deals/{deal_id}/why")
+async def why_community_deal(deal_id: str, user: dict = Depends(get_current_user)):
+    from propbenefits.trust_engine import explain_deal
+    from propbenefits.eligibility import user_context
+    result = await explain_deal(deal_id, await user_context(user))
+    if result.get("error"):
+        raise HTTPException(404, result["error"])
+    return result
+
+
+@user_router.get("/trust/{specialist_id}")
+async def specialist_trust(specialist_id: str, user: dict = Depends(get_current_user)):
+    from propbenefits.trust_engine import explain_specialist
+    return await explain_specialist(specialist_id)
+
+
+# ============================================================================
 # ADMIN — control complet FĂRĂ cod
 # ============================================================================
 @admin_router.get("/overview")
@@ -226,6 +275,12 @@ async def pb_north_star(user=Depends(require_role("admin"))):
     return await north_star()
 
 
+@admin_router.get("/community-growth")
+async def pb_community_growth(user=Depends(require_role("admin"))):
+    from propbenefits.trust_engine import community_growth
+    return await community_growth()
+
+
 @admin_router.get("/community-deals")
 async def pb_deals_admin(user=Depends(require_role("admin"))):
     from propbenefits.community_deals import list_deals, DEAL_STATUSES
@@ -261,9 +316,15 @@ async def pb_run_tick(user=Depends(require_role("admin"))):
 # Tick zilnic — expirări, activări referral, snapshot Subscription Health
 # ============================================================================
 async def pb_daily_tick() -> dict:
+    from propbenefits.trust_engine import validate_recommendations_tick, trust_scores_tick, sync_trust_graph
     expired = await ledger.expire_tick()
     activated = await referral_activation_tick()
     snap = await health_snapshot_tick()
-    result = {"benefits_expired": expired, "referrals_activated": activated, **snap}
+    recs = await validate_recommendations_tick()
+    trust_n = await trust_scores_tick()
+    graph = await sync_trust_graph()
+    result = {"benefits_expired": expired, "referrals_activated": activated, **snap,
+              "recommendations_validated": recs["validated"], "trust_scores": trust_n,
+              "trust_graph": graph}
     logger.info(f"[propbenefits] daily tick: {result}")
     return result
