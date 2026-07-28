@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
   Brain, Loader2, Play, ChevronLeft, Layers, Route as RouteIcon, FileCode,
-  Puzzle, Server, Network, Users, Menu as MenuIcon,
+  Puzzle, Server, Network, Users, Menu as MenuIcon, ScanEye,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -21,6 +21,122 @@ const KIND_META = [
   { kind: "roles", label: "Roluri", icon: Users },
   { kind: "menus", label: "Meniuri", icon: MenuIcon },
 ];
+
+const CtxCard = ({ label, children }) => (
+  <div className="bg-stone-900/40 border border-stone-800 rounded-2xl p-3.5">
+    <div className="text-[10px] font-bold uppercase tracking-wider text-stone-500 mb-1.5">{label}</div>
+    {children}
+  </div>
+);
+
+const ContextInspector = () => {
+  const [email, setEmail] = useState("client@propmanage.io");
+  const [path, setPath] = useState("/client");
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const inspect = async (e) => {
+    e?.preventDefault();
+    setBusy(true); setErr(null);
+    try {
+      const { data: d } = await ax.get(`/api/admin/ai-brain/context/inspect`, { params: { email, path } });
+      setData(d);
+    } catch (ex) {
+      setErr(ex?.response?.data?.detail || ex.message); setData(null);
+    } finally { setBusy(false); }
+  };
+
+  const c = data?.context;
+  return (
+    <div className="border border-stone-800 rounded-2xl bg-stone-900/30 p-4" data-testid="context-inspector">
+      <div className="flex items-center gap-2 mb-3">
+        <ScanEye className="w-4 h-4 text-[#d4ff3a]" />
+        <div className="text-xs font-bold uppercase tracking-wider text-stone-400">Context Inspector — AIB-002 · Context Awareness Engine</div>
+      </div>
+      <form onSubmit={inspect} className="flex flex-wrap gap-2 mb-4">
+        <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email utilizator"
+          className="flex-1 min-w-[220px] bg-stone-800 border border-stone-700 rounded-xl px-3 py-2 text-sm text-white" data-testid="ctx-email-input" />
+        <input value={path} onChange={e => setPath(e.target.value)} placeholder="Rută (ex: /client)"
+          className="flex-1 min-w-[160px] bg-stone-800 border border-stone-700 rounded-xl px-3 py-2 text-sm text-white" data-testid="ctx-path-input" />
+        <button disabled={busy} className="px-4 py-2 text-xs rounded-xl bg-[#d4ff3a] text-stone-900 font-bold flex items-center gap-1.5" data-testid="ctx-inspect-btn">
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ScanEye className="w-3.5 h-3.5" />} Inspectează
+        </button>
+      </form>
+      {err && <div className="text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2" data-testid="ctx-error">{err}</div>}
+      {c && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3" data-testid="ctx-result">
+          <CtxCard label="Utilizator analizat">
+            <div className="text-sm font-bold text-white" data-testid="ctx-user-name">{c.user.name}</div>
+            <div className="text-xs text-stone-400">{c.user.email}</div>
+            <div className="flex gap-1.5 mt-1.5 flex-wrap">
+              <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-[#d4ff3a]/10 text-[#d4ff3a] border border-[#d4ff3a]/30" data-testid="ctx-user-role">{c.user.role}</span>
+              {c.user.tier && <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-stone-800 text-stone-400">{c.user.tier}</span>}
+            </div>
+          </CtxCard>
+          <CtxCard label="Locație · modul activ">
+            <div className="text-sm font-bold text-white" data-testid="ctx-module">{c.location.module}</div>
+            <div className="text-xs text-stone-400">{c.location.path || "—"}</div>
+            <div className="text-[11px] text-stone-500 mt-1">
+              {c.location.known_route ? `Componentă: ${c.location.route?.component}` : "Rută necunoscută în App.js"}
+            </div>
+          </CtxCard>
+          <CtxCard label="Entitate selectată">
+            {c.entity ? (
+              <>
+                <div className="text-sm font-bold text-white" data-testid="ctx-entity">{c.entity.label}</div>
+                <div className="text-[11px] text-stone-500">{c.entity.type} · {c.entity.id}</div>
+              </>
+            ) : c.active_property ? (
+              <>
+                <div className="text-sm font-bold text-white">{c.active_property.label}</div>
+                <div className="text-[11px] text-stone-500">proprietate activă (implicită)</div>
+              </>
+            ) : <div className="text-xs text-stone-500">—</div>}
+          </CtxCard>
+          <CtxCard label="Permisiuni efective">
+            <div className="text-sm font-bold text-white" data-testid="ctx-permissions">{c.permissions.accessible_endpoints} / {c.permissions.total_endpoints} endpoint-uri</div>
+            <div className="text-[11px] text-stone-500 mt-1">{c.permissions.effective_guards.join(" · ")}</div>
+          </CtxCard>
+          <CtxCard label={`Acțiuni disponibile în modul (${c.available_actions.length})`}>
+            <div className="max-h-28 overflow-auto space-y-0.5" data-testid="ctx-actions">
+              {c.available_actions.slice(0, 10).map((a, i) => (
+                <div key={i} className="text-[11px] text-stone-400"><span className="text-[#d4ff3a] font-mono">{a.method}</span> {a.path}</div>
+              ))}
+            </div>
+          </CtxCard>
+          <CtxCard label="Istoric navigare">
+            <div className="max-h-28 overflow-auto space-y-0.5" data-testid="ctx-navigation">
+              {(data.navigation.events || []).length === 0 && <div className="text-xs text-stone-500">Nicio navigare înregistrată încă.</div>}
+              {(data.navigation.events || []).slice(0, 8).map((e, i) => (
+                <div key={i} className="text-[11px] text-stone-400 flex gap-2">
+                  <span className="text-stone-600">{new Date(e.ts).toLocaleTimeString("ro-RO")}</span>
+                  <span className="flex-1 truncate">{e.path}</span>
+                  {e.duration_ms ? <span className="text-stone-600">{Math.round(e.duration_ms / 1000)}s</span> : null}
+                </div>
+              ))}
+            </div>
+          </CtxCard>
+          <CtxCard label={`Conversații AI (${(data.conversations || []).length})`}>
+            <div className="max-h-28 overflow-auto space-y-1" data-testid="ctx-conversations">
+              {(data.conversations || []).length === 0 && <div className="text-xs text-stone-500">Nicio conversație încă.</div>}
+              {(data.conversations || []).map((s, i) => (
+                <div key={i} className="text-[11px] text-stone-400">
+                  <span className="text-stone-500">{s.session_id?.slice(0, 8)}…</span> {s.context?.topic || "—"}
+                </div>
+              ))}
+            </div>
+          </CtxCard>
+          <CtxCard label="Workflow">
+            <div className="text-[11px] text-stone-400" data-testid="ctx-workflow">
+              {(c.workflow.trail || []).length ? c.workflow.trail.join(" → ") : "—"}
+            </div>
+          </CtxCard>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function AIBrainPage() {
   const navigate = useNavigate();
@@ -99,7 +215,7 @@ export default function AIBrainPage() {
         )}
 
         {selected && (
-          <div className="border border-stone-800 rounded-2xl bg-stone-900/30 p-4" data-testid="ai-brain-detail">
+          <div className="border border-stone-800 rounded-2xl bg-stone-900/30 p-4 mb-8" data-testid="ai-brain-detail">
             <div className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3">
               Registry · {KIND_META.find(k => k.kind === selected)?.label} {detail && `(${detail.count} total, primele ${Array.isArray(detail.data) ? detail.data.length : "—"})`}
             </div>
@@ -112,6 +228,8 @@ export default function AIBrainPage() {
             )}
           </div>
         )}
+
+        <ContextInspector />
       </div>
     </div>
   );

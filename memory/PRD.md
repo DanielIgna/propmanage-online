@@ -4145,3 +4145,32 @@ admin (AdminLayoutMetronic, superAdminOnly, badge DISCOVERY).
 ledger entry per discovery), cron zilnic 06:35.
 **TESTAT**: pytest 14/14 nou (tests/test_iter157_ai_brain.py) + 19/19 regresie
 (iter155+156+site_menu), build frontend ✓, screenshot UI ✓ (discovery 533ms).
+
+---
+
+## ✅ AIB-002 — CONTEXT AWARENESS ENGINE (28 Iul 2026)
+**Modul nou: ai_brain/context.py** — construit PE Knowledge Registry (zero hardcodare):
+- `resolve_context(user, path, entity_id, action)`: user+rol+tier, permisiuni efective
+  (guards → nr. endpoint-uri accesibile din registry, ex. client 412/1085), organizație
+  (tenant_id), modul activ + rută potrivită (match exact/dinamic pe registry routes →
+  componenta React), entitate selectată (ID-uri din path → lookup în colecții după
+  keyword: properties/requests/digital_twin_projects/users/etc.), proprietate activă
+  implicită, acțiuni disponibile (API-uri din registry filtrate pe guard+modul), workflow
+  (trail din navigare).
+- **Navigation Context**: db.ai_brain_navigation — ping din AnalyticsRouteTracker (App.js)
+  DOAR pentru utilizatori autentificați (pm_session_hint), durată/pagină calculată
+  server-side din evenimente consecutive; agregare top module. (analytics_events rămâne
+  anonim, GDPR — nu s-a duplicat/alterat.)
+- **Conversation Context**: REUTILIZEAZĂ db.ai_sessions (memoria AI unificată existentă),
+  agent="ai_brain": messages[], context.{topic,last_question,entities[]}, izolare per user.
+  FĂRĂ LLM (conform sprintului) — doar mecanica de continuitate pentru sprinturile viitoare
+  (Explain Screen, Mentor, Recommendations vor consuma direct resolve_context).
+**API**: user_router /api/ai-brain: GET /context, POST+GET /navigation,
+POST /conversation, GET /conversation/{sid}, GET /conversations (get_current_user).
+Admin: GET /api/admin/ai-brain/context/inspect?email&path (context+navigare+conversații).
+**UI**: Context Inspector în /admin/ai-brain (email+path → 8 carduri: utilizator, locație/
+modul, entitate, permisiuni, acțiuni, navigare, conversații, workflow).
+**TESTAT**: pytest 9/9 nou (iter158: context per rol, filtrare acțiuni pe guard, navigare
+cu durată, continuitate conversație + izolare între useri, inspector admin+403) + 25/25
+regresie (iter155-157), build ✓, screenshot Inspector live ✓ (client 412/1085 endpoint-uri,
+trail /client→/marketplace→/client).

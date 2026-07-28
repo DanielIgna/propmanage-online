@@ -113,7 +113,7 @@ from routes.analytics_growth import router as analytics_track_router, admin_rout
 from routes.demo_activity import router as demo_activity_router
 from routes.orchestrator import router as orchestrator_router
 from routes.repair_center import router as repair_center_router
-from routes.ai_brain import router as ai_brain_router
+from routes.ai_brain import router as ai_brain_router, user_router as ai_brain_user_router
 from routes.construction import router as construction_router
 from routes.kg import router as kg_router
 from routes.control_tower import router as control_tower_router
@@ -241,6 +241,7 @@ ALL_ROUTERS = (
     orchestrator_router,
     repair_center_router,
     ai_brain_router,
+    ai_brain_user_router,
     construction_router,
     deprecation_pulse_router,
     architecture_board_router,

@@ -160,6 +160,14 @@ const AnalyticsRouteTracker = () => {
   const location = useLocation();
   React.useEffect(() => {
     trackPageView(location.pathname + location.search);
+    // AI Brain · Navigation Context (doar utilizatori autentificați, fire-and-forget)
+    if (localStorage.getItem("pm_session_hint")) {
+      fetch(`${process.env.REACT_APP_BACKEND_URL}/api/ai-brain/navigation`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: location.pathname }),
+      }).catch(() => {});
+    }
   }, [location.pathname, location.search]);
   React.useEffect(() => {
     window.scrollTo(0, 0);
