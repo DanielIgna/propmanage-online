@@ -435,6 +435,13 @@ async def run_repair_cycle(domains: list = None, trigger: str = "cron") -> dict:
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[repair] guardian re-audit failed: {e}")
 
+    # Architecture Guardian: după orice ciclu, verifică integritatea arhitecturii canonice.
+    try:
+        from architecture_guardian import run_architecture_guardian
+        run["architecture_guardian"] = await run_architecture_guardian(trigger="repair_cycle")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[repair] architecture guardian failed: {e}")
+
     try:
         await db.health_repair_runs.insert_one({**run})
         n = await db.health_repair_runs.estimated_document_count()

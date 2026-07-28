@@ -625,6 +625,15 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=7200,
         )
+        # Architecture Guardian — zilnic 06:40, impune arhitectura canonică + task-uri CTO AI
+        from architecture_guardian import run_architecture_guardian
+        scheduler.add_job(
+            run_architecture_guardian,
+            CronTrigger(hour=6, minute=40, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="architecture_guardian_daily",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
         # CIP-A: Category Visibility Gate — daily 04:30 (via Orchestrator playbook)
         scheduler.add_job(
             construction_visibility_cron,

@@ -45,7 +45,7 @@ import { PrivacyPage, TermsPage, CookiePolicyPage } from "./pages/LegalPages";
 const TrustCenterPage = lazy(() => import("./pages/TrustCenterPage").then(m => ({ default: m.TrustCenterPage })));
 const PrivacyNoticesPage = lazy(() => import("./pages/PrivacyNoticesPage").then(m => ({ default: m.PrivacyNoticesPage })));
 const StatusPage = lazy(() => import("./pages/StatusPage").then(m => ({ default: m.StatusPage })));
-const ComponentsV2 = lazy(() => import("./pages/ComponentsV2"));
+const DesignSystemShowcase = lazy(() => import("./pages/DesignSystemShowcase"));
 const CommunityPage = lazy(() => import("./pages/CommunityPage"));
 import { GDPRAuditBadge } from "./components/GDPRAuditBadge";
 import { TrustStrip } from "./components/TrustStrip";
@@ -1590,7 +1590,7 @@ function App() {
               <Route path="/cookies" element={<CookiePolicyPage />} />
               <Route path="/trust" element={<TrustCenterPage />} />
               <Route path="/status" element={<StatusPage />} />
-              <Route path="/components-v2" element={<ComponentsV2 />} />
+              <Route path="/components-v2" element={<DesignSystemShowcase />} />
               <Route path="/community" element={<CommunityPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/auth" element={<Navigate to="/login" replace />} />

@@ -11,7 +11,7 @@ import {
   Plus, Search, Filter, AlertCircle, Star, Inbox,
 } from "lucide-react";
 
-export default function ComponentsV2() {
+export default function DesignSystemShowcase() {
   const bottomNavItems = [
     { id: "home", label: "Acasă", icon: Home, active: true, onClick: () => {} },
     { id: "jobs", label: "Lucrări", icon: Briefcase, onClick: () => {} },

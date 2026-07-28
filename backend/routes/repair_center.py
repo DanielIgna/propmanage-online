@@ -101,3 +101,41 @@ async def guardian_status(user=Depends(require_role("admin"))):
 async def guardian_run(user=Depends(require_role("admin"))):
     from journey_guardian import run_journey_guardian
     return await run_journey_guardian(trigger=f"manual:{user.get('email')}")
+
+
+# ============================================================================
+# ARCHITECTURE GUARDIAN — impune arhitectura canonică (PM-GUARDIAN-001/002)
+# ============================================================================
+@router.get("/architecture-guardian/status")
+async def arch_guardian_status(user=Depends(require_role("admin"))):
+    last_run = await db.architecture_guardian_runs.find_one({}, {"_id": 0}, sort=[("ts", -1)])
+    tasks = [t async for t in db.architecture_guardian_tasks.find(
+        {"status": "open"}, {"_id": 0}).sort([("severity", 1), ("created_at", -1)]).limit(100)]
+    resolved_total = await db.architecture_guardian_tasks.count_documents({"status": "resolved"})
+    return {"last_run": last_run, "open_tasks": tasks, "resolved_total": resolved_total,
+            "architecture_score": (last_run or {}).get("architecture_score")}
+
+
+@router.post("/architecture-guardian/run")
+async def arch_guardian_run(user=Depends(require_role("admin"))):
+    from architecture_guardian import run_architecture_guardian
+    return await run_architecture_guardian(trigger=f"manual:{user.get('email')}")
+
+
+@router.post("/architecture-guardian/ignore")
+async def arch_guardian_ignore(payload: dict = Body(...), user=Depends(require_role("admin"))):
+    """Marchează un finding drept fals-pozitiv justificat (nu va mai genera task)."""
+    key = (payload.get("key") or "").strip()
+    reason = (payload.get("reason") or "").strip()
+    if not key or not reason:
+        raise HTTPException(400, "key și reason sunt obligatorii")
+    from datetime import datetime, timezone
+    await db.architecture_guardian_ignores.update_one(
+        {"key": key},
+        {"$set": {"reason": reason, "by": user.get("email"),
+                  "ts": datetime.now(timezone.utc).isoformat()}}, upsert=True)
+    await db.architecture_guardian_tasks.update_many(
+        {"key": key, "status": "open"},
+        {"$set": {"status": "ignored", "resolved_at": datetime.now(timezone.utc).isoformat(),
+                  "resolved_by": user.get("email"), "ignore_reason": reason}})
+    return {"ignored": key}

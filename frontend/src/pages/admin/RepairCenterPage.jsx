@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import {
   Wrench, ChevronLeft, Loader2, Play, CheckCircle2, AlertTriangle,
-  Activity, ArrowRight, HeartPulse, History, Compass,
+  Activity, ArrowRight, HeartPulse, History, Compass, Landmark,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -131,6 +131,65 @@ const GuardianSection = () => {
   );
 };
 
+const ArchGuardianSection = () => {
+  const [data, setData] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => {
+    ax.get("/api/admin/repair-center/architecture-guardian/status").then(r => setData(r.data)).catch(() => {});
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const run = async () => {
+    setBusy(true);
+    try { await ax.post("/api/admin/repair-center/architecture-guardian/run"); load(); } finally { setBusy(false); }
+  };
+  const score = data?.architecture_score;
+  return (
+    <div className="mt-10" data-testid="architecture-guardian-section">
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        <Landmark className="w-4 h-4 text-violet-300" />
+        <div className="text-xs font-bold uppercase tracking-wider text-stone-400">Architecture Guardian — o singură implementare canonică</div>
+        {typeof score === "number" && (
+          <span className={`text-[11px] font-black px-2 py-0.5 rounded-full border ${score >= 80 ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30" : score >= 60 ? "bg-amber-500/10 text-amber-300 border-amber-500/30" : "bg-rose-500/10 text-rose-300 border-rose-500/30"}`}
+            data-testid="arch-score-badge">Scor {score}/100</span>
+        )}
+        <div className="flex-1" />
+        {data?.last_run && (
+          <span className="text-[11px] text-stone-500">
+            Ultima rulare: {new Date(data.last_run.ts).toLocaleString("ro-RO")} · {data.last_run.files_scanned} fișiere · {data.last_run.issues_found} probleme · {data.resolved_total} rezolvate istoric
+          </span>
+        )}
+        <button onClick={run} disabled={busy}
+          className="px-3 py-1.5 text-xs rounded-lg border border-stone-700 text-stone-300 hover:text-white flex items-center gap-1.5"
+          data-testid="arch-guardian-run-btn">
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />} Scanează arhitectura
+        </button>
+      </div>
+      {data && (data.open_tasks || []).length === 0 && (
+        <div className="p-6 text-center text-sm text-stone-500 border border-dashed border-stone-800 rounded-2xl" data-testid="arch-guardian-no-tasks">
+          Zero duplicate, zero cod mort, zero switch-uri temporare — arhitectura e canonică.
+        </div>
+      )}
+      <div className="space-y-2" data-testid="arch-guardian-tasks-list">
+        {(data?.open_tasks || []).map(t => (
+          <div key={t.key} className="border border-stone-800 rounded-2xl p-4 bg-stone-900/30" data-testid={`arch-task-${t.key}`}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded border ${SEV_STYLE[t.severity] || SEV_STYLE.medium}`}>{t.severity}</span>
+              <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-stone-800 text-stone-400">risc {t.risk}</span>
+              {t.recurrence > 0 && <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">regresie ×{t.recurrence}</span>}
+              <span className="text-sm font-semibold text-white">{t.title}</span>
+              <div className="flex-1" />
+              <span className="text-[10px] text-stone-500">→ {t.assigned_to}</span>
+            </div>
+            <p className="text-xs text-stone-400 mt-1.5">{t.detail}</p>
+            <p className="text-xs text-stone-500 mt-1"><span className="text-stone-400 font-semibold">Impact:</span> {t.business_impact}</p>
+            {t.migration_plan && <p className="text-xs text-violet-300/70 mt-0.5"><span className="font-semibold">Plan:</span> {t.migration_plan}</p>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export default function RepairCenterPage() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -239,6 +298,7 @@ export default function RepairCenterPage() {
               </div>
             )}
             <GuardianSection />
+            <ArchGuardianSection />
           </>
         )}
       </div>

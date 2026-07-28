@@ -37,7 +37,6 @@ from deps import get_current_user
 logger = logging.getLogger("propmanage.house_health.billing")
 
 router = APIRouter(prefix="/api/house-health", tags=["house-health-billing"])
-webhook_router = APIRouter(prefix="/api/webhook", tags=["house-health-billing"])
 
 
 def _stripe():
@@ -267,24 +266,9 @@ async def checkout_status(session_id: str, user=Depends(get_current_user)):
     return await _activate_subscription_if_paid(session_id)
 
 
-@webhook_router.post("/stripe")
-async def stripe_webhook(request: Request):
-    StripeCheckout, api_key = _stripe()
-    stripe_checkout = StripeCheckout(api_key=api_key, webhook_url="")
-    body = await request.body()
-    signature = request.headers.get("Stripe-Signature", "")
-    try:
-        event = await stripe_checkout.handle_webhook(body, signature)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("[house_health.billing] webhook signature/decode failed: %s", e)
-        raise HTTPException(400, "Webhook invalid.")
-    sid = getattr(event, "session_id", None)
-    if sid:
-        try:
-            await _activate_subscription_if_paid(sid)
-        except Exception as e:  # noqa: BLE001
-            logger.warning("[house_health.billing] webhook activation failed for %s: %s", sid, e)
-    return {"received": True, "event_type": getattr(event, "event_type", None)}
+# Notă (Architecture Guardian): handler-ul webhook duplicat de aici a fost eliminat.
+# POST /api/webhook/stripe canonic e în routes/payments.py și apelează
+# _activate_subscription_if_paid() pentru abonamentele House Health.
 
 
 # ============================================================================

@@ -4055,3 +4055,38 @@ legacy persistat → tot V2, tab-uri, wizard, 4 roluri fără regresii, twin-orc
 **Riscuri rămase**: (a) unificarea twins/digital_twin_projects (planificată); (b) panouri
 gamification din legacy (QuestPanel, TierCelebration, TierProgress) nemontate în V2 —
 decizie de produs dacă revin; (c) naming twin.py.
+
+---
+
+## ✅ PM-GUARDIAN-001/002 — ARCHITECTURE GUARDIAN PERMANENT (28 Iul 2026)
+**Modul nou: /app/backend/architecture_guardian.py** — scanner static pe codul REAL
+(369 fișiere frontend + backend routes), rulat: zilnic 06:40 (cron), după fiecare
+run_repair_cycle (bucla autonomă), manual din Repair Center.
+**Detectează**: implementări paralele (V2/New/Old/Legacy cu bază coexistentă), componente
+moarte (0 importeri, static+lazy+alias @/), lazy imports nerutate, rute cu componente
+nedefinite, switch-uri temporare pe localStorage (clasa Preview≠Live), feature flags
+abandonate (enable_* fără consumatori), importuri circulare (A↔B), API-uri duplicate
+(metodă+cale peste toate routerele), TODO/FIXME acumulate (>60).
+**Lifecycle**: task-uri CTO în db.architecture_guardian_tasks (upsert pe key, auto-resolve
+la dispariție, ignore justificat via POST .../ignore). LEARNING: problemă rezolvată care
+REAPARE = regresie de clasă → recurrence++, severitate crescută, ledger learning.
+**Auto-repair risc redus**: chei enable_* stale din db.app_settings ($unset automat).
+**Scor arhitectură**: 100 − 15·crit − 8·high − 3·med − 1·low. Rute: GET/POST
+/api/admin/repair-center/architecture-guardian/{status,run,ignore}. UI: secțiune în
+/admin/repair-center (badge scor, task list cu risc/plan/regresie, buton scan).
+**DOGFOODING PRIMA RULARE — scor 56 → 97 după reparații**:
+- 🐛 BUG REAL GĂSIT: POST /api/webhook/stripe definit de 2 ori (payments.py +
+  house_health_billing.py webhook_router) — FastAPI servea DOAR payments → webhook-ul
+  abonamentelor House Health NU rula NICIODATĂ. FIX: handler canonic unic în payments.py
+  care apelează _activate_subscription_if_paid(); webhook_router eliminat din
+  house_health_billing + register.py. (Abonamentele se activau doar prin polling!)
+- 8 componente moarte șterse: GatedItem, TierProgressWidget, MaturityCard,
+  WelcomeChecklist, WhatsAppFloat, pages/AdminDashboard.jsx (+ cascade: AutopilotWidget,
+  AdminAnalytics — orfane după prima ștergere, prinse de re-scan).
+- Fals-pozitive reparate în detector: componente definite inline în App.js (LandingPage).
+- Rename canonic: ComponentsV2.jsx → DesignSystemShowcase.jsx (nu era V2 al Components).
+**Task deschis rămas (decizie produs)**: temp_switch:pm_spec_full — opt-out-ul ENTRY
+specialist e per-browser; plan: mutare în backend user prefs.
+**TESTAT**: pytest 6/6 (tests/test_iter155_architecture_guardian.py: run+status+auth
+endpoints, zero API duplicate, canonical client, HH webhook wired), build frontend ✓,
+webhook stripe 200 ✓, UI screenshot ✓ (badge 97/100, task cu plan afișat).

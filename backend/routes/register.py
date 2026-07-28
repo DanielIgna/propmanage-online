@@ -67,7 +67,7 @@ from routes.twin import router as twin_router
 from routes.house_health import router as house_health_router, admin_router as house_health_admin_router
 from routes.house_health_plans import public_router as hh_plans_public_router, admin_router as hh_plans_admin_router
 from routes.house_health_recommendations import router as hh_recommendations_router
-from routes.house_health_billing import router as hh_billing_router, webhook_router as hh_webhook_router
+from routes.house_health_billing import router as hh_billing_router
 from routes.manual_tester import router as manual_tester_router
 from routes.adaptive_ux import router as adaptive_ux_router, admin_router as adaptive_ux_admin_router
 from routes.admin_tour import router as admin_tour_router
@@ -224,7 +224,6 @@ ALL_ROUTERS = (
     hh_plans_admin_router,
     hh_recommendations_router,
     hh_billing_router,
-    hh_webhook_router,
     manual_tester_router,
     adaptive_ux_router,
     adaptive_ux_admin_router,

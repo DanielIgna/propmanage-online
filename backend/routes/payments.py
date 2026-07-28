@@ -247,6 +247,13 @@ async def stripe_webhook(request: Request):
             await _ve_mark_paid(evt.session_id)
         except Exception as e:  # noqa: BLE001
             logger.warning(f"VE order webhook processing failed: {e}")
+        # House Health subscriptions (webhook canonic unic — Architecture Guardian:
+        # handler-ul duplicat din house_health_billing nu era servit niciodată de FastAPI)
+        try:
+            from routes.house_health_billing import _activate_subscription_if_paid
+            await _activate_subscription_if_paid(evt.session_id)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"House Health webhook processing failed: {e}")
     return {"received": True, "event_type": evt.event_type, "session_id": evt.session_id}
 
 
