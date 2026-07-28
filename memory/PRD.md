@@ -3912,3 +3912,30 @@ execută partea automatizabilă și escaladează restul.
    - /marketplace: flux cu specialists activ
 **VALIDAT: iteration_150.json — backend 100%, frontend 100% (5/5 pagini + consistență
 dark/light + regresie checkout wizard pas 1→2). Fix-uri post-test: hash scroll, HH auth state.**
+
+---
+
+## ✅ SERVICE MANAGER + CONFIG BETA (28 Iul 2026)
+**Audit: module existente identificate → EXTINSE (zero module noi paralele):**
+- `routes/site_menu.py` + `pages/admin/MenuManagerPage.jsx` = Menu/Service Manager (extins)
+- `SiteNav.jsx` = meniul public deja DB-driven (nu era hardcodat) — doar config
+- `service_hub.py`/`service_pages` = CMS pagini servicii; `app_settings.py` = admin config
+**Extinderi backend (site_menu.py):** MENU_VERSION=2 cu migrare automată; câmpuri noi per
+serviciu: description, image, category, dest_type (internal/marketplace/external/none),
+providers[] (name, logo, description, url, priority, active), visible_site,
+visible_marketplace. Public: /api/public/service-visibility (gating rute),
+/api/public/services/{id} (404 dacă inactiv — REGULA PLATFORMEI). _public_items filtrează
+active AND visible_site.
+**CONFIG BETA (în DB, migrat):** ACTIVE: imobile_verificate, design_interior, digital_twin,
+mobilier (dest_type=external → pagina /servicii/mobilier cu parteneri administrați din
+admin; empty state cu CTA ofertă). ASCUNSE: design_exterior, arhitectura, constructii,
+renovari, instalatii, amenajari, specialisti, consultanta.
+**Specialiști (/marketplace + /marketplace/:slug):** gated cu ServiceGate — anonim/client →
+redirect home; ADMIN păstrează acces intern; reactivare din Admin → Menu Manager (ochi
+activ + Vizibil în website=DA). Chip 'Specialiști verificați' din EcosystemFlow devine
+span non-clickabil când serviciul e ascuns. Link-uri /marketplace eliminate din
+GhiduriIndex, PreturiIndex, eco links design-interior (content v4).
+**Frontend nou (necesar):** ServiceGate.jsx, serviceVisibility.js (hook cache),
+ServiceProvidersPage.jsx (/servicii/:id). MenuManagerPage: panou ⚙ Detalii serviciu +
+editor parteneri.
+**VALIDAT: iteration_151.json — backend 8/8 (100%), frontend 100%, regresii zero.**
