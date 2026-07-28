@@ -323,6 +323,12 @@ async def build_processes(run_id: str = "") -> dict:
     if procs:
         await db.ai_brain_processes.insert_many([dict(pr) for pr in procs])
     await _sync_graph(procs)
+    # AIB-008: istoric statistici pentru detectarea degradării (Guardian Feedback)
+    try:
+        from ai_brain.adaptive import snapshot_process_stats
+        await snapshot_process_stats(run_id)
+    except Exception:  # noqa: BLE001
+        pass
 
     by_kind: dict = {}
     for pr in procs:

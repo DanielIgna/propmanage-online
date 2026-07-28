@@ -156,7 +156,24 @@ export const DecisionExplorer = () => {
                 <div className="flex items-center gap-2">
                   <ScoreBadge score={sel.score} />
                   <span className="text-sm font-bold text-white flex-1">{sel.title}</span>
+                  {sel.confidence != null && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-violet-500/10 text-violet-300 border border-violet-500/30"
+                      data-testid="de-confidence">Încredere {sel.confidence}%</span>
+                  )}
                 </div>
+                {sel.adaptive?.reasons?.length > 0 && (
+                  <div className="text-[11px] text-violet-200/90 bg-violet-500/10 border border-violet-500/25 rounded-lg px-2.5 py-1.5 space-y-0.5" data-testid="de-adaptive">
+                    <div className="text-[9px] font-black uppercase text-violet-300">
+                      Recalibrare adaptivă: {sel.adaptive.adjustment > 0 ? "+" : ""}{sel.adaptive.adjustment}p (bază {sel.base_score})
+                    </div>
+                    {sel.adaptive.reasons.map((r, i) => <div key={i}>· {r}</div>)}
+                  </div>
+                )}
+                {sel.confidence_factors?.length > 0 && (
+                  <div className="text-[10px] text-stone-500 space-y-0.5" data-testid="de-confidence-factors">
+                    {sel.confidence_factors.map((f, i) => <div key={i}>◦ {f}</div>)}
+                  </div>
+                )}
                 <FactorBars factors={sel.factors} />
                 <div className="text-[11px] text-stone-300 space-y-1" data-testid="de-reasons">
                   {(sel.reasons || []).map((r, i) => <div key={i}>· {r}</div>)}

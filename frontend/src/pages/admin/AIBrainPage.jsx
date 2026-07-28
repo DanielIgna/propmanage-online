@@ -6,6 +6,7 @@ import axios from "axios";
 import { KnowledgeExplorer } from "../../components/KnowledgeExplorer";
 import { ProcessExplorer } from "../../components/ProcessExplorer";
 import { DecisionExplorer } from "../../components/DecisionExplorer";
+import { AdaptiveExplorer } from "../../components/AdaptiveExplorer";
 import {
   Brain, Loader2, Play, ChevronLeft, Layers, Route as RouteIcon, FileCode,
   Puzzle, Server, Network, Users, Menu as MenuIcon, ScanEye,
@@ -236,6 +237,7 @@ export default function AIBrainPage() {
         <KnowledgeExplorer />
         <ProcessExplorer />
         <DecisionExplorer />
+        <AdaptiveExplorer />
       </div>
     </div>
   );

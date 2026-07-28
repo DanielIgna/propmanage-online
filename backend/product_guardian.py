@@ -233,6 +233,50 @@ async def check_process_health(issues):
 
 
 # ============================================================================
+# 7. ADAPTIVE FEEDBACK — AIB-008 (recomandări ineficiente, degradare, blocaje recurente)
+# ============================================================================
+async def check_adaptive_intelligence(issues):
+    from ai_brain.adaptive import POSITIVE, NEGATIVE
+    # recomandări ineficiente: kind cu volum și acceptare foarte mică
+    kinds: dict = {}
+    async for d in db.ai_brain_decision_feedback.aggregate([
+            {"$match": {"kind": {"$ne": None}}},
+            {"$group": {"_id": {"kind": "$kind", "action": "$action"}, "n": {"$sum": 1}}}]):
+        k = d["_id"]["kind"]
+        kinds.setdefault(k, {"pos": 0, "neg": 0})
+        if d["_id"]["action"] in POSITIVE:
+            kinds[k]["pos"] += d["n"]
+        elif d["_id"]["action"] in NEGATIVE:
+            kinds[k]["neg"] += d["n"]
+    for k, v in kinds.items():
+        n = v["pos"] + v["neg"]
+        if n >= 10 and v["pos"] / n < 0.2:
+            issues.append(_issue(
+                f"ineffective_recommendations_{k}", "medium", "low",
+                f"Recomandările «{k}» sunt ignorate în {round(100 * (1 - v['pos'] / n))}% din cazuri",
+                f"{n} reacții reale: doar {v['pos']} urmate. Adaptive Engine le-a scăzut deja scorul.",
+                "Recomandările AI Brain au o rată de urmare de minim 20%.",
+                "Recomandări irelevante erodează încrederea în AI Mentor.",
+                "Analizează kind-ul în AI Brain → Adaptive Intelligence și regândește generatorul."))
+    # degradare procese: rata de stagnare a crescut față de snapshot-ul anterior
+    pids = await db.ai_brain_process_stats_history.distinct("process_id")
+    for pid in pids:
+        hist = [h async for h in db.ai_brain_process_stats_history.find(
+            {"process_id": pid}).sort("ts", -1).limit(2)]
+        if len(hist) == 2 and hist[0]["total"] >= 10 and hist[1]["total"]:
+            r_now = hist[0]["stale"] / hist[0]["total"]
+            r_prev = hist[1]["stale"] / hist[1]["total"]
+            if r_now - r_prev > 0.15:
+                issues.append(_issue(
+                    f"process_degradation_{pid}", "medium", "medium",
+                    f"Procesul «{pid}» se degradează: stagnare {round(r_prev * 100)}% → {round(r_now * 100)}%",
+                    f"Rata instanțelor blocate a crescut cu {round((r_now - r_prev) * 100)}pp între analize.",
+                    "Rata de stagnare a proceselor de business nu crește între analize.",
+                    "Degradarea tăcută a unui proces = utilizatori pierduți fără alarmă.",
+                    "Vezi AI Brain → Process Explorer pentru etapa problematică și cauzele blocajelor."))
+
+
+# ============================================================================
 # RUN — kernel lifecycle (identic cu Architecture Guardian) + learning 3-strikes
 # ============================================================================
 async def run_product_guardian(trigger: str = "cron") -> dict:
@@ -242,7 +286,8 @@ async def run_product_guardian(trigger: str = "cron") -> dict:
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[product-guardian] dead_links failed: {e}")
     fv, conv = {}, {}
-    for acheck in (check_role_homes, check_service_gates, check_process_health):
+    for acheck in (check_role_homes, check_service_gates, check_process_health,
+                   check_adaptive_intelligence):
         try:
             await acheck(issues)
         except Exception as e:  # noqa: BLE001

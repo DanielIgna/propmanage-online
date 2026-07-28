@@ -289,9 +289,16 @@ async def generate_decisions(user: dict, path: str = "") -> list:
 
 
 async def next_best_decisions(user: dict, path: str = "") -> list:
-    """Generează + persistă snapshot-ul (pentru explain/simulate pe decision_id)."""
+    """Generează + recalibrează adaptiv (AIB-008) + persistă snapshot-ul."""
     items = await generate_decisions(user, path)
     uid = user.get("id") or str(user.get("_id", ""))
+    old_snap = await db.ai_brain_decisions.find_one({"user_id": uid}, {"_id": 0})
+    try:
+        from ai_brain.adaptive import reconcile_snapshot, enrich_decisions
+        items = await reconcile_snapshot(user, old_snap, items)
+        items = await enrich_decisions(user, items)
+    except Exception:  # noqa: BLE001
+        pass
     await db.ai_brain_decisions.update_one(
         {"user_id": uid},
         {"$set": {"user_id": uid, "role": user.get("role"), "path": path,

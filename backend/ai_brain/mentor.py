@@ -174,10 +174,18 @@ async def mentor_advise(user: dict, path: str, replay: bool = False, include_gui
     if decisions:
         actions = [{"id": d["id"], "title": d["title"],
                     "reason": (d["reasons"] or [d["resolves"]])[0],
-                    "cta_path": d["cta_path"], "priority": i + 1, "score": d["score"]}
+                    "cta_path": d["cta_path"], "priority": i + 1, "score": d["score"],
+                    "confidence": d.get("confidence")}
                    for i, d in enumerate(decisions[:3])]
     else:
         actions = await next_best_actions(user)
+    # AIB-008 · Personal Mentor: insights discrete din comportamentul real
+    insights = []
+    try:
+        from ai_brain.adaptive import personal_insights
+        insights = await personal_insights(user, path)
+    except Exception:  # noqa: BLE001
+        pass
     return {
         "role": ctx["user"]["role"],
         "module": module,
@@ -185,6 +193,7 @@ async def mentor_advise(user: dict, path: str, replay: bool = False, include_gui
         "onboarding": {"show": show_onboarding, "guide": guide},
         "actions": actions,
         "decisions": decisions[:3],
+        "insights": insights,
         "tips": await contextual_tips(user, path),
         "related_modules": related,
         "process": process,

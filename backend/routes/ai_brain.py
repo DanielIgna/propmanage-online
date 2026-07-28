@@ -45,7 +45,7 @@ async def record_navigation(payload: dict = Body(...), user=Depends(get_current_
     path = (payload.get("path") or "").strip()
     if not path.startswith("/"):
         raise HTTPException(400, "path invalid")
-    return await ctx.record_navigation(_uid(user), path)
+    return await ctx.record_navigation(_uid(user), path, role=user.get("role"))
 
 
 @user_router.get("/navigation")
@@ -285,6 +285,56 @@ async def decisions_inspect(email: str, path: str = "", user=Depends(require_rol
     from ai_brain.decision import next_best_decisions
     return {"email": email, "role": target.get("role"),
             "items": await next_best_decisions(target, path)}
+
+
+# ============================================================================
+# AIB-008 · Adaptive Intelligence Engine
+# ============================================================================
+@user_router.post("/decisions/feedback")
+async def decision_feedback(payload: dict = Body(...), user=Depends(get_current_user)):
+    from ai_brain.adaptive import record_feedback
+    did = (payload.get("decision_id") or "").strip()
+    action = (payload.get("action") or "").strip()
+    if not did or not action:
+        raise HTTPException(400, "decision_id și action sunt obligatorii")
+    res = await record_feedback(user, did, action)
+    if not res["ok"]:
+        raise HTTPException(400, res["reason"])
+    return res
+
+
+@user_router.get("/profile")
+async def my_behavior_profile(user=Depends(get_current_user)):
+    from ai_brain.adaptive import build_user_profile
+    return await build_user_profile(user)
+
+
+@router.get("/adaptive/overview")
+async def adaptive_overview(user=Depends(require_role("admin"))):
+    from ai_brain.adaptive import adaptive_overview as ov
+    return await ov()
+
+
+@router.get("/adaptive/roles")
+async def adaptive_roles(user=Depends(require_role("admin"))):
+    from ai_brain.adaptive import role_profiles
+    return {"items": await role_profiles()}
+
+
+@router.get("/adaptive/processes")
+async def adaptive_processes(user=Depends(require_role("admin"))):
+    from ai_brain.adaptive import process_learning
+    return await process_learning()
+
+
+@router.get("/adaptive/behavior")
+async def adaptive_behavior(email: str, user=Depends(require_role("admin"))):
+    target = await db.users.find_one({"email": email.strip().lower()})
+    if not target:
+        raise HTTPException(404, f"Utilizator inexistent: {email}")
+    target["id"] = target.get("id") or str(target["_id"])
+    from ai_brain.adaptive import build_user_profile
+    return await build_user_profile(target)
 
 
 # ============================================================================

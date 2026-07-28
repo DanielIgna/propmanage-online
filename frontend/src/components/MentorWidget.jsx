@@ -15,25 +15,46 @@ const jpost = (url, body) => fetch(`${API}${url}`, {
 
 export const MentorActions = ({ actions, onNavigate }) => {
   const navigate = useNavigate();
+  const [hidden, setHidden] = useState([]);
   if (!actions?.length) return null;
+  const sendFeedback = (id, action) => {
+    jpost("/api/ai-brain/decisions/feedback", { decision_id: id, action }).catch(() => {});
+  };
+  const visible = actions.filter(a => !hidden.includes(a.id));
+  if (!visible.length) return null;
   return (
     <div className="space-y-2" data-testid="mentor-actions">
-      {actions.map(a => (
-        <button key={a.id} onClick={() => { (onNavigate || navigate)(a.cta_path); }}
-          className="w-full text-left flex items-start gap-3 rounded-2xl border border-stone-800 bg-stone-900/40 p-3 hover:border-[#d4ff3a]/50 transition-colors group"
-          data-testid={`mentor-action-${a.id}`}>
-          <span className="mt-0.5 w-6 h-6 rounded-lg bg-[#d4ff3a]/10 border border-[#d4ff3a]/30 flex items-center justify-center shrink-0">
-            <ArrowRight className="w-3 h-3 text-[#d4ff3a] group-hover:translate-x-0.5 transition-transform" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[13px] font-bold text-white">{a.title}</span>
-            <span className="block text-[11px] text-stone-400 mt-0.5">{a.reason}</span>
-          </span>
+      {visible.map(a => (
+        <div key={a.id} className="flex items-stretch gap-1">
+          <button onClick={() => { sendFeedback(a.id, "accepted"); (onNavigate || navigate)(a.cta_path); }}
+            className="flex-1 text-left flex items-start gap-3 rounded-2xl border border-stone-800 bg-stone-900/40 p-3 hover:border-[#d4ff3a]/50 transition-colors group"
+            data-testid={`mentor-action-${a.id}`}>
+            <span className="mt-0.5 w-6 h-6 rounded-lg bg-[#d4ff3a]/10 border border-[#d4ff3a]/30 flex items-center justify-center shrink-0">
+              <ArrowRight className="w-3 h-3 text-[#d4ff3a] group-hover:translate-x-0.5 transition-transform" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-bold text-white">{a.title}</span>
+              <span className="block text-[11px] text-stone-400 mt-0.5">{a.reason}</span>
+            </span>
+            {a.score != null && (
+              <span className="flex flex-col items-end gap-0.5 shrink-0">
+                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-[#d4ff3a]/10 text-[#d4ff3a] border border-[#d4ff3a]/25"
+                  data-testid={`mentor-action-score-${a.id}`}>{a.score}</span>
+                {a.confidence != null && (
+                  <span className="text-[9px] text-stone-500" data-testid={`mentor-action-confidence-${a.id}`}>
+                    încredere {a.confidence}%
+                  </span>
+                )}
+              </span>
+            )}
+          </button>
           {a.score != null && (
-            <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-[#d4ff3a]/10 text-[#d4ff3a] border border-[#d4ff3a]/25 shrink-0"
-              data-testid={`mentor-action-score-${a.id}`}>{a.score}</span>
+            <button onClick={() => { sendFeedback(a.id, "dismissed"); setHidden(h => [...h, a.id]); }}
+              title="Nu e relevant pentru mine"
+              className="px-1.5 rounded-xl text-stone-600 hover:text-rose-300 hover:bg-rose-500/10 text-xs"
+              data-testid={`mentor-action-dismiss-${a.id}`}>✕</button>
           )}
-        </button>
+        </div>
       ))}
     </div>
   );
@@ -76,6 +97,16 @@ export const MentorWidget = ({ path, onNavigate, autoGuide = false }) => {
   return (
     <div className="space-y-4" data-testid="mentor-widget">
       <MentorTips tips={data.tips} />
+      {(data.insights || []).length > 0 && (
+        <div className="space-y-1.5" data-testid="mentor-insights">
+          {data.insights.map((ins, i) => (
+            <div key={i} className="flex items-start gap-2 text-[11px] text-violet-200/90 bg-violet-500/10 border border-violet-500/25 rounded-xl px-3 py-2"
+              data-testid={`mentor-insight-${ins.kind}`}>
+              <Sparkles className="w-3.5 h-3.5 mt-0.5 shrink-0 text-violet-300" /> {ins.text}
+            </div>
+          ))}
+        </div>
+      )}
       {data.process && (
         <div className="rounded-2xl border border-sky-500/25 bg-sky-500/5 p-3" data-testid="mentor-process">
           <div className="text-[10px] font-black uppercase tracking-wider text-sky-300 mb-1.5">

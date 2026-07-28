@@ -140,7 +140,7 @@ async def resolve_context(user: dict, path: str = "", entity_id: str = None, act
 # ---------------------------------------------------------------------------
 # Navigation Context
 # ---------------------------------------------------------------------------
-async def record_navigation(user_id: str, path: str) -> dict:
+async def record_navigation(user_id: str, path: str, role: str = None) -> dict:
     now = datetime.now(timezone.utc)
     prev = await db.ai_brain_navigation.find_one({"user_id": user_id}, sort=[("ts", -1)])
     if prev and not prev.get("duration_ms"):
@@ -153,7 +153,7 @@ async def record_navigation(user_id: str, path: str) -> dict:
     segs = [s for s in path.split("?")[0].split("/") if s]
     await db.ai_brain_navigation.insert_one({
         "id": uuid.uuid4().hex, "user_id": user_id, "path": path.split("?")[0],
-        "module": segs[0] if segs else "root", "ts": now.isoformat(),
+        "module": segs[0] if segs else "root", "role": role, "ts": now.isoformat(),
     })
     return {"recorded": True}
 

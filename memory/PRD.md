@@ -4316,3 +4316,44 @@ completed→expired), tranziții GET marcate ca efecte de sistem în decizii.
 (client: decizie scor 65 cu factori Urgență 67/Pregătire 100/Risc 100, simulare
 completed→expired cu module house-health/payments/wallet, «NIMIC NU A FOST EXECUTAT»).
 **URMEAZĂ**: AIB-008 Memory Engine, AIB-009 Multi-Agent Coordination.
+
+## ✅ AIB-008 — ADAPTIVE INTELLIGENCE ENGINE (28 Iul 2026)
+**Modul nou: ai_brain/adaptive.py** — învățare continuă FĂRĂ Machine Learning, din date reale:
+- **Decision Feedback Loop**: explicit (POST /decisions/feedback: accepted/dismissed/snoozed/
+  rejected, cu time_to_action din first_seen_at) + IMPLICIT la regenerare (reconcile_snapshot):
+  decizie dispărută + proces avansat spre tranziția recomandată = «followed»; decizie văzută
+  ≥5 generări fără acțiune = «ignored» (o singură dată). Stocare: db.ai_brain_decision_feedback.
+  Snapshot decizii îmbogățit: first_seen_at, seen_count, ignored_recorded.
+- **User Behavior Learning** (build_user_profile): module frecvente + timp, modulul de start
+  obișnuit (primul modul al zilei), fluxuri bigram (X→Y), feedback urmate/ignorate per kind,
+  recomandări persistente ignorate — din ai_brain_navigation + feedback, zero infrastructură nouă.
+- **Role Learning** (role_profiles): profiluri agregate pe rol (navigație cu câmp «role» nou
+  în record_navigation, acceptance rate per rol). 
+- **Process Learning** (process_learning): blocaje frecvente (abandon_points), etape întârziate
+  (avg_hours>72), procese abandonate (stale>50%) vs eficiente (<20%), stări posibil inutile
+  (definite în cod, 0 instanțe), degradare (istoric db.ai_brain_process_stats_history scris la
+  fiecare build_processes).
+- **Adaptive Decision Score** (enrich_decisions în next_best_decisions): ajustări TRANSPARENTE
+  — ±20p după acceptance rate rol+kind (n≥3), -15p decizie văzută ≥5 ori, -25p respinsă explicit,
+  +5p proces eficient; base_score păstrat + adaptive.reasons explicite. VERIFICAT LIVE: dashboard
+  arată deja «process_start: -10p (0% urmate, n=7)» învățat din comportamentul de test.
+- **Confidence Engine** (_confidence): încredere 5-99% explicabilă = 40% calitatea datelor
+  (proces+entitate reală) + 30% istoric feedback (n/(n+5) × rate) + 30% consistența factorilor;
+  confidence_factors listați per decizie.
+- **Personal Mentor** (personal_insights, max 2, discrete): «începi de obicei cu X», «ai urmat
+  N din M recomandări», «pas frecvent omis» — în mentor_advise (câmp insights) + actions cu
+  confidence.
+- **Guardian Feedback** (product_guardian.check_adaptive_intelligence): recomandări ineficiente
+  (n≥10, acceptare<20%) + degradare procese (stagnare +15pp între snapshot-uri) — doar semnale.
+**API**: POST /api/ai-brain/decisions/feedback · GET /api/ai-brain/profile ·
+GET /api/admin/ai-brain/adaptive/{overview,roles,processes,behavior?email=}.
+**UI**: components/AdaptiveExplorer.jsx (tab nou în /admin/ai-brain) — stats urmate/ignorate/
+încredere medie/decizii urmărite, reguli recalibrate, Role Learning, Process Learning
+(blocaje/degradări/eficiente/stări inutile), profil comportamental per email.
+MentorWidget: insights violet discrete, feedback automat la click (accepted), buton ✕ dismiss,
+badge «încredere N%». DecisionExplorer: badge Încredere + panou recalibrare adaptivă +
+confidence factors.
+**TESTAT**: pytest iter164 12/12 nou + 43/43 regresie (iter160-163), guardian check ✓
+(nu semnalează sub praguri — corect), screenshot Admin ✓ (recalibrare reală vizibilă,
+profiluri pe roluri: client 823 useri top house-health, fluxuri client→marketplace ×5).
+**FAZA 1 AI BRAIN ÎNCHISĂ.** URMEAZĂ: AIB-009 Multi-Agent Collaboration, AIB-010 AI Brain v1.0.
