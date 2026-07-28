@@ -127,3 +127,15 @@
   - GET /formulas/{key}/audit — audit log
 - Frontend: EnterpriseHealthPage.jsx + EhDomainCard.jsx, route /admin/enterprise-health, menu item in AdminLayoutMetronic
 - Main agent self-test: full curl suite passed (summary, formulas, explain, PATCH+validations, rollback restores weights, audit trail); screenshots OK (overall 59 Critical, 9 alerts with actions).
+
+## Iteration 148 — CORE-001 Discovery Center + Product Intelligence Engine
+- Date: 2026-07-28
+- Backend: /app/backend/ai_brain/product_intelligence.py (new) + endpoints in routes/ai_brain.py:
+  - GET /api/admin/ai-brain/product-map?refresh= — Live Product Map (19 module canonice, completeness+BVS+priority, orphans, duplicates, consolidation roadmap)
+  - POST /api/admin/ai-brain/product-map/snapshot {label} — snapshot istoric in db.product_map_snapshots
+  - GET /api/admin/ai-brain/product-map/snapshots — list
+  - GET /api/admin/ai-brain/product-map/snapshots/compare?a=&b= — diff completeness per modul
+  - GET /api/admin/ai-brain/product-map/report — MASTER DISCOVERY REPORT markdown (+ scris in /app/docs/CORE001_MASTER_DISCOVERY_REPORT.md)
+  - All admin-only (401 unauth verified)
+- Frontend: components/DiscoveryCenter.jsx mounted in pages/admin/AIBrainPage.jsx (/admin/ai-brain), testids: discovery-center, dc-totals, dc-avg-completeness, dc-tab-{module,duplicate,orfane,roadmap,snapshots}, dc-module-{key}, dc-module-toggle-{key}, dc-refresh-btn, dc-report-btn, dc-snapshot-btn, dc-compare-btn
+- Main agent self-test: full curl E2E passed (map refresh, 2 snapshots, compare with zero deltas, report 14KB, 401 unauth); screenshots OK (modules grid + roadmap tabs)

@@ -9,6 +9,7 @@ import { DecisionExplorer } from "../../components/DecisionExplorer";
 import { AdaptiveExplorer } from "../../components/AdaptiveExplorer";
 import { CollaborationExplorer } from "../../components/CollaborationExplorer";
 import { ProductionReadiness } from "../../components/ProductionReadiness";
+import { DiscoveryCenter } from "../../components/DiscoveryCenter";
 import {
   Brain, Loader2, Play, ChevronLeft, Layers, Route as RouteIcon, FileCode,
   Puzzle, Server, Network, Users, Menu as MenuIcon, ScanEye,
@@ -235,6 +236,7 @@ export default function AIBrainPage() {
           </div>
         )}
 
+        <DiscoveryCenter />
         <ContextInspector />
         <KnowledgeExplorer />
         <ProcessExplorer />

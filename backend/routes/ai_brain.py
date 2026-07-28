@@ -413,6 +413,39 @@ async def adaptive_behavior(email: str, user=Depends(require_role("admin"))):
 
 
 # ============================================================================
+# CORE-001 · Product Intelligence — Live Product Map + snapshots + report
+# ============================================================================
+@router.get("/product-map")
+async def product_map(refresh: bool = False, user=Depends(require_role("admin"))):
+    from ai_brain.product_intelligence import get_product_map
+    return await get_product_map(refresh=refresh)
+
+
+@router.post("/product-map/snapshot")
+async def product_map_snapshot(body: dict = None, user=Depends(require_role("admin"))):
+    from ai_brain.product_intelligence import save_snapshot
+    return await save_snapshot((body or {}).get("label", ""), user.get("email", "admin"))
+
+
+@router.get("/product-map/snapshots")
+async def product_map_snapshots(user=Depends(require_role("admin"))):
+    from ai_brain.product_intelligence import list_snapshots
+    return {"items": await list_snapshots()}
+
+
+@router.get("/product-map/snapshots/compare")
+async def product_map_compare(a: str, b: str, user=Depends(require_role("admin"))):
+    from ai_brain.product_intelligence import compare_snapshots
+    return await compare_snapshots(a, b)
+
+
+@router.get("/product-map/report")
+async def product_map_report(user=Depends(require_role("admin"))):
+    from ai_brain.product_intelligence import generate_report
+    return await generate_report()
+
+
+# ============================================================================
 # AIB-002 · Context Inspector — admin analizează contextul oricărui utilizator
 # ============================================================================
 @router.get("/context/inspect")
