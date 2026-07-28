@@ -214,6 +214,25 @@ async def check_conversion(issues, metrics):
 
 
 # ============================================================================
+# 6. PROCESS HEALTH — AIB-006 · Process Intelligence (procese de business blocate)
+# ============================================================================
+async def check_process_health(issues):
+    async for p in db.ai_brain_processes.find({"kind": "business"}):
+        st = p.get("stats") or {}
+        total, stale = st.get("total", 0), st.get("stale_count", 0)
+        if total >= 10 and stale >= max(5, total * 0.5):
+            top = (st.get("abandon_points") or [{}])[0]
+            issues.append(_issue(
+                f"process_stalled_{p['id']}", "medium", "medium",
+                f"Procesul «{p['name']}» are {stale}/{total} instanțe blocate >14 zile",
+                f"Etapa cu cele mai multe abandonuri: «{top.get('state', '?')}» ({top.get('stuck', 0)} instanțe). "
+                f"Actori implicați: {', '.join(p.get('actors') or [])}.",
+                "Instanțele proceselor de business avansează în <14 zile sau ating o stare terminală.",
+                "Utilizatorii abandonează fluxul — valoare pierdută și percepție de produs blocat.",
+                "Analizează etapa problematică în AI Brain → Process Explorer și adaugă remindere/simplificare."))
+
+
+# ============================================================================
 # RUN — kernel lifecycle (identic cu Architecture Guardian) + learning 3-strikes
 # ============================================================================
 async def run_product_guardian(trigger: str = "cron") -> dict:
@@ -223,7 +242,7 @@ async def run_product_guardian(trigger: str = "cron") -> dict:
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[product-guardian] dead_links failed: {e}")
     fv, conv = {}, {}
-    for acheck in (check_role_homes, check_service_gates):
+    for acheck in (check_role_homes, check_service_gates, check_process_health):
         try:
             await acheck(issues)
         except Exception as e:  # noqa: BLE001

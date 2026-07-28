@@ -72,6 +72,28 @@ export const MentorWidget = ({ path, onNavigate, autoGuide = false }) => {
   return (
     <div className="space-y-4" data-testid="mentor-widget">
       <MentorTips tips={data.tips} />
+      {data.process && (
+        <div className="rounded-2xl border border-sky-500/25 bg-sky-500/5 p-3" data-testid="mentor-process">
+          <div className="text-[10px] font-black uppercase tracking-wider text-sky-300 mb-1.5">
+            Procesul tău activ · {data.process.name}
+          </div>
+          {data.process.current_state ? (
+            <div className="text-[12px] text-stone-200" data-testid="mentor-process-state">
+              Etapa <b className="text-white">{data.process.current_state}</b> ({(data.process.step_index ?? 0) + 1}/{data.process.total_steps})
+              {data.process.next?.length > 0 && <> · urmează <b className="text-sky-200">{data.process.next[0]}</b></>}
+              {data.process.who_acts?.length > 0 && (
+                <span className="block text-[11px] text-stone-400 mt-0.5">Acționează: {data.process.who_acts.join(", ")}</span>
+              )}
+            </div>
+          ) : (
+            <div className="text-[12px] text-stone-300" data-testid="mentor-process-state">Proces nepornit încă — vezi pașii recomandați mai jos.</div>
+          )}
+          {(data.process.blockers || []).map((b, i) => (
+            <div key={i} className="mt-1.5 text-[11px] text-rose-300 bg-rose-500/10 border border-rose-500/25 rounded-lg px-2 py-1"
+              data-testid="mentor-process-blocker">{b.text}</div>
+          ))}
+        </div>
+      )}
       {data.onboarding?.guide?.explanation && (
         <div className="rounded-2xl border border-[#d4ff3a]/25 bg-[#d4ff3a]/5 p-3" data-testid="mentor-onboarding">
           <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-[#d4ff3a] mb-2">
@@ -79,6 +101,20 @@ export const MentorWidget = ({ path, onNavigate, autoGuide = false }) => {
           </div>
           <div className="text-[12px] leading-relaxed text-stone-200 max-h-52 overflow-auto whitespace-pre-wrap">
             {String(data.onboarding.guide.explanation).replace(/##\s?/g, "▸ ").replace(/\*\*/g, "")}
+          </div>
+        </div>
+      )}
+      {data.related_modules?.length > 0 && (
+        <div data-testid="mentor-related">
+          <div className="text-[10px] font-black uppercase tracking-wider text-stone-500 mb-1.5">Module conexe (din Knowledge Graph)</div>
+          <div className="flex flex-wrap gap-1.5">
+            {data.related_modules.map(m => (
+              <button key={m.module} onClick={() => (onNavigate || ((p) => { window.location.href = p; }))(`/${m.module}`)}
+                className="text-[10px] font-bold px-2 py-1 rounded-lg bg-stone-800 text-stone-300 hover:text-white border border-stone-700 hover:border-[#d4ff3a]/40"
+                data-testid={`mentor-related-${m.module}`}>
+                {m.module}
+              </button>
+            ))}
           </div>
         </div>
       )}

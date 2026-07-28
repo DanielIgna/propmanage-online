@@ -14,7 +14,7 @@ from ai_brain import discovery, registry
 
 logger = logging.getLogger("propmanage.ai_brain")
 
-VERSION = "1.0-discovery"
+VERSION = "1.6-process-intelligence"
 
 
 def _now() -> str:
@@ -43,8 +43,23 @@ async def run_discovery(trigger: str = "cron") -> dict:
     counts["components"] = len(components["app"]) + len(components["ui"])
 
     duration_ms = round((time.monotonic() - t0) * 1000)
+    # AIB-005: reconstruiește Knowledge Graph după fiecare discovery
+    graph_meta = None
+    try:
+        from ai_brain.graph import build_graph
+        graph_meta = await build_graph()
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[ai-brain] graph build failed: {e}")
+    # AIB-006: reconstruiește Process Registry (după graf — adaugă noduri process:proc_*)
+    proc_meta = None
+    try:
+        from ai_brain.process import build_processes
+        proc_meta = await build_processes(run_id)
+        counts["processes"] = proc_meta["total"]
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[ai-brain] process build failed: {e}")
     run = {"id": run_id, "ts": _now(), "trigger": trigger,
-           "duration_ms": duration_ms, "counts": counts}
+           "duration_ms": duration_ms, "counts": counts, "graph": graph_meta, "processes": proc_meta}
     await db.ai_brain_runs.insert_one({**run})
 
     from orchestrator.engine import write_ledger
@@ -69,9 +84,11 @@ async def ai_brain_status() -> dict:
     return {
         "status": "active" if last_run else "never_ran",
         "version": VERSION,
-        "capabilities": ["discovery", "knowledge_registry"],
+        "capabilities": ["discovery", "knowledge_registry", "context", "explainability",
+                         "mentor", "knowledge_graph", "process_intelligence"],
         "last_run": last_run,
-        "registry": await registry.counts(),
+        "registry": {**await registry.counts(),
+                     "processes": await db.ai_brain_processes.count_documents({})},
         "guardians": {
             "architecture_score": (arch or {}).get("architecture_score"),
             "product_score": (prod or {}).get("product_score"),

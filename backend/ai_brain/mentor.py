@@ -150,6 +150,20 @@ async def mentor_advise(user: dict, path: str, replay: bool = False, include_gui
     if include_guide and show_onboarding:
         from ai_brain.explain import explain_page
         guide = await explain_page(user, path)
+    # AIB-005 · Cross Navigation: module conexe din Knowledge Graph
+    related = []
+    try:
+        from ai_brain.graph import related_modules
+        related = await related_modules(module, limit=4)
+    except Exception:  # noqa: BLE001
+        pass
+    # AIB-006 · Process Intelligence: procesul activ real al utilizatorului
+    process = None
+    try:
+        from ai_brain.process import mentor_summary
+        process = await mentor_summary(user, path)
+    except Exception:  # noqa: BLE001
+        pass
     return {
         "role": ctx["user"]["role"],
         "module": module,
@@ -157,6 +171,8 @@ async def mentor_advise(user: dict, path: str, replay: bool = False, include_gui
         "onboarding": {"show": show_onboarding, "guide": guide},
         "actions": await next_best_actions(user),
         "tips": await contextual_tips(user, path),
+        "related_modules": related,
+        "process": process,
         "generated_at": _now(),
     }
 

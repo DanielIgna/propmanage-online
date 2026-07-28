@@ -131,6 +131,99 @@ async def mentor_empty_state(payload: dict = Body(...), user=Depends(get_current
 
 
 # ============================================================================
+# AIB-005 · Knowledge Intelligence Engine
+# ============================================================================
+@user_router.post("/explain/relationship")
+async def explain_relationship(payload: dict = Body(...), user=Depends(get_current_user)):
+    from ai_brain import graph
+    question = (payload.get("question") or "").strip()
+    if len(question) < 3:
+        raise HTTPException(400, "question e obligatoriu")
+    return await graph.explain_relationship(user, question)
+
+
+@router.post("/graph/build")
+async def graph_build(user=Depends(require_role("admin"))):
+    from ai_brain import graph
+    return await graph.build_graph()
+
+
+@router.get("/graph/overview")
+async def graph_overview(user=Depends(require_role("admin"))):
+    from ai_brain import graph
+    return await graph.overview()
+
+
+@router.get("/graph/search")
+async def graph_search(q: str = "", kind: str = "", user=Depends(require_role("admin"))):
+    from ai_brain import graph
+    return {"items": await graph.search_nodes(q=q, kind=kind)}
+
+
+@router.get("/graph/node")
+async def graph_node(id: str, user=Depends(require_role("admin"))):
+    from ai_brain import graph
+    d = await graph.node_detail(id)
+    if not d["node"]:
+        raise HTTPException(404, "Nod inexistent")
+    return d
+
+
+@router.get("/graph/impact")
+async def graph_impact(id: str, user=Depends(require_role("admin"))):
+    from ai_brain import graph
+    return await graph.impact(id)
+
+
+@router.get("/graph/modules/{module}/related")
+async def graph_related_modules(module: str, user=Depends(require_role("admin"))):
+    from ai_brain import graph
+    return {"module": module, "related": await graph.related_modules(module, exclude_hubs=False)}
+
+
+# ============================================================================
+# AIB-006 · Process Intelligence Engine
+# ============================================================================
+@router.post("/processes/build")
+async def processes_build(user=Depends(require_role("admin"))):
+    from ai_brain.process import build_processes
+    return await build_processes(run_id=f"manual:{user.get('email')}")
+
+
+@router.get("/processes")
+async def processes_list(kind: str = "", user=Depends(require_role("admin"))):
+    from ai_brain.process import list_processes
+    return {"items": await list_processes(kind=kind)}
+
+
+@router.get("/processes/{pid}")
+async def process_detail(pid: str, user=Depends(require_role("admin"))):
+    from ai_brain.process import get_process
+    p = await get_process(pid)
+    if not p:
+        raise HTTPException(404, "Proces inexistent")
+    return p
+
+
+@router.get("/processes/{pid}/state")
+async def process_state_inspect(pid: str, email: str, entity_id: str = None,
+                                user=Depends(require_role("admin"))):
+    target = await db.users.find_one({"email": email.strip().lower()})
+    if not target:
+        raise HTTPException(404, f"Utilizator inexistent: {email}")
+    target["id"] = target.get("id") or str(target["_id"])
+    from ai_brain.process import process_state
+    return await process_state(target, process_id=pid, entity_id=entity_id)
+
+
+@user_router.get("/process/state")
+async def my_process_state(path: str = "", process_id: str = None, entity_id: str = None,
+                           user=Depends(get_current_user)):
+    from ai_brain.process import process_state
+    return await process_state(user, process_id=process_id, entity_id=entity_id, path=path)
+
+
+# ============================================================================
 # AIB-002 · Context Inspector — admin analizează contextul oricărui utilizator
 # ============================================================================
 @router.get("/context/inspect")

@@ -189,28 +189,60 @@ async def explain_component(user: dict, path: str, component_ref: str) -> dict:
     return {"explanation": text, "cached": False, "found_in": found_in, "model": res.get("model")}
 
 
+def _process_fallback(pstate: dict, trail: list, path: str) -> str:
+    if not (pstate and pstate.get("found")):
+        return ("## Pașii parcurși\n" + ("\n".join(f"- {t}" for t in reversed(trail)) if trail else "- (început)")
+                + f"\n\n## Pasul curent\n- {path}")
+    parts = [f"## În ce proces te afli\nProcesul **{pstate['process']['name']}**"
+             + (f" — {pstate['entity']['label']}." if pstate.get("entity") else " (nepornit încă).")]
+    if pstate.get("current_state"):
+        parts.append(f"## Etapa curentă\n**{pstate['current_state']}** "
+                     f"(pasul {pstate['step_index'] + 1}/{pstate['total_steps']})")
+    if pstate.get("completed_steps"):
+        parts.append("## Pași finalizați\n" + "\n".join(f"- {s}" for s in pstate["completed_steps"]))
+    if pstate.get("next_actions"):
+        parts.append("## Ce urmează\n" + "\n".join(
+            f"- «{t['to']}» — acționează: {t['actor']}" for t in pstate["next_actions"][:3]))
+    if pstate.get("blockers"):
+        parts.append("## Blocaje\n" + "\n".join(f"- {b['text']}" for b in pstate["blockers"]))
+    return "\n\n".join(parts)
+
+
 async def explain_process(user: dict, path: str) -> dict:
     ctx, grounding, anatomy = await _grounding(user, path)
+    # AIB-006: ancorare pe starea REALĂ a procesului (Process Intelligence Engine)
+    pstate = None
+    try:
+        from ai_brain.process import process_state
+        pstate = await process_state(user, path=path)
+    except Exception:  # noqa: BLE001
+        pstate = None
+    pkey = ""
+    if pstate and pstate.get("found"):
+        pkey = (f"{pstate['process']['id']}|{pstate.get('current_state')}|"
+                f"{(pstate.get('entity') or {}).get('id')}|{len(pstate.get('blockers') or [])}")
     key = hashlib.sha1(
-        f"process|{path}|{ctx['user']['role']}|{'>'.join(grounding['navigation_trail'][:5])}".encode()).hexdigest()
+        f"process|{path}|{ctx['user']['role']}|{pkey}|{'>'.join(grounding['navigation_trail'][:5])}".encode()).hexdigest()
     cached = await _cached(key)
     if cached:
         return {"explanation": cached["text"], "cached": True,
-                "trail": grounding["navigation_trail"]}
+                "trail": grounding["navigation_trail"], "process_state": pstate}
 
     from ai_core.provider import call_llm
     user_msg = (
-        "Explică procesul în care se află utilizatorul. Structură (Markdown, română):\n"
-        "## În ce proces te afli\n## Pașii parcurși până acum (din navigation_trail)\n"
-        "## Pasul curent\n## Pașii următori (doar din outgoing_links + available_actions)\n\n"
-        f"DATE REALE:\n{grounding}"
+        "Explică procesul de business în care se află utilizatorul, pe baza stării REALE "
+        "din Process Intelligence Engine. Structură (Markdown, română):\n"
+        "## În ce proces te afli\n## Etapa curentă și pașii finalizați\n"
+        "## Ce urmează și cine trebuie să acționeze (din next_actions/who_acts)\n"
+        "## Blocaje și cum le rezolvi (DOAR din blockers — dacă lista e goală, spune explicit că nu există blocaje)\n\n"
+        f"STAREA REALĂ A PROCESULUI:\n{pstate}\n\n"
+        f"CONTEXT NAVIGARE (trail):\n{grounding['navigation_trail']}"
     )
     res = await call_llm(SYSTEM_PROMPT, user_msg, session_id=f"explain-{key[:12]}")
     if res.get("error") or not res.get("text"):
-        trail = grounding["navigation_trail"]
-        text = ("## Pașii parcurși\n" + ("\n".join(f"- {t}" for t in reversed(trail)) if trail else "- (început)")
-                + f"\n\n## Pasul curent\n- {path}")
-        return {"explanation": text, "cached": False, "model": "fallback", "trail": trail}
+        return {"explanation": _process_fallback(pstate, grounding["navigation_trail"], path),
+                "cached": False, "model": "fallback",
+                "trail": grounding["navigation_trail"], "process_state": pstate}
     await _store(key, "process", path, ctx["user"]["role"], res["text"], res.get("model", ""))
     return {"explanation": res["text"], "cached": False, "model": res.get("model"),
-            "trail": grounding["navigation_trail"]}
+            "trail": grounding["navigation_trail"], "process_state": pstate}

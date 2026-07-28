@@ -4226,3 +4226,55 @@ auto-open O DATĂ la primul acces într-un modul nou (sessionStorage check + onb
 roluri, onboarding once+replay, ghid din cache AIB-003, stuck detection, empty state, 401,
 400) + 30/30 regresie (iter157-159), build ✓, screenshot E2E ✓ (client: tip long_dwell +
 acțiuni «Încarcă documentele» — exact starea lui reală: 0 documente în cartea casei).
+
+---
+
+## ✅ AIB-005 — KNOWLEDGE INTELLIGENCE ENGINE (28 Iul 2026)
+**Modul nou: ai_brain/graph.py** — Knowledge Graph construit AUTOMAT din Discovery/Registry
+(zero relații hardcodate). Noduri: module/route/component/api/service/role/entity/process/signal.
+Muchii din codul real: renders, in_module, links_to, calls, requires_role, defined_in, touches,
+triggers. Motoare: Dependency (node_detail), Impact (BFS invers), Cross Navigation
+(related_modules ponderat), Explain Relationships (LLM ancorat exclusiv pe graf + cache).
+Graful se reconstruiește la fiecare discovery. **API**: /api/admin/ai-brain/graph/{build,
+overview,search,node,impact,modules/{m}/related} + POST /api/ai-brain/explain/relationship.
+**UI**: components/KnowledgeExplorer.jsx (tab în /admin/ai-brain) — căutare → ego-graf SVG
+clicabil + dependențe + impact + Q&A relații. Mentor: related_modules în răspuns + widget.
+**TESTAT**: pytest iter161 (18/18 cu iter160), build ✓, screenshot ✓.
+
+## ✅ AIB-006 — PROCESS INTELLIGENCE ENGINE (28 Iul 2026)
+**Modul nou: ai_brain/process.py** — AI Brain înțelege LOGICA OPERAȚIONALĂ a platformei:
+- **Process Discovery**: mașini de stări extrase AUTOMAT din routes/*.py (insert/update cu
+  «status», precondiții din filtre/verificări, actori din guard-uri require_role/
+  get_current_user) + playbook-uri orchestrator (procese automate). Zero liste hardcodate.
+  42 procese: 17 business, 11 interne, 14 automate; 87 stări, 98 tranziții, 7 actori.
+- **Process Registry** (db.ai_brain_processes): nume, scop (docstring fișier), actori,
+  entitate, stări, pași ORDONAȚI (sortare topologică Kahn pe muchii explicite + rafinare
+  empirică pe offset-urile «{stare}_at» din documente reale), tranziții cu endpoint+actor,
+  stări terminale (heuristică anti-simulări-admin), relații între procese (references din
+  câmpuri <entitate>_id reale + co_writes din endpoint-uri care scriu în 2+ colecții).
+- **Process State Engine**: procesul activ per utilizator (după modul+recență), etapa
+  curentă, pași done/current/pending (dovezi reale: timestamp «{stare}_at» pe document),
+  next_actions (tranziții aplicabile, non-admin preferate), who_acts.
+- **Blocker Detection**: waiting_on_actor, actor_unassigned, expired (deadline/expires),
+  stalled (>7 zile fără activitate), needs_approval, upstream_missing (dependență nepornită).
+- **Process Timeline**: cronologie din câmpurile *_at ale entității + activity_events
+  (event bus) cu actori; durate medii per etapă în stats.
+- **Statistici**: total/active/by_status/stale_count (>14 zile non-terminal)/abandon_points/
+  avg_hours_from_start — per proces.
+**Integrare (fără infrastructură paralelă)**: core.run_discovery → build_processes (după
+graf); graf: noduri process:proc_* + muchii manages/involves/in_module/flows_to/co_writes;
+mentor_advise → secțiunea «process» (stare compactă + blocaje, determinist); explain_process
+→ ancorat pe starea REALĂ a procesului (cache pe stare+entitate+blocaje) cu fallback
+determinist; Product Guardian → check_process_health (instanțe blocate >14 zile → issue).
+**API**: POST /api/admin/ai-brain/processes/build · GET /processes[?kind] · GET /processes/{pid}
+· GET /processes/{pid}/state?email= (inspecție admin) · GET /api/ai-brain/process/state
+(utilizator, ?path/process_id/entity_id).
+**UI**: components/ProcessExplorer.jsx (tab nou în /admin/ai-brain) — listă procese pe
+kind cu instanțe+blocaje, detaliu: flux etape, tranziții (from→to·actor·endpoint), relații,
+statistici, puncte de abandon, Process State Engine live per email. MentorWidget: card
+«Procesul tău activ» cu etapă/urmează/cine acționează/blocaje.
+**TESTAT**: pytest iter162 13/13 nou + 18/18 regresie (iter160-161), guardian check ✓
+(4 procese cu date demo vechi semnalate corect), discovery E2E ✓, screenshot Admin ✓
+(flux requests: open→assigned→completed→confirmed→won; client real blocat în «assigned»,
+blocker «acționează specialistul»).
+**URMEAZĂ**: AIB-007 Recommendation Engine (pe baza proceselor reale), AIB-008 Memory.

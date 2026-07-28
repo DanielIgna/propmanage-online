@@ -3,6 +3,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { KnowledgeExplorer } from "../../components/KnowledgeExplorer";
+import { ProcessExplorer } from "../../components/ProcessExplorer";
 import {
   Brain, Loader2, Play, ChevronLeft, Layers, Route as RouteIcon, FileCode,
   Puzzle, Server, Network, Users, Menu as MenuIcon, ScanEye,
@@ -230,6 +232,8 @@ export default function AIBrainPage() {
         )}
 
         <ContextInspector />
+        <KnowledgeExplorer />
+        <ProcessExplorer />
       </div>
     </div>
   );
