@@ -21,7 +21,6 @@ import { CookieBanner } from "./components/CookieBanner";
 import { BetaFeedbackWidget } from "./components/BetaFeedbackWidget";
 import { AssistantDock } from "./components/AssistantDock";
 import { ThemeToggle } from "./pages/DashShared";
-const ClientDashboard = lazy(() => import("./pages/Dashboards").then(m => ({ default: m.ClientDashboard })));
 const SpecialistDashboard = lazy(() => import("./pages/Dashboards").then(m => ({ default: m.SpecialistDashboard })));
 const AdminDashboard = lazy(() => import("./pages/Dashboards").then(m => ({ default: m.AdminDashboard })));
 const OperatorDashboard = lazy(() => import("./pages/Dashboards").then(m => ({ default: m.OperatorDashboard })));
@@ -147,8 +146,7 @@ const AdminAccountsPage = lazy(() => import("./pages/admin/AdminAccountsPage"));
 const DemoActivityPage = lazy(() => import("./pages/admin/DemoActivityPage"));
 const PartnerDashboard = lazy(() => import("./pages/partner/PartnerDashboard"));
 const ClientJuniorDashboard = lazy(() => import("./pages/dashboard/ClientJuniorDashboard"));
-const ClientV2Wireframe = lazy(() => import("./pages/dashboard/ClientV2Wireframe"));
-const ClientDashboardSwitch = lazy(() => import("./pages/clientv2/ClientDashboardSwitch"));
+const ClientDashboardV2 = lazy(() => import("./pages/clientv2/ClientDashboardV2"));
 const AdministratorWorkspace = lazy(() => import("./pages/AdministratorWorkspace"));
 const ContractPage = lazy(() => import("./pages/ContractPage"));
 const PreturiIndex = lazy(() => import("./pages/PreturiIndex"));
@@ -1688,7 +1686,6 @@ function App() {
               <Route path="/partner/dashboard" element={<PartnerDashboard />} />
               <Route path="/dashboard/client-junior" element={<ClientJuniorDashboard />} />
               <Route path="/incepe" element={<ClientJuniorDashboard />} />
-              <Route path="/dashboard/client-v2" element={<ClientV2Wireframe />} />
               <Route path="/legal/sign" element={<LegalSignPage />} />
               <Route path="/contracts/:id" element={<ContractPage />} />
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />
@@ -1701,7 +1698,7 @@ function App() {
               <Route path="/ghiduri/:slug" element={<GhidPage />} />
               <Route path="/help/:token" element={<HelpPage />} />
               <Route path="/specialists/:id" element={<SpecialistProfile />} />
-              <Route path="/client" element={<ClientDashboardSwitch />} />
+              <Route path="/client" element={<ClientDashboardV2 />} />
               <Route path="/administrator" element={<AdministratorWorkspace />} />
               <Route path="/specialist" element={<SpecialistDashboard />} />
               <Route path="/admin" element={<AdminDashboard />} />

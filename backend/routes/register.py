@@ -87,7 +87,6 @@ from routes.operating_manual import router as operating_manual_router
 from routes.knowledge_center import router as knowledge_center_router
 from routes.experience_tiers import router as experience_tiers_router, self_router as experience_tiers_self_router
 from routes.feature_configurator import router as feature_configurator_router, self_router as feature_configurator_self_router
-from routes.twin_orchestrator import router as twin_orchestrator_router
 from routes.specialist_progression import router_admin as sp_admin_router, router_public as sp_public_router
 from routes.reviews_v2 import router as reviews_v2_router
 from routes.marketplace_offers import router as marketplace_offers_router
@@ -251,7 +250,6 @@ ALL_ROUTERS = (
     experience_tiers_self_router,
     feature_configurator_router,
     feature_configurator_self_router,
-    twin_orchestrator_router,
     sp_admin_router,
     sp_public_router,
     reviews_v2_router,
