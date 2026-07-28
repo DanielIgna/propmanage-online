@@ -109,6 +109,28 @@ async def explain_process(payload: dict = Body(...), user=Depends(get_current_us
 
 
 # ============================================================================
+# AIB-004 · AI Mentor — copilot contextual per rol
+# ============================================================================
+@user_router.get("/mentor")
+async def mentor(path: str, replay: bool = False, include_guide: bool = False,
+                 user=Depends(get_current_user)):
+    from ai_brain import mentor as mentor_svc
+    if not path.startswith("/"):
+        raise HTTPException(400, "path invalid")
+    return await mentor_svc.mentor_advise(user, path, replay=replay, include_guide=include_guide)
+
+
+@user_router.post("/mentor/empty-state")
+async def mentor_empty_state(payload: dict = Body(...), user=Depends(get_current_user)):
+    from ai_brain import mentor as mentor_svc
+    path = (payload.get("path") or "").strip()
+    resource = (payload.get("resource") or "").strip()
+    if not path.startswith("/") or not resource:
+        raise HTTPException(400, "path și resource sunt obligatorii")
+    return await mentor_svc.empty_state(user, path, resource)
+
+
+# ============================================================================
 # AIB-002 · Context Inspector — admin analizează contextul oricărui utilizator
 # ============================================================================
 @router.get("/context/inspect")

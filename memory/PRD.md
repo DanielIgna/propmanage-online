@@ -4200,3 +4200,29 @@ panel lateral cu tabs Pagina/Procesul; admin în plus: input «Explică o compon
 rol, component grounding pe fișier real, process cu trail, 401, 400) + 23/23 regresie
 (iter157-158), build ✓, screenshot E2E client ✓ (panel cu explicație reală a secțiunilor
 v2-header/v2-bell/v2-bottom-nav, «instant (cache) · ancorat pe ClientDashboardV2»).
+
+---
+
+## ✅ AIB-004 — AI MENTOR · COPILOT CONTEXTUAL (28 Iul 2026)
+**Modul nou: ai_brain/mentor.py** — punct unic de interacțiune inteligentă, per rol:
+- **Next Best Action** (max 3): reguli DETERMINISTE pe starea reală din DB — client:
+  fără proprietate→adaugă / fără twin→activează Digital Twin / fără documente→încarcă /
+  fără cereri→prima cerere / altfel→House Health; specialist: profil incomplet /
+  cereri disponibile / obține Verificat; admin: task-uri Guardian deschise / emailuri
+  blocate / AI Brain. Acțiuni 100% reale cu cta_path existent.
+- **Onboarding inteligent**: o dată per (user, modul) — db.ai_brain_mentor_seen;
+  reluabil cu replay=true; ghidul REUTILIZEAZĂ explain_page (AIB-003, inclusiv cache-ul).
+- **Contextual Tips** (discret): stuck_loop (≥4 reveniri pe aceeași pagină în 30 min),
+  long_dwell (>5 min pe o pagină) — din Navigation Context real.
+- **Smart Empty States**: POST /mentor/empty-state {resource} → de ce e gol + pasul
+  următor + CTA real (properties/requests/documents/twins/offers/leads).
+**API**: GET /api/ai-brain/mentor?path&replay&include_guide, POST /mentor/empty-state.
+**UI**: components/MentorWidget.jsx REUTILIZABIL (exportă MentorWidget, MentorActions,
+MentorTips, SmartEmptyState — utilizabile în orice modul). Panelul global ExplainThis a
+devenit «✨ AI Mentor»: tab implicit Mentor (recomandări+tips+ghid), tabs Pagina/Procesul,
+auto-open O DATĂ la primul acces într-un modul nou (sessionStorage check + onboarding.show).
+**Fără** (conform sprintului): KG, predicții, auto-execuție, memorie long-term.
+**TESTAT**: pytest 8/8 nou (iter160: acțiuni reale per rol, role-aware fără scurgeri între
+roluri, onboarding once+replay, ghid din cache AIB-003, stuck detection, empty state, 401,
+400) + 30/30 regresie (iter157-159), build ✓, screenshot E2E ✓ (client: tip long_dwell +
+acțiuni «Încarcă documentele» — exact starea lui reală: 0 documente în cartea casei).
