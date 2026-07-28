@@ -193,6 +193,36 @@ async def handle_webhook_fail(payload: dict) -> dict:
     steps_log = []
 
     if source == "resend_email" and payload.get("to"):
+        from orchestrator.engine import is_permanent_error, escalate_once
+        err = payload.get("error") or ""
+        if is_permanent_error(err):
+            # LEARNING: eroare PERMANENTĂ de config detectată la prima trimitere —
+            # nu programa niciun retry inutil, blochează direct și escaladează agregat.
+            await db.orchestrator_retry_queue.insert_one({
+                "id": uuid.uuid4().hex,
+                "kind": "email",
+                "payload": {"to": payload.get("to"), "subject": payload.get("subject"), "html": payload.get("html")},
+                "attempts": 0,
+                "max_attempts": 3,
+                "status": "blocked_by_config",
+                "last_detail": err,
+                "created_at": _now(),
+                "test": bool(payload.get("test")),
+            })
+            await escalate_once(
+                "email_blocked_by_config",
+                "🚨 Emailuri blocate de configurația Resend",
+                f"Livrarea emailurilor eșuează cu eroare PERMANENTĂ de configurare: {err[:140]}. "
+                "Verifică domeniul în Resend, apoi rulează «Reia emailurile blocate» din Orchestrator.",
+            )
+            steps_log.append({
+                "action": "block_permanent_error", "ok": True,
+                "detail": (
+                    f"Eroare permanentă de config la prima trimitere — retry sărit complet, "
+                    f"email păstrat recuperabil: {err[:120]}"
+                ),
+            })
+            return {"steps": steps_log, "outcome": "blocked_config", "minutes_saved": 5, "escalate": False}
         await db.orchestrator_retry_queue.insert_one({
             "id": uuid.uuid4().hex,
             "kind": "email",

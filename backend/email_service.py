@@ -140,7 +140,7 @@ async def send_email(to: str | List[str], subject: str, html: str, plain: Option
             if not _from_retry and not attachments:
                 try:
                     from orchestrator.engine import emit_signal
-                    await emit_signal("webhook_fail", {"source": "resend_email", "to": recipients, "subject": subject, "html": html})
+                    await emit_signal("webhook_fail", {"source": "resend_email", "to": recipients, "subject": subject, "html": html, "error": str(e)[:200]})
                 except Exception:  # noqa: BLE001
                     pass
             return {"ok": False, "provider": "resend", "error": str(e)}

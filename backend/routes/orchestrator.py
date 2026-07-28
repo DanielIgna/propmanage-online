@@ -59,6 +59,7 @@ async def get_overview(user=Depends(require_role("admin"))):
         "total_minutes_saved": (total_agg[0]["minutes"] if total_agg else 0),
         "total_actions": (total_agg[0]["count"] if total_agg else 0),
         "retry_pending": await db.orchestrator_retry_queue.count_documents({"status": "pending"}),
+        "retry_blocked_config": await db.orchestrator_retry_queue.count_documents({"status": "blocked_by_config"}),
         "playbooks": playbooks,
     }
 
@@ -125,6 +126,33 @@ async def simulate_signal(kind: str, user=Depends(require_role("admin"))):
 @router.post("/retry-tick")
 async def force_retry_tick(user=Depends(require_role("admin"))):
     return await orchestrator_retry_tick()
+
+
+@router.post("/retry-queue/resume-blocked")
+async def resume_blocked_emails(user=Depends(require_role("admin"))):
+    """După repararea configurației (ex. domeniu Resend verificat), repune emailurile
+    blocked_by_config în coadă și rulează imediat un tick."""
+    from orchestrator.engine import write_ledger
+    res = await db.orchestrator_retry_queue.update_many(
+        {"status": "blocked_by_config"},
+        {"$set": {"status": "pending", "attempts": 0,
+                  "next_retry_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    resumed = res.modified_count
+    tick = await orchestrator_retry_tick() if resumed else None
+    await write_ledger({
+        "signal_kind": "webhook_fail",
+        "playbook_id": "webhook_retry_guardian",
+        "playbook_name": "Webhook Retry Guardian",
+        "steps": [{"action": "resume_blocked_emails", "ok": True,
+                   "detail": f"{resumed} emailuri blocate de config repuse în coadă de {user.get('email')}"
+                             + (f" — tick imediat: {tick['sent']} trimise, {tick['blocked_config']} re-blocate" if tick else "")}],
+        "outcome": "auto_resolved" if (tick and tick.get("sent")) else "monitored",
+        "minutes_saved": 5 * resumed,
+        "escalated": False,
+        "test": False,
+    })
+    return {"resumed": resumed, "tick": tick}
 
 
 # ============================================================================

@@ -15,6 +15,8 @@ const ax = axios.create({ baseURL: API, withCredentials: true });
 const OUTCOME_META = {
   auto_resolved: { label: "Auto-rezolvat", color: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
   retry_scheduled: { label: "Retry programat", color: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30" },
+  blocked_config: { label: "Blocat de config (fără retry)", color: "bg-orange-500/15 text-orange-300 border-orange-500/30" },
+  failed_suppressed: { label: "Eșuat (escaladare suprimată)", color: "bg-rose-500/15 text-rose-300 border-rose-500/30" },
   monitored: { label: "Monitorizat", color: "bg-sky-500/15 text-sky-300 border-sky-500/30" },
   escalated: { label: "Escaladat la om", color: "bg-rose-500/15 text-rose-300 border-rose-500/30" },
   error: { label: "Eroare playbook", color: "bg-red-500/15 text-red-300 border-red-500/30" },
@@ -318,6 +320,16 @@ export default function AutonomyOrchestratorPage() {
                 <span className="text-[10px] px-2 py-0.5 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30" data-testid="orch-retry-pending">
                   {overview.retry_pending} retry în coadă
                 </span>
+              )}
+              {overview.retry_blocked_config > 0 && (
+                <>
+                  <span className="text-[10px] px-2 py-0.5 rounded-lg bg-orange-500/15 text-orange-300 border border-orange-500/30" data-testid="orch-retry-blocked">
+                    {overview.retry_blocked_config} emailuri blocate de config
+                  </span>
+                  <button onClick={resumeBlocked} className="text-[10px] px-2 py-0.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-medium" data-testid="orch-resume-blocked">
+                    Reia emailurile blocate
+                  </button>
+                </>
               )}
             </div>
             {ledger.length === 0 ? (

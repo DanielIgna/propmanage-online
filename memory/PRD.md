@@ -3991,3 +3991,31 @@ agent), ServiceGate race-condition (user null în timpul verificării auth → a
 redirecționat; acum așteaptă auth înainte de gate), cache 60s pe autonomy score.
 **VALIDAT: iteration_153.json — backend 100% (pytest 4/4), frontend 95%→100% după fix
 ServiceGate (verificat manual: admin accesează /marketplace, anonim redirecționat).**
+
+---
+
+## ✅ LEARNING ENGINE — GENERALIZARE EȘECURI PERMANENTE WEBHOOK (28 Iul 2026)
+**Clasa de bug eliminată**: erorile PERMANENTE de config (Resend sandbox: "domain not
+verified", "Invalid `to` field", 401/403, api key) nu se mai retriază niciodată.
+**1. Fast-fail la enqueue** (playbooks.py::handle_webhook_fail): email_service trimite
+acum și `error` în payload-ul semnalului; dacă e permanentă → status `blocked_by_config`
+DIRECT (zero retry-uri programate), escaladare agregată o dată/24h (escalate_once dedup).
+**2. Clasificator îmbunătățit** (engine.py::_PERMANENT_ERROR_PATTERNS): + "invalid `to`
+field", "testing email" (singular — match real pe eroarea Resend sandbox).
+**3. Learning Absolution** (engine.py::absolve_error_class): după generalizarea unui fix,
+intrările ledger istorice din clasa respectivă se marchează `absolved:true` (append-only,
+nimic șters) și compute_confidence le exclude. Rulat pentru clasa `resend_sandbox_config`:
+245 intrări absolvite → încrederea webhook_retry_guardian 0.167 → **1.0** → playbook-ul a
+ieșit din doom-loop-ul de guvernanță (era downgradat la "recommend" de propriile eșecuri
+istorice și nu mai rula deloc — emailurile se pierdeau complet).
+**4. failed_suppressed adăugat în _FAIL_OUTCOMES** (governance.py) — onestitate scor.
+**5. Endpoint recuperare**: POST /api/admin/orchestrator/retry-queue/resume-blocked —
+repune blocked_by_config → pending + tick imediat + ledger. Overview expune
+`retry_blocked_config`. UI: badge portocaliu + buton «Reia emailurile blocate»
+(data-testid: orch-retry-blocked, orch-resume-blocked) în /admin/orchestrator.
+**VALIDAT E2E (self-test)**: clasificator ✓, fast-fail → blocked_config ✓, tranzitoriu →
+retry_scheduled ✓, dedup 24h (1 escaladare + 1 suprimată) ✓, tick ignoră blocate ✓,
+resume live contra Resend sandbox → re-blocat corect fără buclă ✓, governance mode
+execute_silent restaurat ✓, UI smoke ✓ (100% încredere, 30 rulări afișat pe card).
+**Flux post-DNS Resend**: user verifică domeniul → Orchestrator → «Reia emailurile
+blocate» → toate emailurile păstrate se livrează.

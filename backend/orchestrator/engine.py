@@ -243,10 +243,76 @@ async def emit_signal(kind: str, payload: dict = None) -> dict:
 
 
 # ============================================================================
+# LEARNING: clasificare erori permanente + deduplicare escaladări (24h)
+# Root cause generalizat: erorile de CONFIGURAȚIE nu se rezolvă prin retry.
+# ============================================================================
+_PERMANENT_ERROR_PATTERNS = (
+    "not verified", "domain is not verified", "api key", "unauthorized",
+    "forbidden", "invalid from", "invalid sender", "testing email",
+    "verify a domain", "account is not activated", "invalid `to` field",
+)
+
+
+def is_permanent_error(detail: str) -> bool:
+    d = (detail or "").lower()
+    return any(p in d for p in _PERMANENT_ERROR_PATTERNS)
+
+
+async def absolve_error_class(playbook_id: str, error_class: str, match_query: dict, reason: str) -> int:
+    """LEARNING: după generalizarea unui fix pentru o clasă de erori, intrările istorice
+    din acea clasă nu mai penalizează scorul de încredere al playbook-ului.
+    Ledger-ul rămâne append-only — doar se marchează absolved, nu se șterge nimic."""
+    res = await db.orchestrator_ledger.update_many(
+        {"playbook_id": playbook_id, "absolved": {"$ne": True}, **match_query},
+        {"$set": {"absolved": True, "absolved_at": _now(), "absolved_class": error_class}},
+    )
+    if res.modified_count:
+        await write_ledger({
+            "signal_kind": "learning",
+            "playbook_id": playbook_id,
+            "playbook_name": "Learning Engine",
+            "steps": [{"action": "learning_absolution", "ok": True,
+                       "detail": f"Clasa de erori '{error_class}' generalizată și fixată — "
+                                 f"{res.modified_count} intrări istorice absolvite din calculul încrederii. Motiv: {reason}"}],
+            "outcome": "auto_resolved",
+            "minutes_saved": 0,
+            "escalated": False,
+            "test": False,
+        })
+        logger.info(f"[learning] absolved {res.modified_count} entries for class '{error_class}' ({playbook_id})")
+    return res.modified_count
+
+
+async def escalate_once(dedup_key: str, title: str, message: str, window_hours: int = 24) -> bool:
+    """Escaladează o clasă de probleme O SINGURĂ DATĂ pe fereastră; restul doar se numără.
+
+    Returnează True dacă escaladarea a fost trimisă acum (prima din fereastră).
+    """
+    now = datetime.now(timezone.utc)
+    window_start = (now - timedelta(hours=window_hours)).isoformat()
+    doc = await db.orchestrator_escalation_dedup.find_one({"key": dedup_key})
+    if doc and (doc.get("last_escalated_at") or "") >= window_start:
+        await db.orchestrator_escalation_dedup.update_one(
+            {"key": dedup_key}, {"$inc": {"suppressed_count": 1}, "$set": {"last_seen_at": _now()}})
+        return False
+    await db.orchestrator_escalation_dedup.update_one(
+        {"key": dedup_key},
+        {"$set": {"last_escalated_at": _now(), "last_seen_at": _now(), "title": title},
+         "$setOnInsert": {"first_seen_at": _now()}, "$inc": {"escalation_count": 1}},
+        upsert=True)
+    suppressed = (doc or {}).get("suppressed_count") or 0
+    suffix = f" (+{suppressed} apariții similare suprimate în ultimele {window_hours}h)" if suppressed else ""
+    await notify_admins(title, message + suffix)
+    if suppressed:
+        await db.orchestrator_escalation_dedup.update_one({"key": dedup_key}, {"$set": {"suppressed_count": 0}})
+    return True
+
+
+# ============================================================================
 # RETRY QUEUE (Webhook Retry Guardian executor) — cron tick every 5 min
 # ============================================================================
 async def orchestrator_retry_tick() -> dict:
-    out = {"processed": 0, "sent": 0, "failed_permanent": 0, "rescheduled": 0}
+    out = {"processed": 0, "sent": 0, "failed_permanent": 0, "rescheduled": 0, "blocked_config": 0}
     now = _now()
     items = [d async for d in db.orchestrator_retry_queue.find(
         {"status": "pending", "next_retry_at": {"$lte": now}}
@@ -266,6 +332,32 @@ async def orchestrator_retry_tick() -> dict:
                 detail = str(e)[:200]
 
         attempts = int(item.get("attempts") or 0) + 1
+        if not ok and is_permanent_error(detail):
+            # Eroare de CONFIG (nu tranzientă): oprește retry-ul, păstrează emailul recuperabil,
+            # escaladează AGREGAT o dată/24h — nu per email.
+            out["blocked_config"] += 1
+            await db.orchestrator_retry_queue.update_one(
+                {"_id": item["_id"]},
+                {"$set": {"status": "blocked_by_config", "attempts": attempts, "last_detail": detail}},
+            )
+            escalated_now = await escalate_once(
+                "email_blocked_by_config",
+                "🚨 Emailuri blocate de configurația Resend",
+                f"Livrarea emailurilor eșuează cu eroare PERMANENTĂ de configurare: {detail[:140]}. "
+                "Verifică domeniul în Resend, apoi rulează «Reia emailurile blocate» din Orchestrator.",
+            )
+            await write_ledger({
+                "signal_kind": "webhook_fail",
+                "playbook_id": "webhook_retry_guardian",
+                "playbook_name": "Webhook Retry Guardian",
+                "steps": [{"action": "block_permanent_error", "ok": True,
+                           "detail": f"Eroare permanentă de config detectată — retry oprit, email păstrat recuperabil: {detail[:120]}"}],
+                "outcome": "blocked_config",
+                "minutes_saved": 5,
+                "escalated": escalated_now,
+                "test": bool(item.get("test")),
+            })
+            continue
         if ok:
             out["sent"] += 1
             await db.orchestrator_retry_queue.update_one(
@@ -289,22 +381,22 @@ async def orchestrator_retry_tick() -> dict:
                 {"_id": item["_id"]},
                 {"$set": {"status": "failed", "attempts": attempts, "last_detail": detail}},
             )
+            escalated_now = await escalate_once(
+                f"email_retry_exhausted:{(detail or '')[:40]}",
+                "🚨 Orchestrator: email nelivrat după 3 încercări",
+                f"Email-ul '{(item.get('payload') or {}).get('subject', '')[:80]}' nu a putut fi livrat. Ultima eroare: {detail[:120]}",
+            )
             await write_ledger({
                 "signal_kind": "webhook_fail",
                 "playbook_id": "webhook_retry_guardian",
                 "playbook_name": "Webhook Retry Guardian",
                 "steps": [{"action": "retry_email_send", "ok": False,
                            "detail": f"Toate cele {attempts} încercări au eșuat: {detail}"}],
-                "outcome": "escalated",
+                "outcome": "escalated" if escalated_now else "failed_suppressed",
                 "minutes_saved": 0,
-                "escalated": True,
+                "escalated": escalated_now,
                 "test": bool(item.get("test")),
             })
-            await notify_admins(
-                "🚨 Orchestrator: email nelivrat după 3 încercări",
-                f"Email-ul '{(item.get('payload') or {}).get('subject', '')[:80]}' nu a putut fi livrat. Ultima eroare: {detail[:120]}",
-                send_emails=False,
-            )
         else:
             out["rescheduled"] += 1
             backoff_min = 5 * (2 ** attempts)

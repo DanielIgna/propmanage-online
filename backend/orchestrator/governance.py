@@ -47,7 +47,7 @@ MIN_RUNS_FOR_CONFIDENCE = 5
 
 _SUCCESS_OUTCOMES = {"auto_resolved", "resolved", "ok", "completed", "done", "informed",
                      "notified", "no_action_needed", "recommended", "healthy"}
-_FAIL_OUTCOMES = {"error", "escalated", "failed"}
+_FAIL_OUTCOMES = {"error", "escalated", "failed", "failed_suppressed"}
 
 
 def _now() -> str:
@@ -74,7 +74,7 @@ async def set_authority(playbook_id: str, level: int, by: str = "") -> int:
 async def compute_confidence(playbook_id: str, window: int = 30) -> dict:
     """Scor de încredere 0-1 din istoricul ledger, ponderat pe recență."""
     entries = [d async for d in db.orchestrator_ledger.find(
-        {"playbook_id": playbook_id, "test": {"$ne": True}},
+        {"playbook_id": playbook_id, "test": {"$ne": True}, "absolved": {"$ne": True}},
         {"outcome": 1, "escalated": 1},
     ).sort("ts", -1).limit(window)]
     if not entries:
