@@ -3,7 +3,7 @@
 // <SmartEmptyState resource="properties" />  → empty state inteligent (de ce + pasul următor)
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Compass, Lightbulb, ArrowRight, Loader2, RotateCcw, Sparkles } from "lucide-react";
+import { Compass, Lightbulb, ArrowRight, Loader2, RotateCcw, Sparkles, Users } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 const jget = (url) => fetch(`${API}${url}`, { credentials: "include" })
@@ -105,6 +105,25 @@ export const MentorWidget = ({ path, onNavigate, autoGuide = false }) => {
               <Sparkles className="w-3.5 h-3.5 mt-0.5 shrink-0 text-violet-300" /> {ins.text}
             </div>
           ))}
+        </div>
+      )}
+      {data.collaboration && (
+        <div className={`flex items-start gap-2 text-[11px] rounded-xl px-3 py-2 border ${
+          data.collaboration.you_act
+            ? "text-[#d4ff3a] bg-[#d4ff3a]/5 border-[#d4ff3a]/25"
+            : data.collaboration.delayed
+              ? "text-rose-300 bg-rose-500/10 border-rose-500/25"
+              : "text-stone-300 bg-stone-900/50 border-stone-800"}`}
+          data-testid="mentor-collaboration">
+          <Users className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span>
+            {data.collaboration.message}
+            {data.collaboration.sla?.ratio > 0.7 && !data.collaboration.you_act && (
+              <span className="block text-[10px] text-stone-500 mt-0.5">
+                ⏱ {Math.round(data.collaboration.sla.hours_in_stage)}h în etapă · SLA ~{Math.round(data.collaboration.sla.sla_hours)}h
+              </span>
+            )}
+          </span>
         </div>
       )}
       {data.process && (

@@ -58,8 +58,16 @@ async def run_discovery(trigger: str = "cron") -> dict:
         counts["processes"] = proc_meta["total"]
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[ai-brain] process build failed: {e}")
+    # AIB-009: SLA sweep + notificări inteligente după fiecare discovery
+    sla_meta = None
+    try:
+        from ai_brain.collaboration import sla_sweep
+        sla_meta = await sla_sweep(run_id)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[ai-brain] sla sweep failed: {e}")
     run = {"id": run_id, "ts": _now(), "trigger": trigger,
-           "duration_ms": duration_ms, "counts": counts, "graph": graph_meta, "processes": proc_meta}
+           "duration_ms": duration_ms, "counts": counts, "graph": graph_meta,
+           "processes": proc_meta, "sla": sla_meta}
     await db.ai_brain_runs.insert_one({**run})
 
     from orchestrator.engine import write_ledger

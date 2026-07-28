@@ -277,6 +277,24 @@ async def check_adaptive_intelligence(issues):
 
 
 # ============================================================================
+# 8. SLA INTELLIGENCE — AIB-009 (depășiri SLA raportate de Collaborative Intelligence)
+# ============================================================================
+async def check_sla_breaches(issues):
+    async for s in db.ai_brain_sla_status.find({}, {"_id": 0}):
+        over = s["counts"]["breached"] + s["counts"]["abandoned"]
+        if s["active"] >= 5 and over / s["active"] > 0.3:
+            top = (s.get("breaches") or [{}])[0]
+            issues.append(_issue(
+                f"sla_breach_{s['process_id']}", "medium", "medium",
+                f"«{s['process_name']}»: {over}/{s['active']} instanțe active au depășit SLA-ul",
+                f"Responsabili blocanți: {', '.join(top.get('responsible_now') or ['—'])}. "
+                f"Escaladare propusă: {((top.get('escalations') or [{}])[0]).get('action', 'reminder')}.",
+                "Instanțele active respectă SLA-ul empiric (2× durata medie a etapei).",
+                "Depășirile SLA repetate duc la abandon și pierderea încrederii în platformă.",
+                "Vezi AI Brain → Collaboration Explorer pentru escaladările propuse per instanță."))
+
+
+# ============================================================================
 # RUN — kernel lifecycle (identic cu Architecture Guardian) + learning 3-strikes
 # ============================================================================
 async def run_product_guardian(trigger: str = "cron") -> dict:
@@ -287,7 +305,7 @@ async def run_product_guardian(trigger: str = "cron") -> dict:
         logger.warning(f"[product-guardian] dead_links failed: {e}")
     fv, conv = {}, {}
     for acheck in (check_role_homes, check_service_gates, check_process_health,
-                   check_adaptive_intelligence):
+                   check_adaptive_intelligence, check_sla_breaches):
         try:
             await acheck(issues)
         except Exception as e:  # noqa: BLE001

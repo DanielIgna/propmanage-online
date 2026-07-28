@@ -288,6 +288,57 @@ async def decisions_inspect(email: str, path: str = "", user=Depends(require_rol
 
 
 # ============================================================================
+# AIB-009 · Collaborative Intelligence Engine
+# ============================================================================
+@user_router.get("/collaboration/state")
+async def my_collaboration_state(path: str = "", process_id: str = None, entity_id: str = None,
+                                 user=Depends(get_current_user)):
+    from ai_brain.collaboration import collaboration_state
+    return await collaboration_state(user, process_id=process_id, entity_id=entity_id, path=path)
+
+
+@router.post("/collaboration/sweep")
+async def collaboration_sweep(user=Depends(require_role("admin"))):
+    from ai_brain.collaboration import sla_sweep
+    return await sla_sweep(run_id=f"manual:{user.get('email')}")
+
+
+@router.get("/collaboration/overview")
+async def collaboration_overview_ep(user=Depends(require_role("admin"))):
+    from ai_brain.collaboration import collaboration_overview
+    return await collaboration_overview()
+
+
+@router.get("/collaboration/handoffs/{pid}")
+async def collaboration_handoffs(pid: str, user=Depends(require_role("admin"))):
+    from ai_brain.collaboration import handoff_map
+    from ai_brain.process import get_process
+    p = await get_process(pid)
+    if not p:
+        raise HTTPException(404, "Proces inexistent")
+    return {"process_id": pid, "process_name": p["name"], "actors": p.get("actors") or [],
+            "handoffs": handoff_map(p)}
+
+
+@router.get("/collaboration/notifications")
+async def collaboration_notifications(user=Depends(require_role("admin"))):
+    items = [n async for n in db.ai_brain_notifications.find(
+        {"status": "active"}, {"_id": 0}).sort("priority", -1).limit(50)]
+    return {"items": items}
+
+
+@router.get("/collaboration/state")
+async def collaboration_state_inspect(pid: str, email: str, entity_id: str = None,
+                                      user=Depends(require_role("admin"))):
+    target = await db.users.find_one({"email": email.strip().lower()})
+    if not target:
+        raise HTTPException(404, f"Utilizator inexistent: {email}")
+    target["id"] = target.get("id") or str(target["_id"])
+    from ai_brain.collaboration import collaboration_state
+    return await collaboration_state(target, process_id=pid, entity_id=entity_id)
+
+
+# ============================================================================
 # AIB-008 · Adaptive Intelligence Engine
 # ============================================================================
 @user_router.post("/decisions/feedback")

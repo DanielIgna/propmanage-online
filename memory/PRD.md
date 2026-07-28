@@ -4357,3 +4357,40 @@ confidence factors.
 (nu semnalează sub praguri — corect), screenshot Admin ✓ (recalibrare reală vizibilă,
 profiluri pe roluri: client 823 useri top house-health, fluxuri client→marketplace ×5).
 **FAZA 1 AI BRAIN ÎNCHISĂ.** URMEAZĂ: AIB-009 Multi-Agent Collaboration, AIB-010 AI Brain v1.0.
+
+## ✅ AIB-009 — COLLABORATIVE INTELLIGENCE ENGINE (28 Iul 2026)
+**Modul nou: ai_brain/collaboration.py** — dirijorul colaborării (observă/explică/recomandă,
+ZERO execuție automată):
+- **Responsibility Engine** (instance_collaboration): per instanță reală — responsible_now
+  (actorii care pot avansa, fără efecte GET, admin omis când există actori de business),
+  next_actors/next_state, waiting_actors (owneri pe entitate), released_actors (au acționat,
+  nu mai sunt implicați), delayed_actors + blocking_actor (peste SLA), unassigned, to_notify.
+  Stările fără nicio acțiune umană posibilă = cvasi-terminale pentru colaborare.
+- **Intelligent Handoff**: handoff_map per proces (lanțul transferurilor între actori derivat
+  din tranzițiile reale, cu «de ce» + endpoint) + handoff-ul curent per instanță (cine a predat,
+  cine preia, ce se transferă, ce urmează).
+- **SLA Intelligence**: SLA empiric per etapă = 2× durata medie observată (avg_hours_from_start
+  diferențial), fallback 72h; niveluri ok/at_risk(>70%)/breached(>1×)/abandoned(>3×);
+  sla_sweep persistă în db.ai_brain_sla_status (rulat și în core.run_discovery zilnic).
+- **Notification Intelligence**: intenții AGREGATE per (actor, proces, etapă) cu count +
+  exemplu + «de ce e importantă», prioritizate (SLA ratio + stale ratio + nealocare +
+  actori în așteptare), dedupe pe cheie stabilă, expirare automată a celor nevalidate în
+  sweep-ul curent. db.ai_brain_notifications. VERIFICAT: 21 notificări agregate vs 219 brute;
+  sweep repetat → 0 duplicate.
+- **Collaboration Timeline**: events cu actori + created_by + contributors + approvals/
+  rejections (pattern matching pe evenimente reale).
+- **Escalation Engine**: propuneri argumentate per instanță — reminder (≤2× SLA), escalate
+  (>2×), reassign (actor nealocat), close (>5×, abandon), admin_intervention (necesită admin).
+**Integrare**: Mentor (câmp «collaboration»: «E rândul tău» / «Aștepți după: specialist» +
+SLA) · Decision Intelligence (decizii admin kind=escalation din sweep) · Guardian
+(check_sla_breaches: >30% instanțe peste SLA → issue; detectează 4+ procese pe demo) ·
+core.run_discovery (sweep automat).
+**API**: GET /api/ai-brain/collaboration/state · POST /api/admin/ai-brain/collaboration/sweep
+· GET /admin/.../collaboration/{overview,handoffs/{pid},notifications,state?pid=&email=}.
+**UI**: components/CollaborationExplorer.jsx (tab nou în /admin/ai-brain) — 6 stats SLA,
+listă procese cu niveluri, handoff map vizual, instanțe peste SLA cu escaladări, notificări
+prioritizate. MentorWidget: card colaborare («E rândul tău» verde / «aștepți după X» +
+întârziere roșu + ore în etapă vs SLA).
+**TESTAT**: pytest iter165 11/11 nou + 55/55 regresie (iter160-164), guardian ✓, screenshot
+Admin ✓ (9 procese, 130 instanțe, handoff specialist↔client cu endpoint-uri, 21 notificări).
+**URMEAZĂ**: AIB-010 — AI Brain v1.0 (stabilizare, optimizare, certificare producție).

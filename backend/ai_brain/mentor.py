@@ -186,6 +186,13 @@ async def mentor_advise(user: dict, path: str, replay: bool = False, include_gui
         insights = await personal_insights(user, path)
     except Exception:  # noqa: BLE001
         pass
+    # AIB-009 · Collaborative Intelligence: cine trebuie să acționeze acum
+    collaboration = None
+    try:
+        from ai_brain.collaboration import mentor_collab
+        collaboration = await mentor_collab(user, path)
+    except Exception:  # noqa: BLE001
+        pass
     return {
         "role": ctx["user"]["role"],
         "module": module,
@@ -194,6 +201,7 @@ async def mentor_advise(user: dict, path: str, replay: bool = False, include_gui
         "actions": actions,
         "decisions": decisions[:3],
         "insights": insights,
+        "collaboration": collaboration,
         "tips": await contextual_tips(user, path),
         "related_modules": related,
         "process": process,

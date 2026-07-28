@@ -244,6 +244,33 @@ async def _admin_decisions(user) -> list:
                     [f"Guardian {name} raportează {n} task-uri deschise."],
                 "score": _score(factors), "can_execute": True,
             })
+    # AIB-009: escaladări din ultimul SLA sweep (Collaborative Intelligence)
+    async for s in db.ai_brain_sla_status.find(
+            {"$expr": {"$gt": [{"$add": ["$counts.breached", "$counts.abandoned"]}, 0]}},
+            {"_id": 0}).limit(10):
+        over = s["counts"]["breached"] + s["counts"]["abandoned"]
+        top = (s.get("breaches") or [{}])[0]
+        factors = {"urgency": min(over / 10, 1.0), "impact": 0.6,
+                   "unblocking": min(over / 5, 1.0), "readiness": 1.0, "progress": 0.5,
+                   "risk_of_inaction": min(s["counts"]["abandoned"] / max(s["active"], 1) + 0.3, 1.0)}
+        esc0 = (top.get("escalations") or [{}])[0]
+        out.append({
+            "id": _did(s["process_id"], "sla_escalation"), "kind": "escalation",
+            "title": f"Deblochează {over} instanțe peste SLA în «{s['process_name']}»",
+            "process_id": s["process_id"], "process_name": s["process_name"], "entity": None,
+            "transition": None, "cta_path": "/admin", "actors": s.get("actors") or [],
+            "dependencies": [],
+            "resolves": f"{over} instanțe au depășit SLA-ul empiric; responsabili: "
+                        f"{', '.join((top.get('responsible_now') or ['—']))}.",
+            "avoids_risk": "Evită abandonul utilizatorilor blocați și degradarea procesului.",
+            "produces_impact": f"Recomandare: {esc0.get('action', 'reminder')} — "
+                               f"{esc0.get('why', 'deblochează fluxul')}",
+            "after": [e.get("action") for b in (s.get("breaches") or [])[:1]
+                      for e in (b.get("escalations") or [])[:3]],
+            "factors": factors, "reasons":
+                [f"SLA Intelligence: {over}/{s['active']} instanțe active au depășit SLA-ul."],
+            "score": _score(factors), "can_execute": True,
+        })
     return out
 
 
