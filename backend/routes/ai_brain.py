@@ -78,6 +78,37 @@ async def conversation_list(user=Depends(get_current_user)):
 
 
 # ============================================================================
+# AIB-003 · Explainability Engine — Context First, grounding real, cache per rol
+# ============================================================================
+@user_router.post("/explain/page")
+async def explain_page(payload: dict = Body(...), user=Depends(get_current_user)):
+    from ai_brain import explain
+    path = (payload.get("path") or "").strip()
+    if not path.startswith("/"):
+        raise HTTPException(400, "path invalid")
+    return await explain.explain_page(user, path)
+
+
+@user_router.post("/explain/component")
+async def explain_component(payload: dict = Body(...), user=Depends(get_current_user)):
+    from ai_brain import explain
+    path = (payload.get("path") or "").strip()
+    ref = (payload.get("component") or "").strip()
+    if not path.startswith("/") or not ref:
+        raise HTTPException(400, "path și component sunt obligatorii")
+    return await explain.explain_component(user, path, ref)
+
+
+@user_router.post("/explain/process")
+async def explain_process(payload: dict = Body(...), user=Depends(get_current_user)):
+    from ai_brain import explain
+    path = (payload.get("path") or "").strip()
+    if not path.startswith("/"):
+        raise HTTPException(400, "path invalid")
+    return await explain.explain_process(user, path)
+
+
+# ============================================================================
 # AIB-002 · Context Inspector — admin analizează contextul oricărui utilizator
 # ============================================================================
 @router.get("/context/inspect")

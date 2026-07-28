@@ -175,6 +175,7 @@ const AnalyticsRouteTracker = () => {
   return null;
 };
 import { ImpersonationBanner } from "./components/ImpersonationBanner";
+import { ExplainThis } from "./components/ExplainThis";
 import { RoleThemeApplier } from "./components/RoleThemeApplier";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import SiteNav from "./components/SiteNav";
@@ -1567,6 +1568,12 @@ const PreviewBanner = () => (
   </div>
 );
 
+const ExplainThisMount = () => {
+  const { user } = useAuth();
+  if (!user) return null;
+  return <ExplainThis role={user.role} />;
+};
+
 // ============= MAIN APP =============
 function App() {
   return (
@@ -1580,6 +1587,7 @@ function App() {
               <ImpersonationBanner />
               <RoleThemeApplier />
               <AnalyticsRouteTracker />
+              <ExplainThisMount />
               <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
               <Routes>
               <Route path="/" element={<LandingPage />} />

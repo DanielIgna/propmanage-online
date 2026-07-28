@@ -4174,3 +4174,29 @@ modul, entitate, permisiuni, acțiuni, navigare, conversații, workflow).
 cu durată, continuitate conversație + izolare între useri, inspector admin+403) + 25/25
 regresie (iter155-157), build ✓, screenshot Inspector live ✓ (client 412/1085 endpoint-uri,
 trail /client→/marketplace→/client).
+
+---
+
+## ✅ AIB-003 — EXPLAINABILITY ENGINE (28 Iul 2026)
+**Modul nou: ai_brain/explain.py** — construit exclusiv pe infrastructura existentă:
+resolve_context (AIB-002) + Knowledge Registry (AIB-001) + ai_core.provider.call_llm
+(Emergent LLM Key, DEJA integrat — zero integrare nouă). Fără RAG/vector DB/KG.
+**CONTEXT FIRST impus în cod**: orice explicație pornește din resolve_context (rol,
+pagină, modul, permisiuni, acțiuni) — LLM-ul primește DOAR date reale.
+**Grounding pe anatomia reală a paginii**: sursa componentei React a rutei se citește
+de pe disc → data-testids, headings, butoane, linkuri de ieșire → LLM explică secțiuni
+care EXISTĂ, nu generice. Fallback determinist structural dacă LLM-ul e indisponibil.
+**Cache inteligent**: db.ai_brain_explanations per (rută-pattern, ROL, hash-anatomie) —
+o pagină neschimbată = 1 singur apel LLM per rol, restul instant + counter hits.
+**3 explainere**: explain_page (scop/cui/acțiuni/secțiuni/module legate/pași următori),
+explain_component (ce este/face/când/procese/permisiuni — grounding pe fragmentul de cod
+sursă unde apare ref-ul), explain_process (pași parcurși din navigation trail + pasul
+curent + următorii din outgoing_links).
+**API**: POST /api/ai-brain/explain/{page,component,process} (autentificat, rol respectat).
+**UI global**: components/ExplainThis.jsx montat în App.js (ExplainThisMount cu useAuth) —
+buton discret «✨ Explică această pagină» stânga-jos pe TOATE paginile (doar autentificați),
+panel lateral cu tabs Pagina/Procesul; admin în plus: input «Explică o componentă».
+**TESTAT**: pytest 7/7 nou (iter159: grounding pe ClientDashboardV2, cache hit, cache per
+rol, component grounding pe fișier real, process cu trail, 401, 400) + 23/23 regresie
+(iter157-158), build ✓, screenshot E2E client ✓ (panel cu explicație reală a secțiunilor
+v2-header/v2-bell/v2-bottom-nav, «instant (cache) · ancorat pe ClientDashboardV2»).
