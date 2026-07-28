@@ -101,7 +101,7 @@ const SnapshotsPanel = ({ onRefresh }) => {
 
   const take = async () => {
     setBusy(true);
-    try { await ax.post("/api/admin/ai-brain/product-map/snapshot", { label: `Snapshot ${new Date().toLocaleDateString("ro-RO")}` }); load(); onRefresh?.(); }
+    try { await ax.post("/api/admin/ai-brain/product-map/snapshot", { label: `Snapshot ${new Date().toLocaleString("ro-RO")}` }); load(); onRefresh?.(); }
     finally { setBusy(false); }
   };
   const toggle = (id) => setSel(s => s.includes(id) ? s.filter(x => x !== id) : [...s.slice(-1), id]);

@@ -1,3 +1,24 @@
+## 🧭 CORE-001 — CANONICAL DISCOVERY & PRODUCT INTELLIGENCE · LIVRAT & TESTAT 100% (28 Iul 2026)
+
+**Aprobare Fondator (extins)**: Live Product Map + snapshot-uri istorice (varianta C extinsă) · Canonical Product Graph cu clasificare per element (activ/experimental/duplicat/neconectat/depreciat/candidat_reutilizare) · **Regula 60%** (implementarea existentă >60% se REUTILIZEAZĂ și se EXTINDE, nu se rescrie) · **Product Completeness Score** per modul · **Business Value Score** per modul (venit 35% · conversie 25% · retenție 25% · costuri 15%) · Roadmap de Consolidare (impact × risc) · Ordinea post-CORE-001: **PB-001 → FP-001 → HH-Next**.
+
+**Implementat** (`ai_brain/product_intelligence.py` + endpoints în `routes/ai_brain.py`, UI `components/DiscoveryCenter.jsx` montat canonic în `/admin/ai-brain` — zero dashboard nou):
+- **Live Product Map**: 19 module canonice evaluate pe DOVEZI reale (fișiere backend/frontend, endpoint-uri numărate, colecții Mongo cu date, teste, feature checks grep-based). Cache 5 min + `?refresh=true`. Scoruri reale la livrare: medie 90% · PropBenefits 0% · FairPrice 17% (doar piese: fairness ranking, praguri HH, pagini prețuri) · Buildings 80% · celelalte 85-100%.
+- **Priority Index** = BVS × (100 − Completeness)/100 — top investiții: PB-001 (82), FP-001 (53), Buildings (15).
+- **Detecție orfani REALĂ**: BFS pe graful de importuri din App.js/index.js (suportă `import/export ... from`, `import()`, alias `@/`) → 6 fișiere neconectate legitime (TierToolsPanel, lib/api, lib/apiBase, featureMatrix, utils, use-toast — shadcn ui neutilizat de aplicație). QuestPanel/TierCelebration s-au dovedit CONECTATE (importate în SpecialistDashboard).
+- **4 duplicate documentate**: 4 sisteme twin (G2) · 4 viewere twin · recenzii v1/v2 · dashboards legacy/V2 — fiecare cu impact + recomandare.
+- **Roadmap Consolidare** (9 intrări, sortat impact×2−risc): 1) Ledger unificat Tokens/Wallet pt PB-001 · 2) Unificare twin G2 · 3) Consolidare pricing → FP-001 · 4) Split bundle admin · 5) Recenzii v1/v2 · 6) Viewere twin · 7) Gamification decision · 8) Curățenie orfani · 9) Retragere Dashboards.jsx.
+- **Snapshot-uri istorice**: `db.product_map_snapshots` (POST snapshot, list, compare cu delte per modul). Baseline salvat: „CORE-001 Baseline".
+- **MASTER DISCOVERY REPORT**: generat live (14KB markdown, 7 secțiuni incl. pregătire PB-001 cu % reutilizare per activ: referral ~80%, tiers ~70%, wallet ~60%, campanii ~65%, billing ~70%, orchestrator ~90%), descărcabil din UI + scris în `/app/docs/CORE001_MASTER_DISCOVERY_REPORT.md`.
+
+**Testare**: iteration_155 — backend **10/10 PASS** (suite regresie: `tests/test_core001_product_intelligence.py`), frontend **100%** (toate tab-urile, expand module, snapshot+compare în UI, raport, regresie AI Brain page completă). Fix post-test: label snapshot cu oră. Snapshot-uri de test curățate.
+
+**Bug de proces (learning)**: un `search_replace` pe regex cu triple-quotes a raportat succes dar NU a persistat pe disc — verificat cu grep și reaplicat. La edit-uri pe regex-uri complexe: verifică persistența.
+
+**URMEAZĂ (ordinea aprobată de Fondator)**: **PB-001 – PropBenefits Engine Foundation** (prin EXTENSIE, cf. hărții de reutilizare din raport) → FP-001 – FairPrice Engine → HH-Next – House Health Subscriptions UI. Blockere externe neschimbate: Stripe LIVE claim · Resend DNS · purge demo pe prod (Fondator).
+
+---
+
 ## 🛟 FIRUL B (B+) — LAUNCH SENTINEL + MONEY-FLOW GUARD + SEMNALE ORCHESTRATOR · LIVRAT & TESTAT (27 Iul 2026)
 
 **BUGFIX (raportat de Fondator, 27 Iul)**: item-urile paletei ⌘K / sidebar admin fără `href` („Toți userii" + alte 25 taburi de consolă) erau moarte pe ~40 pagini admin standalone — `handleNavClick` apela `onChange(id)` cu `onChange` undefined. **Fix central** în `AdminLayoutMetronic.jsx`: fallback `navigate(/admin?tab={id})` (AdminConsole citea deja `?tab=`). Verificat E2E cu screenshot: din /admin/command-center, paleta → „Toți userii" → secțiunea se încarcă complet. Audit suplimentar: toate cele 76 href-uri au rute valide. **Nou**: `/app/scripts/ui_nav_audit.py` — audit determinist reproductibil (href vs rute + taburi vs TITLES), exit 1 la probleme; prima cărămidă a modulului de auto-verificare cerut de Fondator (auto-REPARARE = AI CTO, amânat post-lansare conform deciziei B+). NOTĂ: fix-ul e în preview — necesită REDEPLOY pentru propmanage.ro.
