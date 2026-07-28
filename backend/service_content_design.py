@@ -13,7 +13,7 @@ IMG = {
 }
 
 DEFAULT_CONTENT: dict[str, Any] = {
-    "content_version": 2,
+    "content_version": 3,
     "active": True,
     "show_on_homepage": True,
     "menu_order": 1,
@@ -42,6 +42,66 @@ DEFAULT_CONTENT: dict[str, Any] = {
         "cta_tertiary": "Discută cu un designer",
     },
     "journey": ["Audit", "Digital Twin", "Proiectare", "Implementare", "Management", "Întreținere", "House Health"],
+    # ── SURSA UNICĂ DE ADEVĂR pentru întreg ecosistemul (Unified Service Journey) ──
+    "canonical_flow": {
+        "title": "Un singur proces. Nu servicii izolate.",
+        "tagline": "Auditul descoperă. Digital Twin memorează. Designul construiește. Implementarea execută. House Health întreține.",
+        "steps": [
+            {"key": "audit", "label": "Audit", "desc": "Diagnoza tehnică completă — starea reală a locuinței.", "href": "/design-interior#audit"},
+            {"key": "twin", "label": "Digital Twin", "desc": "Copia digitală vie — tot ce s-a descoperit devine memorie.", "href": "/design-interior#digital-twin"},
+            {"key": "plans", "label": "Planșe tehnice", "desc": "Documentația exactă pe care lucrează echipele.", "href": "/design-interior#proces"},
+            {"key": "design", "label": "Design", "desc": "Proiectare pe date reale, nu pe presupuneri.", "href": "/design-interior#proces"},
+            {"key": "implementation", "label": "Implementare", "desc": "Execuție coordonată, cu plăți protejate prin escrow.", "href": "/design-interior#implementare"},
+            {"key": "specialists", "label": "Specialiști verificați", "desc": "Identitate, portofoliu și recenzii verificate.", "href": "/marketplace"},
+            {"key": "reception", "label": "Recepție", "desc": "Lucrarea se închide doar când e conformă cu proiectul.", "href": "/design-interior#implementare"},
+            {"key": "twin_update", "label": "Twin actualizat", "desc": "Tot ce s-a executat intră în copia digitală.", "href": "/design-interior#digital-twin"},
+            {"key": "house_health", "label": "House Health", "desc": "Monitorizare și întreținere planificată pe termen lung.", "href": "/house-health/upgrade"},
+        ],
+    },
+    "audit_full": {
+        "title": "Tot ce include Auditul tehnic",
+        "intro": "Auditul este pasul zero al oricărui proiect: diagnoza completă a locuinței, cu măsurători reale, nu estimări. Rezultatele intră direct în Digital Twin și în proiectare.",
+        "outro": "Primești un raport tehnic complet cu priorități de reparație, estimări de cost și documentație foto — fundația fiecărei decizii care urmează.",
+        "groups": [
+            {"name": "Microclimat & aer interior", "items": [
+                "Analiză umiditate (pereți, pardoseli, tavane)", "Punct de rouă și zone de risc condens",
+                "Punți termice identificate cu camera termică", "Termografie completă (imagini în infraroșu)",
+                "Măsurare CO₂ și compuși organici volatili (VOC)", "Evaluarea ventilației și a schimbului de aer",
+                "Calitatea aerului interior", "Cartografierea umidității (moisture mapping)"]},
+            {"name": "Instalații & siguranță", "items": [
+                "Siguranță electrică (tablou, împământare, circuite)", "Măsurători electrice (tensiune, izolație, continuitate)",
+                "Instalație de apă (trasee, presiune, pierderi)", "Instalație de gaz (etanșeitate, conformitate)",
+                "Canalizare și scurgeri", "Verificarea sistemului de încălzire"]},
+            {"name": "Structură & anvelopă", "items": [
+                "Evaluarea structurii (fisuri, tasări, elemente portante)", "Starea anvelopei (izolație, tâmplărie, acoperiș)",
+                "Eficiență energetică și pierderi de căldură", "Posibilități de recompartimentare"]},
+            {"name": "Rezultate & livrabile", "items": [
+                "Analiza riscurilor tehnice", "Priorități de reparație (urgent / recomandat / opțional)",
+                "Priorități de investiție (unde merită banii întâi)", "Estimare costuri de intervenție",
+                "Raport tehnic complet (PDF)", "Recomandări personalizate", "Documentație foto completă",
+                "Metodologia măsurătorilor (transparență totală)"]},
+        ],
+    },
+    "twin_full": {
+        "title": "Tot ce conține Digital Twin",
+        "intro": "Digital Twin nu este un model 3D frumos. Este memoria vie a proprietății: fiecare traseu ascuns, fiecare material, fiecare document — accesibile oricând, pentru orice proiect viitor.",
+        "outro": "Când peste 3 ani schimbi bucătăria, designerul deschide Twin-ul și știe exact ce e în spatele fiecărui perete. Fără măsurători repetate. Fără informații pierdute.",
+        "groups": [
+            {"name": "Trasee ascunse & instalații", "items": [
+                "Trasee electrice ascunse (circuite, doze, tablou)", "Țevi de apă rece", "Țevi de apă caldă",
+                "Sistem de încălzire (calorifere, centrală)", "Încălzire în pardoseală (trasee complete)",
+                "Canalizare și scurgeri", "Cartografiere electrică completă"]},
+            {"name": "Geometrie & planuri", "items": [
+                "Măsurători exacte (releveu complet)", "Planuri de arhitectură", "Planșe tehnice de execuție",
+                "Model 3D interactiv al locuinței", "Scanări 3D"]},
+            {"name": "Materiale & istoric", "items": [
+                "Istoricul construcției", "Materiale folosite (pe fiecare zonă)", "Finisaje și echipamente",
+                "Istoricul intervențiilor și mentenanței", "Fotografii pe etape"]},
+            {"name": "Documente & viitor", "items": [
+                "Documente și contracte", "Garanții (cu termene)", "Intervenții viitoare planificate",
+                "Planificarea renovărilor", "Property Memory — memoria completă a proprietății"]},
+        ],
+    },
     "positioning": {
         "title": "Proiecte oriunde în România",
         "text": "Realizăm proiecte complete la nivel național — remote pe bază de scanări, planuri și apeluri video, sau cu prezență la fața locului. Căutăm activ proiecte în zona Cluj-Napoca și Transilvania, unde echipele noastre pot gestiona lucrări complexe de la audit la recepție.",

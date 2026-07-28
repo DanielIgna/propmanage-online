@@ -7,6 +7,7 @@ import { Building2, Star, CheckCircle2, Search, Filter, ArrowLeft, Shield, QrCod
 import { useAuth, formatApiError } from "../auth";
 import { useSEO } from "../hooks/useSEO";
 import { PMCard, PMPillButton, PMChip, PMSectionHeader, PMEmptyState } from "../components/pm";
+import { EcosystemFlow } from "../components/ecosystem/EcosystemFlow";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -82,7 +83,10 @@ export const PublicMarketplace = () => {
         <div className="pm-fade-in">
           <PMChip variant="primary" className="mb-3">MARKETPLACE PROPMANAGE</PMChip>
           <h1 className="font-serif text-4xl sm:text-6xl tracking-tight mb-3" data-testid="mkt-title">Specialiști verificați</h1>
-          <p className="text-stone-400 mb-8 max-w-xl">Descoperă cei mai buni profesioniști pentru proprietatea ta. Recenzii reale, plăți escrow, garanție lucrare.</p>
+          <p className="text-stone-400 mb-6 max-w-xl">Descoperă cei mai buni profesioniști pentru proprietatea ta. Recenzii reale, plăți escrow, garanție lucrare.</p>
+          <div className="pm-card-glass !p-4 mb-8" data-testid="mkt-ecosystem-flow">
+            <EcosystemFlow dark compact activeKey="specialists" />
+          </div>
         </div>
 
         {/* Filters */}

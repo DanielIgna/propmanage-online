@@ -8,6 +8,8 @@ import {
 import axios from "axios";
 import { EstateMapView } from "./EstateMapView";
 import { useDynamicSEO } from "@/lib/useDynamicSEO";
+import { EcosystemFlow } from "@/components/ecosystem/EcosystemFlow";
+import { ServiceDetailModal } from "@/components/ecosystem/ServiceDetailModal";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -169,6 +171,7 @@ const ListingCard = ({ item }) => (
 
 export const EstateBrowse = () => {
   useDynamicSEO("estate", { title: "Imobile Verificate · PropManage" });
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterCity, setFilterCity] = useState("");
@@ -176,6 +179,7 @@ export const EstateBrowse = () => {
   const [filterPriceMax, setFilterPriceMax] = useState("");
   const [filterTransaction, setFilterTransaction] = useState("");
   const [showExtModal, setShowExtModal] = useState(false);
+  const [detailKind, setDetailKind] = useState(null);
   const [viewMode, setViewMode] = useState("grid"); // grid | map
 
   useEffect(() => {
@@ -213,12 +217,20 @@ export const EstateBrowse = () => {
             Imobile <span className="italic gradient-text">Verificate</span>.<br />
             Zero surprize.
           </h1>
-          <p className="text-lg text-stone-400 max-w-2xl mb-10">
+          <p className="text-lg text-stone-400 max-w-2xl mb-6">
             Fiecare imobil listat aici a trecut prin <strong className="text-white">audit tehnic complet</strong>,
             are <strong className="text-white">Digital Twin</strong> propriu și a obținut minimum
             <strong className="text-white"> 90% recomandări acceptate</strong> de proprietar.
             Cumperi cu încredere. Vinzi cu credibilitate.
           </p>
+          <div className="flex flex-wrap gap-2 mb-8 text-xs">
+            <button onClick={() => setDetailKind("audit")} className="px-3.5 py-1.5 rounded-full border border-white/15 text-stone-300 hover:border-[#d4ff3a]/60 hover:text-white font-bold transition-colors" data-testid="estate-audit-details">
+              Ce înseamnă auditul? →
+            </button>
+            <button onClick={() => setDetailKind("twin")} className="px-3.5 py-1.5 rounded-full border border-white/15 text-stone-300 hover:border-[#d4ff3a]/60 hover:text-white font-bold transition-colors" data-testid="estate-twin-details">
+              Ce conține Digital Twin? →
+            </button>
+          </div>
           <div className="flex flex-col sm:flex-row gap-3">
             <Link to="/imobile-verificate/sell" className="btn-accent px-8 py-3.5 rounded-full font-medium inline-flex items-center justify-center gap-2" data-testid="estate-sell-cta">
               <Building2 className="w-4 h-4" /> Vinde-ți imobilul cu noi
@@ -226,6 +238,9 @@ export const EstateBrowse = () => {
             <button onClick={() => setShowExtModal(true)} className="glass px-8 py-3.5 rounded-full font-medium inline-flex items-center justify-center gap-2 hover:bg-white/10 transition-colors" data-testid="estate-external-cta">
               <ExternalLink className="w-4 h-4" /> Audit pentru imobil din altă platformă
             </button>
+          </div>
+          <div className="mt-10 p-5 rounded-3xl bg-white/[0.03] border border-white/10" data-testid="estate-ecosystem-flow">
+            <EcosystemFlow dark compact activeKey="twin_update" />
           </div>
         </div>
       </section>
@@ -350,6 +365,17 @@ export const EstateBrowse = () => {
       </section>
 
       <ExternalAuditModal open={showExtModal} onClose={() => setShowExtModal(false)} />
+      {detailKind && (
+        <ServiceDetailModal
+          kind={detailKind}
+          dark
+          onClose={() => setDetailKind(null)}
+          primaryCta={{
+            label: detailKind === "audit" ? "Solicită Audit" : "Solicită Digital Twin",
+            onClick: () => navigate("/imobile-verificate/sell"),
+          }}
+        />
+      )}
     </div>
   );
 };

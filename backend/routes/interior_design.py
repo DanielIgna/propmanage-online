@@ -198,7 +198,8 @@ async def admin_update_content(patch: dict = Body(...), _admin=Depends(require_r
     allowed = {"active", "show_on_homepage", "menu_order", "seo", "hero", "benefits",
                "portfolio", "reviews", "faq", "styles", "budgets", "local_cities", "seo_article",
                "brand", "positioning", "journey", "process_phases", "digital_twin", "audit",
-               "implementation", "styles_showcase", "ecosystem"}
+               "implementation", "styles_showcase", "ecosystem",
+               "canonical_flow", "audit_full", "twin_full"}
     clean = {k: v for k, v in patch.items() if k in allowed}
     if not clean:
         raise HTTPException(400, "Nimic valid de actualizat.")

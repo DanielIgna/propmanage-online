@@ -9,10 +9,7 @@ import {
   Heart, Check, Loader2, Sparkles, AlertCircle, ChevronLeft, CreditCard,
 } from "lucide-react";
 import { API } from "./DashShared";
-
-// ============================================================================
-// /house-health/upgrade → plan picker
-// ============================================================================
+import { EcosystemFlow } from "../components/ecosystem/EcosystemFlow";
 const HouseHealthUpgradePage = () => {
   const navigate = useNavigate();
   const [plans, setPlans] = useState([]);
@@ -74,6 +71,10 @@ const HouseHealthUpgradePage = () => {
           evaluări tehnice de la specialiști verificați, scor de sănătate al proprietății, recomandări personalizate
           și automatizare lead-uri în marketplace cu comision redus.
         </p>
+        <div className="mb-8 p-5 rounded-3xl bg-white/[0.03] border border-white/10" data-testid="hh-ecosystem-flow">
+          <EcosystemFlow dark compact activeKey="house_health" />
+          <p className="text-xs text-stone-500 mt-3">House Health este ultima etapă a procesului PropManage: după audit, Digital Twin și implementare, locuința intră în întreținere monitorizată.</p>
+        </div>
 
         {error && (
           <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/40 text-rose-300 text-sm flex items-center gap-2" data-testid="hh-upgrade-error">

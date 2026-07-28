@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { API } from "./DashShared";
 import { useDynamicSEO } from "../lib/useDynamicSEO";
+import { EcosystemFlow } from "../components/ecosystem/EcosystemFlow";
+import { ServiceDetailModal } from "../components/ecosystem/ServiceDetailModal";
 
 const ax = axios.create({ baseURL: API });
 
@@ -165,6 +167,7 @@ const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior:
 
 export default function InteriorDesignLanding() {
   const [content, setContent] = useState(null);
+  const [detailKind, setDetailKind] = useState(null);
   useDynamicSEO("interior_design", {
     title: content?.seo?.title || "Interior Intelligence by PropManage — Design Interior & Arhitectură | România",
     description: content?.seo?.description,
@@ -326,6 +329,9 @@ export default function InteriorDesignLanding() {
             ))}
           </div>
           <p className="mt-7 text-emerald-300/90 text-sm font-semibold max-w-2xl">{twin.outro}</p>
+          <button onClick={() => setDetailKind("twin")} className="mt-6 px-6 py-3 rounded-full bg-emerald-500 text-white font-bold hover:bg-emerald-400 transition-colors" data-testid="id-twin-details-btn">
+            Vezi tot ce conține Digital Twin →
+          </button>
         </div>
       </Section>
 
@@ -337,6 +343,9 @@ export default function InteriorDesignLanding() {
             <h2 className="text-2xl sm:text-3xl font-black text-stone-900 leading-tight">{audit.title}</h2>
             <p className="mt-4 text-sm text-stone-600 leading-relaxed">{audit.intro}</p>
             <p className="mt-4 text-sm text-stone-700 font-semibold">{audit.outro}</p>
+            <button onClick={() => setDetailKind("audit")} className="mt-6 px-6 py-3 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors" data-testid="id-audit-details-btn">
+              Află tot ce include Auditul →
+            </button>
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
             {(audit.points || []).map((p, i) => (
@@ -401,7 +410,10 @@ export default function InteriorDesignLanding() {
       {/* ECOSISTEM */}
       <Section id="ecosistem" className="py-14">
         <h2 className="text-2xl sm:text-3xl font-black text-stone-900 mb-2">{eco.title || "Parte dintr-un ecosistem complet"}</h2>
-        <p className="text-sm text-stone-500 mb-8 max-w-2xl">{eco.intro}</p>
+        <p className="text-sm text-stone-500 mb-6 max-w-2xl">{eco.intro}</p>
+        <div className="mb-8 p-5 rounded-3xl bg-stone-50 border border-stone-100" data-testid="id-canonical-flow">
+          <EcosystemFlow />
+        </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {(eco.links || []).map((s, i) => (
             <Link key={i} to={s.href} className="p-5 rounded-3xl border border-stone-100 hover:border-emerald-300 hover:shadow-lg transition-all group" data-testid={`id-eco-${i}`}>
@@ -466,6 +478,16 @@ export default function InteriorDesignLanding() {
       </footer>
 
       <AssistantWidget />
+      {detailKind && (
+        <ServiceDetailModal
+          kind={detailKind}
+          onClose={() => setDetailKind(null)}
+          primaryCta={{
+            label: detailKind === "audit" ? "Solicită Audit" : "Solicită Digital Twin",
+            onClick: scrollToForm,
+          }}
+        />
+      )}
     </div>
   );
 }
