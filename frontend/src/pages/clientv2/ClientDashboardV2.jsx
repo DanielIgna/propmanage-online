@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { Home, Plus, Wrench, Building2, Settings, Bell, ChevronDown, Shield, LayoutDashboard, ChevronRight } from "lucide-react";
+import { Home, Plus, Wrench, Building2, Settings, Bell, ChevronDown, Shield, ChevronRight } from "lucide-react";
 import { useAuth, formatApiError } from "../../auth";
 import { API } from "../DashShared";
 import { GREEN, Sheet } from "./ui";
@@ -213,15 +213,6 @@ export default function ClientDashboardV2() {
               className="w-full flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm text-left">
               <span className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center"><Shield className="w-5 h-5 text-slate-500" /></span>
               <span className="text-sm font-black text-slate-900 flex-1">Securitate (2FA)</span>
-              <ChevronRight className="w-4 h-4 text-slate-300" />
-            </button>
-            <button onClick={() => { localStorage.setItem("pm_client_ui", "legacy"); window.location.reload(); }} data-testid="v2-switch-legacy"
-              className="w-full flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm text-left">
-              <span className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center"><LayoutDashboard className="w-5 h-5 text-slate-500" /></span>
-              <div className="flex-1">
-                <div className="text-sm font-black text-slate-900">Dashboardul clasic</div>
-                <div className="text-[10px] text-slate-400">comută temporar la interfața veche</div>
-              </div>
               <ChevronRight className="w-4 h-4 text-slate-300" />
             </button>
             <div className="pt-2 rounded-3xl bg-stone-900 p-4" data-testid="v2-settings-legacy-panel"><SettingsPanel /></div>

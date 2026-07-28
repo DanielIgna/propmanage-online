@@ -4019,3 +4019,39 @@ resume live contra Resend sandbox → re-blocat corect fără buclă ✓, govern
 execute_silent restaurat ✓, UI smoke ✓ (100% încredere, 30 rulări afișat pe card).
 **Flux post-DNS Resend**: user verifică domeniul → Orchestrator → «Reia emailurile
 blocate» → toate emailurile păstrate se livrează.
+
+---
+
+## ✅ PM-ARCHITECT-002 — CANONICAL PLATFORM ENFORCEMENT (28 Iul 2026)
+**ROOT CAUSE Preview vs Live GĂSIT**: /client trecea prin ClientDashboardSwitch care alegea
+între dashboard legacy (939 linii) și V2 pe baza localStorage `pm_client_ui`. Userii care
+apăsaseră cândva «dashboardul clasic» aveau flag-ul persistat PE BROWSERUL LOR → vedeau
+vechiul ecran la infinit, indiferent de deploy. Preview (browser curat) → V2. FIXAT.
+**Implementat (risc redus, acum)**:
+1. /client → ClientDashboardV2 DIRECT (canonic). Șterse: ClientDashboardSwitch.jsx,
+   ClientDashboard.jsx (legacy), lazy import mort din App.js, export din barrel Dashboards.
+2. Șters ClientV2Wireframe.jsx + ruta moartă /dashboard/client-v2 (mock design Faza 3).
+3. Șters BugMemoryPage.jsx (mort — înlocuit de BugMemoryAggregatorPage).
+4. Backend: șters routes/twin_orchestrator.py (sistem mort: feature flag OFF, 0 utilizare
+   frontend) — scos din register.py + câmpul enable_twin_orchestrator din app_settings.
+5. Șters butonul mort «Dashboardul clasic» din setările V2 (raportat de testing agent).
+**Clasificare cele 4 sisteme Twin**:
+- routes/twin.py (/api/admin/twin) = AI-ul platformei (Q&A admin) — DOMENIU DIFERIT, doar
+  naming confuz. RESPINS rename (breaking change fără beneficiu).
+- routes/digital_twin.py = CANONIC (digital_twin_projects/models/pins/plans).
+- routes/operator_twins.py + colecția `twins` (74 docs) = lifecycle per property_id.
+  Colecția `twins` e folosită de 16 fișiere backend (passport, DNA, properties, requests,
+  value_loop, seed...). Unificare cu digital_twin_projects = RISC MARE → PLANIFICAT
+  post-pilot (plan: twins devine sub-document `lifecycle` în digital_twin_projects,
+  migrare cu dual-read, apoi cutover). NU acum, cu 13 apartamente pilot iminente.
+- routes/twin_orchestrator.py = ELIMINAT (mort).
+**Role system**: câte un dashboard canonic per ROL (client/specialist/operator/admin) —
+acceptabil (persona diferită). Tier-urile NU încarcă dashboard-uri separate: specialist
+ENTRY primește view simplificat ÎN ACELAȘI component (SpecialistEntryHome în
+SpecialistDashboard, gated de tierInfo.tier din backend). Client junior = funnel public
+pre-auth (/incepe), nu duplicat.
+**VALIDAT: iteration_154.json — backend 8/8 (100%), frontend 100% (login client cu flag
+legacy persistat → tot V2, tab-uri, wizard, 4 roluri fără regresii, twin-orchestrator 404).**
+**Riscuri rămase**: (a) unificarea twins/digital_twin_projects (planificată); (b) panouri
+gamification din legacy (QuestPanel, TierCelebration, TierProgress) nemontate în V2 —
+decizie de produs dacă revin; (c) naming twin.py.
