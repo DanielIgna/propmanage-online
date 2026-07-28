@@ -3939,3 +3939,30 @@ GhiduriIndex, PreturiIndex, eco links design-interior (content v4).
 ServiceProvidersPage.jsx (/servicii/:id). MenuManagerPage: panou ⚙ Detalii serviciu +
 editor parteneri.
 **VALIDAT: iteration_151.json — backend 8/8 (100%), frontend 100%, regresii zero.**
+
+---
+
+## ✅ CONVERSION JOURNEY + CUSTOMER JOURNEY GUARDIAN (28 Iul 2026)
+**1. Journey chaining în ServiceDetailModal** (JOURNEY_NEXT): CTA secundar continuă
+călătoria — Audit → «Continuă: Digital Twin» → «Continuă: cele 17 etape» → link-uri finale
+Implementare + House Health. Când utilizatorul avansează în lanț, CTA primar devine
+«Începe procesul complet» → /imobile-verificate/sell (conversie bundle).
+**2. Breadcrumbs automate** (EcosystemFlow): pașii dinaintea activeKey marcați «✓ parcurs»
+(stil dim accent) — clientul vede unde e, ce a înțeles, ce urmează.
+**3. NextStep** (components/ecosystem/NextStep.jsx) — zero fundături: /servicii/:id
+(«Începe cu un audit»), /imobile-verificate («Transform-o în Imobil Verificat»),
+/design-interior ecosistem («Vezi Imobilele Verificate»), /house-health/upgrade
+(«Solicită Audit + Digital Twin»).
+**4. Customer Journey Guardian** (/app/backend/journey_guardian.py):
+   - Verificări reale pe configurația publică: link-uri moarte în meniu (vs PUBLIC_ROUTES),
+     servicii active fără descriere, servicii external fără parteneri, flux canonic rupt
+     (≠9 pași / href-uri invalide), audit_full/twin_full incomplete, ≠17 etape proces.
+   - Task lifecycle automat în db.journey_guardian_tasks: creare fără duplicate (upsert pe
+     key), auto-resolve când problema dispare, assigned_to=cto_ai, cu affected files/
+     expected/business_impact/severity.
+   - Cron zilnic 06:50 + ledger + Decision Memory + notificare admin la critice.
+   - Rute: GET/POST /api/admin/repair-center/journey-guardian/{status,run}.
+   - UI: secțiunea «Customer Journey Guardian» în /admin/repair-center (task list + run).
+   - Prima rulare reală: 1 task detectat corect (mobilier fără parteneri, medium).
+**VALIDAT: iteration_152.json — backend 4/4 (100%), frontend 100% (chaining, breadcrumbs,
+NextStep×4, guardian UI, regresii zero, auto-resolve + restaurare stare).**
