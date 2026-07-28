@@ -189,11 +189,15 @@ export const SpecialistDashboard = () => {
             />
           ),
         };
-        const order = xosLayout || [
+        const defaultOrder = [
           { id: "today_summary", enabled: true }, { id: "cockpit", enabled: true },
           { id: "pb_benefits", enabled: true },
           { id: "quests", enabled: true }, { id: "tier_tools", enabled: true }, { id: "tier_progress", enabled: true },
         ];
+        // layout-urile stocate primesc automat widget-urile noi din default (altfel rămân invizibile)
+        const order = xosLayout
+          ? [...xosLayout, ...defaultOrder.filter(d => !xosLayout.some(w => w.id === d.id))]
+          : defaultOrder;
         const rail = order
           .filter(w => w.enabled && !xosHidden.includes(`widget:${w.id}`))
           .map(w => <React.Fragment key={w.id}>{xosWidgets[w.id] || null}</React.Fragment>);

@@ -294,11 +294,11 @@ class TestMentorIntegration:
         ids = []
         for a in actions:
             ids.append(a.get("id", ""))
+            ids.append(a.get("source_action_id") or "")
         pb_ids = [i for i in ids if str(i).startswith("pb_")]
-        # Report as informational — the mentor endpoint may pass actions through
-        # decisions layer which reassigns IDs. Accept if any action title is PB-driven.
+        # Provenance real: source_action_id păstrează prefixul pb_ prin decision layer.
         titles = [(a.get("title") or "").lower() for a in actions]
-        has_pb_title = any(("benefic" in t) or ("propbenef" in t) for t in titles)
+        has_pb_title = any(("benefic" in t) or ("casa ta" in t) for t in titles)
         assert pb_ids or has_pb_title, f"no pb_ action found. ids={ids} titles={titles}"
 
 

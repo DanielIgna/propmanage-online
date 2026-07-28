@@ -1,3 +1,32 @@
+## 🌐 PB-002 — PROPBENEFITS EVERYWHERE · LIVRAT & TESTAT (28 Iul 2026)
+
+**Misiune: platforma ADUCE beneficiile în context — utilizatorul nu le caută. Slogan oficial: „PropManage nu vinde reduceri. Construiește valoare pentru proprietari prin puterea comunității."**
+
+**Backend** (`propbenefits/summaries.py`, `community_deals.py`, extensii `health.py`/`ai_agents.py`):
+- **Benefits Pulse** (`/api/benefits/pulse`) — primele 30s ale clientului: beneficii disponibile acum + valoare, „cât ai câștigat prin ecosistem" (beneficii folosite + lead fees waived ×45 RON), aproape deblocate, negocieri comunitate (preview 3), next action, slogan.
+- **Community Deals** (`/api/benefits/community-deals` + support; admin CRUD) — negocierea comunității: 12 deals seed (🇮🇹🇪🇸 gresie, 🛋 mobilier DE/IT/NL/SE/DK, 🎨 design, 🚿 baie, ⚡ pompe, ☀️ fotovoltaice, 🏠 City Partner Cluj), statusuri in_lucru/negociere/pilot/lansat, susținere idempotentă ($addToSet). **FĂRĂ procente promise** — disclaimer obligatoriu.
+- **Specialist summary** (`/api/benefits/specialist-summary`) — profil %, verificare, campania lunii, beneficii parteneri activi.
+- **Building summary** (`/api/benefits/building-summary/{id}`) — participare apartamente, abonamente, campanii asociație, „ce deblocați împreună".
+- **Marketplace flags** (`/api/benefits/marketplace-flags`) — 🟢 Beneficiu Activ / 🟡 Disponibil prin abonament / 🔒 Se deblochează după… / ✓ folosit.
+- **Context banners** (`/api/benefits/context-banner/{house_health|digital_twin}`) — AI vorbește despre casă cu efecte ✔ (HH crește, beneficiu activ, puncte / campanii Premium, beneficii exclusive, nivel superior).
+- **AI Success Manager house-centric** — mesajele vorbesc despre CASĂ („Casa ta este documentată în proporție de X% — cu încă N documente…"), nu despre platformă.
+- **North Star** (`/api/admin/prop-benefits/north-star`) — 3.000 abonamente ACTIVE și SĂNĂTOASE (healthy = health≥70) + 4 dimensiuni (folosesc/întrețin/beneficiază/recomandă); obiectiv COMUN injectat în promptul Growth Advisor.
+
+**Frontend** (`components/pb/PbEverywhere.jsx` — 6 componente montate în TOATE suprafețele):
+- Client Home (`HomeV2`): widget „Valoarea abonamentului tău azi" (pb-pulse) + next action + preview negocieri.
+- PropBenefitsHub: secțiune Community Deals (12 carduri, „Susțin" → „Susținut ✓").
+- Specialist rail: „PropBenefits pentru tine" (pb-specialist-card) — cu merge automat al widget-urilor noi în xosLayout stocat (fix HIGH din testare).
+- AdministratorWorkspace → BuildingDetail: „Beneficii pentru întreaga clădire" (pb-building-card).
+- HouseHealthPage + DigitalTwinPage: bannere contextuale (pb-banner-*).
+- Marketplace: strip flags (pb-mkt-strip; NOTĂ: ServiceGate „specialisti" redirecționează clientul demo — comportament pre-existent, endpoint-ul funcționează).
+- Admin PropBenefits: **North Star widget** (pbadmin-north-star cu progres + 4 dimensiuni + definiție) + tab **Community Deals** (add + status select) + slogan.
+
+**Testare**: iteration_168 — backend 20/20 (+1 skip: buildings goale în demo), frontend ~85% → fix-uri aplicate (xosLayout merge + test mentor pe source_action_id) → **suita completă PB-001+PB-002: 44 passed, 1 skipped**. Screenshot specialist card confirmat (3 mesaje).
+
+**Rămas minor**: ServiceGate 'specialisti' blochează /marketplace pt clientul demo (pre-existent, de discutat la integrare marketplace).
+
+---
+
 ## 🎁 PB-001 — PROPBENEFITS ENGINE FOUNDATION · LIVRAT & TESTAT 100% (28 Iul 2026)
 
 **Subsistem strategic la nivelul AI Brain — motorul economic și de retenție. NU e sistem de reduceri. Țintă arhitecturală: 3.000 abonamente active.**
