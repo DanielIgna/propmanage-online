@@ -7,6 +7,7 @@ import { Building2, Star, CheckCircle2, Search, Filter, ArrowLeft, Shield, QrCod
 import { useAuth, formatApiError } from "../auth";
 import { useSEO } from "../hooks/useSEO";
 import { PMCard, PMPillButton, PMChip, PMSectionHeader, PMEmptyState } from "../components/pm";
+import { MarketplaceBenefitStrip } from "../components/pb/PbEverywhere";
 import { EcosystemFlow } from "../components/ecosystem/EcosystemFlow";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -88,6 +89,8 @@ export const PublicMarketplace = () => {
             <EcosystemFlow dark compact activeKey="specialists" />
           </div>
         </div>
+
+        <MarketplaceBenefitStrip />
 
         {/* Filters */}
         <div className="pm-card-glass !p-4 mb-6 flex flex-wrap gap-3 items-center pm-fade-in-delay-1">

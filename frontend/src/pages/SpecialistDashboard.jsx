@@ -28,6 +28,7 @@ import {
   PMSectionHeader, PMEmptyState,
 } from "../components/pm";
 import { SpecialistProgressCard } from "../components/SpecialistProgressCard";
+import { SpecialistBenefitsCard } from "../components/pb/PbEverywhere";
 import { SpecialistCampaigns } from "../components/SpecialistCampaigns";
 import { BetaFeedbackEntry } from "../components/BetaFeedbackWidget";
 import { SpecialistEntryHome } from "./dashboard/SpecialistEntryHome";
@@ -177,6 +178,7 @@ export const SpecialistDashboard = () => {
           // PPOS: Cockpit-ul de pipeline se deblochează la ADVANCED+ (progressive disclosure)
           cockpit: ["ADVANCED", "PREMIUM", "TOP"].includes(user?.tier) ? <SpecialistCockpit onGo={(dest) => (dest === "opportunities" ? window.scrollTo({ top: 0 }) : setTab(dest))} /> : null,
           quests: tierInfo.canSeeQuests ? <QuestPanel hideActive={mine.length > 0 || (user?.jobs_completed || 0) > 0} /> : null,
+          pb_benefits: <SpecialistBenefitsCard />,
           tier_tools: null,
           tier_progress: (
             <SpecialistProgressCard
@@ -189,6 +191,7 @@ export const SpecialistDashboard = () => {
         };
         const order = xosLayout || [
           { id: "today_summary", enabled: true }, { id: "cockpit", enabled: true },
+          { id: "pb_benefits", enabled: true },
           { id: "quests", enabled: true }, { id: "tier_tools", enabled: true }, { id: "tier_progress", enabled: true },
         ];
         const rail = order

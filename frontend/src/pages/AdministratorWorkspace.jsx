@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { API } from "./DashShared";
 import { useAuth, formatApiError } from "../auth";
+import { BuildingBenefitsCard } from "../components/pb/PbEverywhere";
 
 const GREEN = "#166534";
 const DOT = { green: "#22c55e", yellow: "#f59e0b", red: "#ef4444" };
@@ -93,6 +94,8 @@ const BuildingDetail = ({ buildingId, onBack }) => {
             </h3>
             <HealthBar health={d.health} />
           </div>
+
+          <BuildingBenefitsCard buildingId={buildingId} />
 
           <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
             <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-3">

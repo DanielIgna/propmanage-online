@@ -63,6 +63,61 @@ async def my_success_manager(user: dict = Depends(get_current_user)):
 
 
 # ============================================================================
+# PB-002 · PropBenefits Everywhere — sumarele contextuale per rol
+# ============================================================================
+@user_router.get("/pulse")
+async def my_pulse(user: dict = Depends(get_current_user)):
+    from propbenefits.summaries import client_pulse
+    await ensure_seed()
+    return await client_pulse(user)
+
+
+@user_router.get("/specialist-summary")
+async def my_specialist_summary(user: dict = Depends(get_current_user)):
+    from propbenefits.summaries import specialist_summary
+    return await specialist_summary(user)
+
+
+@user_router.get("/building-summary/{building_id}")
+async def my_building_summary(building_id: str, user: dict = Depends(get_current_user)):
+    from propbenefits.summaries import building_summary
+    result = await building_summary(user, building_id)
+    if result.get("error"):
+        raise HTTPException(404, result["error"])
+    return result
+
+
+@user_router.get("/marketplace-flags")
+async def my_marketplace_flags(user: dict = Depends(get_current_user)):
+    from propbenefits.summaries import marketplace_flags
+    await ensure_seed()
+    return await marketplace_flags(user)
+
+
+@user_router.get("/context-banner/{surface}")
+async def my_context_banner(surface: str, user: dict = Depends(get_current_user)):
+    from propbenefits.summaries import context_banner
+    if surface not in ("house_health", "digital_twin"):
+        raise HTTPException(400, "surface invalid — permise: house_health, digital_twin")
+    return await context_banner(user, surface)
+
+
+@user_router.get("/community-deals")
+async def my_community_deals(user: dict = Depends(get_current_user)):
+    from propbenefits.community_deals import list_deals, DISCLAIMER
+    return {"items": await list_deals(user_id=user["id"]), "disclaimer": DISCLAIMER}
+
+
+@user_router.post("/community-deals/{deal_id}/support")
+async def support_community_deal(deal_id: str, user: dict = Depends(get_current_user)):
+    from propbenefits.community_deals import support_deal
+    result = await support_deal(deal_id, user["id"])
+    if result.get("error"):
+        raise HTTPException(404, result["error"])
+    return result
+
+
+# ============================================================================
 # ADMIN — control complet FĂRĂ cod
 # ============================================================================
 @admin_router.get("/overview")
@@ -163,6 +218,38 @@ async def pb_impact_scores(user=Depends(require_role("admin"))):
 @admin_router.get("/growth-advisor")
 async def pb_growth_advisor(refresh: bool = False, user=Depends(require_role("admin"))):
     return await growth_advisor(refresh=refresh)
+
+
+@admin_router.get("/north-star")
+async def pb_north_star(user=Depends(require_role("admin"))):
+    from propbenefits.health import north_star
+    return await north_star()
+
+
+@admin_router.get("/community-deals")
+async def pb_deals_admin(user=Depends(require_role("admin"))):
+    from propbenefits.community_deals import list_deals, DEAL_STATUSES
+    return {"items": await list_deals(include_archived=True), "statuses": DEAL_STATUSES}
+
+
+@admin_router.post("/community-deals")
+async def pb_deal_create(body: dict = Body(...), user=Depends(require_role("admin"))):
+    from propbenefits.community_deals import upsert_deal
+    try:
+        return await upsert_deal(body)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@admin_router.patch("/community-deals/{deal_id}")
+async def pb_deal_update(deal_id: str, body: dict = Body(...), user=Depends(require_role("admin"))):
+    from propbenefits.community_deals import upsert_deal
+    try:
+        return await upsert_deal(body, deal_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except LookupError as e:
+        raise HTTPException(404, str(e))
 
 
 @admin_router.post("/run-tick")

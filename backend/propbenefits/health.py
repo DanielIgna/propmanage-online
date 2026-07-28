@@ -138,6 +138,36 @@ async def ecosystem_health() -> dict:
 
 
 # ---------------------------------------------------------------------------
+# North Star — 3.000 de abonamente ACTIVE și SĂNĂTOASE (obiectiv comun al agenților)
+# ---------------------------------------------------------------------------
+async def north_star() -> dict:
+    now = _iso()
+    since30 = _iso(_now() - timedelta(days=30))
+    active = await db.hh_subscriptions.count_documents({"status": "active", "expires_at": {"$gt": now}})
+    sub_uids = await db.hh_subscriptions.distinct("user_id", {"status": "active", "expires_at": {"$gt": now}})
+    healthy = await db.pb_subscription_health.count_documents({"user_id": {"$in": sub_uids}, "score": {"$gte": 70}}) if sub_uids else 0
+    using = len([u for u in await db.ai_brain_navigation.distinct("user_id", {"ts": {"$gte": since30}}) if u in set(sub_uids)]) if sub_uids else 0
+    maintaining = len(await db.maintenance_tasks.distinct("user_id", {"user_id": {"$in": sub_uids}})) if sub_uids else 0
+    benefiting = len(await db.pb_ledger.distinct("user_id", {"user_id": {"$in": sub_uids}})) if sub_uids else 0
+    referring = len(await db.referral_invites.distinct("inviter_id", {"inviter_id": {"$in": sub_uids}, "claimed_by": {"$ne": None}})) if sub_uids else 0
+    return {
+        "label": "3.000 de abonamente active și sănătoase",
+        "target": 3000,
+        "active": active,
+        "healthy": healthy,
+        "progress_pct": round(100 * healthy / 3000, 2),
+        "dimensions": [
+            {"key": "using", "label": "Folosesc platforma (30z)", "value": using},
+            {"key": "maintaining", "label": "Își întrețin locuința", "value": maintaining},
+            {"key": "benefiting", "label": "Beneficiază de campanii", "value": benefiting},
+            {"key": "referring", "label": "Recomandă alți membri", "value": referring},
+        ],
+        "definition": "Nu doar 3.000 de abonamente — 3.000 de abonați care folosesc platforma, își întrețin locuințele, beneficiază de campanii și recomandă alți membri. Fiecare abonat crește puterea de negociere a comunității.",
+        "generated_at": now,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Subscription Impact Score — per modul (vizibil în Discovery Center)
 # ---------------------------------------------------------------------------
 IMPACT_DECLARED = {

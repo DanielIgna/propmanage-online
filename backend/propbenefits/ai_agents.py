@@ -41,29 +41,30 @@ async def success_manager(user: dict) -> dict:
     if wallet["counts"].get("available"):
         soon = sorted(wallet["available"], key=lambda b: b.get("expires_at") or "")[0]
         candidates.append(_act("use_benefit",
-                               f"Folosește beneficiul „{soon['title']}”",
-                               "Îl ai deja câștigat — nu-l lăsa să expire.",
+                               f"Casa ta are un beneficiu câștigat care așteaptă: „{soon['title']}”",
+                               "L-ai câștigat prin comunitate — folosește-l înainte să expire, casa ta merită.",
                                "/client?tab=benefits", 9))
-    if ctx["documents"] < 3:
-        missing = 3 - ctx["documents"]
+    if ctx["documents"] < 5:
+        doc_pct = min(95, ctx["documents"] * 20)
+        missing = max(1, 3 - ctx["documents"])
         candidates.append(_act("docs_for_benefit",
-                               f"Îți mai lipsesc {missing} documente pentru primul Beneficiu Activ",
-                               "Cartea casei completă deblochează beneficii și crește valoarea proprietății.",
+                               f"Casa ta este documentată în proporție de {doc_pct}%",
+                               f"Cu încă {missing} documente, istoricul tehnic devine mult mai complet — și vei avea acces la beneficii suplimentare atunci când sunt disponibile.",
                                "/client?tab=property", 8))
     if ctx["twins"] == 0:
         candidates.append(_act("activate_twin",
-                               "Activează Digital Twin pentru acces la campaniile exclusive",
-                               "Membrii cu twin au acces la auditul acoperit 70% și la beneficiile Verified.",
+                               "Casa ta nu are încă geamăn digital",
+                               "Finalizează Digital Twin și deblochezi Campaniile Premium, Beneficiile Exclusive și un nivel superior de membru.",
                                "/digital-twin", 8))
     if not ctx["hh_score"] and ctx["properties"] > 0:
         candidates.append(_act("house_health",
-                               "Pornește House Health — scorul casei tale",
-                               "Un scor calculat îți deblochează recomandări și beneficii dedicate.",
+                               "Casa ta nu are încă un scor de sănătate",
+                               "House Health îți arată exact ce merită îngrijit — iar verificările din campaniile active cresc scorul și îți aduc puncte de progres.",
                                "/house-health", 7))
     if feed["opportunities"]:
         top = feed["opportunities"][0]
         candidates.append(_act("claim_opportunity",
-                               f"Activează oportunitatea „{top['title']}”",
+                               f"Comunitatea a pregătit pentru casa ta: „{top['title']}”",
                                (top.get("why") or ["Este relevantă pentru casa ta."])[0],
                                "/client?tab=benefits", 7))
     if ctx["subscription_active"] and ctx.get("subscription_expires_at"):
@@ -71,15 +72,15 @@ async def success_manager(user: dict) -> dict:
             days = (datetime.fromisoformat(str(ctx["subscription_expires_at"]).replace("Z", "+00:00")) - _now()).days
             if 0 <= days <= 14:
                 candidates.append(_act("renew_subscription",
-                                       f"Abonamentul tău expiră în {days} zile",
-                                       "Reînnoiește-l ca să nu pierzi beneficiile active și scorul House Health.",
+                                       f"Grija pentru casa ta expiră în {days} zile",
+                                       "Reînnoiește abonamentul ca să păstrezi beneficiile active, scorul House Health și puterea comunității de partea ta.",
                                        "/house-health/upgrade", 10))
         except Exception:  # noqa: BLE001
             pass
     if ctx["referrals_claimed"] == 0 and ctx["completed_jobs"] >= 1:
         candidates.append(_act("invite_neighbor",
-                               "Invită un vecin — Beneficiu Comunitate pentru amândoi",
-                               "Beneficiul se activează când vecinul își pornește abonamentul sau primul serviciu.",
+                               "Un vecin în plus = o comunitate mai puternică pentru casa ta",
+                               "Când vecinul invitat își activează abonamentul sau primul serviciu, amândoi primiți un Beneficiu Comunitate.",
                                "/client?tab=settings", 6))
 
     candidates.sort(key=lambda a: -a["impact"])
@@ -134,15 +135,20 @@ async def growth_advisor(refresh: bool = False) -> dict:
     summary_text = ""
     try:
         from ai_core.provider import call_llm
-        metrics_txt = (f"Ecosystem Health {eco['score']}/100 · abonamente active {eco['components'][0]['value']} "
-                       f"(țintă finală 3000) · retenție 30z {eco['components'][1]['value']}% · "
+        from propbenefits.health import north_star
+        ns = await north_star()
+        metrics_txt = (f"NORTH STAR: {ns['healthy']} abonamente sănătoase din ținta de 3000 (active: {ns['active']}; "
+                       f"dimensiuni: {[(d['label'], d['value']) for d in ns['dimensions']]}) · "
+                       f"Ecosystem Health {eco['score']}/100 · retenție 30z {eco['components'][1]['value']}% · "
                        f"campanii: {[(c['title'], c['claims']) for c in camp_stats[:6]]} · "
                        f"referral: {activated_ref} activate / {pending_ref} pending · "
                        f"at-risk {at_risk} · watch {watch} · expiră 30z {expiring} · orașe top {[(c['_id'], c['n']) for c in cities]}")
         r = await call_llm(
             "Ești AI Growth Advisor pentru PropManage (Home Graph, România). Răspunzi DOAR în română, "
-            "concis, acționabil. Obiectiv: creșterea abonamentelor active spre 3000, retenție și comunitate. "
-            "NU propui reduceri — propui beneficii, campanii, retenție. Format: 3-5 acțiuni numerotate, fiecare cu impactul estimat.",
+            "concis, acționabil. OBIECTIV COMUN (North Star, împărțit cu AI Success Manager): 3.000 de abonamente "
+            "ACTIVE și SĂNĂTOASE — abonați care folosesc platforma, își întrețin locuințele, beneficiază de campanii "
+            "și recomandă alți membri. REGULĂ: PropManage nu vinde reduceri — construiește valoare pentru proprietari "
+            "prin puterea comunității. Format: 3-5 acțiuni numerotate, fiecare cu impactul estimat asupra North Star.",
             f"Datele reale ale platformei azi: {metrics_txt}. Constatări deterministe: {findings}. Propune acțiunile săptămânii.")
         summary_text = r.get("text", "")
     except Exception as e:  # noqa: BLE001

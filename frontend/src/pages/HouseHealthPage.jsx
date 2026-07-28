@@ -12,6 +12,7 @@ import { DocumentsSection } from "./house_health/DocumentsSection";
 import { HistorySection } from "./house_health/HistorySection";
 import { EvaluationSection } from "./house_health/EvaluationSection";
 import { RecommendationsSection } from "./house_health/RecommendationsSection";
+import { PbContextBanner } from "../components/pb/PbEverywhere";
 
 const HouseHealthPage = () => {
   const { twinId } = useParams();
@@ -55,6 +56,8 @@ const HouseHealthPage = () => {
             </p>
           </div>
         </div>
+
+        <PbContextBanner surface="house_health" />
 
         <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-5">
           <aside className="bg-stone-900/40 border border-stone-800 rounded-2xl p-3 h-fit" data-testid="hh-sidebar">

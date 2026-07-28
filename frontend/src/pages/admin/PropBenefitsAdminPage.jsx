@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
   Gift, ChevronLeft, Loader2, Plus, RefreshCw, HeartPulse, Globe2, Brain,
-  Megaphone, SlidersHorizontal, Play, Pencil, X,
+  Megaphone, SlidersHorizontal, Play, Pencil, X, Handshake, Target,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -183,6 +183,43 @@ const ConfigPanel = () => {
   );
 };
 
+const DealsPanel = () => {
+  const [d, setD] = useState(null);
+  const [nt, setNt] = useState("");
+  const load = () => ax.get("/api/admin/prop-benefits/community-deals").then(r => setD(r.data)).catch(() => {});
+  useEffect(() => { load(); }, []);
+  if (!d) return <Loader2 className="w-4 h-4 animate-spin text-stone-500" />;
+  const setStatus = async (id, status) => { await ax.patch(`/api/admin/prop-benefits/community-deals/${id}`, { status }); load(); };
+  const add = async () => {
+    if (!nt.trim()) return;
+    await ax.post("/api/admin/prop-benefits/community-deals", { title: nt, status: "in_lucru" });
+    setNt(""); load();
+  };
+  return (
+    <div className="space-y-2" data-testid="pbadmin-deals">
+      <p className="text-[11px] text-stone-500">Negocierea comunității. REGULĂ: nu promitem procente — beneficiile depind de acordurile comerciale și de puterea comunității la momentul lansării.</p>
+      <div className="flex gap-2">
+        <input value={nt} onChange={e => setNt(e.target.value)} placeholder="Deal nou (ex: 🚪 Uși interior Polonia)"
+          className="flex-1 bg-stone-800 border border-stone-700 rounded-xl px-3 py-2 text-sm text-white" data-testid="pbadmin-deal-new-title" />
+        <button onClick={add} className="px-3 py-2 text-xs rounded-xl bg-[#d4ff3a] text-stone-900 font-bold" data-testid="pbadmin-deal-add">Adaugă</button>
+      </div>
+      {d.items.map(deal => (
+        <div key={deal.id} className="bg-stone-900/40 border border-stone-800 rounded-xl p-3 flex items-center gap-3 flex-wrap" data-testid={`pbadmin-deal-${deal.id}`}>
+          <span className="text-lg">{deal.emoji}</span>
+          <div className="flex-1 min-w-[180px]">
+            <div className="text-xs font-bold text-white">{deal.title}</div>
+            <div className="text-[10px] text-stone-500">{deal.category || "—"} · {deal.supporters} susținători</div>
+          </div>
+          <select value={deal.status} onChange={e => setStatus(deal.id, e.target.value)}
+            className="bg-stone-800 border border-stone-700 rounded-lg px-2 py-1.5 text-[11px] text-white" data-testid={`pbadmin-deal-status-${deal.id}`}>
+            {d.statuses.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export default function PropBenefitsAdminPage() {
   const navigate = useNavigate();
   const [ov, setOv] = useState(null);
@@ -193,10 +230,12 @@ export default function PropBenefitsAdminPage() {
   const [advisorBusy, setAdvisorBusy] = useState(false);
   const [form, setForm] = useState(null);
   const [tickBusy, setTickBusy] = useState(false);
+  const [ns, setNs] = useState(null);
 
   const load = useCallback(() => {
     ax.get("/api/admin/prop-benefits/overview").then(r => setOv(r.data)).catch(() => {});
     ax.get("/api/admin/prop-benefits/campaigns").then(r => setCamps(r.data.items || [])).catch(() => {});
+    ax.get("/api/admin/prop-benefits/north-star").then(r => setNs(r.data)).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -216,6 +255,7 @@ export default function PropBenefitsAdminPage() {
   const eco = ov?.ecosystem;
   const TABS = [
     { id: "campaigns", label: `Campanii (${camps.length})`, icon: Megaphone },
+    { id: "deals", label: "Community Deals", icon: Handshake },
     { id: "config", label: "Niveluri & Config", icon: SlidersHorizontal },
     { id: "health", label: "Subscription Health", icon: HeartPulse },
     { id: "advisor", label: "AI Growth Advisor", icon: Brain },
@@ -235,7 +275,32 @@ export default function PropBenefitsAdminPage() {
             {tickBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />} Rulează tick-ul zilnic
           </button>
         </div>
-        <p className="text-xs text-stone-500 mb-5">Nu e un sistem de reduceri — e motorul economic și de retenție. Țintă arhitecturală: 3.000 de abonamente active.</p>
+        <p className="text-xs text-stone-500 mb-5">PropManage nu vinde reduceri. Construiește valoare pentru proprietari prin puterea comunității.</p>
+
+        {ns && (
+          <div className="border border-[#d4ff3a]/25 bg-[#d4ff3a]/5 rounded-2xl p-4 mb-4" data-testid="pbadmin-north-star">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              <Target className="w-4 h-4 text-[#d4ff3a]" />
+              <span className="text-xs font-black uppercase tracking-wider text-[#d4ff3a]">North Star — obiectivul comun al agenților AI</span>
+              <span className="text-[10px] text-stone-500">AI Growth Advisor + AI Success Manager</span>
+            </div>
+            <div className="flex items-end gap-3 flex-wrap">
+              <div className="text-3xl font-black text-white" data-testid="pbadmin-ns-value">{ns.healthy}</div>
+              <div className="text-xs text-stone-400 pb-1">/ {ns.target} abonamente active și sănătoase</div>
+              <div className="flex-1" />
+              {ns.dimensions.map(dd => (
+                <div key={dd.key} className="text-center px-2">
+                  <div className="text-sm font-bold text-white">{dd.value}</div>
+                  <div className="text-[9px] text-stone-500 leading-tight max-w-[90px]">{dd.label}</div>
+                </div>
+              ))}
+            </div>
+            <div className="h-1.5 bg-stone-800 rounded-full overflow-hidden mt-2.5">
+              <div className="h-full rounded-full bg-[#d4ff3a]" style={{ width: `${Math.max(0.5, ns.progress_pct)}%` }} />
+            </div>
+            <p className="text-[10px] text-stone-500 mt-1.5">{ns.definition}</p>
+          </div>
+        )}
 
         {ov && (
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6" data-testid="pbadmin-kpis">
@@ -281,6 +346,8 @@ export default function PropBenefitsAdminPage() {
             ))}
           </div>
         )}
+
+        {tab === "deals" && <DealsPanel />}
 
         {tab === "config" && <ConfigPanel />}
 

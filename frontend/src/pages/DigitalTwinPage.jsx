@@ -5,6 +5,7 @@ import axios from "axios";
 import { Box, Plus, Lock, Eye, Trash2, ArrowLeft, Sparkles, ExternalLink, Upload, FileBox, X, Layers, BellRing } from "lucide-react";
 import { API } from "./DashShared";
 import DigitalTwinViewer from "../components/DigitalTwinViewer";
+import { PbContextBanner } from "../components/pb/PbEverywhere";
 import DigitalTwinPlans from "../components/DigitalTwinPlans";
 import SentReportsDashboard from "../components/SentReportsDashboard";
 
@@ -445,8 +446,7 @@ export default function DigitalTwinPage() {
             <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-400/80 font-semibold mb-1">Premium · Digital Twin Pro</div>
             <h1 className="font-serif text-4xl">Proiectele tale 3D</h1>
             <p className="text-sm text-stone-400 mt-1">Vizualizare BIM colaborativă · X-Ray · pin-uri · workflow inter-specialități</p>
-          </div>
-          <div className="flex items-center gap-2">
+          </div>          <div className="flex items-center gap-2">
             <button
               onClick={() => setShowSentReports(true)}
               className="relative inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white/5 hover:bg-white/10 text-stone-300 text-sm"
@@ -469,6 +469,8 @@ export default function DigitalTwinPage() {
             </button>
           </div>
         </header>
+
+        <PbContextBanner surface="digital_twin" />
 
         {projects.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center" data-testid="dt-empty-state">
