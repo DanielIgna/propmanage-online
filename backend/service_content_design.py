@@ -13,7 +13,7 @@ IMG = {
 }
 
 DEFAULT_CONTENT: dict[str, Any] = {
-    "content_version": 3,
+    "content_version": 4,
     "active": True,
     "show_on_homepage": True,
     "menu_order": 1,
@@ -183,14 +183,13 @@ DEFAULT_CONTENT: dict[str, Any] = {
         "title": "Parte dintr-un ecosistem complet",
         "intro": "Interior Intelligence nu e un serviciu izolat. Fiecare etapă e conectată la platforma PropManage — aceleași date, aceiași specialiști, aceeași protecție.",
         "links": [
-            {"title": "Marketplace", "text": "Cereri de ofertă și servicii pentru orice lucrare.", "href": "/marketplace"},
-            {"title": "Specialiști verificați", "text": "Identitate, portofoliu și recenzii verificate.", "href": "/marketplace"},
+            {"title": "Imobile Verificate", "text": "Proprietăți cu istoric tehnic transparent.", "href": "/imobile-verificate"},
+            {"title": "Mobilier la comandă", "text": "Parteneri verificați, de la proiect la montaj.", "href": "/servicii/mobilier"},
             {"title": "Audit locuință", "text": "Diagnoza tehnică — primul pas al oricărui proiect.", "href": "/house-health"},
             {"title": "Digital Twin", "text": "Copia digitală completă a proprietății tale.", "href": "/#twin"},
             {"title": "House Health", "text": "Monitorizare și întreținere planificată.", "href": "/house-health"},
             {"title": "Escrow", "text": "Plăți protejate — banii se eliberează doar la aprobare.", "href": "/preturi"},
             {"title": "Wallet", "text": "Plăți și bugete gestionate central în platformă.", "href": "/dashboard"},
-            {"title": "Imobile Verificate", "text": "Proprietăți cu istoric tehnic transparent.", "href": "/imobile-verificate"},
             {"title": "Ghiduri", "text": "Resurse practice despre amenajare și renovare.", "href": "/community"},
             {"title": "Cereri Proiect", "text": "Pornește un proiect în 2 minute, fără obligații.", "href": "/register"},
             {"title": "Comunitate", "text": "Întrebări, răspunsuri și experiențe reale.", "href": "/community"},

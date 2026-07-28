@@ -8,6 +8,7 @@ import {
   Activity, Layers, Cpu, Award, MessageSquare, Camera, Bell, Plus, Minus, Languages, LogIn, LogOut, LayoutDashboard, ShieldCheck
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./auth";
+import { ServiceGate } from "./components/ServiceGate";
 import { I18nProvider, useI18n } from "./i18n";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { DesignTokensProvider } from "./contexts/DesignTokensProvider";
@@ -98,6 +99,7 @@ const EnterpriseExplorer = lazy(() => import("./pages/admin/EnterpriseExplorer")
 const ArchitectureNavigator = lazy(() => import("./pages/admin/ArchitectureNavigator"));
 const EnterpriseHealthPage = lazy(() => import("./pages/admin/EnterpriseHealthPage"));
 const RepairCenterPage = lazy(() => import("./pages/admin/RepairCenterPage"));
+const ServiceProvidersPage = lazy(() => import("./pages/ServiceProvidersPage"));
 const CeoBriefingPage = lazy(() => import("./pages/admin/CeoBriefingPage"));
 const EvolutionCouncilPage = lazy(() => import("./pages/admin/EvolutionCouncilPage"));
 const HealthScorePage = lazy(() => import("./pages/growth/HealthScorePage"));
@@ -1600,8 +1602,9 @@ function App() {
               <Route path="/specialist/capabilities" element={<CapabilityEditorPage />} />
               <Route path="/kyc" element={<KYCPage />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="/marketplace" element={<PublicMarketplace />} />
-              <Route path="/marketplace/:slug" element={<MarketplaceLanding />} />
+              <Route path="/marketplace" element={<ServiceGate serviceId="specialisti"><PublicMarketplace /></ServiceGate>} />
+              <Route path="/marketplace/:slug" element={<ServiceGate serviceId="specialisti"><MarketplaceLanding /></ServiceGate>} />
+              <Route path="/servicii/:id" element={<ServiceProvidersPage />} />
               <Route path="/imobile-verificate" element={<EstateBrowse />} />
               <Route path="/de-ce-noi" element={<WhyUsPage />} />
               <Route path="/imobile-verificate/sell" element={<SellMyProperty />} />

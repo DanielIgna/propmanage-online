@@ -16,22 +16,53 @@ router = APIRouter(prefix="/api", tags=["site-menu"])
 logger = logging.getLogger("propmanage.site_menu")
 
 # visibility: "all" | "guests" (doar vizitatori) | "auth" (doar autentificați)
+# dest_type (servicii): "internal" | "marketplace" | "external" | "none"
+MENU_VERSION = 2
+
+
+def _svc(id, label, href, icon, *, active, category, description, dest_type="internal", providers=None):
+    return {
+        "id": id, "label": label, "href": href, "icon": icon,
+        "active": active, "visible_site": active, "visible_marketplace": dest_type == "marketplace",
+        "visibility": "all", "category": category, "description": description,
+        "image": "", "dest_type": dest_type, "providers": providers or [], "children": [],
+    }
+
+
+# CONFIG BETA: active DOAR Imobile Verificate, Design Interior, Digital Twin, Mobilier la comandă.
+SERVICE_DEFAULTS = [
+    _svc("imobile_verificate", "Imobile Verificate", "/imobile-verificate", "BadgeCheck",
+         active=True, category="imobiliare", description="Proprietăți cu audit tehnic complet și Digital Twin — cumperi și vinzi cu încredere."),
+    _svc("design_interior", "Design Interior", "/design-interior", "Palette",
+         active=True, category="proiectare", description="Interior Intelligence — proiectare pe date reale, de la audit la implementare."),
+    _svc("digital_twin", "Digital Twin", "/#twin", "Box",
+         active=True, category="tehnologie", description="Copia digitală vie a locuinței: trasee ascunse, planuri, materiale, istoric."),
+    _svc("mobilier", "Mobilier la comandă", "/servicii/mobilier", "Armchair",
+         active=True, category="amenajare", dest_type="external",
+         description="Parteneri verificați pentru mobilier la comandă — de la proiect la montaj."),
+    _svc("design_exterior", "Design Exterior", "/design-exterior", "Trees",
+         active=False, category="proiectare", description="Amenajare exterioară și peisagistică."),
+    _svc("arhitectura", "Arhitectură", "/arhitectura", "Compass",
+         active=False, category="proiectare", description="Proiectare arhitecturală completă."),
+    _svc("constructii", "Construcții", "/marketplace?categorie=constructii", "Hammer",
+         active=False, category="executie", dest_type="marketplace", description="Echipe de construcții verificate."),
+    _svc("renovari", "Renovări", "/marketplace?categorie=renovari", "Paintbrush",
+         active=False, category="executie", dest_type="marketplace", description="Renovări complete sau parțiale."),
+    _svc("instalatii", "Instalații", "/marketplace?categorie=instalatii", "Wrench",
+         active=False, category="executie", dest_type="marketplace", description="Instalatori autorizați: electric, sanitar, HVAC."),
+    _svc("amenajari", "Amenajări", "/marketplace?categorie=amenajari", "Brush",
+         active=False, category="executie", dest_type="marketplace", description="Amenajări interioare și exterioare."),
+    _svc("specialisti", "Specialiști", "/marketplace", "Users",
+         active=False, category="marketplace", dest_type="marketplace",
+         description="Marketplace-ul de specialiști verificați — în dezvoltare, se activează din Admin când e complet."),
+    _svc("consultanta", "Consultanță", "/marketplace?categorie=consultanta", "MessageCircle",
+         active=False, category="servicii", dest_type="marketplace", description="Consultanță tehnică și imobiliară."),
+]
+
 DEFAULT_MENU = [
     {"id": "acasa", "label": "Acasă", "href": "/", "icon": "Home", "active": True, "visibility": "all", "children": []},
-    {"id": "servicii", "label": "Servicii", "href": "", "icon": "Layers", "active": True, "visibility": "all", "children": [
-        {"id": "imobile_verificate", "label": "Imobile Verificate", "href": "/imobile-verificate", "icon": "BadgeCheck", "active": True, "visibility": "all"},
-        {"id": "digital_twin", "label": "Digital Twin", "href": "/#twin", "icon": "Box", "active": True, "visibility": "all"},
-        {"id": "design_interior", "label": "Design Interior", "href": "/design-interior", "icon": "Palette", "active": True, "visibility": "all"},
-        {"id": "design_exterior", "label": "Design Exterior", "href": "/design-exterior", "icon": "Trees", "active": True, "visibility": "all"},
-        {"id": "arhitectura", "label": "Arhitectură", "href": "/arhitectura", "icon": "Compass", "active": True, "visibility": "all"},
-        {"id": "constructii", "label": "Construcții", "href": "/marketplace?categorie=constructii", "icon": "Hammer", "active": True, "visibility": "all"},
-        {"id": "renovari", "label": "Renovări", "href": "/marketplace?categorie=renovari", "icon": "Paintbrush", "active": True, "visibility": "all"},
-        {"id": "mobilier", "label": "Mobilier la comandă", "href": "/marketplace?categorie=mobilier", "icon": "Armchair", "active": True, "visibility": "all"},
-        {"id": "instalatii", "label": "Instalații", "href": "/marketplace?categorie=instalatii", "icon": "Wrench", "active": True, "visibility": "all"},
-        {"id": "amenajari", "label": "Amenajări", "href": "/marketplace?categorie=amenajari", "icon": "Brush", "active": True, "visibility": "all"},
-        {"id": "specialisti", "label": "Specialiști", "href": "/marketplace", "icon": "Users", "active": True, "visibility": "all"},
-        {"id": "consultanta", "label": "Consultanță", "href": "/marketplace?categorie=consultanta", "icon": "MessageCircle", "active": True, "visibility": "all"},
-    ]},
+    {"id": "servicii", "label": "Servicii", "href": "", "icon": "Layers", "active": True, "visibility": "all",
+     "children": [dict(s) for s in SERVICE_DEFAULTS]},
     {"id": "proprietari", "label": "Pentru Proprietari", "href": "", "icon": "KeyRound", "active": True, "visibility": "all", "children": [
         {"id": "cum_functioneaza", "label": "Cum funcționează", "href": "/#journey", "icon": "PlayCircle", "active": True, "visibility": "all"},
         {"id": "beneficii", "label": "Beneficii", "href": "/de-ce-noi", "icon": "Sparkles", "active": True, "visibility": "all"},
@@ -57,8 +88,31 @@ DEFAULT_MENU = [
     ]},
 ]
 
-_ALLOWED_KEYS = {"id", "label", "href", "icon", "active", "visibility", "children"}
+_ALLOWED_KEYS = {"id", "label", "href", "icon", "active", "visibility", "children",
+                 "description", "image", "category", "dest_type", "providers",
+                 "visible_site", "visible_marketplace"}
 _VISIBILITIES = {"all", "guests", "auth"}
+_DEST_TYPES = {"internal", "marketplace", "external", "none"}
+
+
+def _sanitize_providers(providers: list) -> list:
+    out = []
+    for p in providers or []:
+        if not isinstance(p, dict) or not str(p.get("name", "")).strip():
+            continue
+        try:
+            priority = int(p.get("priority") or 0)
+        except (TypeError, ValueError):
+            priority = 0
+        out.append({
+            "name": str(p["name"])[:80],
+            "logo": str(p.get("logo") or "")[:300],
+            "description": str(p.get("description") or "")[:300],
+            "url": str(p.get("url") or "")[:300],
+            "priority": priority,
+            "active": bool(p.get("active", True)),
+        })
+    return out
 
 
 def _sanitize_items(items: list, depth: int = 0) -> list:
@@ -75,6 +129,13 @@ def _sanitize_items(items: list, depth: int = 0) -> list:
             "icon": str(it.get("icon") or "")[:40],
             "active": bool(it.get("active", True)),
             "visibility": it.get("visibility") if it.get("visibility") in _VISIBILITIES else "all",
+            "description": str(it.get("description") or "")[:300],
+            "image": str(it.get("image") or "")[:300],
+            "category": str(it.get("category") or "")[:60],
+            "dest_type": it.get("dest_type") if it.get("dest_type") in _DEST_TYPES else "internal",
+            "providers": _sanitize_providers(it.get("providers")),
+            "visible_site": bool(it.get("visible_site", True)),
+            "visible_marketplace": bool(it.get("visible_marketplace", False)),
             "children": _sanitize_items(it.get("children") or [], depth + 1),
         }
         out.append(clean)
@@ -84,15 +145,49 @@ def _sanitize_items(items: list, depth: int = 0) -> list:
 async def _get_menu_doc() -> dict:
     doc = await db.site_menu.find_one({"key": "main"})
     if not doc:
-        doc = {"key": "main", "items": DEFAULT_MENU, "updated_at": datetime.now(timezone.utc).isoformat()}
+        doc = {"key": "main", "items": DEFAULT_MENU, "version": MENU_VERSION,
+               "updated_at": datetime.now(timezone.utc).isoformat()}
         await db.site_menu.insert_one(dict(doc))
+        return doc
+    if (doc.get("version") or 1) < MENU_VERSION:
+        doc["items"] = _upgrade_items_v2(doc.get("items") or [])
+        doc["version"] = MENU_VERSION
+        await db.site_menu.update_one(
+            {"key": "main"},
+            {"$set": {"items": doc["items"], "version": MENU_VERSION,
+                      "updated_at": datetime.now(timezone.utc).isoformat(),
+                      "updated_by": "migration:service_manager_v2"}})
+        logger.info("[site-menu] migrat la v2 (Service Manager + config Beta)")
     return doc
+
+
+def _upgrade_items_v2(items: list) -> list:
+    """v1→v2: adaugă câmpurile Service Manager + aplică config Beta pe grupul «servicii»."""
+    defaults = {s["id"]: s for s in SERVICE_DEFAULTS}
+    upgraded = _sanitize_items(items)
+    for group in upgraded:
+        if group.get("id") != "servicii":
+            continue
+        merged, seen = [], set()
+        for child in group.get("children") or []:
+            d = defaults.get(child["id"])
+            if d:
+                merged.append(dict(d))
+            else:
+                merged.append(child)
+            seen.add(child["id"])
+        for sid, d in defaults.items():
+            if sid not in seen:
+                merged.append(dict(d))
+        group["children"] = merged
+    return upgraded
 
 
 def _public_items(items: list) -> list:
     out = []
     for it in items:
-        if not it.get("active", True):
+        # REGULA PLATFORMEI: un serviciu apare public doar dacă e ACTIV și VIZIBIL pe site.
+        if not it.get("active", True) or not it.get("visible_site", True):
             continue
         out.append({
             "id": it["id"], "label": it["label"], "href": it.get("href", ""),
@@ -100,6 +195,51 @@ def _public_items(items: list) -> list:
             "children": _public_items(it.get("children") or []),
         })
     return out
+
+
+def _find_service(items: list, service_id: str) -> dict | None:
+    for it in items:
+        if it.get("id") == service_id:
+            return it
+        found = _find_service(it.get("children") or [], service_id)
+        if found:
+            return found
+    return None
+
+
+@router.get("/public/service-visibility")
+async def public_service_visibility():
+    """Harta de vizibilitate a serviciilor — folosită de frontend pentru gating de rute."""
+    doc = await _get_menu_doc()
+    services = {}
+    for group in doc.get("items") or []:
+        if group.get("id") != "servicii":
+            continue
+        for c in group.get("children") or []:
+            services[c["id"]] = {
+                "active": bool(c.get("active", True)),
+                "visible_site": bool(c.get("visible_site", True)),
+                "dest_type": c.get("dest_type", "internal"),
+            }
+    return {"services": services}
+
+
+@router.get("/public/services/{service_id}")
+async def public_service_detail(service_id: str):
+    """Detalii serviciu + provideri externi activi (pagina /servicii/{id})."""
+    doc = await _get_menu_doc()
+    svc = _find_service(doc.get("items") or [], service_id)
+    if not svc or not svc.get("active", True) or not svc.get("visible_site", True):
+        raise HTTPException(404, "Serviciu indisponibil.")
+    providers = sorted(
+        [p for p in (svc.get("providers") or []) if p.get("active", True)],
+        key=lambda p: -int(p.get("priority") or 0))
+    return {
+        "id": svc["id"], "label": svc["label"], "description": svc.get("description", ""),
+        "image": svc.get("image", ""), "category": svc.get("category", ""),
+        "dest_type": svc.get("dest_type", "internal"), "href": svc.get("href", ""),
+        "providers": providers,
+    }
 
 
 @router.get("/public/site-menu")

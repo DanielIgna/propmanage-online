@@ -41,7 +41,7 @@ export const GhiduriIndex = () => {
             </div>
             <span className="font-serif text-lg font-semibold">PropManage</span>
           </Link>
-          <Link to="/marketplace" className="text-xs text-stone-400 hover:text-white">Marketplace</Link>
+          <Link to="/imobile-verificate" className="text-xs text-stone-400 hover:text-white">Imobile Verificate</Link>
         </div>
       </header>
 

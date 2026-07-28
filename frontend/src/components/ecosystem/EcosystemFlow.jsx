@@ -4,9 +4,14 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { useEcosystemContent } from "./useEcosystemContent";
+import { useServiceVisibility, isServiceEnabled } from "../serviceVisibility";
+
+// Pașii din flux care depind de un serviciu gestionat în Service Manager
+const STEP_SERVICE = { specialists: "specialisti" };
 
 export const EcosystemFlow = ({ dark = false, activeKey = null, compact = false }) => {
   const content = useEcosystemContent();
+  const services = useServiceVisibility();
   const flow = content?.canonical_flow;
   if (!flow) return null;
   const chip = dark
@@ -25,19 +30,21 @@ export const EcosystemFlow = ({ dark = false, activeKey = null, compact = false 
         </>
       )}
       <div className="flex flex-wrap items-center gap-1.5">
-        {flow.steps.map((s, i) => (
-          <React.Fragment key={s.key}>
-            <Link
-              to={s.href}
-              title={s.desc}
-              className={`px-2.5 py-1.5 rounded-full border text-[11px] font-bold transition-colors ${s.key === activeKey ? active : chip}`}
-              data-testid={`eco-flow-${s.key}`}
-            >
-              {s.label}
-            </Link>
-            {i < flow.steps.length - 1 && <ArrowRight className={`w-3 h-3 shrink-0 ${arrow}`} />}
-          </React.Fragment>
-        ))}
+        {flow.steps.map((s, i) => {
+          const svcId = STEP_SERVICE[s.key];
+          const gated = svcId && !isServiceEnabled(services, svcId);
+          const cls = `px-2.5 py-1.5 rounded-full border text-[11px] font-bold transition-colors ${s.key === activeKey ? active : chip}`;
+          return (
+            <React.Fragment key={s.key}>
+              {gated ? (
+                <span title={s.desc} className={`${cls} cursor-default`} data-testid={`eco-flow-${s.key}`}>{s.label}</span>
+              ) : (
+                <Link to={s.href} title={s.desc} className={cls} data-testid={`eco-flow-${s.key}`}>{s.label}</Link>
+              )}
+              {i < flow.steps.length - 1 && <ArrowRight className={`w-3 h-3 shrink-0 ${arrow}`} />}
+            </React.Fragment>
+          );
+        })}
       </div>
     </div>
   );

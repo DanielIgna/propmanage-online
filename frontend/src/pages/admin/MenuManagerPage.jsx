@@ -3,6 +3,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import {
   ArrowUp, ArrowDown, Trash2, Plus, Save, RotateCcw, Eye, EyeOff, GripVertical, Menu as MenuIco,
+  Settings2, Globe, Store,
 } from "lucide-react";
 import { AdminLayoutMetronic } from "./AdminLayoutMetronic";
 
@@ -13,6 +14,83 @@ const VIS_OPTIONS = [
   { value: "guests", label: "Doar vizitatori" },
   { value: "auth", label: "Doar autentificați" },
 ];
+
+const DEST_OPTIONS = [
+  { value: "internal", label: "Pagină internă" },
+  { value: "marketplace", label: "Marketplace" },
+  { value: "external", label: "URL extern (parteneri)" },
+  { value: "none", label: "Fără destinație" },
+];
+
+const newProvider = () => ({ name: "", logo: "", description: "", url: "", priority: 0, active: true });
+
+const ProviderRow = ({ p, onChange, onDelete, idx, itemId }) => (
+  <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg bg-black/20 border border-white/10" data-testid={`mm-provider-${itemId}-${idx}`}>
+    <input value={p.name} onChange={(e) => onChange({ ...p, name: e.target.value })} placeholder="Nume partener"
+      className="bg-black/30 border border-white/10 rounded-lg px-2 py-1 text-xs w-36" data-testid={`mm-prov-name-${itemId}-${idx}`} />
+    <input value={p.url} onChange={(e) => onChange({ ...p, url: e.target.value })} placeholder="https://..."
+      className="bg-black/30 border border-white/10 rounded-lg px-2 py-1 text-xs flex-1 min-w-[120px]" data-testid={`mm-prov-url-${itemId}-${idx}`} />
+    <input value={p.logo} onChange={(e) => onChange({ ...p, logo: e.target.value })} placeholder="Logo URL"
+      className="bg-black/30 border border-white/10 rounded-lg px-2 py-1 text-xs w-28" />
+    <input value={p.description} onChange={(e) => onChange({ ...p, description: e.target.value })} placeholder="Descriere scurtă"
+      className="bg-black/30 border border-white/10 rounded-lg px-2 py-1 text-xs flex-1 min-w-[120px]" />
+    <input type="number" value={p.priority} onChange={(e) => onChange({ ...p, priority: Number(e.target.value) || 0 })} title="Prioritate (mai mare = primul)"
+      className="bg-black/30 border border-white/10 rounded-lg px-2 py-1 text-xs w-16" />
+    <button onClick={() => onChange({ ...p, active: !p.active })}
+      className={`p-1 rounded-lg border ${p.active ? "text-[#d4ff3a] border-[#d4ff3a]/30" : "text-stone-500 border-white/10"}`}
+      title={p.active ? "Activ" : "Inactiv"} data-testid={`mm-prov-toggle-${itemId}-${idx}`}>
+      {p.active ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+    </button>
+    <button onClick={onDelete} className="p-1 rounded-lg hover:bg-red-500/20 text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
+  </div>
+);
+
+const ServiceDetailsPanel = ({ item, onChange }) => (
+  <div className="mt-1 p-3 rounded-xl bg-black/20 border border-white/10 space-y-2" data-testid={`mm-details-${item.id}`}>
+    <div className="flex flex-wrap gap-2">
+      <input value={item.description || ""} onChange={(e) => onChange({ ...item, description: e.target.value })}
+        placeholder="Descriere serviciu" className="bg-black/30 border border-white/10 rounded-lg px-2 py-1.5 text-xs flex-1 min-w-[200px]"
+        data-testid={`mm-desc-${item.id}`} />
+      <input value={item.category || ""} onChange={(e) => onChange({ ...item, category: e.target.value })}
+        placeholder="Categorie" className="bg-black/30 border border-white/10 rounded-lg px-2 py-1.5 text-xs w-32" />
+      <input value={item.image || ""} onChange={(e) => onChange({ ...item, image: e.target.value })}
+        placeholder="Imagine URL (opțional)" className="bg-black/30 border border-white/10 rounded-lg px-2 py-1.5 text-xs w-44" />
+      <select value={item.dest_type || "internal"} onChange={(e) => onChange({ ...item, dest_type: e.target.value })}
+        className="bg-black/30 border border-white/10 rounded-lg px-2 py-1.5 text-xs" data-testid={`mm-dest-${item.id}`}>
+        {DEST_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </div>
+    <div className="flex flex-wrap gap-2 text-xs">
+      <button onClick={() => onChange({ ...item, visible_site: item.visible_site === false })}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-semibold ${item.visible_site !== false ? "text-[#d4ff3a] border-[#d4ff3a]/40 bg-[#d4ff3a]/10" : "text-stone-500 border-white/10"}`}
+        data-testid={`mm-vissite-${item.id}`}>
+        <Globe className="w-3.5 h-3.5" /> Vizibil în website: {item.visible_site !== false ? "DA" : "NU"}
+      </button>
+      <button onClick={() => onChange({ ...item, visible_marketplace: !item.visible_marketplace })}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-semibold ${item.visible_marketplace ? "text-[#d4ff3a] border-[#d4ff3a]/40 bg-[#d4ff3a]/10" : "text-stone-500 border-white/10"}`}
+        data-testid={`mm-vismkt-${item.id}`}>
+        <Store className="w-3.5 h-3.5" /> Vizibil în Marketplace: {item.visible_marketplace ? "DA" : "NU"}
+      </button>
+    </div>
+    {item.dest_type === "external" && (
+      <div className="space-y-2 pt-1">
+        <div className="text-[10px] font-black uppercase tracking-wider text-stone-500">
+          Parteneri externi (pagina publică /servicii/{item.id})
+        </div>
+        {(item.providers || []).map((p, pi) => (
+          <ProviderRow key={pi} p={p} idx={pi} itemId={item.id}
+            onChange={(v) => onChange({ ...item, providers: item.providers.map((x, xi) => (xi === pi ? v : x)) })}
+            onDelete={() => onChange({ ...item, providers: item.providers.filter((_, xi) => xi !== pi) })} />
+        ))}
+        <button onClick={() => onChange({ ...item, providers: [...(item.providers || []), newProvider()] })}
+          className="inline-flex items-center gap-1.5 text-xs text-stone-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5"
+          data-testid={`mm-add-provider-${item.id}`}>
+          <Plus className="w-3.5 h-3.5" /> Adaugă partener
+        </button>
+      </div>
+    )}
+  </div>
+);
 
 const ICON_SUGGESTIONS = "Home, Layers, BadgeCheck, Box, Palette, Trees, Compass, Hammer, Paintbrush, Armchair, Wrench, Brush, Users, MessageCircle, KeyRound, PlayCircle, Sparkles, CircleDollarSign, HelpCircle, Building2, Info, BookOpen, Mail, UserCircle, LogIn, LogOut, UserPlus, LayoutDashboard, FolderKanban, MessageSquare, Bell, Settings";
 
@@ -26,8 +104,11 @@ const newItem = () => ({
   children: [],
 });
 
-const ItemRow = ({ item, onChange, onMove, onDelete, isChild }) => (
-  <div className={`flex flex-wrap items-center gap-2 py-2 px-3 rounded-xl ${isChild ? "bg-white/[0.03]" : "bg-white/[0.06]"} border border-white/10`}>
+const ItemRow = ({ item, onChange, onMove, onDelete, isChild }) => {
+  const [showDetails, setShowDetails] = useState(false);
+  return (
+  <div className={`py-2 px-3 rounded-xl ${isChild ? "bg-white/[0.03]" : "bg-white/[0.06]"} border border-white/10`}>
+  <div className="flex flex-wrap items-center gap-2">
     <GripVertical className="w-4 h-4 text-stone-600 shrink-0" />
     <input
       value={item.label}
@@ -71,9 +152,20 @@ const ItemRow = ({ item, onChange, onMove, onDelete, isChild }) => (
       <button onClick={() => onMove(-1)} className="p-1.5 rounded-lg hover:bg-white/10 text-stone-400" data-testid={`mm-up-${item.id}`}><ArrowUp className="w-4 h-4" /></button>
       <button onClick={() => onMove(1)} className="p-1.5 rounded-lg hover:bg-white/10 text-stone-400" data-testid={`mm-down-${item.id}`}><ArrowDown className="w-4 h-4" /></button>
       <button onClick={onDelete} className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400" data-testid={`mm-del-${item.id}`}><Trash2 className="w-4 h-4" /></button>
+      {isChild && (
+        <button onClick={() => setShowDetails(!showDetails)}
+          className={`p-1.5 rounded-lg border ${showDetails ? "text-[#d4ff3a] border-[#d4ff3a]/30 bg-[#d4ff3a]/10" : "text-stone-400 border-white/10 hover:bg-white/10"}`}
+          title="Detalii serviciu (descriere, destinație, parteneri, vizibilitate)"
+          data-testid={`mm-details-btn-${item.id}`}>
+          <Settings2 className="w-4 h-4" />
+        </button>
+      )}
     </div>
   </div>
-);
+  {isChild && showDetails && <ServiceDetailsPanel item={item} onChange={onChange} />}
+  </div>
+  );
+};
 
 export default function MenuManagerPage() {
   const [items, setItems] = useState(null);
@@ -217,6 +309,9 @@ export default function MenuManagerPage() {
       </button>
 
       <div className="text-xs text-stone-500 space-y-1 pt-2 border-t border-white/10">
+        <p>• <b>Regula platformei</b>: un serviciu apare public DOAR când e marcat <b>Activ</b> (ochi) și <b>Vizibil în website = DA</b>. Serviciile incomplete rămân ascunse până le activezi de aici.</p>
+        <p>• <b>Detalii serviciu</b> (⚙ pe subcategorii): descriere, categorie, imagine, tip destinație (pagină internă / Marketplace / URL extern / fără) și partenerii externi cu prioritate.</p>
+        <p>• <b>URL extern</b>: serviciile cu parteneri primesc automat pagina publică <code>/servicii/&#123;id&#125;</code> (ex. Mobilier la comandă).</p>
         <p>• <b>Vizibilitate</b>: „Toți" = oricine; „Doar vizitatori" = ascuns după login; „Doar autentificați" = vizibil doar cu cont.</p>
         <p>• <b>Link-uri speciale</b>: <code>/dashboard</code> duce automat la dashboard-ul rolului; <code>#logout</code> deconectează.</p>
         <p>• <b>Iconuri disponibile</b>: {ICON_SUGGESTIONS}.</p>
