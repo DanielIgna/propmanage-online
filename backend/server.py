@@ -643,6 +643,15 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=7200,
         )
+        # AI Brain Discovery — zilnic 06:35, recartografiază structura aplicației
+        from ai_brain.core import run_discovery as ai_brain_discovery
+        scheduler.add_job(
+            ai_brain_discovery,
+            CronTrigger(hour=6, minute=35, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="ai_brain_discovery_daily",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
         # CIP-A: Category Visibility Gate — daily 04:30 (via Orchestrator playbook)
         scheduler.add_job(
             construction_visibility_cron,

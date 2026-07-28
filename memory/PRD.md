@@ -4121,3 +4121,27 @@ se va auto-rezolva/recalcula după purge-ul P0).
 **TESTAT**: pytest 11/11 (iter155 + iter156: run/status/auth endpoints, portal API partener,
 role mapping, zero API duplicate), build ✓, login partener → redirect portal ✓ (screenshot),
 Repair Center cu 3 secțiuni Guardian ✓ (screenshot).
+
+---
+
+## ✅ AIB-001 SPRINT 1 — AI BRAIN FOUNDATION & DISCOVERY (28 Iul 2026)
+**Pachet nou /app/backend/ai_brain/** (core.py, discovery.py, registry.py) — punct unic de
+acces AI; independent de UI; pregătit pentru sprinturile următoare (KG/RAG/conversații NU
+sunt implementate încă, conform sprintului).
+**Discovery Engine** (zero hardcodare): rute din App.js (138), pagini din pages/ (218),
+componente app+ui (105), API-uri din routes/*.py cu metodă+cale+guard (1078), servicii
+backend (74 module+pachete), module derivate din prefixe API+rute (98), roluri din
+db.users + require_role din cod (26, cu endpoint_guards per rol), meniuri din db.site_menu.
+Reutilizează ai_core.code_index (fără duplicare); ai_core.knowledge_graph rămâne separat
+(graf de date per-user, nu structură aplicație).
+**Knowledge Registry**: snapshot per kind în db.ai_brain_registry (upsert) + istoric în
+db.ai_brain_runs; interogare cu filtru q + limit.
+**API**: GET /api/admin/ai-brain/status (include scoruri Guardian Kernel), POST /discover,
+GET /registry/{kind} (8 kinds). Toate cu require_role("admin").
+**UI**: /admin/ai-brain (AIBrainPage.jsx) — status, 8 carduri contoare clicabile cu
+drill-down în registry, scoruri Guardian, buton «Analizează aplicația». Link în meniul
+admin (AdminLayoutMetronic, superAdminOnly, badge DISCOVERY).
+**Integrare**: auth+roluri existente (require_role), Guardian Kernel (scoruri în status,
+ledger entry per discovery), cron zilnic 06:35.
+**TESTAT**: pytest 14/14 nou (tests/test_iter157_ai_brain.py) + 19/19 regresie
+(iter155+156+site_menu), build frontend ✓, screenshot UI ✓ (discovery 533ms).
