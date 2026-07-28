@@ -3966,3 +3966,28 @@ Implementare + House Health. Când utilizatorul avansează în lanț, CTA primar
    - Prima rulare reală: 1 task detectat corect (mobilier fără parteneri, medium).
 **VALIDAT: iteration_152.json — backend 4/4 (100%), frontend 100% (chaining, breadcrumbs,
 NextStep×4, guardian UI, regresii zero, auto-resolve + restaurare stare).**
+
+---
+
+## ✅ MOD CTO AUTONOM — PERF + AUTONOMY SCORE + BUCLA ÎNCHISĂ (28 Iul 2026)
+**🟢 AUTO IMPLEMENT (fără aprobare — performanță/observabilitate/self-healing):**
+1. **Code-splitting (backlog istoric rezolvat)**: 21 pagini convertite la React.lazy în
+   App.js (pattern named-export .then(m=>({default:m.X}))): PublicDemoPage (three.js/drei
+   scos din main!), ProjectWorkspace, PublicMarketplace, MarketplaceLanding, EstateBrowse/
+   Detail/Sell/VerifiedEstateAdmin, Ghiduri/GhidPage/Help, Trust/Privacy/Status,
+   AdminAuthHealth, AdminSupportInbox, ClientRequestOffers, PremiumProfileEditor,
+   SpecialistProfile, HouseHealthUpgrade+Success. **main.js: 2.3MB → 962KB (-58%)**.
+2. **Scor de Autonomie real** (orchestrator/governance.py::compute_autonomy_score, cache
+   60s): 5 componente ponderate din date reale 7z — auto_resolution (ledger fără escaladare,
+   w35%), autonomous_decisions (w20%), cron_reliability (w20%), journey_health (task-uri
+   critice deschise, w15%), self_healing_activity (w10%). Expus în: repair-center/status,
+   governance snapshot, CEO briefing (linia ai_governance), badge UI în Repair Center.
+   **Scor actual: ~82/100** (componenta slabă: auto_resolution 52% — istoric escaladări).
+3. **Bucla autonomă închisă**: run_repair_cycle → la final rulează automat Journey Guardian
+   (re-audit + auto-close task-uri rezolvate); rezultatul se persistă în health_repair_runs
+   (câmp journey_guardian). Diagrama founder: Repair → Guardian → (task-uri CTO) → repeat.
+**Fix-uri post-test (iter 153)**: guardian re-audit mutat înainte de insert_one (testing
+agent), ServiceGate race-condition (user null în timpul verificării auth → adminul era
+redirecționat; acum așteaptă auth înainte de gate), cache 60s pe autonomy score.
+**VALIDAT: iteration_153.json — backend 100% (pytest 4/4), frontend 95%→100% după fix
+ServiceGate (verificat manual: admin accesează /marketplace, anonim redirecționat).**

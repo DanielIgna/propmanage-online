@@ -254,12 +254,19 @@ async def governance_watchdog_tick() -> dict:
     return out
 
 
+_autonomy_cache = {"ts": 0.0, "data": None}
+
+
 async def compute_autonomy_score() -> dict:
     """Scorul de autonomie al platformei (0-100) — cât rulează singură, fără om.
 
     Componente (7 zile): rezolvare autonomă ledger, decizii executate autonom,
     fiabilitate cron, sănătatea călătoriei clientului, activitate self-healing.
+    Cache 60s (agregările Mongo sunt scumpe pentru un endpoint de dashboard).
     """
+    import time
+    if _autonomy_cache["data"] and time.monotonic() - _autonomy_cache["ts"] < 60:
+        return _autonomy_cache["data"]
     since7d = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
 
     total_ledger = await db.orchestrator_ledger.count_documents({"ts": {"$gte": since7d}, "test": {"$ne": True}})
@@ -297,7 +304,11 @@ async def compute_autonomy_score() -> dict:
                                   "detail": f"{healing} evenimente autonome de reparare (7z)"},
     }
     score = round(sum(c["score"] * c["weight"] for c in components.values()), 1)
-    return {"score": score, "components": components, "computed_at": _now()}
+    result = {"score": score, "components": components, "computed_at": _now()}
+    import time
+    _autonomy_cache["ts"] = time.monotonic()
+    _autonomy_cache["data"] = result
+    return result
 
 
 async def governance_snapshot() -> dict:
