@@ -189,6 +189,13 @@ export default function RepairCenterPage() {
           <HeartPulse className="w-5 h-5 text-violet-400" />
           <h1 className="text-xl lg:text-2xl font-bold text-white">Health Repair Engine</h1>
           <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/30">Detect → Repair → Validate</span>
+          {status?.autonomy && (
+            <span className="text-[11px] font-black px-2.5 py-1 rounded-full bg-[#d4ff3a]/10 text-[#d4ff3a] border border-[#d4ff3a]/30"
+              title={Object.values(status.autonomy.components).map(c => c.detail).join(" · ")}
+              data-testid="autonomy-score-badge">
+              Autonomie {status.autonomy.score}/100
+            </span>
+          )}
           <div className="flex-1" />
           <Link to="/admin/enterprise-health" className="px-3 py-1.5 text-xs rounded-lg border border-stone-700 text-stone-300 hover:text-white flex items-center gap-1.5" data-testid="repair-to-health">
             <Activity className="w-3.5 h-3.5" /> Enterprise Health

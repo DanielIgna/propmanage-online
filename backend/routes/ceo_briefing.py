@@ -201,8 +201,9 @@ async def ceo_briefing(user=Depends(require_role("admin"))):
         ai_governance = await governance_snapshot()
         snapshot.append({"key": "ai_governance", "label": "Guvernanță AI",
                          "line": f"{ai_governance['decisions_24h']} decizii 24h · {ai_governance['executed_24h']} executate · "
-                                 f"{ai_governance['recommended_24h']} recomandate · încredere medie {ai_governance['avg_confidence'] or '—'}",
-                         "score": None, "color": "#d4ff3a"})
+                                 f"{ai_governance['recommended_24h']} recomandate · încredere medie {ai_governance['avg_confidence'] or '—'} · "
+                                 f"autonomie {ai_governance.get('autonomy_score', '—')}/100",
+                         "score": ai_governance.get("autonomy_score"), "color": "#d4ff3a"})
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[CEO Briefing] governance snapshot failed: {e}")
 

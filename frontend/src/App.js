@@ -15,8 +15,8 @@ import { DesignTokensProvider } from "./contexts/DesignTokensProvider";
 import { useABTest } from "./ab";
 import { LoginPage, RegisterPage } from "./pages/Auth";
 import { EmailVerifyPage } from "./pages/EmailVerifyPage";
-import { ClientRequestOffersPage } from "./pages/ClientRequestOffersPage";
-import { PremiumProfileEditorPage } from "./pages/PremiumProfileEditorPage";
+const ClientRequestOffersPage = lazy(() => import("./pages/ClientRequestOffersPage").then(m => ({ default: m.ClientRequestOffersPage })));
+const PremiumProfileEditorPage = lazy(() => import("./pages/PremiumProfileEditorPage").then(m => ({ default: m.PremiumProfileEditorPage })));
 import { CookieBanner } from "./components/CookieBanner";
 import { BetaFeedbackWidget } from "./components/BetaFeedbackWidget";
 import { AssistantDock } from "./components/AssistantDock";
@@ -39,13 +39,13 @@ import { RoleTour } from "./pages/RoleTour";
 import { AIConciergeBubble } from "./components/AIConciergeBubble";
 import { BookDemoModal } from "./pages/BookDemoModal";
 import { LandingDemo3D } from "./components/LandingDemo3D";
-import { PublicDemoPage } from "./pages/PublicDemoPage";
-import { AdminAuthHealthPage } from "./pages/admin/AdminAuthHealthPage";
-import { AdminSupportInboxPage } from "./pages/admin/AdminSupportInboxPage";
+const PublicDemoPage = lazy(() => import("./pages/PublicDemoPage").then(m => ({ default: m.PublicDemoPage })));
+const AdminAuthHealthPage = lazy(() => import("./pages/admin/AdminAuthHealthPage").then(m => ({ default: m.AdminAuthHealthPage })));
+const AdminSupportInboxPage = lazy(() => import("./pages/admin/AdminSupportInboxPage").then(m => ({ default: m.AdminSupportInboxPage })));
 import { PrivacyPage, TermsPage, CookiePolicyPage } from "./pages/LegalPages";
-import { TrustCenterPage } from "./pages/TrustCenterPage";
-import { PrivacyNoticesPage } from "./pages/PrivacyNoticesPage";
-import { StatusPage } from "./pages/StatusPage";
+const TrustCenterPage = lazy(() => import("./pages/TrustCenterPage").then(m => ({ default: m.TrustCenterPage })));
+const PrivacyNoticesPage = lazy(() => import("./pages/PrivacyNoticesPage").then(m => ({ default: m.PrivacyNoticesPage })));
+const StatusPage = lazy(() => import("./pages/StatusPage").then(m => ({ default: m.StatusPage })));
 const ComponentsV2 = lazy(() => import("./pages/ComponentsV2"));
 const CommunityPage = lazy(() => import("./pages/CommunityPage"));
 import { GDPRAuditBadge } from "./components/GDPRAuditBadge";
@@ -53,10 +53,10 @@ import { TrustStrip } from "./components/TrustStrip";
 const DigitalTwinPage = lazy(() => import("./pages/DigitalTwinPage"));
 const ReportApprovalPage = lazy(() => import("./pages/ReportApprovalPage"));
 const KYCPage = lazy(() => import("./pages/KYCPage"));
-import { EstateBrowse } from "./pages/verified-estate/EstateBrowse";
-import { EstateDetail } from "./pages/verified-estate/EstateDetail";
-import { SellMyProperty } from "./pages/verified-estate/SellMyProperty";
-import { VerifiedEstateAdmin } from "./pages/verified-estate/VerifiedEstateAdmin";
+const EstateBrowse = lazy(() => import("./pages/verified-estate/EstateBrowse").then(m => ({ default: m.EstateBrowse })));
+const EstateDetail = lazy(() => import("./pages/verified-estate/EstateDetail").then(m => ({ default: m.EstateDetail })));
+const SellMyProperty = lazy(() => import("./pages/verified-estate/SellMyProperty").then(m => ({ default: m.SellMyProperty })));
+const VerifiedEstateAdmin = lazy(() => import("./pages/verified-estate/VerifiedEstateAdmin").then(m => ({ default: m.VerifiedEstateAdmin })));
 const WhyUsPage = lazy(() => import("./pages/WhyUsPage"));
 const AdminSettingsControl = lazy(() => import("./pages/admin/AdminSettingsControl"));
 const AdminDocumentation = lazy(() => import("./pages/admin/AdminDocumentation"));
@@ -73,7 +73,8 @@ const TwinPage = lazy(() => import("./pages/admin/TwinPage"));
 const AdminHouseHealthPage = lazy(() => import("./pages/admin/AdminHouseHealthPage"));
 const ManualTesterPage = lazy(() => import("./pages/admin/ManualTesterPage"));
 const HouseHealthPage = lazy(() => import("./pages/HouseHealthPage"));
-import HouseHealthUpgradePage, { HouseHealthUpgradeSuccess } from "./pages/HouseHealthUpgradePage";
+const HouseHealthUpgradeLazy = lazy(() => import("./pages/HouseHealthUpgradePage"));
+const HouseHealthUpgradeSuccessLazy = lazy(() => import("./pages/HouseHealthUpgradePage").then(m => ({ default: m.HouseHealthUpgradeSuccess })));
 const AdminTodoBoard = lazy(() => import("./pages/admin/AdminTodoBoard"));
 const ExperienceSpacesPage = lazy(() => import("./pages/admin/ExperienceSpacesPage"));
 const FutureIdeasVault = lazy(() => import("./pages/admin/FutureIdeasVault"));
@@ -1622,8 +1623,8 @@ function App() {
               <Route path="/admin/control-tower" element={<ControlTowerPage />} />
               <Route path="/admin/twin" element={<TwinPage />} />
               <Route path="/house-health/:twinId" element={<HouseHealthPage />} />
-              <Route path="/house-health/upgrade" element={<HouseHealthUpgradePage />} />
-              <Route path="/house-health/upgrade/success" element={<HouseHealthUpgradeSuccess />} />
+              <Route path="/house-health/upgrade" element={<HouseHealthUpgradeLazy />} />
+              <Route path="/house-health/upgrade/success" element={<HouseHealthUpgradeSuccessLazy />} />
               <Route path="/admin/house-health" element={<AdminHouseHealthPage />} />
               <Route path="/admin/manual-tester" element={<ManualTesterPage />} />
               <Route path="/admin/todo" element={<AdminTodoBoard />} />

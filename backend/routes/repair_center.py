@@ -47,7 +47,9 @@ async def repair_status(user=Depends(require_role("admin"))):
                             "actions": len(lr["actions"]), "delta": lr.get("delta")} if lr else None,
         })
     domains.sort(key=lambda d: d["score"])
+    from orchestrator.governance import compute_autonomy_score
     return {"domains": domains, "last_run": last_run,
+            "autonomy": await compute_autonomy_score(),
             "runs_total": await db.health_repair_runs.count_documents({})}
 
 

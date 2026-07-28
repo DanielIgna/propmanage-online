@@ -254,6 +254,52 @@ async def governance_watchdog_tick() -> dict:
     return out
 
 
+async def compute_autonomy_score() -> dict:
+    """Scorul de autonomie al platformei (0-100) — cât rulează singură, fără om.
+
+    Componente (7 zile): rezolvare autonomă ledger, decizii executate autonom,
+    fiabilitate cron, sănătatea călătoriei clientului, activitate self-healing.
+    """
+    since7d = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+
+    total_ledger = await db.orchestrator_ledger.count_documents({"ts": {"$gte": since7d}, "test": {"$ne": True}})
+    escalated = await db.orchestrator_ledger.count_documents(
+        {"ts": {"$gte": since7d}, "test": {"$ne": True}, "escalated": True})
+    auto_ratio = (total_ledger - escalated) / total_ledger if total_ledger else 1.0
+
+    total_dec = await db.orchestrator_decisions.count_documents({"ts": {"$gte": since7d}, "test": {"$ne": True}})
+    executed = await db.orchestrator_decisions.count_documents(
+        {"ts": {"$gte": since7d}, "test": {"$ne": True}, "decided": "executed"})
+    exec_ratio = executed / total_dec if total_dec else 1.0
+
+    total_runs = await db.agent_runs.count_documents({"ts": {"$gte": since7d}})
+    err_runs = await db.agent_runs.count_documents({"ts": {"$gte": since7d}, "status": "error"})
+    cron_ratio = (total_runs - err_runs) / total_runs if total_runs else 1.0
+
+    open_crit = await db.journey_guardian_tasks.count_documents(
+        {"status": "open", "severity": {"$in": ["critical", "high"]}})
+    journey_ratio = max(0.0, 1.0 - 0.25 * open_crit)
+
+    healing = await db.orchestrator_ledger.count_documents(
+        {"ts": {"$gte": since7d}, "playbook_id": {"$in": ["governance_watchdog", "health_repair_engine", "journey_guardian"]}})
+    healing_ratio = min(1.0, healing / 7)  # minim un eveniment autonom pe zi
+
+    components = {
+        "auto_resolution": {"score": round(auto_ratio * 100), "weight": 0.35,
+                            "detail": f"{total_ledger - escalated}/{total_ledger} acțiuni fără escaladare (7z)"},
+        "autonomous_decisions": {"score": round(exec_ratio * 100), "weight": 0.20,
+                                 "detail": f"{executed}/{total_dec} decizii executate autonom"},
+        "cron_reliability": {"score": round(cron_ratio * 100), "weight": 0.20,
+                             "detail": f"{total_runs - err_runs}/{total_runs} rulări cron fără eroare"},
+        "journey_health": {"score": round(journey_ratio * 100), "weight": 0.15,
+                           "detail": f"{open_crit} task-uri critice/high deschise în călătoria clientului"},
+        "self_healing_activity": {"score": round(healing_ratio * 100), "weight": 0.10,
+                                  "detail": f"{healing} evenimente autonome de reparare (7z)"},
+    }
+    score = round(sum(c["score"] * c["weight"] for c in components.values()), 1)
+    return {"score": score, "components": components, "computed_at": _now()}
+
+
 async def governance_snapshot() -> dict:
     """Metrici agregate pentru CEO Briefing + panoul de guvernanță."""
     since24 = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
@@ -267,6 +313,7 @@ async def governance_snapshot() -> dict:
     healed7d = await db.orchestrator_ledger.count_documents(
         {"playbook_id": "governance_watchdog", "ts": {"$gte": since7d}})
     last_review = await db.orchestrator_reviews.find_one({}, {"_id": 0}, sort=[("ts", -1)])
+    autonomy = await compute_autonomy_score()
     return {
         "decisions_24h": len(decisions24),
         "executed_24h": executed,
@@ -274,5 +321,7 @@ async def governance_snapshot() -> dict:
         "escalated_24h": sum(1 for d in decisions24 if d.get("escalated")),
         "avg_confidence": round(sum(confs) / len(confs), 2) if confs else None,
         "self_healing_events_7d": healed7d,
+        "autonomy_score": autonomy["score"],
+        "autonomy": autonomy,
         "last_review": last_review,
     }

@@ -426,6 +426,15 @@ async def run_repair_cycle(domains: list = None, trigger: str = "cron") -> dict:
         "total_actions": sum(len(r["actions"]) for r in results),
         "results": results,
     }
+
+    # Bucla autonomă: după reparații, Journey Guardian re-auditează și închide task-urile rezolvate.
+    # (Trebuie să ruleze ÎNAINTE de persist ca să apară în /runs.)
+    try:
+        from journey_guardian import run_journey_guardian
+        run["journey_guardian"] = await run_journey_guardian(trigger="repair_cycle")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[repair] guardian re-audit failed: {e}")
+
     try:
         await db.health_repair_runs.insert_one({**run})
         n = await db.health_repair_runs.estimated_document_count()
@@ -459,6 +468,7 @@ async def run_repair_cycle(domains: list = None, trigger: str = "cron") -> dict:
             "test": False,
         })
     logger.info(f"[repair] cycle done: {len(results)} domenii reparate, {run['total_actions']} acțiuni")
+
     run.pop("_id", None)
     return run
 
