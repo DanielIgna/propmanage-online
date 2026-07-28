@@ -1,3 +1,34 @@
+## 🎁 PB-001 — PROPBENEFITS ENGINE FOUNDATION · LIVRAT & TESTAT 100% (28 Iul 2026)
+
+**Subsistem strategic la nivelul AI Brain — motorul economic și de retenție. NU e sistem de reduceri. Țintă arhitecturală: 3.000 abonamente active.**
+
+**Domeniu nou `backend/propbenefits/`** (regula 60% aplicată — totul prin EXTENSIE):
+- **PB-001.1 Benefits Wallet** (`ledger.py`): ledger de beneficii/drepturi (nu bani) — `pb_ledger`: available/used/expired/pending_activation, istoric imutabil, limite per campanie, expirare automată.
+- **PB-001.2 Campaign Engine** (`campaigns.py`): admin creează FĂRĂ cod campanii (10 tipuri: active_benefit/seasonal/local/city_partner/digital_twin/audit/house_health/fair_price/community/referral) cu perioadă, buget, max claims, max/user, eligibilitate, prioritate, impact estimat. Claim atomic ($inc cu guard buget+limite). 4 campanii seed.
+- **PB-001.3 Opportunity Engine + AI Recommendation** (`opportunities.py`): afișează OPORTUNITĂȚI (nu reduceri) DOAR celor relevanți — targeting determinist explicabil (relevance score + why[]), locked cu unlock hints.
+- **PB-001.4 Referral EXTINS** (`referral_ext.py` + hook în `trust_growth.py` claim + `house_health_billing.py` activare): beneficii acordate DOAR la abonament activ SAU primul serviciu plătit (pb_referral_pending → activated → ledger AMBELE părți + notify). NU la crearea contului.
+- **PB-001.5 Eligibility Engine** (`eligibility.py`): user_context complet (13 semnale reale) + 10 reguli (abonament, twin, HH, oraș, tip proprietate, nivel, documente, lucrări, email).
+- **PB-001.6 Membership Levels** (`membership.py`): Explorer→Bronze→Silver→Gold→Verified→Elite, puncte din 9 criterii configurabile (REUSE experience_tier ca semnal). Oferă prioritate+acces, nu reduceri automate.
+- **AI Success Manager** (`ai_agents.py`): UN next_action cu cel mai mare impact (beneficii care expiră, documente lipsă pt primul Beneficiu Activ, twin pt campanii exclusive, reînnoire abonament, invită vecin). Contextual, anti-spam.
+- **AI Growth Advisor** (`ai_agents.py`): agent admin — metrici reale (retenție, campanii, referral funnel, orașe, at-risk, expirări 30z) + findings deterministe + sinteză LLM RO (ai_core.call_llm, cache 6h în pb_advisor_reports).
+- **Subscription Health** (`health.py`): scor 0-100/user din 8 factori ponderați configurabil; snapshot zilnic (pb_subscription_health) → lista at-risk în Admin; sub 40 = at_risk → Success Manager intervine.
+- **Ecosystem Health** (`health.py`): scor global din 8 componente cu ținte configurabile (north star: 3000 abonamente).
+- **Subscription Impact Score** (`health.py`): per modul CORE-001 — potențial (activare/retenție/conversie/recomandări) × completitudine = realizat; gap = unde merită investit. **Vizibil în Discovery Center (tab „Impact abonamente")**.
+- **Integrare AI Mentor**: mentor.py folosește success_manager (acțiune pb_ cu valoare, nu funcție); provenance păstrat prin source_action_id în decision layer.
+- **Scheduler**: tick zilnic 08:45 (expirări + activări referral + health snapshot) + buton manual în Admin.
+
+**API**: `/api/benefits/{opportunities,wallet,membership,claim/{cid},use/{bid},success-manager}` (user) · `/api/admin/prop-benefits/{overview,campaigns CRUD,config,subscription-health,ecosystem-health,impact-scores,growth-advisor,run-tick}` (admin; 401/403 verificate).
+
+**UI**: `PropBenefitsHub.jsx` — tab „Beneficii" în ClientDashboardV2 (desktop nav + deep-link ?tab=benefits + intrare Setări mobil; bottom nav intact 5 items): nivel membru cu progres, next action Success Manager, oportunități cu why + claim, aproape deblocate, portofel (active/folosite/expirate). `PropBenefitsAdminPage.jsx` — `/admin/prop-benefits` (sidebar): KPIs, campanii CRUD fără cod (form complet cu eligibilitate + impact estimat), config niveluri/puncte/referral, Subscription Health list, Growth Advisor cu regenerare, Ecosystem Health breakdown.
+
+**Testare**: iteration_167 — backend **24/24 PASS** (`tests/test_pb001_prop_benefits.py`, regresie permanentă), frontend **100%** (desktop+mobil+admin+Discovery impact tab). Fix post-test: provenance pb_ în decision layer (source_action_id). Referral gating validat cap-coadă: claim → pending (FĂRĂ beneficiu) → plată → tick → activated → beneficii ambele părți.
+
+**Definition of Done: TOATE cele 9 criterii ✅**
+
+**URMEAZĂ (ordinea Fondatorului)**: **FP-001 – FairPrice Engine** → HH-Next – House Health Subscriptions UI. Recomandarea Fondatorului post-PB-001: câteva sprinturi de INTEGRARE PropBenefits în toate fluxurile existente (client, specialist, administrator, HH, Digital Twin, Marketplace, AI Mentor) înainte de lansarea abonamentului de 5€/lună.
+
+---
+
 ## 🧭 CORE-001 — CANONICAL DISCOVERY & PRODUCT INTELLIGENCE · LIVRAT & TESTAT 100% (28 Iul 2026)
 
 **Aprobare Fondator (extins)**: Live Product Map + snapshot-uri istorice (varianta C extinsă) · Canonical Product Graph cu clasificare per element (activ/experimental/duplicat/neconectat/depreciat/candidat_reutilizare) · **Regula 60%** (implementarea existentă >60% se REUTILIZEAZĂ și se EXTINDE, nu se rescrie) · **Product Completeness Score** per modul · **Business Value Score** per modul (venit 35% · conversie 25% · retenție 25% · costuri 15%) · Roadmap de Consolidare (impact × risc) · Ordinea post-CORE-001: **PB-001 → FP-001 → HH-Next**.

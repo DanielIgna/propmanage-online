@@ -182,6 +182,7 @@ async def mentor_advise(user: dict, path: str, replay: bool = False, include_gui
         pass
     if decisions:
         actions = [{"id": d["id"], "title": d["title"],
+                    "source_action_id": d.get("source_action_id"),
                     "reason": (d["reasons"] or [d["resolves"]])[0],
                     "cta_path": d["cta_path"], "priority": i + 1, "score": d["score"],
                     "confidence": d.get("confidence")}

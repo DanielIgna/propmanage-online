@@ -185,6 +185,7 @@ def _decision_from_mentor(a: dict, i: int) -> dict:
                "readiness": 1.0, "progress": 0.0, "risk_of_inaction": 0.4}
     return {
         "id": _did("mentor", a["id"]),
+        "source_action_id": a["id"],
         "kind": "mentor_action",
         "title": a["title"], "process_id": None, "process_name": None, "entity": None,
         "transition": None, "cta_path": a["cta_path"], "actors": [],
