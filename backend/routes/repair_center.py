@@ -139,3 +139,42 @@ async def arch_guardian_ignore(payload: dict = Body(...), user=Depends(require_r
         {"$set": {"status": "ignored", "resolved_at": datetime.now(timezone.utc).isoformat(),
                   "resolved_by": user.get("email"), "ignore_reason": reason}})
     return {"ignored": key}
+
+
+# ============================================================================
+# PRODUCT GUARDIAN — modulul de produs al Guardian Kernel (PM-GUARDIAN-003)
+# ============================================================================
+@router.get("/product-guardian/status")
+async def product_guardian_status(user=Depends(require_role("admin"))):
+    last_run = await db.product_guardian_runs.find_one({}, {"_id": 0}, sort=[("ts", -1)])
+    tasks = [t async for t in db.product_guardian_tasks.find(
+        {"status": "open"}, {"_id": 0}).sort([("severity", 1), ("created_at", -1)]).limit(100)]
+    resolved_total = await db.product_guardian_tasks.count_documents({"status": "resolved"})
+    return {"last_run": last_run, "open_tasks": tasks, "resolved_total": resolved_total,
+            "product_score": (last_run or {}).get("product_score"),
+            "platform_score": (last_run or {}).get("platform_score"),
+            "ceo_summary": (last_run or {}).get("ceo_summary")}
+
+
+@router.post("/product-guardian/run")
+async def product_guardian_run(user=Depends(require_role("admin"))):
+    from product_guardian import run_product_guardian
+    return await run_product_guardian(trigger=f"manual:{user.get('email')}")
+
+
+@router.post("/product-guardian/ignore")
+async def product_guardian_ignore(payload: dict = Body(...), user=Depends(require_role("admin"))):
+    key = (payload.get("key") or "").strip()
+    reason = (payload.get("reason") or "").strip()
+    if not key or not reason:
+        raise HTTPException(400, "key și reason sunt obligatorii")
+    from datetime import datetime, timezone
+    await db.product_guardian_ignores.update_one(
+        {"key": key},
+        {"$set": {"reason": reason, "by": user.get("email"),
+                  "ts": datetime.now(timezone.utc).isoformat()}}, upsert=True)
+    await db.product_guardian_tasks.update_many(
+        {"key": key, "status": "open"},
+        {"$set": {"status": "ignored", "resolved_at": datetime.now(timezone.utc).isoformat(),
+                  "resolved_by": user.get("email"), "ignore_reason": reason}})
+    return {"ignored": key}

@@ -49,7 +49,11 @@ export const LoginPage = () => {
   const _isSafeNext = (p) => typeof p === "string" && p.startsWith("/") && !p.startsWith("//");
   const safeNext = _isSafeNext(nextPath) ? nextPath : null;
 
-  const roleHome = (role) => role === "city_partner" ? "/partner/dashboard" : `/${role}`;
+  const roleHome = (role) => ({
+    city_partner: "/partner/dashboard",
+    marketplace_partner: "/partner/marketplace",
+    marketing_manager: "/admin/marketing",
+  }[role] || `/${role}`);
 
   if (user && user !== false) return <Navigate to={safeNext || roleHome(user.role)} replace />;
 

@@ -634,6 +634,15 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=7200,
         )
+        # Product Guardian — zilnic 06:45, CTA/roluri/gates/funnel + task-uri CTO AI
+        from product_guardian import run_product_guardian
+        scheduler.add_job(
+            run_product_guardian,
+            CronTrigger(hour=6, minute=45, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="product_guardian_daily",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
         # CIP-A: Category Visibility Gate — daily 04:30 (via Orchestrator playbook)
         scheduler.add_job(
             construction_visibility_cron,

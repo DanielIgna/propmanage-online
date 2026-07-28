@@ -4090,3 +4090,34 @@ specialist e per-browser; plan: mutare în backend user prefs.
 **TESTAT**: pytest 6/6 (tests/test_iter155_architecture_guardian.py: run+status+auth
 endpoints, zero API duplicate, canonical client, HH webhook wired), build frontend ✓,
 webhook stripe 200 ✓, UI screenshot ✓ (badge 97/100, task cu plan afișat).
+
+---
+
+## ✅ PM-GUARDIAN-003 — PRODUCT GUARDIAN (modul al Guardian Kernel) (28 Iul 2026)
+**Modul nou: /app/backend/product_guardian.py** — motoare REALE, fără stub-uri:
+1. **CTA Validator**: toate link-urile interne literale (to=/href=/navigate/window.location)
+   din frontend vs tabela de rute din App.js (exact + pattern-uri dinamice :param).
+2. **Role Consistency**: fiecare rol distinct din db.users are rută home validă; maparea
+   roleHome se parsează DIRECT din Auth.jsx (sursă unică, rămâne sincron automat).
+3. **ServiceGate Validator**: serviceId-urile din cod există în site_menu.
+4. **First Value Engine**: conversii reale din DB (client→proprietate→cerere→plată).
+5. **Conversion Engine**: funnel landing→register/login din analytics_events (30 zile).
+6. **Product Health Score** + Platform Score (medie cu Architecture) + ceo_summary/rulare.
+**Lifecycle kernel**: product_guardian_tasks/runs/ignores, recurrence, 3-strikes → notify.
+Rulează: cron 06:45, în run_repair_cycle, manual. Rute: /api/admin/repair-center/
+product-guardian/{status,run,ignore}. UI: secțiune în Repair Center (scoruri, CEO summary,
+funnel stats, task-uri cu plan).
+**DOGFOODING — 2 BUG-URI CRITICE REALE GĂSITE ȘI REPARATE**:
+- `role_no_home:marketplace_partner`: 4 utilizatori reali aterizau pe landing după login —
+  backend-ul portalului (/api/marketplace-partner/*) exista, UI-ul NU fusese construit
+  niciodată. FIX: pagină nouă /partner/marketplace (MarketplacePartnerPortal.jsx: stats,
+  listă lead-uri, adăugare lead) + roleHome mapat. Testat E2E cu cont de test
+  (mp.partner.test@propmanage.io / MpTest123! → partener "[TEST] Partener Demo Guardian").
+- `role_no_home:marketing_manager`: 1 utilizator (colaborator marketing) → landing.
+  FIX: roleHome mapat la /admin/marketing.
+**Task deschis rămas**: ttfv_property_dropoff (11.1% clienți cu proprietate — zgomot demo,
+se va auto-rezolva/recalcula după purge-ul P0).
+**Scoruri curente**: Produs 97/100 · Arhitectură 97/100 · Platformă 97/100.
+**TESTAT**: pytest 11/11 (iter155 + iter156: run/status/auth endpoints, portal API partener,
+role mapping, zero API duplicate), build ✓, login partener → redirect portal ✓ (screenshot),
+Repair Center cu 3 secțiuni Guardian ✓ (screenshot).

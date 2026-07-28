@@ -442,6 +442,13 @@ async def run_repair_cycle(domains: list = None, trigger: str = "cron") -> dict:
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[repair] architecture guardian failed: {e}")
 
+    # Product Guardian: verifică experiența de produs (CTA, roluri, gates, funnel).
+    try:
+        from product_guardian import run_product_guardian
+        run["product_guardian"] = await run_product_guardian(trigger="repair_cycle")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[repair] product guardian failed: {e}")
+
     try:
         await db.health_repair_runs.insert_one({**run})
         n = await db.health_repair_runs.estimated_document_count()
