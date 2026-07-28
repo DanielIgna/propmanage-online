@@ -9,7 +9,7 @@ agregate pe rol), Process Learning (stats + istoric build-uri), Adaptive Decisio
 Personal Mentor (insights discrete) și Guardian Feedback (semnale, fără acțiuni).
 """
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 from db import db
 

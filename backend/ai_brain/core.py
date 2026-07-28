@@ -14,7 +14,7 @@ from ai_brain import discovery, registry
 
 logger = logging.getLogger("propmanage.ai_brain")
 
-VERSION = "1.6-process-intelligence"
+VERSION = "1.0.0"
 
 
 def _now() -> str:
@@ -93,10 +93,15 @@ async def ai_brain_status() -> dict:
         "status": "active" if last_run else "never_ran",
         "version": VERSION,
         "capabilities": ["discovery", "knowledge_registry", "context", "explainability",
-                         "mentor", "knowledge_graph", "process_intelligence"],
+                         "mentor", "knowledge_graph", "process_intelligence",
+                         "decision_intelligence", "adaptive_intelligence",
+                         "collaborative_intelligence", "certification"],
         "last_run": last_run,
         "registry": {**await registry.counts(),
                      "processes": await db.ai_brain_processes.count_documents({})},
+        "certification": await db.ai_brain_certification.find_one(
+            {}, {"_id": 0, "verdict": 1, "scores": 1, "version": 1, "generated_at": 1},
+            sort=[("generated_at", -1)]),
         "guardians": {
             "architecture_score": (arch or {}).get("architecture_score"),
             "product_score": (prod or {}).get("product_score"),

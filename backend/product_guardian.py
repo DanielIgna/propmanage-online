@@ -295,6 +295,39 @@ async def check_sla_breaches(issues):
 
 
 # ============================================================================
+# 9. AI BRAIN CERTIFICATION — AIB-010 (verdictul ultimei certificări)
+# ============================================================================
+async def check_ai_brain_certification(issues):
+    cert = await db.ai_brain_certification.find_one({}, sort=[("generated_at", -1)])
+    if not cert:
+        issues.append(_issue(
+            "ai_brain_not_certified", "medium", "low",
+            "AI Brain nu a fost certificat încă (AIB-010)",
+            "Nicio rulare de certificare găsită în db.ai_brain_certification.",
+            "AI Brain are un certificat de release valid înainte de pilot.",
+            "Fără certificare, problemele de stabilitate/explicabilitate rămân nedetectate.",
+            "Rulează certificarea din AI Brain → Production Readiness."))
+        return
+    if cert.get("verdict") == "Not Ready":
+        issues.append(_issue(
+            "ai_brain_cert_not_ready", "high", "high",
+            "Certificarea AI Brain a eșuat: verdict «Not Ready»",
+            f"Probleme critice: {'; '.join((cert.get('critical_issues') or [])[:3])}",
+            "AI Brain trece certificarea cu verdict minim «Ready for Pilot».",
+            "Lansarea pilotului cu un AI Brain necertificat riscă experiențe eronate.",
+            "Rezolvă problemele critice din certificat și re-rulează certificarea."))
+    for k, v in (cert.get("scores") or {}).items():
+        if v < 70:
+            issues.append(_issue(
+                f"ai_brain_score_low_{k}", "medium", "medium",
+                f"Scor AI Brain scăzut: {k} = {v}/100",
+                "Sub pragul de 70 acceptat pentru pilot.",
+                f"{k} ≥ 70 la certificare.",
+                "Scorurile scăzute indică riscuri de fiabilitate în producție.",
+                "Vezi detaliile în AI Brain → Production Readiness."))
+
+
+# ============================================================================
 # RUN — kernel lifecycle (identic cu Architecture Guardian) + learning 3-strikes
 # ============================================================================
 async def run_product_guardian(trigger: str = "cron") -> dict:
@@ -305,7 +338,8 @@ async def run_product_guardian(trigger: str = "cron") -> dict:
         logger.warning(f"[product-guardian] dead_links failed: {e}")
     fv, conv = {}, {}
     for acheck in (check_role_homes, check_service_gates, check_process_health,
-                   check_adaptive_intelligence, check_sla_breaches):
+                   check_adaptive_intelligence, check_sla_breaches,
+                   check_ai_brain_certification):
         try:
             await acheck(issues)
         except Exception as e:  # noqa: BLE001

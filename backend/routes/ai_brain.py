@@ -288,6 +288,30 @@ async def decisions_inspect(email: str, path: str = "", user=Depends(require_rol
 
 
 # ============================================================================
+# AIB-010 · Certification & Production Readiness
+# ============================================================================
+@router.post("/certification/run")
+async def certification_run(user=Depends(require_role("admin"))):
+    from ai_brain.certification import run_certification
+    return await run_certification(trigger=f"manual:{user.get('email')}")
+
+
+@router.get("/certification/latest")
+async def certification_latest(user=Depends(require_role("admin"))):
+    from ai_brain.certification import latest_certificate
+    cert = await latest_certificate()
+    if not cert:
+        raise HTTPException(404, "Nicio certificare rulată încă — folosește POST /certification/run")
+    return cert
+
+
+@router.get("/certification/debt")
+async def certification_debt(user=Depends(require_role("admin"))):
+    from ai_brain.certification import tech_debt_scan
+    return await tech_debt_scan()
+
+
+# ============================================================================
 # AIB-009 · Collaborative Intelligence Engine
 # ============================================================================
 @user_router.get("/collaboration/state")

@@ -4394,3 +4394,40 @@ prioritizate. MentorWidget: card colaborare («E rândul tău» verde / «aștep
 **TESTAT**: pytest iter165 11/11 nou + 55/55 regresie (iter160-164), guardian ✓, screenshot
 Admin ✓ (9 procese, 130 instanțe, handoff specialist↔client cu endpoint-uri, 21 notificări).
 **URMEAZĂ**: AIB-010 — AI Brain v1.0 (stabilizare, optimizare, certificare producție).
+
+## ✅ AIB-010 — CERTIFICATION & PRODUCTION READINESS (28 Iul 2026) — FAZA 1 ÎNCHISĂ OFICIAL
+**Modul nou: ai_brain/certification.py** — sprint exclusiv de consolidare (ZERO AI nou):
+- **Certification Audit** (component_audit): AIB-001..009 auditate prin execuție reală +
+  date (registru, context live, explicații+cache, mentor cu justificări, graf+noduri proces,
+  procese+tranziții, decizii scorate+confidence, feedback loop, SLA+notificări). Statusuri:
+  certified/experimental/failed.
+- **Architecture Integrity**: reutilizează Architecture Guardian (ultimul run + task-uri) +
+  pyflakes pe ai_brain/ (CURAT după fix: __all__ în __init__, timedelta eliminat) +
+  detecție cicluri de importuri ai_brain (0) + endpoint-uri duplicate din registru.
+- **Production Health Checks**: latențe reale per motor (mongodb 0ms, context 5ms, process
+  4ms, decision 33ms, graph 685→153ms DUPĂ indexare ai_brain_graph_nodes.id +
+  edges.source/target, LLM roundtrip ~1.3s), memorie /proc/self/status (~358MB), CPU load,
+  erori din loguri supervisor, retry queue, fallback-uri.
+- **Explainability Validation**: 100% din recomandări justificate (decizii: reasons+resolves+
+  factors+confidence_factors; notificări: why; escaladări: why; blockers: text) — verificat
+  pe >50 recomandări reale.
+- **Stress & Load**: 69 operațiuni concurente asyncio (context×24, process×12, collaboration
+  ×12, decisions×9, graph×12) pe 3 roluri — 1242ms total, 18ms/op, 0 erori.
+- **Pilot Readiness**: 13/100/1000 apartamente — TOATE «ready» (praguri latență 3000/1500/
+  600ms + consistență owneri + stress).
+- **Technical Debt Scanner** (read-only): module API fără apeluri frontend (candidate),
+  stări de proces inutile + procese abandonate (reuse Adaptive), findings Guardian.
+- **Guardian Certification**: scoruri AI Brain 100 / Reliability 100 / Explainability 100 /
+  Stability 95; product_guardian.check_ai_brain_certification (Not Ready→high, scor<70→medium).
+- **Release Certificate**: db.ai_brain_certification (istoric) — VERDICT FINAL:
+  **«Production Ready with Warnings»** · AI Brain v1.0.0 · 9/9 componente certificate ·
+  0 critice · 1 minoră (4 emailuri blocate de DNS Resend — acțiune manuală user).
+**VERSIUNE**: core.VERSION = «1.0.0»; ai_brain_status include certification + 11 capabilities.
+**API**: POST /api/admin/ai-brain/certification/run · GET /certification/{latest,debt}.
+**UI**: components/ProductionReadiness.jsx (tab nou în /admin/ai-brain) — banner verdict,
+4 scoruri, componente auditate, health & performanță, stress + pilot readiness, critice/
+minore/recomandări, Technical Debt Scanner expandabil.
+**TESTAT**: pytest iter166 12/12 nou + 66/66 regresie (iter160-165), pyflakes curat,
+guardian ✓ (0 issues la certificare validă), screenshot Admin ✓.
+**FAZA 1 — AI BRAIN CORE: COMPLETĂ ȘI CERTIFICATĂ.** Urmează servicii verticale peste
+AI Brain: House Health AI, Digital Twin AI, Marketplace AI, Verified Property AI.

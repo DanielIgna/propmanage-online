@@ -130,9 +130,12 @@ async def build_graph() -> dict:
     await db.ai_brain_graph_edges.delete_many({})
     if nodes:
         await db.ai_brain_graph_nodes.insert_many([dict(n) for n in nodes.values()])
+        await db.ai_brain_graph_nodes.create_index("id")
     if edges:
         await db.ai_brain_graph_edges.insert_many(
             [{"source": s, "target": t, "rel": rel, "weight": w} for (s, t, rel), w in edges.items()])
+        await db.ai_brain_graph_edges.create_index("source")
+        await db.ai_brain_graph_edges.create_index("target")
 
     by_kind = {}
     for n in nodes.values():
