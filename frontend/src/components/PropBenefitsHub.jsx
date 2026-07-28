@@ -135,6 +135,14 @@ export const PropBenefitsHub = () => {
         </a>
       )}
 
+      {sm?.community_action && (
+        <a href={sm.community_action.cta_path} className="block rounded-3xl border border-slate-100 bg-white p-4 shadow-sm" data-testid="pb-community-action">
+          <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Pentru comunitatea ta</div>
+          <div className="text-sm font-black text-slate-900">{sm.community_action.title}</div>
+          <div className="text-xs text-slate-500 mt-0.5">{sm.community_action.value}</div>
+        </a>
+      )}
+
       {msg && (
         <div className={`text-xs font-bold rounded-2xl px-4 py-3 ${msg.ok ? "bg-[#F0FBF4] text-[#166534]" : "bg-rose-50 text-rose-600"}`} data-testid="pb-message">
           {msg.text}

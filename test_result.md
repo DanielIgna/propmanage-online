@@ -154,3 +154,10 @@
 - Frontend: components/pb/PbEverywhere.jsx montat în HomeV2, SpecialistDashboard (rail + merge xosLayout), AdministratorWorkspace, HouseHealthPage, DigitalTwinPage, Marketplace, PropBenefitsHub (Community Deals), PropBenefitsAdminPage (North Star + Deals tab)
 - Testing: iteration_168 (backend 100%), fixes: xosLayout merge pentru widget-uri noi + test mentor pe source_action_id → suite PB-001+PB-002: 44 passed 1 skipped
 - Known pre-existing: ServiceGate 'specialisti' redirect pe /marketplace pentru client logat (strip-ul nu se poate exersa în UI demo; API OK)
+
+## Iteration 151 — PB-003 Community Trust & Recommendation Engine
+- Backend: propbenefits/trust_engine.py (recommendation engine cu AI classify, trust score explicabil + cache, ambassador + promovare, rewards DOAR la efect real, deal signals + demand + priority, trust graph în ai_brain, community growth 6 răspunsuri); config: recommendation_reward + ambassador (get_config merge defaults); success_manager: slot community_action + almost_ambassador impact 9
+- Routes: POST/GET /api/benefits/recommendations(+/mine), /ambassador, /community-deals/{id}/signal + /why, /trust/{id}; admin /community-growth; tick extins (validate+trust+graph)
+- Marketplace: _trust extins cu pb_trust_scores batch (trust_score/confirmed_jobs/ambassadors/community_value)
+- Frontend: PostJobGrowthLoop pjl-recommend, AmbassadorCard, deals cu 4 semnale, Marketplace trust badges, Admin GrowthPanel
+- Testing: iteration_169 backend 100% frontend 100%; fix post-test: community_action slot (xfail→pass); suite totală 63 passed 2 skipped

@@ -1,3 +1,29 @@
+## 🤝 PB-003 — COMMUNITY TRUST & RECOMMENDATION ENGINE · LIVRAT & TESTAT (28 Iul 2026)
+
+**Liantul dintre PropBenefits, Community Deals, Success Manager, Marketplace, specialiști, Digital Twin și House Health. Zero cod duplicat — totul prin EXTENSIE.**
+
+**Backend** (`propbenefits/trust_engine.py` + extensii):
+- **1. Recommendation Engine**: după lucrare completed/confirmed clientul recomandă (specialist/lucrare/serviciu + motiv + foto) — EXTINDE colecția `recommendations` (deja folosită de trust rollup Marketplace). **AI clasifică** (LLM + fallback keywords): calitate/punctualitate/comunicare/pret_corect/incredere. Idempotent per lucrare, 403 pe lucrări străine.
+- **2. Trust Score** (0-100, explicabil, cache `pb_trust_scores` la tick): recomandări validate (20) + lucrări confirmate (25) + satisfacție din reviews (20) + experiență (15) + vechime (10) + activitate 30z (10). `explain_specialist` → „De ce recomand acest specialist" cu factori + vocile comunității.
+- **3. Community Ambassador**: la N recomandări VALIDATE (config, default 2) — badge + beneficiu (pb_ledger REUSE) + puncte membership (criteriu nou `ambassador`) + notify. Nu bani — beneficii.
+- **4. Recommendation Rewards — DOAR la efect real**: pending → tick detectează efecte (contact → ofertă → lucrare → lucrare_confirmată de la ALT client după recomandare) → validated → reward din `pb_config.recommendation_reward` (Reward Engine REUSE).
+- **5. Community Deals semnale**: Susțin/Interesat/Vreau ofertă/Notifică-mă (`pb_deal_signals`, $addToSet idempotent) → demand_score ponderat (oferă×3, interesat×2, notifică×1.5, susțin×1) → interest_level + **negotiation_priority** + `explain_deal` („De ce recomand acest deal").
+- **6. AI Trust Graph** (REUSE `ai_brain_graph_nodes/edges`): noduri trust_client/specialist/deal/benefit + muchii recommended/executed_for/supports_deal/benefit_granted/referred — sincronizat la tick.
+- **7. Marketplace**: cardurile primesc din batch `pb_trust_scores`: trust_score, recommendations(+validated), confirmed_jobs, ambassadors, community_value (RON beneficii generate comunității).
+- **8. Community Growth Dashboard** (`/api/admin/prop-benefits/community-growth`): răspunde determinist la cele 6 întrebări ale Fondatorului (cel mai valoros deal, ce negociere de pornit, categoria cu cerere maximă, partenerul de contactat, ambasadorii activi, impactul asupra retenției).
+- **9. Success Manager**: candidați noi (recomandă specialistul / mai ai un pas până la Ambassador impact 9 / negocierea X mai are nevoie de N susținători) + **slot dedicat `community_action`** în payload — acțiunile de comunitate nu mai sunt îngropate de acțiunile de casă (fix post-testare, xfail→pass).
+- Tick zilnic extins: validare recomandări + trust scores + graph sync.
+
+**UI**: PostJobGrowthLoop — pas „Recomandă lucrarea" (textarea + trimite, pjl-recommend) · PropBenefitsHub — card Ambassador cu progres (pb-ambassador-card) + card „Pentru comunitatea ta" (pb-community-action) + deals cu 4 chips de semnale · Marketplace — badge-uri Trust/lucrări confirmate/ambasadori/valoare comunitate · Admin — tab **Community Growth** (6 răspunsuri + tabel cerere cu priorități).
+
+**Testare**: iteration_169 — backend 100% (16/16 + suite regresie `test_pb003_trust_recommendations.py`), frontend 100% pe suprafețele verificabile. **Suita PB-001+002+003: 63 passed, 2 skipped.** Flux validat cap-coadă: recomandare → AI labels → efect real → reward → progres ambassador 1/2.
+
+**Known (pre-existent)**: ServiceGate `specialisti` redirecționează /marketplace pentru anonim/client demo — badge-urile trust nu-s verificabile în UI demo (backend confirmat corect).
+
+**URMEAZĂ (ordinea Fondatorului)**: **ASM-001 – AI Success Manager** → SH-001 – Subscription Health → FP-001 – FairPrice → Partner Negotiation Pipeline (IT/DE/NL/SE/DK/ES/PT/FR/PL/GR).
+
+---
+
 ## 🌐 PB-002 — PROPBENEFITS EVERYWHERE · LIVRAT & TESTAT (28 Iul 2026)
 
 **Misiune: platforma ADUCE beneficiile în context — utilizatorul nu le caută. Slogan oficial: „PropManage nu vinde reduceri. Construiește valoare pentru proprietari prin puterea comunității."**
