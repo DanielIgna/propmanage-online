@@ -178,6 +178,12 @@ export default function InteriorDesignLanding() {
   }, []);
 
   useEffect(() => {
+    if (!content || !window.location.hash) return;
+    const el = document.getElementById(window.location.hash.slice(1));
+    if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth" }), 150);
+  }, [content]);
+
+  useEffect(() => {
     if (!content) return;
     const ld = document.createElement("script");
     ld.type = "application/ld+json";

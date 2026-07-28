@@ -3882,3 +3882,33 @@ last_repair agregat per domeniu, lock concurență, polling ieftin.**
 **Notă onestă**: lead_followup emails eșuează în sandbox Resend (P0 blocat pe acțiunea
 userului — DNS). Scorurile revenue/product cer acțiuni umane (vânzare, onboarding) — motorul
 execută partea automatizabilă și escaladează restul.
+
+---
+
+## ✅ UNIFIED SERVICE JOURNEY (28 Iul 2026)
+**EPIC: toate punctele de intrare conduc la același ecosistem — o singură sursă de adevăr.**
+1. Sursă canonică (backend `service_content_design.py`, content_version 3, servită de
+   GET /api/interior-design/content — upgrade automat pe versiune):
+   - `canonical_flow`: 9 pași (Audit → Digital Twin → Planșe → Design → Implementare →
+     Specialiști → Recepție → Twin actualizat → House Health) + tagline "Auditul descoperă.
+     Digital Twin memorează. Designul construiește. Implementarea execută. House Health întreține."
+   - `audit_full`: 4 grupuri / 26 itemi (umiditate, punct de rouă, punți termice, termografie,
+     CO₂/VOC, electric, apă, gaz, structură, priorități, costuri, raport, foto, metodologie)
+   - `twin_full`: 4 grupuri / 22 itemi (trasee ascunse, apă caldă/rece, pardoseală, planuri,
+     3D, materiale, garanții, documente, Property Memory)
+2. Componente partajate `/components/ecosystem/`: useEcosystemContent (cache modul, 1 fetch),
+   EcosystemFlow (chips flux canonic, teme dark/light, activeKey), ServiceDetailModal
+   (audit/twin/process — 17 etape refolosite din process_phases, CTA primar + flux în footer).
+3. Integrări (zero duplicare de conținut):
+   - /imobile-verificate/sell: PackageCard cu CTA dublu — [Alege pachetul] + [Află tot ce
+     include Auditul / Vezi toate cele 17 etape / Vezi tot ce conține]; flux deasupra
+     pachetelor; bundle repozitionat "PROCESUL COMPLET · RECOMANDAT" (Audit descoperă +
+     Twin memorează = un singur proces)
+   - /imobile-verificate: butoane "Ce înseamnă auditul/Digital Twin?" + flux; CTA modal → /sell
+   - /design-interior: butoane detalii complete în secțiunile audit/twin + flux canonic în
+     ecosistem + scroll automat la hash (#audit etc.)
+   - /house-health/upgrade: flux cu house_health activ + empty state corect pt. nelogați
+     (CTA login/register în loc de "niciun plan")
+   - /marketplace: flux cu specialists activ
+**VALIDAT: iteration_150.json — backend 100%, frontend 100% (5/5 pagini + consistență
+dark/light + regresie checkout wizard pas 1→2). Fix-uri post-test: hash scroll, HH auth state.**

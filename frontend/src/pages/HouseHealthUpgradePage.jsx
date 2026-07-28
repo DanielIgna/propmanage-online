@@ -17,11 +17,16 @@ const HouseHealthUpgradePage = () => {
   const [busySlug, setBusySlug] = useState(null);
   const [error, setError] = useState("");
 
+  const [authRequired, setAuthRequired] = useState(false);
+
   useEffect(() => {
     axios
       .get(`${API}/house-health/plans`)
       .then((r) => setPlans(r.data?.items || []))
-      .catch(() => setPlans([]))
+      .catch((e) => {
+        setPlans([]);
+        if (e?.response?.status === 401) setAuthRequired(true);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -87,7 +92,18 @@ const HouseHealthUpgradePage = () => {
             <Loader2 className="w-4 h-4 animate-spin" /> Se încarcă planurile...
           </div>
         ) : plans.length === 0 ? (
-          <div className="text-stone-500 italic">Niciun plan disponibil momentan.</div>
+          authRequired ? (
+            <div className="p-8 rounded-3xl bg-white/[0.03] border border-white/10 text-center" data-testid="hh-auth-required">
+              <p className="text-stone-300 font-semibold mb-1">Planurile House Health sunt disponibile după autentificare.</p>
+              <p className="text-sm text-stone-500 mb-5">Creează-ți cont gratuit sau conectează-te pentru a-ți activa monitorizarea locuinței.</p>
+              <div className="flex justify-center gap-3">
+                <a href="/auth" className="px-6 py-2.5 rounded-full bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-400 transition-colors" data-testid="hh-login-cta">Conectează-te</a>
+                <a href="/register" className="px-6 py-2.5 rounded-full border border-white/15 text-stone-300 text-sm font-bold hover:border-emerald-400/60 hover:text-white transition-colors" data-testid="hh-register-cta">Creează cont</a>
+              </div>
+            </div>
+          ) : (
+            <div className="text-stone-500 italic">Niciun plan disponibil momentan.</div>
+          )
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5" data-testid="hh-upgrade-plans">
             {plans.map((p) => (
