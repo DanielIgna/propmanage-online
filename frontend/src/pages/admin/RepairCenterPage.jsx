@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import {
   Wrench, ChevronLeft, Loader2, Play, CheckCircle2, AlertTriangle,
-  Activity, ArrowRight, HeartPulse, History,
+  Activity, ArrowRight, HeartPulse, History, Compass,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -72,6 +72,64 @@ const RunResult = ({ r }) => (
     ))}
   </div>
 );
+
+const SEV_STYLE = {
+  critical: "bg-rose-500/15 text-rose-300 border-rose-500/30",
+  high: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  medium: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+};
+
+const GuardianSection = () => {
+  const [data, setData] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => {
+    ax.get("/api/admin/repair-center/journey-guardian/status").then(r => setData(r.data)).catch(() => {});
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const run = async () => {
+    setBusy(true);
+    try { await ax.post("/api/admin/repair-center/journey-guardian/run"); load(); } finally { setBusy(false); }
+  };
+  return (
+    <div className="mt-10" data-testid="journey-guardian-section">
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        <Compass className="w-4 h-4 text-[#d4ff3a]" />
+        <div className="text-xs font-bold uppercase tracking-wider text-stone-400">Customer Journey Guardian — ochii clientului</div>
+        <div className="flex-1" />
+        {data?.last_run && (
+          <span className="text-[11px] text-stone-500">
+            Ultima rulare: {new Date(data.last_run.ts).toLocaleString("ro-RO")} · {data.last_run.issues_found} probleme · {data.resolved_total} rezolvate istoric
+          </span>
+        )}
+        <button onClick={run} disabled={busy}
+          className="px-3 py-1.5 text-xs rounded-lg border border-stone-700 text-stone-300 hover:text-white flex items-center gap-1.5"
+          data-testid="guardian-run-btn">
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />} Auditează călătoria
+        </button>
+      </div>
+      {data && (data.open_tasks || []).length === 0 && (
+        <div className="p-6 text-center text-sm text-stone-500 border border-dashed border-stone-800 rounded-2xl" data-testid="guardian-no-tasks">
+          Zero fundături, zero link-uri moarte, conținut canonic complet — călătoria clientului e intactă.
+        </div>
+      )}
+      <div className="space-y-2" data-testid="guardian-tasks-list">
+        {(data?.open_tasks || []).map(t => (
+          <div key={t.key} className="border border-stone-800 rounded-2xl p-4 bg-stone-900/30" data-testid={`guardian-task-${t.key}`}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded border ${SEV_STYLE[t.severity] || SEV_STYLE.medium}`}>{t.severity}</span>
+              <span className="text-sm font-semibold text-white">{t.title}</span>
+              <div className="flex-1" />
+              <span className="text-[10px] text-stone-500">→ {t.assigned_to}</span>
+            </div>
+            <p className="text-xs text-stone-400 mt-1.5">{t.detail}</p>
+            <p className="text-xs text-stone-500 mt-1"><span className="text-stone-400 font-semibold">Impact:</span> {t.business_impact}</p>
+            <p className="text-xs text-emerald-300/70 mt-0.5"><span className="font-semibold">Așteptat:</span> {t.expected}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export default function RepairCenterPage() {
   const [status, setStatus] = useState(null);
@@ -173,6 +231,7 @@ export default function RepairCenterPage() {
                 Toate domeniile sunt peste prag — nimic de reparat în ultima rulare.
               </div>
             )}
+            <GuardianSection />
           </>
         )}
       </div>

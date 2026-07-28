@@ -10,6 +10,7 @@ import { EstateMapView } from "./EstateMapView";
 import { useDynamicSEO } from "@/lib/useDynamicSEO";
 import { EcosystemFlow } from "@/components/ecosystem/EcosystemFlow";
 import { ServiceDetailModal } from "@/components/ecosystem/ServiceDetailModal";
+import { NextStep } from "@/components/ecosystem/NextStep";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -362,6 +363,16 @@ export const EstateBrowse = () => {
             ))}
           </div>
         </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-16">
+        <NextStep
+          dark
+          title="Ai o proprietate? Transform-o în Imobil Verificat"
+          desc="Audit tehnic + Digital Twin = credibilitate maximă la vânzare și preț corect, susținut de date."
+          to="/imobile-verificate/sell"
+          cta="Începe procesul"
+        />
       </section>
 
       <ExternalAuditModal open={showExtModal} onClose={() => setShowExtModal(false)} />

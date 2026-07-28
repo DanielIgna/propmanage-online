@@ -616,6 +616,15 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=7200,
         )
+        # Customer Journey Guardian — zilnic 06:50, audit călătoria clientului + task-uri CTO AI
+        from journey_guardian import run_journey_guardian
+        scheduler.add_job(
+            run_journey_guardian,
+            CronTrigger(hour=6, minute=50, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="journey_guardian_daily",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
         # CIP-A: Category Visibility Gate — daily 04:30 (via Orchestrator playbook)
         scheduler.add_job(
             construction_visibility_cron,

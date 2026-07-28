@@ -17,10 +17,14 @@ export const EcosystemFlow = ({ dark = false, activeKey = null, compact = false 
   const chip = dark
     ? "bg-white/5 border-white/10 text-stone-200 hover:border-[#d4ff3a]/60 hover:text-white"
     : "bg-stone-50 border-stone-200 text-stone-700 hover:border-emerald-400 hover:text-emerald-900";
+  const done = dark
+    ? "bg-[#d4ff3a]/10 border-[#d4ff3a]/30 text-[#d4ff3a]/80"
+    : "bg-emerald-50 border-emerald-200 text-emerald-700";
   const active = dark
     ? "bg-[#d4ff3a] border-[#d4ff3a] text-black font-black"
     : "bg-emerald-700 border-emerald-700 text-white font-black";
   const arrow = dark ? "text-[#d4ff3a]" : "text-emerald-600";
+  const activeIdx = flow.steps.findIndex((s) => s.key === activeKey);
   return (
     <div data-testid="ecosystem-flow">
       {!compact && (
@@ -33,13 +37,16 @@ export const EcosystemFlow = ({ dark = false, activeKey = null, compact = false 
         {flow.steps.map((s, i) => {
           const svcId = STEP_SERVICE[s.key];
           const gated = svcId && !isServiceEnabled(services, svcId);
-          const cls = `px-2.5 py-1.5 rounded-full border text-[11px] font-bold transition-colors ${s.key === activeKey ? active : chip}`;
+          const isDone = activeIdx > -1 && i < activeIdx;
+          const cls = `px-2.5 py-1.5 rounded-full border text-[11px] font-bold transition-colors ${
+            s.key === activeKey ? active : isDone ? done : chip}`;
+          const label = isDone ? `✓ ${s.label}` : s.label;
           return (
             <React.Fragment key={s.key}>
               {gated ? (
-                <span title={s.desc} className={`${cls} cursor-default`} data-testid={`eco-flow-${s.key}`}>{s.label}</span>
+                <span title={s.desc} className={`${cls} cursor-default`} data-testid={`eco-flow-${s.key}`}>{label}</span>
               ) : (
-                <Link to={s.href} title={s.desc} className={cls} data-testid={`eco-flow-${s.key}`}>{s.label}</Link>
+                <Link to={s.href} title={s.desc} className={cls} data-testid={`eco-flow-${s.key}`}>{label}</Link>
               )}
               {i < flow.steps.length - 1 && <ArrowRight className={`w-3 h-3 shrink-0 ${arrow}`} />}
             </React.Fragment>

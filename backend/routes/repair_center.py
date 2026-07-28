@@ -81,3 +81,21 @@ async def repair_runs(limit: int = 10, user=Depends(require_role("admin"))):
     limit = max(1, min(int(limit), 50))
     items = [d async for d in db.health_repair_runs.find({}, {"_id": 0}).sort("ts", -1).limit(limit)]
     return {"items": items}
+
+
+# ============================================================================
+# CUSTOMER JOURNEY GUARDIAN — audit continuu al călătoriei clientului
+# ============================================================================
+@router.get("/journey-guardian/status")
+async def guardian_status(user=Depends(require_role("admin"))):
+    last_run = await db.journey_guardian_runs.find_one({}, {"_id": 0}, sort=[("ts", -1)])
+    tasks = [t async for t in db.journey_guardian_tasks.find(
+        {"status": "open"}, {"_id": 0}).sort([("severity", 1), ("created_at", -1)]).limit(50)]
+    resolved_total = await db.journey_guardian_tasks.count_documents({"status": "resolved"})
+    return {"last_run": last_run, "open_tasks": tasks, "resolved_total": resolved_total}
+
+
+@router.post("/journey-guardian/run")
+async def guardian_run(user=Depends(require_role("admin"))):
+    from journey_guardian import run_journey_guardian
+    return await run_journey_guardian(trigger=f"manual:{user.get('email')}")

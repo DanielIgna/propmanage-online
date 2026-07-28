@@ -6,6 +6,7 @@ import axios from "axios";
 import { ArrowLeft, ExternalLink, Store, Sparkles } from "lucide-react";
 import { SiteNav } from "../components/SiteNav";
 import { EcosystemFlow } from "../components/ecosystem/EcosystemFlow";
+import { NextStep } from "../components/ecosystem/NextStep";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -81,9 +82,16 @@ export default function ServiceProvidersPage() {
               </div>
             )}
 
-            <div className="p-5 rounded-3xl bg-white/[0.03] border border-white/10">
+            <div className="p-5 rounded-3xl bg-white/[0.03] border border-white/10 mb-8">
               <EcosystemFlow dark compact />
             </div>
+            <NextStep
+              dark
+              title="Începe procesul complet: Audit + Digital Twin"
+              desc="Mobilierul perfect pornește de la măsurători exacte. Cu Digital Twin, partenerii lucrează pe planurile reale ale locuinței tale."
+              to="/imobile-verificate/sell"
+              cta="Începe cu un audit"
+            />
           </>
         )}
       </section>

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { API } from "./DashShared";
 import { EcosystemFlow } from "../components/ecosystem/EcosystemFlow";
+import { NextStep } from "../components/ecosystem/NextStep";
 const HouseHealthUpgradePage = () => {
   const navigate = useNavigate();
   const [plans, setPlans] = useState([]);
@@ -124,6 +125,17 @@ const HouseHealthUpgradePage = () => {
             Plata este procesată prin Stripe. Datele cardului tău nu trec niciodată prin serverele PropManage.
             Poți anula oricând — accesul rămâne activ până la sfârșitul perioadei plătite.
           </p>
+        </div>
+
+        <div className="mt-8">
+          <NextStep
+            dark
+            label="Nu ai încă audit sau Digital Twin?"
+            title="Începe procesul de la primul pas"
+            desc="House Health funcționează cel mai bine pe o locuință auditată, cu Digital Twin — monitorizarea pornește de la date reale."
+            to="/imobile-verificate/sell"
+            cta="Solicită Audit + Digital Twin"
+          />
         </div>
       </div>
     </div>

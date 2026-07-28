@@ -12,6 +12,7 @@ import { API } from "./DashShared";
 import { useDynamicSEO } from "../lib/useDynamicSEO";
 import { EcosystemFlow } from "../components/ecosystem/EcosystemFlow";
 import { ServiceDetailModal } from "../components/ecosystem/ServiceDetailModal";
+import { NextStep } from "../components/ecosystem/NextStep";
 
 const ax = axios.create({ baseURL: API });
 
@@ -420,7 +421,7 @@ export default function InteriorDesignLanding() {
         <div className="mb-8 p-5 rounded-3xl bg-stone-50 border border-stone-100" data-testid="id-canonical-flow">
           <EcosystemFlow />
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
           {(eco.links || []).map((s, i) => (
             <Link key={i} to={s.href} className="p-5 rounded-3xl border border-stone-100 hover:border-emerald-300 hover:shadow-lg transition-all group" data-testid={`id-eco-${i}`}>
               <h3 className="font-bold text-stone-900 text-sm group-hover:text-emerald-800">{s.title} →</h3>
@@ -428,6 +429,12 @@ export default function InteriorDesignLanding() {
             </Link>
           ))}
         </div>
+        <NextStep
+          title="Vinde sau cumpără cu istoric tehnic complet"
+          desc="Proprietățile care trec prin acest proces devin Imobile Verificate — cu audit, Digital Twin și credibilitate maximă la vânzare."
+          to="/imobile-verificate"
+          cta="Vezi Imobilele Verificate"
+        />
       </Section>
 
       {/* RECENZII */}
