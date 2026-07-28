@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { Home, Plus, Wrench, Building2, Settings, Bell, ChevronDown, Shield, ChevronRight } from "lucide-react";
+import { Home, Plus, Wrench, Building2, Settings, Bell, ChevronDown, Shield, ChevronRight, Gift } from "lucide-react";
 import { useAuth, formatApiError } from "../../auth";
 import { API } from "../DashShared";
 import { GREEN, Sheet } from "./ui";
@@ -25,9 +25,10 @@ import { TrustedSpecialists } from "../../components/TrustedSpecialists";
 import { MaintenanceCalendar } from "../../components/MaintenanceCalendar";
 import { BuildingHub } from "../../components/BuildingHub";
 import { PostJobGrowthLoop } from "../../components/PostJobGrowthLoop";
+import { PropBenefitsHub } from "../../components/PropBenefitsHub";
 
 const NAV = [[Home, "Acasă", "home"], [Wrench, "Lucrări", "jobs"], [Plus, "Solicită", "request"], [Building2, "Propr.", "property"], [Settings, "Setări", "settings"]];
-const TITLES = { home: null, jobs: "Lucrările mele", property: "Proprietatea mea", settings: "Setări" };
+const TITLES = { home: null, jobs: "Lucrările mele", property: "Proprietatea mea", settings: "Setări", benefits: "Beneficiile mele" };
 
 export default function ClientDashboardV2() {
   const { user, refreshUser, logout } = useAuth();
@@ -76,7 +77,7 @@ export default function ClientDashboardV2() {
     }
     if (wantedTab) {
       if (wantedTab === "request") setShowWizard(true);
-      else if (["home", "jobs", "property", "settings"].includes(wantedTab)) setTab(wantedTab);
+      else if (["home", "jobs", "property", "settings", "benefits"].includes(wantedTab)) setTab(wantedTab);
       params.delete("tab");
       const rest = params.toString();
       window.history.replaceState(null, "", `/client${rest ? `?${rest}` : ""}`);
@@ -184,6 +185,10 @@ export default function ClientDashboardV2() {
               <Icon style={{ width: 18, height: 18 }} /> {label === "Propr." ? "Proprietăți" : label}
             </button>
           ))}
+          <button onClick={() => { window.scrollTo({ top: 0 }); setTab("benefits"); }} data-testid="v2-desktop-nav-benefits"
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold transition-colors ${tab === "benefits" ? "bg-slate-900 text-white" : "bg-slate-50 text-slate-600 border border-slate-100 hover:bg-slate-100"}`}>
+            <Gift style={{ width: 18, height: 18 }} /> Beneficii
+          </button>
           {!(tab === "home" && properties.length === 0) && (
           <button onClick={() => actions.openWizard()} data-testid="v2-desktop-cta"
             className={`ml-auto flex items-center gap-2 px-6 py-3 rounded-full text-sm font-black transition-transform ${txActive
@@ -205,8 +210,15 @@ export default function ClientDashboardV2() {
           <MaintenanceCalendar properties={properties} prop={prop} onRequestCreated={loadRequests} />
           <BuildingHub properties={properties} onRequestsChanged={loadRequests} />
         </>)}
+        {tab === "benefits" && <PropBenefitsHub />}
         {tab === "settings" && (
           <div className="px-5 pb-8 space-y-2 lg:max-w-3xl" data-testid="v2-settings-view">
+            <button onClick={() => { window.scrollTo({ top: 0 }); setTab("benefits"); }} data-testid="v2-set-benefits"
+              className="w-full flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm text-left lg:hidden">
+              <span className="w-10 h-10 rounded-xl bg-[#ecfdf3] flex items-center justify-center"><Gift className="w-5 h-5 text-[#166534]" /></span>
+              <span className="text-sm font-black text-slate-900 flex-1">Beneficiile mele</span>
+              <ChevronRight className="w-4 h-4 text-slate-300" />
+            </button>
             <ReferralHub variant="light" />
             <BetaFeedbackEntry light />
             <button onClick={() => setShow2FA(true)} data-testid="v2-set-2fa"

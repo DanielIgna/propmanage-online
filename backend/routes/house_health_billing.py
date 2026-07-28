@@ -227,6 +227,12 @@ async def _activate_subscription_if_paid(session_id: str) -> dict:
         update["activated_at"] = now.isoformat()
         update["expires_at"] = new_expires
         activated = True
+        # PB-001.4: abonament activat → activează beneficiile de referral în așteptare
+        try:
+            from propbenefits.referral_ext import activate_for_user
+            await activate_for_user(tx["user_id"])
+        except Exception:  # noqa: BLE001
+            pass
 
         await db.hh_audit_log.insert_one({
             "user_id": tx["user_id"],

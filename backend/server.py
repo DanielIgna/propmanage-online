@@ -158,6 +158,11 @@ async def _campaign_detection_tick():
     await campaign_detection_tick()
 
 
+async def _pb_daily_tick():
+    from routes.prop_benefits import pb_daily_tick
+    await pb_daily_tick()
+
+
 async def _cs_sentinel_tick():
     from routes.launch_sentinel import cs_sentinel_tick
     await cs_sentinel_tick()
@@ -278,6 +283,14 @@ async def startup():
             _campaign_detection_tick,
             CronTrigger(hour=8, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="campaign_detection_daily",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        # PB-001: PropBenefits (08:45) — expirare beneficii + activare referral + snapshot Subscription Health
+        scheduler.add_job(
+            _pb_daily_tick,
+            CronTrigger(hour=8, minute=45, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="prop_benefits_daily",
             replace_existing=True,
             misfire_grace_time=3600,
         )

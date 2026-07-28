@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import {
   Compass, Loader2, RefreshCw, Camera, FileDown, ChevronDown, ChevronUp,
-  AlertTriangle, Copy, GitCompare, Layers, TrendingUp, Unplug, FileText,
+  AlertTriangle, Copy, GitCompare, Layers, TrendingUp, Unplug, FileText, Gauge,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -159,6 +159,34 @@ const SnapshotsPanel = ({ onRefresh }) => {
   );
 };
 
+const ImpactPanel = () => {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    ax.get("/api/admin/prop-benefits/impact-scores").then(r => setData(r.data)).catch(() => {});
+  }, []);
+  if (!data) return <Loader2 className="w-4 h-4 animate-spin text-stone-500" />;
+  return (
+    <div className="space-y-2" data-testid="dc-impact">
+      <p className="text-[11px] text-stone-500">{data.note}</p>
+      {data.items.map(it => (
+        <div key={it.key} className="bg-stone-900/40 border border-stone-800 rounded-xl p-3" data-testid={`dc-impact-${it.key}`}>
+          <div className="flex justify-between items-center text-xs mb-1.5">
+            <span className="font-bold text-white">{it.name}</span>
+            <span className="text-stone-400">realizat <b className="text-[#d4ff3a]">{it.realized}</b> / potențial {it.potential} · gap <b className="text-amber-300">{it.gap}</b></span>
+          </div>
+          <div className="h-1.5 bg-stone-800 rounded-full overflow-hidden">
+            <div className="h-full rounded-full bg-[#d4ff3a]" style={{ width: `${it.potential ? (it.realized / it.potential) * 100 : 0}%` }} />
+          </div>
+          <div className="flex gap-3 mt-1.5 text-[10px] text-stone-500">
+            <span>activare {it.impact.activation}/10</span><span>retenție {it.impact.retention}/10</span>
+            <span>conversie {it.impact.conversion}/10</span><span>recomandări {it.impact.referrals}/10</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export const DiscoveryCenter = () => {
   const [map, setMap] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -195,6 +223,7 @@ export const DiscoveryCenter = () => {
     { id: "duplicate", label: `Duplicate (${map?.duplicates?.length ?? "—"})`, icon: Copy },
     { id: "orfane", label: `Neconectate (${t?.orphans ?? "—"})`, icon: Unplug },
     { id: "roadmap", label: "Roadmap consolidare", icon: TrendingUp },
+    { id: "impact", label: "Impact abonamente", icon: Gauge },
     { id: "snapshots", label: "Snapshot-uri", icon: Camera },
   ];
 
@@ -301,6 +330,8 @@ export const DiscoveryCenter = () => {
           ))}
         </div>
       )}
+
+      {tab === "impact" && <ImpactPanel />}
 
       {tab === "snapshots" && <SnapshotsPanel onRefresh={() => load(true)} />}
 

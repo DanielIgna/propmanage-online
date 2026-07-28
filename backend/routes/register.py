@@ -156,6 +156,7 @@ from routes.maintenance_calendar import router as maintenance_calendar_router
 from routes.community_buildings import router as community_buildings_router
 from routes.building_admin import router as building_admin_router
 from routes.launch_sentinel import router as launch_sentinel_router
+from routes.prop_benefits import user_router as prop_benefits_user_router, admin_router as prop_benefits_admin_router
 from routes.capability_engine import router as capability_engine_router
 from routes.property_intelligence import router as property_intelligence_router
 from routes.resend_diagnostics import router as resend_diagnostics_router
@@ -323,6 +324,8 @@ ALL_ROUTERS = (
     community_buildings_router,
     building_admin_router,
     launch_sentinel_router,
+    prop_benefits_user_router,
+    prop_benefits_admin_router,
     capability_engine_router,
     opportunities_router,
     growth_intelligence_router,

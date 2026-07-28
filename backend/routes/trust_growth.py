@@ -232,6 +232,12 @@ async def claim_invite(body: dict = Body(...), user: dict = Depends(get_current_
         await log_event(None, "referral_invite_claimed", actor=user, payload={"inviter_id": inv["inviter_id"], "role": user.get("role")})
     except Exception:
         pass
+    # PB-001.4: beneficiul se acordă DOAR la activare (abonament/primul serviciu plătit) — drept în așteptare
+    try:
+        from propbenefits.referral_ext import on_referral_claimed
+        await on_referral_claimed(inv["inviter_id"], user["id"], user.get("name") or "")
+    except Exception:
+        pass
     return {"ok": True, "recommendation_created": recommendation_created}
 
 

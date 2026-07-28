@@ -100,6 +100,7 @@ const ArchitectureNavigator = lazy(() => import("./pages/admin/ArchitectureNavig
 const EnterpriseHealthPage = lazy(() => import("./pages/admin/EnterpriseHealthPage"));
 const RepairCenterPage = lazy(() => import("./pages/admin/RepairCenterPage"));
 const AIBrainPage = lazy(() => import("./pages/admin/AIBrainPage"));
+const PropBenefitsAdminPage = lazy(() => import("./pages/admin/PropBenefitsAdminPage"));
 const ServiceProvidersPage = lazy(() => import("./pages/ServiceProvidersPage"));
 const CeoBriefingPage = lazy(() => import("./pages/admin/CeoBriefingPage"));
 const EvolutionCouncilPage = lazy(() => import("./pages/admin/EvolutionCouncilPage"));
@@ -1673,6 +1674,7 @@ function App() {
               <Route path="/admin/enterprise-health" element={<EnterpriseHealthPage />} />
               <Route path="/admin/repair-center" element={<RepairCenterPage />} />
               <Route path="/admin/ai-brain" element={<AIBrainPage />} />
+              <Route path="/admin/prop-benefits" element={<PropBenefitsAdminPage />} />
               <Route path="/admin/ceo-briefing" element={<CeoBriefingPage />} />
               <Route path="/admin/evolution-council" element={<EvolutionCouncilPage />} />
               <Route path="/admin/notification-center" element={<NotificationCenterPage />} />

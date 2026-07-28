@@ -34,6 +34,15 @@ async def _actions_client(user: dict) -> list:
                            "/client?tab=property", 1))
         return out
     twins = await db.digital_twin_projects.count_documents({"owner_id": uid})
+    # PB-001: Mentor folosește PropBenefits — comunică valoarea, nu funcția
+    try:
+        from propbenefits.ai_agents import success_manager
+        sm = await success_manager(user)
+        if sm.get("next_action"):
+            a = sm["next_action"]
+            out.append(_action(f"pb_{a['id']}", a["title"], a["value"], a["cta_path"], 1))
+    except Exception:  # noqa: BLE001
+        pass
     if twins == 0:
         out.append(_action("activate_twin", "Activează Digital Twin",
                            f"Ai {props} propriet{'ăți' if props > 1 else 'ate'} dar niciun twin digital — copia 3D e baza întregului ecosistem.",
