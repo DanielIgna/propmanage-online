@@ -113,6 +113,7 @@ const NAV_SECTIONS = [
       { id: "repair_center", label: "Repair Engine", icon: Activity, badge: "AUTO-FIX", href: "/admin/repair-center", superAdminOnly: true },
       { id: "ai_brain", label: "AI Brain", icon: Brain, badge: "DISCOVERY", href: "/admin/ai-brain", superAdminOnly: true },
       { id: "prop_benefits", label: "PropBenefits", icon: Brain, badge: "PB-001", href: "/admin/prop-benefits", superAdminOnly: true },
+      { id: "storage_center", label: "Storage", icon: Server, badge: "ST-001", href: "/admin/storage", superAdminOnly: true },
       { id: "automation_center", label: "Automation Center", icon: Zap, badge: "DACĂ→ATUNCI", href: "/admin/automation" },
       { id: "roadmap", label: "Roadmap · Evoluție", icon: Map, badge: "LIVE", href: "/admin/roadmap" },
       { id: "ai_search", label: "AI Search", icon: Search, badge: "NLP", href: "/admin/ai-search" },

@@ -18,6 +18,7 @@ from deps import get_current_user
 from event_bus import emit
 from routes.property_dna import _load_property_for
 from storage_client import get_object, put_object
+import storage_service
 
 router = APIRouter(prefix="/api", tags=["property_documents"])
 
@@ -42,7 +43,6 @@ ALLOWED_EXT = {
     "webp": "image/webp", "gif": "image/gif", "heic": "image/heic",
     "mp4": "video/mp4", "mov": "video/quicktime",
 }
-MAX_SIZE = 25 * 1024 * 1024
 
 DOC_FIELDS = [
     "id", "property_id", "title", "category", "category_label", "filename", "content_type", "size",
@@ -152,13 +152,20 @@ async def upload_document(
     data = await file.read()
     if len(data) == 0:
         raise HTTPException(400, "Fișierul este gol")
-    if len(data) > MAX_SIZE:
-        raise HTTPException(400, "Fișierul depășește 25MB")
+    limit = await storage_service.file_limit_bytes("document_vault")
+    if len(data) > limit:
+        raise HTTPException(413, f"Fișierul depășește limita de {storage_service.fmt_bytes(limit)} per fișier")
+
+    content_type = ALLOWED_EXT[ext]
+    compression_meta = None
+    if content_type.startswith("image/"):
+        data, compression_meta = await storage_service.maybe_compress_image(data, ext)
+    owner_id = str(prop.get("owner_id"))
+    await storage_service.check_quota(owner_id, len(data), "personal")
 
     first_upload = await db.property_documents.count_documents({"property_id": prop_id, "deleted": {"$ne": True}}) == 0
 
     path = f"propmanage/properties/{prop_id}/{uuid.uuid4().hex}.{ext}"
-    content_type = ALLOWED_EXT[ext]
     result = await asyncio.to_thread(put_object, path, data, content_type)
 
     role = user.get("active_view") or user.get("role")
@@ -195,10 +202,15 @@ async def upload_document(
         "prev_version_id": None,
         "superseded": False,
         "deleted": False,
+        "compression": compression_meta,
         "history": [{"at": now, "by": user.get("name"), "event": "upload"}],
     }
     ins = await db.property_documents.insert_one(doc)
     doc["_id"] = ins.inserted_id
+
+    await storage_service.add_usage(owner_id, len(data), "personal")
+    if content_type.startswith("video/"):
+        asyncio.create_task(storage_service.compress_vault_video(str(ins.inserted_id)))
 
     await emit("document.uploaded", property_id=prop_id, actor=user,
                payload={"doc_id": str(ins.inserted_id), "category": category, "title": doc["title"]})
@@ -315,8 +327,12 @@ async def upload_new_version(doc_id: str, file: UploadFile = File(...), user: di
     if ext not in ALLOWED_EXT:
         raise HTTPException(400, "Tip de fișier neacceptat")
     data = await file.read()
-    if not data or len(data) > MAX_SIZE:
-        raise HTTPException(400, "Fișier gol sau peste 25MB")
+    limit = await storage_service.file_limit_bytes("document_vault")
+    if not data or len(data) > limit:
+        raise HTTPException(413, f"Fișier gol sau peste {storage_service.fmt_bytes(limit)}")
+    if ALLOWED_EXT[ext].startswith("image/"):
+        data, _cm = await storage_service.maybe_compress_image(data, ext)
+    await storage_service.check_quota(str(doc.get("owner_id")), len(data), "personal")
     path = f"propmanage/properties/{doc['property_id']}/{uuid.uuid4().hex}.{ext}"
     result = await asyncio.to_thread(put_object, path, data, ALLOWED_EXT[ext])
     now = datetime.now(timezone.utc).isoformat()
@@ -330,6 +346,9 @@ async def upload_new_version(doc_id: str, file: UploadFile = File(...), user: di
     ins = await db.property_documents.insert_one(new_doc)
     new_doc["_id"] = ins.inserted_id
     await db.property_documents.update_one({"_id": doc["_id"]}, {"$set": {"superseded": True}})
+    await storage_service.add_usage(str(doc.get("owner_id")), len(data), "personal")
+    if ALLOWED_EXT[ext].startswith("video/"):
+        asyncio.create_task(storage_service.compress_vault_video(str(ins.inserted_id)))
     await emit("document.updated", property_id=doc["property_id"], actor=user,
                payload={"doc_id": str(ins.inserted_id), "title": new_doc.get("title"), "version": new_doc["version"]})
     return {"document": _out(new_doc)}
@@ -340,4 +359,5 @@ async def delete_document(doc_id: str, user: dict = Depends(get_current_user)):
     doc = await _load_doc_for(user, doc_id)
     entry = {"at": datetime.now(timezone.utc).isoformat(), "by": user.get("name"), "event": "delete"}
     await db.property_documents.update_one({"_id": doc["_id"]}, {"$set": {"deleted": True}, "$push": {"history": entry}})
+    await storage_service.add_usage(str(doc.get("owner_id")), -(doc.get("size") or 0), "personal")
     return {"ok": True}

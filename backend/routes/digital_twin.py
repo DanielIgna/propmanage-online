@@ -60,8 +60,7 @@ ALLOWED_PLAN_EXTS = {".pdf"}
 DOWNLOAD_ONLY_EXTS = {".skp"}
 # Extensions Blender can auto-convert to .glb headless on Linux
 BLENDER_CONVERT_EXTS = {".dae", ".obj", ".fbx", ".stl", ".ply"}
-MAX_UPLOAD_BYTES = 200 * 1024 * 1024  # 200 MB hard cap
-MAX_PLAN_BYTES = 50 * 1024 * 1024  # 50 MB cap for PDFs
+import storage_service  # noqa: E402 — ST-001: limite dinamice + cote DT (bucket separat)
 
 PLAN_TYPES = {"floorplan", "section", "elevation", "detail", "site", "other"}
 
@@ -328,6 +327,8 @@ async def upload_model(
             "Format permis: .glb / .gltf (vizualizabil 3D) · .dae / .obj / .fbx / .stl / .ply (auto-conversie via Blender) · .skp (SketchUp, descărcabil — exportă .dae din SketchUp pentru randare browser).",
         )
 
+    max_bytes = await storage_service.file_limit_bytes("digital_twin_model")
+    dt_remaining = await storage_service.dt_remaining_bytes(p["owner_id"])
     # Persist to disk with streaming (chunks of 1 MB) to avoid loading 200MB in RAM
     project_dir = UPLOAD_ROOT / project_id
     project_dir.mkdir(parents=True, exist_ok=True)
@@ -343,10 +344,14 @@ async def upload_model(
                 if not chunk:
                     break
                 total += len(chunk)
-                if total > MAX_UPLOAD_BYTES:
+                if total > max_bytes:
                     out.close()
                     dest.unlink(missing_ok=True)
-                    raise HTTPException(413, f"Fișier prea mare (max {MAX_UPLOAD_BYTES // (1024*1024)} MB).")
+                    raise HTTPException(413, f"Fișier prea mare (max {max_bytes // (1024*1024)} MB).")
+                if total > dt_remaining:
+                    out.close()
+                    dest.unlink(missing_ok=True)
+                    raise HTTPException(413, "Cota de stocare Digital Twin este plină. Șterge modele vechi sau contactează echipa.")
                 out.write(chunk)
     except HTTPException:
         raise
@@ -422,6 +427,9 @@ async def upload_model(
         model_doc["conversion_started_at"] = _now_iso()
         model_doc["conversion_engine"] = "cloudconvert"
     await db.digital_twin_models.insert_one(model_doc)
+    # ST-001: bucket separat DT + copie durabilă în Object Storage (discul se pierde la redeploy)
+    await storage_service.add_usage(p["owner_id"], total, "digital_twin")
+    asyncio.create_task(storage_service.mirror_dt_file("model", model_doc["id"]))
     # Only set as the active model_url if it's actually viewable (.glb/.gltf)
     is_viewable = not is_archive and not needs_blender
     update_set = {"updated_at": _now_iso()}
@@ -803,6 +811,7 @@ async def delete_model_layer(model_id: str, user: dict = Depends(get_current_use
     except Exception as _e:  # noqa: BLE001
         logger.warning(f"[dt] failed to remove file {doc.get('stored_as')}: {_e}")
     await db.digital_twin_models.delete_one({"id": model_id})
+    await storage_service.add_usage(proj.get("owner_id"), -(doc.get("size_bytes") or 0), "digital_twin")
     # Decrement project counter
     await db.digital_twin_projects.update_one(
         {"id": doc["project_id"]},
@@ -1918,6 +1927,8 @@ async def upload_plan(
     if ext not in ALLOWED_PLAN_EXTS:
         raise HTTPException(400, "Format permis: .pdf")
 
+    max_plan_bytes = await storage_service.file_limit_bytes("digital_twin_plan")
+    dt_remaining = await storage_service.dt_remaining_bytes(p["owner_id"])
     plans_dir = UPLOAD_ROOT / project_id / "plans"
     plans_dir.mkdir(parents=True, exist_ok=True)
     safe_stem = uuid.uuid4().hex[:12]
@@ -1932,10 +1943,14 @@ async def upload_plan(
                 if not chunk:
                     break
                 total += len(chunk)
-                if total > MAX_PLAN_BYTES:
+                if total > max_plan_bytes:
                     out.close()
                     dest.unlink(missing_ok=True)
-                    raise HTTPException(413, f"Fișier prea mare (max {MAX_PLAN_BYTES // (1024*1024)} MB pentru PDF).")
+                    raise HTTPException(413, f"Fișier prea mare (max {max_plan_bytes // (1024*1024)} MB pentru PDF).")
+                if total > dt_remaining:
+                    out.close()
+                    dest.unlink(missing_ok=True)
+                    raise HTTPException(413, "Cota de stocare Digital Twin este plină. Șterge planuri/modele vechi sau contactează echipa.")
                 out.write(chunk)
     except HTTPException:
         raise
@@ -1969,6 +1984,8 @@ async def upload_plan(
         "uploaded_at": _now_iso(),
     }
     await db.digital_twin_plans.insert_one(doc)
+    await storage_service.add_usage(p["owner_id"], total, "digital_twin")
+    asyncio.create_task(storage_service.mirror_dt_file("plan", doc["id"]))
     await db.digital_twin_projects.update_one(
         {"id": project_id},
         {"$set": {"updated_at": _now_iso()}, "$inc": {"plan_count": 1}},
@@ -2019,7 +2036,9 @@ async def serve_plan_file(project_id: str, filename: str, user: dict = Depends(g
         raise HTTPException(400, "Invalid filename.")
     file_path = UPLOAD_ROOT / project_id / "plans" / filename
     if not file_path.exists() or not file_path.is_file():
-        raise HTTPException(404, "Plan file not found.")
+        file_path = await storage_service.restore_dt_file("plan", project_id, filename)
+        if not file_path:
+            raise HTTPException(404, "Plan file not found.")
     return FileResponse(
         file_path,
         media_type="application/pdf",
@@ -2074,6 +2093,7 @@ async def delete_plan(plan_id: str, user: dict = Depends(get_current_user)):
     file_path = UPLOAD_ROOT / plan["project_id"] / "plans" / plan["stored_as"]
     file_path.unlink(missing_ok=True)
     await db.digital_twin_plans.delete_one({"id": plan_id})
+    await storage_service.add_usage(proj.get("owner_id"), -(plan.get("size_bytes") or 0), "digital_twin")
     await db.digital_twin_projects.update_one(
         {"id": plan["project_id"]},
         {"$inc": {"plan_count": -1}, "$set": {"updated_at": _now_iso()}},

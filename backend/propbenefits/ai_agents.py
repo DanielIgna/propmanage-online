@@ -61,6 +61,23 @@ async def success_manager(user: dict) -> dict:
                                "Casa ta nu are încă un scor de sănătate",
                                "House Health îți arată exact ce merită îngrijit — iar verificările din campaniile active cresc scorul și îți aduc puncte de progres.",
                                "/house-health", 7))
+    # ST-001: stocare aproape plină → upgrade (free) sau curățenie (house_health)
+    try:
+        from storage_service import quota_status
+        stq = await quota_status(ctx["uid"])
+        if stq and stq["pct"] >= stq["thresholds"][0]:
+            if stq["tier"] == "free":
+                candidates.append(_act("storage_upgrade",
+                                       f"Spațiul de stocare al casei tale este {round(stq['pct'])}% plin",
+                                       f"Ai folosit {stq['used_human']} din {stq['quota_human']}. Cu abonamentul House Health primești 5 GB — de 20 de ori mai mult spațiu pentru documentele și amintirile casei.",
+                                       "/house-health/upgrade", 9 if stq["pct"] >= stq["thresholds"][1] else 7))
+            else:
+                candidates.append(_act("storage_cleanup",
+                                       f"Spațiul de stocare este {round(stq['pct'])}% plin ({stq['used_human']} din {stq['quota_human']})",
+                                       "Șterge documentele sau versiunile vechi ca să faci loc pentru ce contează cu adevărat.",
+                                       "/client?tab=property", 6))
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[success_manager] storage candidate failed: {e}")
     if feed["opportunities"]:
         top = feed["opportunities"][0]
         candidates.append(_act("claim_opportunity",

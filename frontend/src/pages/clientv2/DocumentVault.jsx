@@ -7,6 +7,7 @@ import {
 import { API } from "../DashShared";
 import { formatApiError } from "../../auth";
 import { GREEN, Sheet, CTA } from "./ui";
+import { StorageUsageCard } from "../../components/StorageUsageCard";
 
 const CAT_ICONS = { foto: ImageIcon, video: ImageIcon };
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString("ro-RO", { day: "numeric", month: "short", year: "numeric" }) : "—");
@@ -406,6 +407,10 @@ export const DocumentVaultCard = ({ prop }) => {
             Toate ({compl.docs_count})
           </button>
         )}
+      </div>
+
+      <div className="mt-3">
+        <StorageUsageCard />
       </div>
 
       {showUpload && <UploadSheet prop={prop} presetCategory={presetCat} onClose={() => setShowUpload(false)} onDone={onUploaded} />}
