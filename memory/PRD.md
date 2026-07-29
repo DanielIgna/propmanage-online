@@ -1,3 +1,27 @@
+## 🧭 ASM-001 — COPILOTUL CASEI (AI SUCCESS MANAGER) · LIVRAT & TESTAT (29 Iul 2026)
+
+**Misiune**: sprint de UNIFICARE — zero rescrieri, doar compunere a motoarelor existente într-un singur Copilot, primul widget pe Home. Utilizatorul înțelege în 30s: unde e, ce valoare are, ce poate câștiga, care e pasul cu impact maxim.
+
+**Backend** (`propbenefits/copilot.py` + `routes/copilot.py` — COMPUNERE, zero logică duplicată):
+- **`GET /api/copilot/dashboard`** reutilizează: `success_manager` (decizie) · `user_context` (semnale) · `subscription_health` (8 factori) · `usage_snapshot` ST-001 (storage) · `ledger.wallet_summary` + `opportunities.feed` (beneficii) · `ambassador_status` + `deals_demand` (comunitate) · `_completeness` Cartea Casei · `ai_core.call_llm` (rezumat).
+- **Scorul Casei 0-100 explicabil** (nou, dar compus din semnale existente): Cartea Casei 30p (completeness×0.30) + Digital Twin 20p (proiect 40%/model 40%/planuri 20% × 0.20) + House Health 15p (scor 10 + abonament 5) + Mentenanță 10p + Beneficii 10p + Comunitate 10p (recomandări 4/ambasador 4/deal 2) + Activitate 5p. Items cu points/max/hint + `top_gap`.
+- **Explainability** pe FIECARE acțiune success_manager (12 id-uri mapate + generic): `explain: {why, gain, unlocks, duration, house_impact}` — motorul decizional NEATINS, doar îmbogățit la ieșire.
+- **Onboarding checklist** 5 pași din semnale reale: create_book → first_document → first_benefit → discover_deals → first_request.
+- **Rezumat AI**: LLM (ai_core) house-centric RO, max 4 propoziții, DOAR cifre reale; cache `copilot_reports` (hash context + 6h); fallback determinist. Surse: ai/ai_cached/deterministic.
+- **AI Success Timeline** (`copilot_timeline`): la fiecare dashboard — recomandările rezolvate (action_id dispărut din candidați) → status done + efect real din delta semnale („+N documente · Scorul Casei +X · +N beneficii"); recomandarea top se loghează o singură dată (idempotent, testat). `GET /api/copilot/timeline`.
+- **Subscription Coach anti-spam**: upgrade_suggestion DOAR cu valoare reală (storage≥80% / ≥10 documente / ≥2 beneficii active), altfel null.
+- **Founding Ambassador** (extensie `trust_engine`): primii 10 (config `ambassador.founding_max`) care devin Community Ambassador → `pb_founding_ambassador` + `pb_founding_rank` permanent, notificare dedicată, locurile se închid definitiv. `ambassador_status` expune is_founding/founding_rank/founding_badge/founding_slots_left (câmpurile vechi intacte — regresie AmbassadorCard testată).
+
+**Frontend**: `components/copilot/HouseCopilot.jsx` — **PRIMUL widget în HomeV2** (workspace + onboarding, id `house_copilot` prin show()): inel Scorul Casei SVG → Rezumat AI → Pasul cu impact maxim (CTA „Fă pasul acum" + „De ce?" expandabil cu cele 5 rânduri) → checklist (ascuns când 5/5) → 3 mini-progres (Carte/Twin/Nivel) → beneficii → comunitate (badge Founding 🏆 + top deal cu susținători necesari) → Storage + Subscription mini → Timeline expandabil. Navigare prin `go(tab)` / navigate. AmbassadorCard (PbEverywhere) afișează badge Founding `#rank din primii 10`.
+
+**Testare**: pytest `tests/test_asm001_copilot.py` **16/16 PASS** (structură, scor explicabil sumă max=100, explainability 5 câmpuri, checklist, founding fields, storage reuse, sub health 8 factori, timeline idempotent fără duplicate, 401, regresii success-manager/pulse/ambassador) · regresie totală ASM+PB+ST **56 passed, 1 skipped** · testing agent frontend iteration_171 **100% desktop (1920) + mobil (390)**, zero issues, regresie pb-pulse/v2-copilot-card/pb-ambassador-card OK.
+
+**Note**: cardul Copilot legacy din coloana dreaptă (v2-copilot-card, `/api/client/copilot` — nudges pe cereri) rămâne NEATINS (motor diferit, complementar); poate fi ascuns din XOS ui-rules (`widget:copilot`) dacă Fondatorul dorește. Clientul demo nu are documente proprii — checklist 4/5 corect.
+
+**URMEAZĂ (ordinea Fondatorului, post-ASM: valoare directă + venit)**: **SH-001 – Subscription Health** → FP-001 – FairPrice Engine → Partner Negotiation Pipeline → House Health AI → Digital Twin AI. Blockere externe: Stripe LIVE claim · Resend DNS · purge demo prod.
+
+---
+
 ## 📦 ST-001 — STORAGE & MEDIA AUDIT + STORAGE STRATEGY FOUNDATION · LIVRAT & TESTAT (29 Iul 2026)
 
 **Audit livrat Fondatorului**: 3 provideri fragmentați (Emergent Object Storage doar Vault · disc local `/app/backend/uploads` pentru DT+HH — SE PIERDEA LA REDEPLOY · base64 în Mongo pentru DocsAI/KYC), 6 limite hardcodate (25MB vault, 200/50MB DT, 20MB HH, 10MB DocsAI), zero cote per user.
