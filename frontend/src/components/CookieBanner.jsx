@@ -56,7 +56,7 @@ export const CookieBanner = () => {
     return (
       <button
         onClick={() => { setOpen(true); setCustomize(true); }}
-        className="fixed bottom-[88px] sm:bottom-4 left-4 z-40 w-9 h-9 rounded-full bg-[#0f0f0f] border border-white/10 hover:border-[#ccff00]/40 flex items-center justify-center opacity-50 hover:opacity-100 transition-opacity"
+        className="pm-float-left-2 w-9 h-9 rounded-full bg-[#0f0f0f] border border-white/10 hover:border-[#ccff00]/40 flex items-center justify-center opacity-50 hover:opacity-100 transition-opacity"
         title="Schimbă preferințele cookie"
         data-testid="cookie-banner-reopen"
       >
@@ -66,7 +66,7 @@ export const CookieBanner = () => {
   }
 
   return (
-    <div className="fixed bottom-[88px] sm:bottom-4 left-4 z-[60] w-[min(360px,calc(100vw-2rem))]" data-testid="cookie-banner">
+    <div className="pm-float-left-1 pm-float-panel w-[min(360px,calc(100vw-2rem))]" data-testid="cookie-banner">
       <div className="rounded-2xl bg-[#0a0a0a]/95 backdrop-blur-xl border border-white/10 shadow-2xl p-4">
         <div className="flex items-start gap-2.5">
           <Cookie className="w-4 h-4 text-[#ccff00] shrink-0 mt-0.5" />

@@ -61,7 +61,7 @@ export const ExplainThis = ({ role }) => {
   return (
     <>
       <button onClick={() => { setTab("mentor"); setOpen(true); }}
-        className="fixed bottom-5 left-5 z-[70] flex items-center gap-1.5 px-3 py-2 rounded-full bg-stone-900/90 border border-stone-700 text-[11px] font-bold text-stone-200 hover:border-[#d4ff3a]/60 hover:text-white shadow-lg backdrop-blur transition-colors"
+        className="pm-float-left-1 flex items-center gap-1.5 px-3 py-2 rounded-full bg-stone-900/90 border border-stone-700 text-[11px] font-bold text-stone-200 hover:border-[#d4ff3a]/60 hover:text-white shadow-lg backdrop-blur transition-colors"
         data-testid="explain-page-btn" title="AI Mentor — ghidul tău contextual">
         <Sparkles className="w-3.5 h-3.5 text-[#d4ff3a]" /> AI Mentor
       </button>

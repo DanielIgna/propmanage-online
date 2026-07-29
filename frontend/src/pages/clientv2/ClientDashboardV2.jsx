@@ -22,6 +22,7 @@ import { HelpButton } from "../../components/HelpButton";
 import { BetaFeedbackEntry } from "../../components/BetaFeedbackWidget";
 import { ReferralHub, claimPendingInvite } from "../../components/ReferralHub";
 import { TrustedSpecialists } from "../../components/TrustedSpecialists";
+import { useMobileDock } from "../../components/floating";
 import { MaintenanceCalendar } from "../../components/MaintenanceCalendar";
 import { BuildingHub } from "../../components/BuildingHub";
 import { PostJobGrowthLoop } from "../../components/PostJobGrowthLoop";
@@ -31,6 +32,7 @@ const NAV = [[Home, "Acasă", "home"], [Wrench, "Lucrări", "jobs"], [Plus, "Sol
 const TITLES = { home: null, jobs: "Lucrările mele", property: "Proprietatea mea", settings: "Setări", benefits: "Beneficiile mele" };
 
 export default function ClientDashboardV2() {
+  useMobileDock();
   const { user, refreshUser, logout } = useAuth();
   const [loaded, setLoaded] = useState(false);
   const [properties, setProperties] = useState([]);

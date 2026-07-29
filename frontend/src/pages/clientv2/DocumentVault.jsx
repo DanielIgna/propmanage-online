@@ -3,6 +3,7 @@ import axios from "axios";
 import {
   FileText, Upload, X, Search, Download, Trash2, Pencil, ShieldCheck, Sparkles,
   ChevronRight, ChevronDown, Image as ImageIcon, FileUp, BadgeCheck, History,
+  Camera, FolderOpen,
 } from "lucide-react";
 import { API } from "../DashShared";
 import { formatApiError } from "../../auth";
@@ -49,7 +50,11 @@ const UploadSheet = ({ prop, presetCategory, onClose, onDone }) => {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [cats, setCats] = useState([]);
-  const inputRef = useRef(null);
+  const [showSource, setShowSource] = useState(false);
+  const galleryRef = useRef(null);
+  const cameraRef = useRef(null);
+  const isTouch = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
+  const openPicker = () => (isTouch ? setShowSource(true) : galleryRef.current?.click());
 
   useEffect(() => {
     axios.get(`${API}/properties/${prop.id}/documents`).then(r => setCats(r.data.categories || [])).catch(() => {});
@@ -77,16 +82,50 @@ const UploadSheet = ({ prop, presetCategory, onClose, onDone }) => {
 
   return (
     <Sheet title="Adaugă în cartea casei" onClose={onClose} testid="vault-upload-sheet">
-      <button onClick={() => inputRef.current?.click()} data-testid="vault-file-pick"
+      {/* BUGFIX-001: inputurile sunt frați ai butonului (input în button = HTML invalid, tap mort pe mobil) */}
+      <input ref={galleryRef} type="file" className="hidden" data-testid="vault-file-input"
+        accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.heic,.mp4,.mov" onChange={e => { pick(e.target.files?.[0]); e.target.value = ""; }} />
+      <input ref={cameraRef} type="file" className="hidden" data-testid="vault-camera-input"
+        accept="image/*" capture="environment" onChange={e => { pick(e.target.files?.[0]); e.target.value = ""; }} />
+      <button type="button" onClick={openPicker} data-testid="vault-file-pick"
         className={`w-full rounded-3xl border-2 border-dashed p-6 text-center transition-colors ${file ? "border-[#34C759] bg-[#F0FBF4]" : "border-slate-200 hover:border-slate-300"}`}>
-        <input ref={inputRef} type="file" className="hidden" data-testid="vault-file-input"
-          accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.heic,.mp4,.mov" onChange={e => pick(e.target.files?.[0])} />
         <FileUp className="w-7 h-7 mx-auto" style={{ color: file ? GREEN : "#94a3b8" }} />
         <div className="mt-2 text-sm font-bold text-slate-700" data-testid="vault-file-name">
           {file ? file.name : "Alege fișierul"}
         </div>
         <div className="mt-0.5 text-[11px] text-slate-400">{file ? fmtSize(file.size) : "PDF, poze, planuri, facturi — max. 25MB"}</div>
       </button>
+
+      {showSource && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/40" onClick={() => setShowSource(false)} data-testid="vault-source-sheet">
+          <div className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-4" style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }} onClick={e => e.stopPropagation()}>
+            <div className="mx-auto w-10 h-1 rounded-full bg-slate-200 mb-3 sm:hidden" />
+            <div className="text-sm font-black text-slate-900 px-1 pb-2">De unde adaugi documentul?</div>
+            <button type="button" data-testid="vault-source-camera"
+              onClick={() => { cameraRef.current?.click(); setShowSource(false); }}
+              className="w-full flex items-center gap-3 p-4 rounded-2xl border border-slate-100 bg-white text-left active:bg-slate-50">
+              <span className="w-10 h-10 rounded-xl bg-[#F0FBF4] flex items-center justify-center shrink-0"><Camera className="w-5 h-5" style={{ color: GREEN }} /></span>
+              <span className="flex-1">
+                <span className="block text-sm font-black text-slate-900">Fotografiază document</span>
+                <span className="block text-[11px] text-slate-400">deschide camera telefonului</span>
+              </span>
+              <ChevronRight className="w-4 h-4 text-slate-300" />
+            </button>
+            <button type="button" data-testid="vault-source-gallery"
+              onClick={() => { galleryRef.current?.click(); setShowSource(false); }}
+              className="mt-2 w-full flex items-center gap-3 p-4 rounded-2xl border border-slate-100 bg-white text-left active:bg-slate-50">
+              <span className="w-10 h-10 rounded-xl bg-[#F0FBF4] flex items-center justify-center shrink-0"><FolderOpen className="w-5 h-5" style={{ color: GREEN }} /></span>
+              <span className="flex-1">
+                <span className="block text-sm font-black text-slate-900">Alege din galerie</span>
+                <span className="block text-[11px] text-slate-400">poze, PDF-uri și fișiere existente</span>
+              </span>
+              <ChevronRight className="w-4 h-4 text-slate-300" />
+            </button>
+            <button type="button" data-testid="vault-source-cancel" onClick={() => setShowSource(false)}
+              className="mt-3 w-full py-3 rounded-full text-sm font-bold text-slate-500 bg-slate-50">Anulează</button>
+          </div>
+        </div>
+      )}
 
       <label className="mt-4 block text-[11px] font-black uppercase tracking-wider text-slate-400">Ce este documentul?</label>
       <div className="mt-2 flex flex-wrap gap-1.5" data-testid="vault-category-chips">

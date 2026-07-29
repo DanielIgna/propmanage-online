@@ -68,7 +68,7 @@ export const BetaFeedbackWidget = () => {
   };
 
   return (
-    <div className="fixed bottom-[88px] sm:bottom-4 left-4 z-[70] w-[340px] max-w-[calc(100vw-2rem)] rounded-3xl bg-white border border-slate-200 shadow-2xl p-4" data-testid="beta-feedback-panel">
+    <div className="pm-float-left-1 pm-float-panel w-[340px] max-w-[calc(100vw-2rem)] rounded-3xl bg-white border border-slate-200 shadow-2xl p-4" data-testid="beta-feedback-panel">
       <div className="flex items-start gap-2">
         <MessageSquareHeart className="w-5 h-5 text-slate-900 shrink-0 mt-0.5" />
         <div className="flex-1">
