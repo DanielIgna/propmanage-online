@@ -4629,3 +4629,20 @@ minore/recomandări, Technical Debt Scanner expandabil.
 guardian ✓ (0 issues la certificare validă), screenshot Admin ✓.
 **FAZA 1 — AI BRAIN CORE: COMPLETĂ ȘI CERTIFICATĂ.** Urmează servicii verticale peste
 AI Brain: House Health AI, Digital Twin AI, Marketplace AI, Verified Property AI.
+
+## BUGFIX-001 — Mobile Upload + Camera + Floating Buttons (2026-06 · DONE, testat 100% iter174)
+**Root cause buton „Adaugă document" mort pe mobil**: `.cv2-fade { animation-fill-mode: both }`
+păstra un `transform: matrix()` permanent pe `v2-property-view` → orice `position:fixed`
+descendant (Sheet-urile z-50) era poziționat relativ la container → randat off-screen (y≈2754).
+**Fix**: `both` → `backwards` în index.css (linia ~768, la fel `.cv2-celebrate`). NU reveni la `both`!
+**Implementat**:
+- Action Sheet mobil (pointer: coarse) în UploadSheet (DocumentVault.jsx): „Fotografiază document"
+  (`vault-camera-input`, accept=image/*, capture=environment) + „Alege din galerie" (`vault-file-input`).
+  Inputurile sunt frați ai butonului (input în button = HTML invalid). Desktop: file dialog direct, fără action sheet.
+- FloatingManager: clase CSS `.pm-float-left-1/-left-2/-right-1` cu `bottom: calc(--pm-dock-h + safe-area + offset)`;
+  hook `useMobileDock()` (components/floating.js) apelat în ClientDashboardV2 setează `--pm-dock-h=64px` sub lg.
+- ExplainThis (AI Mentor): z-[70]→pm-float-left-1 (z-40, sub sheet-uri, deasupra dock-ului).
+  CookieBanner reopen→pm-float-left-2; cookie panel + BetaFeedback panel→pm-float-left-1 pm-float-panel (z-60).
+  TwinAIQA + xos-dock: safe-area-inset-bottom. index.html: viewport-fit=cover.
+**Testat**: iter174 — 100% pass mobil (390x844 touch) + desktop (1920x800), e2e upload ambele,
+stacking verificat cu bounding boxes + elementFromPoint, zero regresii.
