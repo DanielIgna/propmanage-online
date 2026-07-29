@@ -367,7 +367,7 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
 
   // Desktop: workspace 8+4 (main + Right Context Panel). Mobil: stivă în ordinea PPOS.
   return (
-    <div className="lg:px-5 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start" data-testid="v2-home-workspace">
+    <div className="lg:px-5 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start pb-24 lg:pb-0" data-testid="v2-home-workspace">
       <div className="lg:col-span-8 lg:space-y-6 min-w-0">
         {/* ASM-001: Copilotul Casei — primul widget din Home */}
         {show("house_copilot") && <HouseCopilot key="house_copilot" go={go} />}

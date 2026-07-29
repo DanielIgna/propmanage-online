@@ -126,9 +126,9 @@ const Timeline = ({ tl }) => {
           {tl.items.map((e, i) => (
             <div key={i} className="flex items-start gap-2.5" data-testid={`copilot-timeline-item-${i}`}>
               <span className={`mt-0.5 w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${e.kind === "level_up" ? "bg-amber-400" : e.kind === "milestone" ? "bg-sky-400" : e.kind === "badge" ? "bg-purple-400" : e.status === "done" ? "bg-[#34C759]" : "bg-slate-200"}`}>
-                {e.kind === "level_up" ? <Trophy className="w-2.5 h-2.5 text-white" />
-                  : e.kind === "milestone" ? <Flag className="w-2.5 h-2.5 text-white" />
-                  : e.kind === "badge" ? <Star className="w-2.5 h-2.5 text-white" />
+                {e.kind === "level_up" ? <Trophy className="w-3 h-3 text-white" />
+                  : e.kind === "milestone" ? <Flag className="w-3 h-3 text-white" />
+                  : e.kind === "badge" ? <Star className="w-3 h-3 text-white" />
                   : e.status === "done" ? <Check className="w-2.5 h-2.5 text-white" />
                   : <Sparkles className="w-2.5 h-2.5 text-slate-500" />}
               </span>

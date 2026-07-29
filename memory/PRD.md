@@ -1,3 +1,23 @@
+## 🏆 UX-001 + UX-001.1 — EMOTIONAL ENGAGEMENT & ACHIEVEMENT SYSTEM · LIVRAT, AUDITAT & PRODUCTION READY (29 Iul 2026)
+
+**Notă de proces**: Fondatorul a trimis UX-001.1 (finalizare) presupunând UX-001 gata; agentul a implementat AMBELE într-o singură trecere, în forma finală (achievement final redenumit + badge 🛡 incluse de la început).
+
+**Backend** (`propbenefits/achievements.py` + `routes/engagement.py`, `GET /api/engagement/summary`):
+- **Config completă în pb_config.engagement** (allowed în update_config, ZERO hardcodare): enabled/animations, prag celebrare Readiness (+5), milestones [10,25,50,75,90,100] + mesaje, mesaje niveluri 2-7, deblocări per nivel (L3 Digital Twin → L7 Publicare), **10 insigne** fiecare cu explainability completă {why, meaning, benefit, next} + enabled/label/icon editabile.
+- **Insigne (din semnale reale)**: first_document · first_request · first_work · twin_active · house_health_active · **doc_verified 🛡** („NU înseamnă că imobilul este perfect — documentația e verificată și transparentă"; sursa: L5 Journey done — reutilizat de FairPrice/VE/Marketplace/AI) · community_ambassador · founding_ambassador · imobil_verificat · **casa_publicata 🏡 „Proprietate publicată prin PropManage"** (achievement final, denumire uniformă peste tot).
+- **Level Up Engine**: stare per user în `engagement_state` (last_level/last_readiness/badges_earned/milestones_hit); trecerile de nivel → evenimente cu mesaj config + unlock + intrare în AI Timeline (kind `level_up`). **Milestones** pe House Readiness + **readiness_gain** (delta ≥ prag). **Prima rulare SILENȚIOASĂ** (badge-urile vechi se marchează fără animații retroactive). Evenimente idempotente (dedupe pe action_id în copilot_timeline).
+- Timeline îmbunătățit: intrările cu `kind` apar în GET /api/copilot/timeline existent.
+
+**Frontend**: `AchievementsCard.jsx` — „Realizările casei" ÎNTRE Copilot și Drumul Casei (id `achievements`): celebrări discrete (CSS `cv2-celebrate`, dismissable), rândurile 🏆 Ultimul achievement / 📈 Ultimul progres / 🎯 Următorul obiectiv / ⭐ Beneficiul care urmează, grilă 10 insigne (earned color / locked gri+lacăt) cu explainability expandabilă („De ce l-am primit?" vs „De ce l-aș primi?"). Timeline din Copilot: iconițe kind (Trophy amber/Flag sky/Star purple, w-3). PB Admin Config: secțiunea „Engagement & Achievements (UX-001)" completă. Fix minor audit: pb-24 pe HomeV2 mobil (FAB nu mai ocluzează grila).
+
+**Testare & Audit**: pytest `tests/test_ux001_engagement.py` **13/13 PASS** (10 insigne + explainability, denumire achievement final, transparență doc_verified, primă rulare silențioasă, detecție level_up/milestone/gain prin manipulare stare, idempotență, timeline kind, config E2E + disable, 401, regresii copilot/journey) · regresie totală **89 passed, 1 skipped** (ASM+SH+PB+ST) · testing agent iteration_173 **100% desktop+mobil+admin, AUDIT UX curat** (2 observații minore — ambele fixate).
+
+**UX-001 este ÎNCHIS · PRODUCTION READY.**
+
+**URMEAZĂ**: **FP-001 – FairPrice Engine** (consumă fairprice_signals + doc_verified) → Partner Negotiation Pipeline → House Health AI → Digital Twin AI. Blockere: Stripe LIVE · Resend DNS · purge demo prod (+ migrare ST-001 pe prod).
+
+---
+
 ## 🏡 SH-001 — SUBSCRIPTION HEALTH & HOUSE VALUE JOURNEY · LIVRAT & TESTAT (29 Iul 2026)
 
 **Misiune**: conectarea motoarelor existente într-un motor logic unic al evoluției proprietății. Zero rescrieri — AI Brain, Copilot, Storage, Imobile Verificate NEATINSE. Principiu: măsurăm cât de DOCUMENTATĂ/verificată/transparentă e casa, nu cât de perfectă.
