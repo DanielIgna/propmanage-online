@@ -1,3 +1,29 @@
+## 📦 ST-001 — STORAGE & MEDIA AUDIT + STORAGE STRATEGY FOUNDATION · LIVRAT & TESTAT (29 Iul 2026)
+
+**Audit livrat Fondatorului**: 3 provideri fragmentați (Emergent Object Storage doar Vault · disc local `/app/backend/uploads` pentru DT+HH — SE PIERDEA LA REDEPLOY · base64 în Mongo pentru DocsAI/KYC), 6 limite hardcodate (25MB vault, 200/50MB DT, 20MB HH, 10MB DocsAI), zero cote per user.
+
+**Backend** (`storage_service.py` + `routes/storage.py`, înregistrat în register.py):
+- **Config DB-driven** `storage_configs` (singleton "global", cache 60s, merge defaults): tiers FREE 250MB / House Health 5GB (abonament hh_subscriptions activ) / **Digital Twin 20GB BUCKET SEPARAT** (nu consumă cota personală) · limite per fișier pe 6 categorii · praguri avertizare [80,95] · setări compresie. ZERO hardcodare — toate cele 6 limite vechi înlocuite cu `file_limit_bytes()`.
+- **Tracking `storage_usage`** per user (personal_bytes + digital_twin_bytes + files counts): incremental la upload/delete în TOATE endpoint-urile (vault upload/version/delete, HH doc/eval upload+delete, DT model/plan upload+delete, docs_ai upload/delete) + **recompute retroactiv** (`recompute_all`, rulat automat prima dată via `ensure_initial_recompute` — funcționează și pe prod după redeploy).
+- **Enforcement**: `check_quota` → 413 cu mesaj RO + hint upgrade House Health; DT verificat în timpul streamingului (`dt_remaining_bytes`).
+- **Migrare disc → Object Storage** (`POST /api/admin/storage/migrate`, background + status live): HH docs+eval attachments mutate COMPLET pe object storage (disc șters), DT modele+planuri primesc **mirror durabil** (discul rămâne cache pt viewer 3D + Blender; servire cu fallback `restore_dt_file` — re-descarcă de pe object storage dacă discul e gol după redeploy). **RULATĂ în preview: 2 HH docs + 14 eval + 26 modele + 13 planuri = ~200MB, 0 erori (2 erori 500 tranzitorii rezolvate la retry).** ⚠️ PE PRODUCȚIE trebuie rulată o dată din /admin/storage → Migrare, după redeploy.
+- **Compresie automată**: imagini (Pillow — jpg/png/webp, max 2560px, quality 82, doar dacă scade >10%) sincron la upload (vault + HH); video (ffmpeg static via `imageio-ffmpeg`, H.264 CRF 28, max 1080p) în background pentru vault, înlocuiește obiectul + ajustează usage. Toggle-uri + parametri din Admin.
+- **AI Success Manager** (`propbenefits/ai_agents.py`): candidat `storage_upgrade` (tier free ≥80% → House Health 5GB, impact 7/9) sau `storage_cleanup` (tier plătit ≥80%).
+
+**API**: `GET /api/storage/usage` (user) · `GET|PUT /api/admin/storage/config` · `GET /api/admin/storage/overview` · `POST /api/admin/storage/recompute` · `POST /api/admin/storage/migrate` + `GET /migrate/status` (admin, 401/403 verificate).
+
+**UI**: `StorageUsageCard.jsx` — montat sub DocumentVaultCard (Cartea casei): bară progres colorată (verde/amber/roșu), folosit/total/%, avertizări 80%/95%, CTA „Treci la House Health · 5 GB" (doar tier free), secțiune Digital Twin separată cu nota „nu consumă spațiul tău personal"; refresh la event `propmanage:doc-uploaded`. `StorageAdminPage.jsx` — `/admin/storage` (sidebar „Storage" badge ST-001, superAdminOnly): KPIs, module & provideri, top utilizatori cu bare, tab Configurare (tiers/limite/praguri/compresie fără cod), tab Migrare & Audit (migrare + recompute + status).
+
+**Testare**: pytest `tests/test_st001_storage.py` **13/13 PASS** (usage structure, DT bucket separat, 401/403, config update+persistență+validare, overview, recompute, enforcement 413 la limită dinamică, tracking E2E upload→+bytes→delete→-bytes, success-manager regresie) · regresie PB-001+003 **43 passed, 1 skipped** · testing agent frontend iteration_170 **100%** (admin page + config save/persist/restore + migrare status + widget client cu tier House Health + DT separat).
+
+**Bug de proces (recurență!)**: search_replace pe App.js a raportat succes dar lazy import NU a persistat → ReferenceError la runtime. Fix cu insert_text + verificare grep. REGULĂ: după edit-uri pe App.js/regex-uri, verifică persistența cu grep.
+
+**Decizii**: KYC (base64 Mongo, ~3.4MB, date de verificare identitate) rămâne în afara cotelor — nu e media storage. Versiunile vechi din vault ocupă în continuare spațiu (corect — sunt stocate).
+
+**URMEAZĂ (ordinea Fondatorului)**: **ASM-001 – AI Success Manager (expansiune completă pe context PB-003)** → SH-001 – Subscription Health → FP-001 – FairPrice → Partner Negotiation Pipeline. Blockere externe: Stripe LIVE claim · Resend DNS · purge demo prod (Fondator).
+
+---
+
 ## 🤝 PB-003 — COMMUNITY TRUST & RECOMMENDATION ENGINE · LIVRAT & TESTAT (28 Iul 2026)
 
 **Liantul dintre PropBenefits, Community Deals, Success Manager, Marketplace, specialiști, Digital Twin și House Health. Zero cod duplicat — totul prin EXTENSIE.**
