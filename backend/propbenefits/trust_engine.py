@@ -155,14 +155,21 @@ async def validate_recommendations_tick() -> dict:
 async def ambassador_status(user_id: str) -> dict:
     cfg = (await get_config()).get("ambassador", {})
     threshold = int(cfg.get("min_validated", 2))
+    founding_max = int(cfg.get("founding_max", 10))
     validated = await db.recommendations.count_documents({"owner_id": user_id, "status": "validated"})
     pending = await db.recommendations.count_documents({"owner_id": user_id, "source": "job", "status": "pending"})
-    u = await db.users.find_one({"id": user_id}, {"pb_ambassador": 1}) or {}
+    u = await db.users.find_one({"id": user_id}, {"pb_ambassador": 1, "pb_founding_ambassador": 1, "pb_founding_rank": 1}) or {}
+    founding_taken = await db.users.count_documents({"pb_founding_ambassador": True})
     return {"is_ambassador": bool(u.get("pb_ambassador")), "validated": validated,
             "pending": pending, "threshold": threshold,
             "remaining": max(0, threshold - validated),
             "badge": cfg.get("badge", "Community Ambassador"),
-            "perks": cfg.get("perks", [])}
+            "perks": cfg.get("perks", []),
+            # ASM-001: Founding Ambassador — primii N (cronologic) ambasadori validați, badge permanent
+            "is_founding": bool(u.get("pb_founding_ambassador")),
+            "founding_rank": u.get("pb_founding_rank"),
+            "founding_badge": cfg.get("founding_badge", "Founding Ambassador"),
+            "founding_slots_left": max(0, founding_max - founding_taken)}
 
 
 async def _check_ambassador_promotion(user_id: str):
@@ -175,12 +182,27 @@ async def _check_ambassador_promotion(user_id: str):
                                     {"$set": {"pb_ambassador": True, "pb_ambassador_at": _iso()}})
     if not res.modified_count:
         return False
+    # ASM-001: Founding Ambassador — primii N cronologic; badge unic, permanent, apoi locurile se închid
+    founding_max = int(cfg.get("founding_max", 10))
+    founding_taken = await db.users.count_documents({"pb_founding_ambassador": True})
+    is_founding = False
+    if founding_taken < founding_max:
+        fres = await db.users.update_one({"id": user_id, "pb_founding_ambassador": {"$ne": True}},
+                                         {"$set": {"pb_founding_ambassador": True,
+                                                   "pb_founding_rank": founding_taken + 1,
+                                                   "pb_founding_at": _iso()}})
+        is_founding = bool(fres.modified_count)
     await ledger.grant(user_id, cfg.get("benefit", {}), source="ambassador", expires_days=120)
     try:
         from services import notify
-        await notify(user_id, "Ești acum Community Ambassador 🏅",
-                     "Recomandările tale confirmate construiesc comunitatea — ai primit beneficiul de ambasador și prioritate la campaniile exclusive.",
-                     type_="success", link="/client?tab=benefits")
+        if is_founding:
+            await notify(user_id, "Ești Founding Ambassador 🏆",
+                         f"Ești printre primii {founding_max} membri care au construit încrederea comunității — badge-ul Founding Ambassador este al tău permanent.",
+                         type_="success", link="/client?tab=benefits")
+        else:
+            await notify(user_id, "Ești acum Community Ambassador 🏅",
+                         "Recomandările tale confirmate construiesc comunitatea — ai primit beneficiul de ambasador și prioritate la campaniile exclusive.",
+                         type_="success", link="/client?tab=benefits")
     except Exception:  # noqa: BLE001
         pass
     return True

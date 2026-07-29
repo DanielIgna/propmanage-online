@@ -281,8 +281,13 @@ export const AmbassadorCard = () => {
       <div className="flex items-center gap-2 mb-1.5">
         <BadgeCheck className="w-4 h-4" style={{ color: a.is_ambassador ? "#166534" : "#94a3b8", width: 16, height: 16 }} />
         <span className="text-[13px] font-black text-slate-900">
-          {a.is_ambassador ? `Ești ${a.badge} 🏅` : "Community Ambassador"}
+          {a.is_founding ? `Ești ${a.founding_badge} 🏆` : a.is_ambassador ? `Ești ${a.badge} 🏅` : "Community Ambassador"}
         </span>
+        {a.is_founding && a.founding_rank && (
+          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-100" data-testid="pb-founding-badge">
+            #{a.founding_rank} din primii 10
+          </span>
+        )}
       </div>
       {a.is_ambassador ? (
         <div className="text-[11px] text-slate-500">Recomandările tale confirmate construiesc comunitatea. {a.perks.join(" · ")}</div>

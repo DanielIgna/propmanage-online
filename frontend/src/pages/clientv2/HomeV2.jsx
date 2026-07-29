@@ -8,6 +8,7 @@ import {
 import { GREEN, CTA, Steps, stepForStatus, Skeleton } from "./ui";
 import { API } from "../DashShared";
 import { BenefitsPulse } from "../../components/pb/PbEverywhere";
+import { HouseCopilot } from "../../components/copilot/HouseCopilot";
 
 const IMG_TWIN = "https://images.unsplash.com/photo-1721244654394-36a7bc2da288?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzh8MHwxfHNlYXJjaHwyfHxhcmNoaXRlY3R1cmFsJTIwYmx1ZXByaW50JTIwYnVpbGRpbmd8ZW58MHx8fHwxNzg0OTkwMDEyfDA&ixlib=rb-4.1.0&q=85&w=800";
 const IMG_HEALTH = "https://images.pexels.com/photos/36035073/pexels-photo-36035073.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
@@ -316,6 +317,7 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
     return (
       <div className="lg:px-5 lg:max-w-3xl" data-testid="v2-home-onboarding">
         {hero}
+        {show("house_copilot") && <HouseCopilot key="house_copilot" go={go} />}
       </div>
     );
   }
@@ -363,6 +365,8 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
   return (
     <div className="lg:px-5 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start" data-testid="v2-home-workspace">
       <div className="lg:col-span-8 lg:space-y-6 min-w-0">
+        {/* ASM-001: Copilotul Casei — primul widget din Home */}
+        {show("house_copilot") && <HouseCopilot key="house_copilot" go={go} />}
         {hero}
         {contextualEl}
         {show("benefits_pulse") && <BenefitsPulse key="benefits_pulse" go={go} />}
