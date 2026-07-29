@@ -210,6 +210,59 @@ const ConfigPanel = () => {
             className="mt-3 px-3 py-1.5 text-[11px] rounded-xl bg-stone-800 border border-stone-700 text-white font-bold" data-testid="pbadmin-save-journey">Salvează Journey</button>
         </div>
       )}
+      {cfg.engagement && (
+        <div className="border border-stone-800 rounded-2xl p-4" data-testid="pbadmin-engagement-config">
+          <div className="text-xs font-black uppercase tracking-wider text-stone-400 mb-1">Engagement & Achievements (UX-001)</div>
+          <p className="text-[11px] text-stone-500 mb-3">Mesaje, praguri, insigne și deblocări — zero hardcodare.</p>
+          <div className="flex gap-2 mb-3">
+            {[["enabled", "Sistem activ"], ["animations_enabled", "Animații"]].map(([k, lbl]) => (
+              <button key={k} onClick={() => setCfg(p => ({ ...p, engagement: { ...p.engagement, [k]: !p.engagement[k] } }))}
+                data-testid={`pbadmin-eng-${k}`}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border ${cfg.engagement[k] ? "bg-[#d4ff3a]/10 text-[#d4ff3a] border-[#d4ff3a]/40" : "bg-stone-900 text-stone-400 border-stone-700"}`}>
+                {lbl}: {cfg.engagement[k] ? "ON" : "OFF"}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Field label="Prag celebrare Readiness (+%)">
+              <input type="number" min="1" className={inputCls} value={cfg.engagement.readiness_celebration_min_delta}
+                onChange={e => setCfg(p => ({ ...p, engagement: { ...p.engagement, readiness_celebration_min_delta: Number(e.target.value) } }))} />
+            </Field>
+            <div className="col-span-2">
+              <Field label="Milestone-uri (%) — virgulă">
+                <input className={inputCls} value={(cfg.engagement.milestones || []).join(", ")} data-testid="pbadmin-eng-milestones"
+                  onChange={e => setCfg(p => ({ ...p, engagement: { ...p.engagement, milestones: e.target.value.split(",").map(s => Number(s.trim())).filter(n => n > 0) } }))} />
+              </Field>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+            {Object.entries(cfg.engagement.level_messages || {}).map(([n, msg]) => (
+              <Field key={n} label={`Mesaj Nivel ${n} · deblocare: ${(cfg.engagement.level_unlocks || {})[n] || "—"}`}>
+                <input className={inputCls} value={msg} data-testid={`pbadmin-eng-lvlmsg-${n}`}
+                  onChange={e => setCfg(p => ({ ...p, engagement: { ...p.engagement, level_messages: { ...p.engagement.level_messages, [n]: e.target.value } } }))} />
+              </Field>
+            ))}
+          </div>
+          <div className="mt-3">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-stone-500 mb-2">Insigne ({(cfg.engagement.badges || []).length})</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {(cfg.engagement.badges || []).map((b, i) => (
+                <div key={b.id} className="flex items-center gap-2 bg-stone-900/40 border border-stone-800 rounded-xl p-2" data-testid={`pbadmin-badge-${b.id}`}>
+                  <span className="text-base shrink-0">{b.icon}</span>
+                  <input className="flex-1 bg-transparent text-xs text-white font-bold outline-none" value={b.label}
+                    onChange={e => setCfg(p => { const badges = [...p.engagement.badges]; badges[i] = { ...badges[i], label: e.target.value }; return { ...p, engagement: { ...p.engagement, badges } }; })} />
+                  <button onClick={() => setCfg(p => { const badges = [...p.engagement.badges]; badges[i] = { ...badges[i], enabled: !badges[i].enabled }; return { ...p, engagement: { ...p.engagement, badges } }; })}
+                    className={`text-[9px] font-black px-2 py-0.5 rounded-full ${b.enabled !== false ? "bg-emerald-500/10 text-emerald-300" : "bg-stone-800 text-stone-500"}`}>
+                    {b.enabled !== false ? "ON" : "OFF"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <button onClick={() => save({ engagement: cfg.engagement })} disabled={busy}
+            className="mt-3 px-3 py-1.5 text-[11px] rounded-xl bg-stone-800 border border-stone-700 text-white font-bold" data-testid="pbadmin-save-engagement">Salvează Engagement</button>
+        </div>
+      )}
       {saved && <div className="text-xs text-emerald-300" data-testid="pbadmin-config-saved">Configurare salvată.</div>}
     </div>
   );

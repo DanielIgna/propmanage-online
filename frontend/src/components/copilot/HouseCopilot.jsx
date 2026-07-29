@@ -6,7 +6,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import {
   Sparkles, ChevronRight, ChevronDown, Check, Clock, Gift, Users, HardDrive,
-  HeartPulse, History, BadgeCheck, Trophy, Box, BookOpen, CircleHelp,
+  HeartPulse, History, BadgeCheck, Trophy, Box, BookOpen, CircleHelp, Flag, Star,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -125,13 +125,17 @@ const Timeline = ({ tl }) => {
         <div className="mt-2 space-y-2">
           {tl.items.map((e, i) => (
             <div key={i} className="flex items-start gap-2.5" data-testid={`copilot-timeline-item-${i}`}>
-              <span className={`mt-0.5 w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${e.status === "done" ? "bg-[#34C759]" : "bg-slate-200"}`}>
-                {e.status === "done" ? <Check className="w-2.5 h-2.5 text-white" /> : <Sparkles className="w-2.5 h-2.5 text-slate-500" />}
+              <span className={`mt-0.5 w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${e.kind === "level_up" ? "bg-amber-400" : e.kind === "milestone" ? "bg-sky-400" : e.kind === "badge" ? "bg-purple-400" : e.status === "done" ? "bg-[#34C759]" : "bg-slate-200"}`}>
+                {e.kind === "level_up" ? <Trophy className="w-2.5 h-2.5 text-white" />
+                  : e.kind === "milestone" ? <Flag className="w-2.5 h-2.5 text-white" />
+                  : e.kind === "badge" ? <Star className="w-2.5 h-2.5 text-white" />
+                  : e.status === "done" ? <Check className="w-2.5 h-2.5 text-white" />
+                  : <Sparkles className="w-2.5 h-2.5 text-slate-500" />}
               </span>
               <div className="min-w-0">
                 <div className="text-[11px] font-bold text-slate-700 leading-snug">{e.title}</div>
                 <div className="text-[10px] text-slate-400">
-                  {e.status === "done" ? <>Ai făcut-o ✓{e.effect ? ` · ${e.effect}` : ""}</> : "Recomandat acum"}
+                  {e.kind ? (e.effect || "") : e.status === "done" ? <>Ai făcut-o ✓{e.effect ? ` · ${e.effect}` : ""}</> : "Recomandat acum"}
                 </div>
               </div>
             </div>

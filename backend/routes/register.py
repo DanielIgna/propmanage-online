@@ -160,6 +160,7 @@ from routes.prop_benefits import user_router as prop_benefits_user_router, admin
 from routes.storage import user_router as storage_user_router, admin_router as storage_admin_router
 from routes.copilot import router as copilot_router
 from routes.journey import router as journey_router, fairprice_router as journey_fairprice_router
+from routes.engagement import router as engagement_router
 from routes.capability_engine import router as capability_engine_router
 from routes.property_intelligence import router as property_intelligence_router
 from routes.resend_diagnostics import router as resend_diagnostics_router
@@ -334,6 +335,7 @@ ALL_ROUTERS = (
     copilot_router,
     journey_router,
     journey_fairprice_router,
+    engagement_router,
     capability_engine_router,
     opportunities_router,
     growth_intelligence_router,
