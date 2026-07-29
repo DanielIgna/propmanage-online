@@ -1,3 +1,24 @@
+## 🏡 SH-001 — SUBSCRIPTION HEALTH & HOUSE VALUE JOURNEY · LIVRAT & TESTAT (29 Iul 2026)
+
+**Misiune**: conectarea motoarelor existente într-un motor logic unic al evoluției proprietății. Zero rescrieri — AI Brain, Copilot, Storage, Imobile Verificate NEATINSE. Principiu: măsurăm cât de DOCUMENTATĂ/verificată/transparentă e casa, nu cât de perfectă.
+
+**Backend** (`propbenefits/house_journey.py` + `routes/journey.py`):
+- **House Journey L1→L7** din date reale: L1 Casa înregistrată → L2 Cartea Casei (min docs config) → L3 Digital Twin (proiect+model) → L4 House Health (hh_score) → L5 Documentație verificată (completitudine ≥prag config + categorii obligatorii config: act_proprietate/cadastru/certificat_energetic) → L6 Imobil Verificat (citit din modulul VE existent: listing owner_email + gates_status; notă transparență: publicarea NU e blocată de scor mic) → L7 Publicat. Fiecare nivel: status done/in_progress/missing + pct + cerințe explicabile cu CTA. current_level = contiguu.
+- **House Readiness 0-100** pe 5 dimensiuni (administrare/mentenanță/audit/finanțare/vânzare), fiecare cu 4 verificări REALE din itemii `_completeness` (reuse total) + missing list exactă; scor ponderat cu `journey.readiness_weights` din config PB.
+- **Config Admin (zero hardcodare)**: secțiunea `journey` în pb_config (DEFAULT + allowed în update_config): min_completeness, categorii obligatorii, min docs L2, ponderi readiness — editabile din PB Admin → Config → „Journey & Readiness (SH-001)" (pbadmin-journey-config, persistență testată E2E).
+- **FairPrice Data Contract** (fundația FP-001): la fiecare calcul journey se persistă `fairprice_signals` per property {documentare, verificare, digital_twin, house_health, transparenta, istoric, mentenanta} + journey_level + readiness_score. `GET /api/fairprice/signals` — FP-001 va consuma EXCLUSIV această sursă.
+- **Recomandări înlănțuite**: `chain_for_action(action_id, journey)` — lanț de efecte filtrat de starea Journey („crește documentarea → crește House Readiness → crește Subscription Health → te apropii de Imobil Verificat → pregătești casa pentru FairPrice").
+- **Copilot extins (motorul AI neatins)**: dashboard-ul primește `journey` (nivel/next/readiness_score), `explain.chain` pe next_action, `subscription.improvements` (top 3 gap-uri factori cu hint concret — răspunde la „Ce fac pentru un scor mai bun?").
+- API: `GET /api/journey/house` · `GET /api/fairprice/signals` (ambele autentificate).
+
+**Frontend**: `HouseJourneyCard.jsx` — widget „Drumul Casei Tale" imediat sub Copilot (id `house_journey`, workspace + onboarding): header Nivel n/7 + buton Readiness cu panou 5 dimensiuni (bare + „Lipsește: …"), stepper vertical 7 pași cu badge Gata/În lucru/Lipsește, expandare pe pas → cerințe cu ✓ + notă transparență L6 + CTA „Continuă acest pas", card „Următorul nivel" cu ce lipsește exact. PB Admin ConfigPanel: secțiune Journey & Readiness.
+
+**Testare**: pytest `tests/test_sh001_journey.py` **17/17 PASS** (7 niveluri, contiguitate, explainability, notă L6, 5 dimensiuni, scor ponderat = config, prag configurabil reflectat E2E (60→33→60), contract FairPrice complet + persistat, copilot journey/chain/improvements, 401, VE neatins, success-manager regresie) · regresie totală ASM+PB+ST **72 passed, 1 skipped** · testing agent frontend iteration_172 **100% desktop + mobil + admin config persistence**, zero issues.
+
+**URMEAZĂ**: **FP-001 – FairPrice Engine** (consumă fairprice_signals) → Partner Negotiation Pipeline → House Health AI → Digital Twin AI. Blockere externe: Stripe LIVE claim · Resend DNS · purge demo prod (+ migrare ST-001 pe prod după redeploy).
+
+---
+
 ## 🧭 ASM-001 — COPILOTUL CASEI (AI SUCCESS MANAGER) · LIVRAT & TESTAT (29 Iul 2026)
 
 **Misiune**: sprint de UNIFICARE — zero rescrieri, doar compunere a motoarelor existente într-un singur Copilot, primul widget pe Home. Utilizatorul înțelege în 30s: unde e, ce valoare are, ce poate câștiga, care e pasul cu impact maxim.
