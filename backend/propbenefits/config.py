@@ -58,6 +58,14 @@ DEFAULT_CONFIG = {
     "ecosystem_targets": {"subscriptions": 100, "twins": 100, "hh_subs": 50,
                           "campaigns_active": 5, "specialists_active": 25,
                           "city_partners": 5, "retention_pct": 60},
+    # SH-001 · House Journey & Readiness — praguri configurabile din Admin, zero hardcodare
+    "journey": {
+        "doc_verified_min_completeness": 60,
+        "doc_verified_required_categories": ["act_proprietate", "cadastru", "certificat_energetic"],
+        "book_started_min_docs": 1,
+        "readiness_weights": {"administrare": 20, "mentenanta": 20, "audit": 20,
+                              "finantare": 20, "vanzare": 20},
+    },
 }
 
 SEED_CAMPAIGNS = [
@@ -119,7 +127,7 @@ async def get_config() -> dict:
 
 async def update_config(patch: dict, updated_by: str) -> dict:
     allowed = {"levels", "level_points", "referral_benefit", "subscription_health_weights",
-               "notifications", "ecosystem_targets", "recommendation_reward", "ambassador"}
+               "notifications", "ecosystem_targets", "recommendation_reward", "ambassador", "journey"}
     clean = {k: v for k, v in patch.items() if k in allowed}
     if not clean:
         raise ValueError("Nicio cheie validă de configurare.")

@@ -9,6 +9,7 @@ import { GREEN, CTA, Steps, stepForStatus, Skeleton } from "./ui";
 import { API } from "../DashShared";
 import { BenefitsPulse } from "../../components/pb/PbEverywhere";
 import { HouseCopilot } from "../../components/copilot/HouseCopilot";
+import { HouseJourneyCard } from "../../components/copilot/HouseJourneyCard";
 
 const IMG_TWIN = "https://images.unsplash.com/photo-1721244654394-36a7bc2da288?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzh8MHwxfHNlYXJjaHwyfHxhcmNoaXRlY3R1cmFsJTIwYmx1ZXByaW50JTIwYnVpbGRpbmd8ZW58MHx8fHwxNzg0OTkwMDEyfDA&ixlib=rb-4.1.0&q=85&w=800";
 const IMG_HEALTH = "https://images.pexels.com/photos/36035073/pexels-photo-36035073.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
@@ -318,6 +319,7 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
       <div className="lg:px-5 lg:max-w-3xl" data-testid="v2-home-onboarding">
         {hero}
         {show("house_copilot") && <HouseCopilot key="house_copilot" go={go} />}
+        {show("house_journey") && <HouseJourneyCard key="house_journey" go={go} />}
       </div>
     );
   }
@@ -367,6 +369,8 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
       <div className="lg:col-span-8 lg:space-y-6 min-w-0">
         {/* ASM-001: Copilotul Casei — primul widget din Home */}
         {show("house_copilot") && <HouseCopilot key="house_copilot" go={go} />}
+        {/* SH-001: Drumul Casei Tale — imediat sub Copilot */}
+        {show("house_journey") && <HouseJourneyCard key="house_journey" go={go} />}
         {hero}
         {contextualEl}
         {show("benefits_pulse") && <BenefitsPulse key="benefits_pulse" go={go} />}

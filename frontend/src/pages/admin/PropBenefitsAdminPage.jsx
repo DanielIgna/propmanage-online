@@ -178,6 +178,38 @@ const ConfigPanel = () => {
         <button onClick={() => save({ referral_benefit: cfg.referral_benefit })} disabled={busy}
           className="mt-3 px-3 py-1.5 text-[11px] rounded-xl bg-stone-800 border border-stone-700 text-white font-bold">Salvează referral</button>
       </div>
+      {cfg.journey && (
+        <div className="border border-stone-800 rounded-2xl p-4" data-testid="pbadmin-journey-config">
+          <div className="text-xs font-black uppercase tracking-wider text-stone-400 mb-1">Journey & Readiness (SH-001)</div>
+          <p className="text-[11px] text-stone-500 mb-3">Pragurile Drumului Casei — zero hardcodare. Categoriile obligatorii pentru „Documentație verificată" se scriu separate prin virgulă.</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Field label="Completitudine minimă L5 (%)">
+              <input type="number" min="1" max="100" className={inputCls} value={cfg.journey.doc_verified_min_completeness} data-testid="pbadmin-journey-mincomp"
+                onChange={e => setCfg(p => ({ ...p, journey: { ...p.journey, doc_verified_min_completeness: Number(e.target.value) } }))} />
+            </Field>
+            <Field label="Min. documente L2">
+              <input type="number" min="1" className={inputCls} value={cfg.journey.book_started_min_docs}
+                onChange={e => setCfg(p => ({ ...p, journey: { ...p.journey, book_started_min_docs: Number(e.target.value) } }))} />
+            </Field>
+            <div className="col-span-2">
+              <Field label="Categorii obligatorii L5 (virgulă)">
+                <input className={inputCls} value={(cfg.journey.doc_verified_required_categories || []).join(", ")} data-testid="pbadmin-journey-cats"
+                  onChange={e => setCfg(p => ({ ...p, journey: { ...p.journey, doc_verified_required_categories: e.target.value.split(",").map(s => s.trim()).filter(Boolean) } }))} />
+              </Field>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3">
+            {Object.entries(cfg.journey.readiness_weights || {}).map(([k, v]) => (
+              <Field key={k} label={`Pondere ${k}`}>
+                <input type="number" min="0" className={inputCls} value={v}
+                  onChange={e => setCfg(p => ({ ...p, journey: { ...p.journey, readiness_weights: { ...p.journey.readiness_weights, [k]: Number(e.target.value) } } }))} />
+              </Field>
+            ))}
+          </div>
+          <button onClick={() => save({ journey: cfg.journey })} disabled={busy}
+            className="mt-3 px-3 py-1.5 text-[11px] rounded-xl bg-stone-800 border border-stone-700 text-white font-bold" data-testid="pbadmin-save-journey">Salvează Journey</button>
+        </div>
+      )}
       {saved && <div className="text-xs text-emerald-300" data-testid="pbadmin-config-saved">Configurare salvată.</div>}
     </div>
   );

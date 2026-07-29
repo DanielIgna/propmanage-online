@@ -345,6 +345,32 @@ async def copilot_dashboard(user: dict) -> dict:
     secondary = [_with_explain(a) for a in sm.get("secondary") or []]
     community_action = _with_explain(sm.get("community_action"))
 
+    # SH-001: Journey + Readiness + lanț de efecte pe recomandarea principală (compunere)
+    journey = None
+    try:
+        from propbenefits.house_journey import journey_summary, chain_for_action
+        journey = await journey_summary(user, ctx=ctx, book=book, twin=twin)
+        if next_action:
+            next_action["explain"]["chain"] = chain_for_action(next_action["id"], journey)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[copilot] journey section failed: {e}")
+
+    # SH-001: „Ce fac pentru un scor mai bun?" — top 3 îmbunătățiri din gap-urile factorilor
+    _factor_hints = {
+        "activity": "Folosește platforma săptămânal — cere o ofertă sau verifică starea casei",
+        "documents": "Încarcă documente în Cartea Casei",
+        "house_health": "Generează scorul House Health",
+        "digital_twin": "Pornește Digital Twin-ul casei",
+        "campaigns": "Participă la o campanie activă",
+        "benefits_used": "Folosește un beneficiu din portofel",
+        "referrals": "Recomandă un vecin sau un specialist",
+        "ai_usage": "Întreabă Copilotul despre casa ta",
+    }
+    sub_improvements = sorted(sub["factors"], key=lambda f: f["weight"] - f["points"], reverse=True)[:3]
+    sub_improvements = [{"label": f["label"], "gain": round(f["weight"] - f["points"], 1),
+                         "hint": _factor_hints.get(f["key"])} for f in sub_improvements if f["weight"] - f["points"] > 0]
+    subscription["improvements"] = sub_improvements
+
     # Timeline: închide recomandările rezolvate + loghează recomandarea curentă
     current_ids = {a["id"] for a in [next_action, community_action, *secondary] if a}
     signals = {"documents": ctx["documents"], "benefits_available": benefits["available"],
@@ -382,6 +408,7 @@ async def copilot_dashboard(user: dict) -> dict:
         "community": community,
         "storage": storage,
         "subscription": subscription,
+        "journey": journey,
         "timeline": tl,
         "generated_at": _iso(),
     }
