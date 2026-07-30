@@ -4646,3 +4646,13 @@ descendant (Sheet-urile z-50) era poziționat relativ la container → randat of
   TwinAIQA + xos-dock: safe-area-inset-bottom. index.html: viewport-fit=cover.
 **Testat**: iter174 — 100% pass mobil (390x844 touch) + desktop (1920x800), e2e upload ambele,
 stacking verificat cu bounding boxes + elementFromPoint, zero regresii.
+
+## HOTFIX — Crash /admin/orchestrator „resumeBlocked is not defined" (2026-06 · DONE, testat e2e)
+Raportat pe PRODUCȚIE (propmanage.ro). Cauză: butonul „Reia emailurile blocate"
+(AutonomyOrchestratorPage.jsx:329) folosea handler-ul `resumeBlocked` care nu era definit —
+ReferenceError crăpa pagina DOAR când `retry_blocked_config > 0` (cazul prod + preview: emailuri
+blocate de config Resend). Fix: adăugat handler `resumeBlocked` → POST
+/api/admin/orchestrator/retry-queue/resume-blocked, mesaj cu resumed+tick, reload.
+Testat în preview: pagina se încarcă, click → „32 emailuri repuse în coadă — tick imediat:
+0 trimise, 20 re-blocate" (re-blocate = normal, DNS Resend încă neconfigurat — acțiune manuală user).
+⚠️ Fixul e în PREVIEW — user trebuie să REDEPLOYEZE pentru propmanage.ro.

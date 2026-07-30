@@ -234,6 +234,14 @@ export default function AutonomyOrchestratorPage() {
     } catch (e) { setMsg(`❌ ${e?.response?.data?.detail || e.message}`); }
   };
 
+  const resumeBlocked = async () => {
+    try {
+      const r = await ax.post("/api/admin/orchestrator/retry-queue/resume-blocked");
+      setMsg(`📬 ${r.data.resumed} emailuri repuse în coadă${r.data.tick ? ` — tick imediat: ${r.data.tick.sent} trimise, ${r.data.tick.blocked_config} re-blocate` : ""}.`);
+      await load();
+    } catch (e) { setMsg(`❌ ${e?.response?.data?.detail || e.message}`); }
+  };
+
   return (
     <div className="min-h-screen bg-stone-950 p-4 lg:p-8" data-testid="orchestrator-page">
       <div className="max-w-6xl mx-auto">
