@@ -56,7 +56,18 @@ export const ServiceDetailModal = ({ kind, dark = false, onClose, primaryCta = n
 
         {data && (
           <>
-            <p className={`text-sm leading-relaxed mb-6 ${sub}`}>{data.intro}</p>
+            <p className={`text-sm leading-relaxed mb-4 ${sub}`}>{data.intro}</p>
+            {data.key_message && (
+              <div className={`mb-6 p-4 rounded-2xl border-l-4 ${dark ? "bg-[#d4ff3a]/10 border-[#d4ff3a]" : "bg-emerald-50 border-emerald-600"}`} data-testid="detail-key-message">
+                <p className={`text-sm font-bold leading-relaxed italic ${dark ? "text-[#d4ff3a]" : "text-emerald-900"}`}>&bdquo;{data.key_message}&rdquo;</p>
+              </div>
+            )}
+            {data.methodology_note && (
+              <div className={`mb-6 p-4 rounded-2xl border ${dark ? "bg-white/5 border-white/10 text-stone-300" : "bg-stone-50 border-stone-200 text-stone-700"}`} data-testid="detail-methodology-note">
+                <div className={`text-[10px] font-black uppercase tracking-widest mb-1.5 ${accent}`}>Metodologie modulară</div>
+                <p className="text-xs leading-relaxed">{data.methodology_note}</p>
+              </div>
+            )}
             <div className="grid sm:grid-cols-2 gap-4">
               {data.groups.map((g, gi) => (
                 <div key={gi} className={`p-4 rounded-2xl border ${card}`} data-testid={`detail-group-${gi}`}>

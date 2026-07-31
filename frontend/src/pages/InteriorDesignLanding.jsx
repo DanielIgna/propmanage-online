@@ -335,6 +335,12 @@ export default function InteriorDesignLanding() {
               <span key={i} className="px-3.5 py-2 rounded-full bg-white/5 border border-white/10 text-stone-200 text-xs font-semibold" data-testid={`id-twin-item-${i}`}>{c}</span>
             ))}
           </div>
+          {twin.modular_note && (
+            <div className="mt-6 p-4 rounded-2xl bg-white/5 border border-white/10 max-w-2xl" data-testid="id-twin-modular-note">
+              <div className="text-[10px] font-black uppercase tracking-widest text-emerald-300 mb-1.5">Soluție modulară</div>
+              <p className="text-xs text-stone-300 leading-relaxed">{twin.modular_note}</p>
+            </div>
+          )}
           <p className="mt-7 text-emerald-300/90 text-sm font-semibold max-w-2xl">{twin.outro}</p>
           <button onClick={() => setDetailKind("twin")} className="mt-6 px-6 py-3 rounded-full bg-emerald-500 text-white font-bold hover:bg-emerald-400 transition-colors" data-testid="id-twin-details-btn">
             Vezi tot ce conține Digital Twin →
@@ -346,9 +352,20 @@ export default function InteriorDesignLanding() {
       <Section id="audit" className="py-14">
         <div className="grid lg:grid-cols-2 gap-10 items-start">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold mb-5"><ClipboardCheck className="w-3.5 h-3.5" /> Pasul zero al oricărui proiect</div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold mb-5"><ClipboardCheck className="w-3.5 h-3.5" /> Diagnostic tehnic, nu inspecție vizuală</div>
             <h2 className="text-2xl sm:text-3xl font-black text-stone-900 leading-tight">{audit.title}</h2>
             <p className="mt-4 text-sm text-stone-600 leading-relaxed">{audit.intro}</p>
+            {audit.key_message && (
+              <div className="mt-5 p-4 rounded-2xl bg-emerald-50 border-l-4 border-emerald-600" data-testid="id-audit-key-message">
+                <p className="text-sm font-bold text-emerald-900 italic leading-relaxed">&bdquo;{audit.key_message}&rdquo;</p>
+              </div>
+            )}
+            {audit.modular_note && (
+              <div className="mt-4 p-4 rounded-2xl bg-stone-50 border border-stone-200" data-testid="id-audit-modular-note">
+                <div className="text-[10px] font-black uppercase tracking-widest text-emerald-700 mb-1.5">Metodologie modulară</div>
+                <p className="text-xs text-stone-700 leading-relaxed">{audit.modular_note}</p>
+              </div>
+            )}
             <p className="mt-4 text-sm text-stone-700 font-semibold">{audit.outro}</p>
             <button onClick={() => setDetailKind("audit")} className="mt-6 px-6 py-3 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors" data-testid="id-audit-details-btn">
               Află tot ce include Auditul →
