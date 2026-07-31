@@ -15,10 +15,9 @@ const JOURNEY_NEXT = {
   process: null,
 };
 
-export const ServiceDetailModal = ({ kind, dark = false, onClose, primaryCta = null }) => {
+export const ServiceDetailModal = ({ kind, dark = false, onClose, onKindChange = null, primaryCta = null }) => {
   const content = useEcosystemContent();
-  const [curKind, setCurKind] = React.useState(kind);
-  useEffect(() => { setCurKind(kind); }, [kind]);
+  const curKind = kind; // controlled by parent (URL hash sync)
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -38,6 +37,7 @@ export const ServiceDetailModal = ({ kind, dark = false, onClose, primaryCta = n
   const phases = curKind === "process" ? content?.process_phases : null;
   const title = curKind === "process" ? "Un singur proces. 17 etape. Zero improvizație." : data?.title;
   const nextStep = JOURNEY_NEXT[curKind];
+  const switchKind = onKindChange || (() => {}); // fallback dacă parent nu oferă handler
 
   return (
     <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur flex items-center justify-center p-4" onClick={onClose} data-testid={`service-detail-modal-${curKind}`}>
@@ -111,8 +111,8 @@ export const ServiceDetailModal = ({ kind, dark = false, onClose, primaryCta = n
         <div className={`mt-7 pt-5 border-t ${dark ? "border-white/10" : "border-stone-100"}`}>
           <EcosystemFlow dark={dark} compact activeKey={curKind === "audit" ? "audit" : curKind === "twin" ? "twin" : null} />
           <div className="flex flex-wrap gap-3 mt-5">
-            {curKind !== kind ? (
-              <Link to="/imobile-verificate/sell" onClick={onClose}
+            {curKind === "process" ? (
+              <Link to="/imobile-verificate/sell"
                 className={`px-5 py-2.5 rounded-full text-sm font-bold ${dark ? "bg-[#d4ff3a] text-black hover:opacity-90" : "bg-emerald-700 text-white hover:bg-emerald-800"}`}
                 data-testid="service-detail-full-process-cta">
                 Începe procesul complet
@@ -125,19 +125,19 @@ export const ServiceDetailModal = ({ kind, dark = false, onClose, primaryCta = n
               </button>
             )}
             {nextStep ? (
-              <button onClick={() => setCurKind(nextStep.kind)}
+              <button onClick={() => switchKind(nextStep.kind)}
                 className={`px-5 py-2.5 rounded-full text-sm font-bold border inline-flex items-center gap-1.5 ${dark ? "border-[#d4ff3a]/50 text-[#d4ff3a] hover:bg-[#d4ff3a]/10" : "border-emerald-500 text-emerald-800 hover:bg-emerald-50"}`}
                 data-testid="service-detail-continue">
                 {nextStep.label} <ArrowRight className="w-3.5 h-3.5" />
               </button>
             ) : (
               <>
-                <Link to="/design-interior#implementare" onClick={onClose}
+                <Link to="/design-interior#implementare"
                   className={`px-5 py-2.5 rounded-full text-sm font-bold border inline-flex items-center gap-1.5 ${dark ? "border-white/20 text-stone-200 hover:border-white/50" : "border-stone-200 text-stone-700 hover:border-emerald-500"}`}
                   data-testid="service-detail-implementation-link">
                   Cum implementăm <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
-                <Link to="/house-health/upgrade" onClick={onClose}
+                <Link to="/house-health/upgrade"
                   className={`px-5 py-2.5 rounded-full text-sm font-bold border inline-flex items-center gap-1.5 ${dark ? "border-white/20 text-stone-200 hover:border-white/50" : "border-stone-200 text-stone-700 hover:border-emerald-500"}`}
                   data-testid="service-detail-hh-link">
                   House Health <ArrowRight className="w-3.5 h-3.5" />

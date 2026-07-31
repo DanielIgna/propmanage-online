@@ -178,6 +178,31 @@ export default function InteriorDesignLanding() {
     ax.get("/interior-design/content").then((r) => setContent(r.data)).catch(() => {});
   }, []);
 
+  // URL hash ↔ modal state sync. Browser Back/Forward restaurează corect modal-ul.
+  useEffect(() => {
+    const parseHash = () => {
+      const m = (window.location.hash || "").match(/^#detail-(audit|twin|process)$/);
+      return m ? m[1] : null;
+    };
+    setDetailKind(parseHash());
+    const onHash = () => setDetailKind(parseHash());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  const openDetail = (kind) => {
+    if (window.location.hash === `#detail-${kind}`) { setDetailKind(kind); return; }
+    window.history.pushState(null, "", `${window.location.pathname}#detail-${kind}`);
+    setDetailKind(kind);
+  };
+  const closeDetail = () => {
+    if ((window.location.hash || "").startsWith("#detail-")) {
+      window.history.back(); // triggers hashchange → setDetailKind(null)
+    } else {
+      setDetailKind(null);
+    }
+  };
+
   useEffect(() => {
     if (!content || !window.location.hash) return;
     const el = document.getElementById(window.location.hash.slice(1));
@@ -342,7 +367,7 @@ export default function InteriorDesignLanding() {
             </div>
           )}
           <p className="mt-7 text-emerald-300/90 text-sm font-semibold max-w-2xl">{twin.outro}</p>
-          <button onClick={() => setDetailKind("twin")} className="mt-6 px-6 py-3 rounded-full bg-emerald-500 text-white font-bold hover:bg-emerald-400 transition-colors" data-testid="id-twin-details-btn">
+          <button onClick={() => openDetail("twin")} className="mt-6 px-6 py-3 rounded-full bg-emerald-500 text-white font-bold hover:bg-emerald-400 transition-colors" data-testid="id-twin-details-btn">
             Vezi tot ce conține Digital Twin →
           </button>
         </div>
@@ -367,7 +392,7 @@ export default function InteriorDesignLanding() {
               </div>
             )}
             <p className="mt-4 text-sm text-stone-700 font-semibold">{audit.outro}</p>
-            <button onClick={() => setDetailKind("audit")} className="mt-6 px-6 py-3 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors" data-testid="id-audit-details-btn">
+            <button onClick={() => openDetail("audit")} className="mt-6 px-6 py-3 rounded-full bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors" data-testid="id-audit-details-btn">
               Află tot ce include Auditul →
             </button>
           </div>
@@ -511,7 +536,8 @@ export default function InteriorDesignLanding() {
       {detailKind && (
         <ServiceDetailModal
           kind={detailKind}
-          onClose={() => setDetailKind(null)}
+          onClose={closeDetail}
+          onKindChange={openDetail}
           primaryCta={{
             label: detailKind === "audit" ? "Solicită Audit" : "Solicită Digital Twin",
             onClick: scrollToForm,
