@@ -26,25 +26,27 @@ from service_content_design import DEFAULT_CONTENT
 
 async def _get_content() -> dict[str, Any]:
     # 2.4: service_pages e master; fallback + dual-write cu legacy interior_design_content
+    # BUGFIX: verificarea content_version rulează pe AMBELE ramuri (master + legacy),
+    # altfel pe medii unde service_pages nu are doc, legacy întorcea conținut stale.
     doc = await db.service_pages.find_one({"slug": "design-interior"})
-    if doc and (doc.get("content_version") or 1) < DEFAULT_CONTENT["content_version"]:
-        # upgrade v2 (Interior Intelligence): păstrăm flagurile admin, restul e conținut nou
-        upgraded = {**DEFAULT_CONTENT,
-                    "active": doc.get("active", True),
-                    "show_on_homepage": doc.get("show_on_homepage", True),
-                    "slug": "design-interior",
-                    "updated_at": datetime.now(timezone.utc).isoformat()}
-        await db.service_pages.update_one({"slug": "design-interior"}, {"$set": upgraded})
-        await db.interior_design_content.update_one({"_id": "main"}, {"$set": upgraded}, upsert=True)
-        logger.info("[interior_design] content upgraded to v2 (Interior Intelligence)")
-        doc = await db.service_pages.find_one({"slug": "design-interior"})
     if not doc:
         doc = await db.interior_design_content.find_one({"_id": "main"})
-    if not doc:
-        await db.interior_design_content.update_one(
-            {"_id": "main"}, {"$set": {**DEFAULT_CONTENT, "updated_at": datetime.now(timezone.utc).isoformat()}}, upsert=True
-        )
-        return dict(DEFAULT_CONTENT)
+
+    current_version = DEFAULT_CONTENT["content_version"]
+    doc_version = (doc or {}).get("content_version") or 1
+
+    if not doc or doc_version < current_version:
+        # First-time seed OR upgrade — păstrează flagurile admin, restul e conținut nou
+        upgraded = {**DEFAULT_CONTENT,
+                    "active": (doc or {}).get("active", True),
+                    "show_on_homepage": (doc or {}).get("show_on_homepage", True),
+                    "slug": "design-interior",
+                    "updated_at": datetime.now(timezone.utc).isoformat()}
+        await db.service_pages.update_one({"slug": "design-interior"}, {"$set": upgraded}, upsert=True)
+        await db.interior_design_content.update_one({"_id": "main"}, {"$set": upgraded}, upsert=True)
+        logger.info(f"[interior_design] content upgraded {doc_version} → {current_version}")
+        doc = await db.service_pages.find_one({"slug": "design-interior"})
+
     doc.pop("_id", None)
     return doc
 
