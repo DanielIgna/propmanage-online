@@ -1,3 +1,26 @@
+## 🔐 AUTH-GOOGLE-DIRECT — MIGRARE Google OAuth de la Emergent la Google Cloud Propriu · LIVRAT & TESTAT (6 Feb 2026)
+
+**Cerință Fondator**: consent screen Google să afișeze "PropManage" în loc de brandul Emergent implicit. Folosind Client ID + Secret proprii din Google Cloud Console (setare externă făcută de Fondator; JavaScript origins + Authorized Redirect URIs configurate pentru propmanage.ro; preview URI încă de whitelisted).
+
+**Backend** (`/app/backend/routes/auth.py`):
+- Nou: `POST /api/auth/google/callback` — flux DIRECT: exchange `code` la `oauth2.googleapis.com/token` cu `client_id`/`client_secret` din env, apoi fetch profile la `openidconnect.googleapis.com/v1/userinfo`, upsert user (identic cu fluxul Emergent: `google_auth=True`, `avatar_source='google'`, `_enforce_admin_role`), setare JWT cookies. Toate branch-urile de eșec (config, network, token_refused, no_token, userinfo_network, userinfo_refused, no_email) + succes se înregistrează în `db.oauth_health` cu `flow='direct'` prin helper `_record_oauth_health` — paritate cu fluxul Emergent legacy.
+- Legacy `POST /api/auth/google/session` RĂMÂNE ca fallback (`flow='emergent'`) — cererea Fondatorului: păstrează back-up-ul.
+- `.env`: `GOOGLE_CLIENT_ID=563332033077-4m9lqf02au29ubl3m4liv2e3bp8t7r4k.apps.googleusercontent.com` + `GOOGLE_CLIENT_SECRET`.
+
+**Frontend**:
+- `Auth.jsx` — butonul „Continuă cu Google" (data-testid `google-login-btn`) construiește dinamic URL-ul: dacă `REACT_APP_GOOGLE_CLIENT_ID` există → `accounts.google.com/o/oauth2/v2/auth?...` (params: `client_id, redirect_uri=<origin>/auth/callback, response_type=code, scope=openid email profile, access_type=online, prompt=select_account`); altfel fallback la `auth.emergentagent.com`.
+- `AuthCallback.jsx` — complet rescris, discriminare automată a fluxului: `?code=...` → POST `/api/auth/google/callback` cu `{code, redirect_uri}`; `#session_id=...` → POST `/api/auth/google/session` cu header X-Session-ID (Emergent legacy); `?error=access_denied` → mesaj UI fără backend call; nimic → redirect `/login`. Error UI păstrează mesajele detaliate + link „Raportează".
+- `.env`: `REACT_APP_GOOGLE_CLIENT_ID` setat; frontend repornit ca să prindă env-ul la build time.
+
+**Testare**: `test_reports/iteration_175.json` — **backend 8/8 PASS · frontend 6/6 PASS**. Testing agent a validat: (1) butonul redirecționează la accounts.google.com cu Client ID-ul corect, (2) AuthCallback discriminează corect ?code vs #session_id vs ?error vs empty, (3) endpoint direct returnează 401 cu detaliu RO care menționează Google Cloud Console la cod invalid, (4) legacy Emergent endpoint încă răspunde, (5) regresie login email/parolă OK, (6) `oauth_health` tracking pentru eșecuri direct-flow verificat manual cu pymongo (event `outcome=token_refused, upstream=400, duration_ms=87`).
+
+**Blocaj extern (Fondator)**: preview URI `https://phased-document.preview.emergentagent.com/auth/callback` nu este încă în Authorized Redirect URIs în Google Cloud Console → E2E complet cu consent Google real nu poate fi testat automat în preview (Google returnează `redirect_uri_mismatch`). Producția (`propmanage.ro/auth/callback`) trebuie deja whitelisted — de verificat cu login real după redeploy.
+
+**URMEAZĂ**: (1) Adaugă preview URI în Google Cloud → E2E complet · (2) Redeploy pe propmanage.ro pentru migrare live · (3) SSOT Structural Registry Creation (așteaptă aprobare pe `ENTERPRISE_REGISTRY_ARCHITECTURE_AUDIT.md`) · (4) FEATURE FREEZE activ până la interviurile de research (15-20 asociații).
+
+---
+
+
 ## 🏆 UX-001 + UX-001.1 — EMOTIONAL ENGAGEMENT & ACHIEVEMENT SYSTEM · LIVRAT, AUDITAT & PRODUCTION READY (29 Iul 2026)
 
 **Notă de proces**: Fondatorul a trimis UX-001.1 (finalizare) presupunând UX-001 gata; agentul a implementat AMBELE într-o singură trecere, în forma finală (achievement final redenumit + badge 🛡 incluse de la început).

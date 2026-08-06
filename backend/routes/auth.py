@@ -1087,9 +1087,21 @@ async def google_direct_callback(payload: GoogleCallbackIn, response: Response, 
     identical (google_auth=True, avatar_source='google', etc.).
     """
     started_at = datetime.now(timezone.utc)
+
+    def _base_event(**extra):
+        ev = {
+            "event_type": "google_oauth_direct",
+            "flow": "direct",
+            "started_at": started_at.isoformat(),
+            "ip": request.client.host if request.client else None,
+        }
+        ev.update(extra)
+        return ev
+
     client_id = os.environ.get("GOOGLE_CLIENT_ID")
     client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
     if not client_id or not client_secret:
+        await _record_oauth_health(_base_event(outcome="config_error", final_status=500), started_at)
         raise HTTPException(500, "Server misconfigured: GOOGLE_CLIENT_ID/SECRET missing.")
 
     # Step 1: exchange authorization code for access_token at Google
@@ -1104,10 +1116,12 @@ async def google_direct_callback(payload: GoogleCallbackIn, response: Response, 
             })
     except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPError) as e:
         logger.error(f"[google_direct_callback] token network error: {e}")
+        await _record_oauth_health(_base_event(outcome="network", final_status=503, last_error=f"{type(e).__name__}: {e}"), started_at)
         raise HTTPException(503, f"Google OAuth token endpoint unreachable: {type(e).__name__}") from e
 
     if token_r.status_code != 200:
         logger.warning(f"[google_direct_callback] token exchange failed status={token_r.status_code} body={token_r.text[:300]}")
+        await _record_oauth_health(_base_event(outcome="token_refused", final_status=401, upstream_status=token_r.status_code, last_error=token_r.text[:300]), started_at)
         raise HTTPException(
             401,
             f"Google a refuzat schimbul de cod (HTTP {token_r.status_code}). "
@@ -1116,6 +1130,7 @@ async def google_direct_callback(payload: GoogleCallbackIn, response: Response, 
     tokens = token_r.json()
     access_token = tokens.get("access_token")
     if not access_token:
+        await _record_oauth_health(_base_event(outcome="no_token", final_status=401), started_at)
         raise HTTPException(401, "Google nu a returnat access_token.")
 
     # Step 2: fetch user profile
@@ -1123,13 +1138,16 @@ async def google_direct_callback(payload: GoogleCallbackIn, response: Response, 
         async with httpx.AsyncClient(timeout=10) as http:
             ui_r = await http.get(_GOOGLE_USERINFO_URL, headers={"Authorization": f"Bearer {access_token}"})
     except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPError) as e:
+        await _record_oauth_health(_base_event(outcome="userinfo_network", final_status=503, last_error=f"{type(e).__name__}: {e}"), started_at)
         raise HTTPException(503, f"Google userinfo unreachable: {type(e).__name__}") from e
 
     if ui_r.status_code != 200:
+        await _record_oauth_health(_base_event(outcome="userinfo_refused", final_status=401, upstream_status=ui_r.status_code), started_at)
         raise HTTPException(401, f"Google userinfo refuzat (HTTP {ui_r.status_code}).")
     profile = ui_r.json()
     email = (profile.get("email") or "").lower()
     if not email:
+        await _record_oauth_health(_base_event(outcome="no_email", final_status=400), started_at)
         raise HTTPException(400, "Google nu a returnat email.")
     name = profile.get("name") or ""
     picture = profile.get("picture") or ""
@@ -1168,20 +1186,8 @@ async def google_direct_callback(payload: GoogleCallbackIn, response: Response, 
     access = create_access_token(uid, email, user.get("role", "client"))
     refresh = create_refresh_token(uid)
     set_auth_cookies(response, access, refresh)
-    # Track success in oauth_health (same collection as Emergent flow, tag flow=direct)
-    try:
-        await db.oauth_health.insert_one({
-            "event_type": "google_oauth_direct",
-            "flow": "direct",
-            "started_at": started_at.isoformat(),
-            "outcome": "success",
-            "final_status": 200,
-            "duration_ms": int((datetime.now(timezone.utc) - started_at).total_seconds() * 1000),
-            "email": email,
-            "ip": request.client.host if request.client else None,
-        })
-    except Exception:  # noqa: BLE001
-        pass
+    # Success (uses same helper for consistency with failure branches)
+    await _record_oauth_health(_base_event(outcome="success", final_status=200, email=email), started_at)
     return serialize_doc(user)
 
 
