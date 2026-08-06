@@ -31,7 +31,7 @@ CATEGORY_ORDER = [
     "System Zero", "Constitution", "Board Directives", "Board Resolutions", "Execution Orders",
     "Enterprise Standards", "Enterprise Principles", "Enterprise Playbooks", "Executive Prompts",
     "CEO Mode", "AI Charters", "Enterprise Metrics", "Enterprise Health", "Enterprise Score",
-    "Governance", "Strategy", "Roadmaps", "Architecture", "Platform Audits", "Digital Twin", "Finance",
+    "Governance", "Strategy", "Roadmaps", "Architecture", "Platform Audits", "Registries", "Digital Twin", "Finance",
     "Case Library", "Memory",
 ]
 
@@ -54,6 +54,7 @@ PATH_RULES = [
     ("memory/strategy/ROADMAP", "Roadmaps"),
     ("memory/strategy/", "Strategy"),
     ("memory/audits/", "Platform Audits"),
+    ("memory/registries/", "Registries"),
 ]
 NAME_RULES = [
     ("ENTERPRISE_STANDARDS", "Enterprise Standards"),
@@ -90,7 +91,9 @@ CORE_ACTIVE_TOKENS = ("MEMORY_RULES", "INDEX.MD", "TEST_CREDENTIALS", "PRD.MD")
 #   - Backward-compatible: consumatorii care ignoră `artifact_type` continuă să funcționeze.
 # ============================================================
 ARTIFACT_TYPES = ("DOCUMENT", "REGISTRY", "GRAPH", "LEDGER", "INDEX", "CATALOG")
-PATH_ARTIFACT_TYPE_RULES: list[tuple[str, str]] = []  # (prefix, ARTIFACT_TYPE); reserved for future
+PATH_ARTIFACT_TYPE_RULES: list[tuple[str, str]] = [
+    ("memory/registries/", "REGISTRY"),  # Canonical location for enterprise registries (first: SSOT_REGISTRY.md)
+]
 NAME_ARTIFACT_TYPE_RULES: list[tuple[str, str]] = []  # (uppercase_token, ARTIFACT_TYPE); reserved for future
 
 

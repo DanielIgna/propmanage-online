@@ -33,6 +33,32 @@ const StatusBadge = ({ s }) => (
   <span className={`text-[9px] px-2 py-0.5 rounded-full border shrink-0 uppercase ${LIFECYCLE_STYLE[s] || LIFECYCLE_STYLE.Review}`}>{s}</span>
 );
 
+// Registry-specific client-side parser (no backend contract touched).
+// Extracts structured metadata from the markdown body of a REGISTRY artifact.
+const parseRegistryMeta = (md) => {
+  if (!md) return null;
+  const readLabel = (label) => {
+    const m = md.match(new RegExp(`\\*\\*${label}\\*\\*:\\s*(.+?)$`, "im"));
+    return m ? m[1].trim() : null;
+  };
+  // Count Entries table rows: locate the "## Entries" section then count non-separator table rows.
+  let entries = 0;
+  const sections = md.split(/^##\s+/im);
+  const entriesSection = sections.find(s => /^Entries\b/i.test(s));
+  if (entriesSection) {
+    const rows = entriesSection.split("\n").filter(l => /^\s*\|.+\|\s*$/.test(l) && !/^\s*\|(\s*[-:]+\s*\|)+\s*$/.test(l));
+    // rows[0] is the header row; data rows = rest
+    entries = Math.max(0, rows.length - 1);
+  }
+  return {
+    owner: readLabel("Owner"),
+    lastReview: readLabel("Last Review"),
+    schema: readLabel("Schema"),
+    purpose: readLabel("Purpose"),
+    entries,
+  };
+};
+
 // Enterprise Artifact Type badges (UI extension — infrastructure already exposed by backend).
 // Contract descriptions loaded from /api/founder/knowledge/artifact-types.
 const ARTIFACT_TYPE_STYLE = {
@@ -156,6 +182,42 @@ const InspectorPane = ({ path, onOpen, contract }) => {
               <div className="text-[10px] text-stone-500">Confidence: {h.confidence} · Quality Gate: <span className={data.gate.passed ? "text-emerald-300" : "text-amber-300"}>{data.gate.passed ? "PASSED" : `REVIEW (${(data.gate.critical_failed || []).join(", ")})`}</span> · Quality {data.gate.quality_score}%</div>
             </div>
           </div>
+          {m.artifact_type === "REGISTRY" && (() => {
+            const meta = parseRegistryMeta(data.content);
+            if (!meta) return null;
+            const schemaFields = meta.schema ? meta.schema.split(/\s*[·|,]\s*/).filter(Boolean) : [];
+            return (
+              <div className="p-5 border-b border-white/10 bg-indigo-500/[0.03]" data-testid="kc-registry-details">
+                <div className="text-[10px] uppercase tracking-widest text-indigo-300/80 mb-2 flex items-center gap-1.5">
+                  <Network className="w-3 h-3" /> Registry Details
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-[11px]">
+                  <div>
+                    <div className="text-stone-500 text-[10px] uppercase">Entries</div>
+                    <div className="text-white font-mono text-lg" data-testid="kc-registry-entries">{meta.entries}</div>
+                  </div>
+                  <div>
+                    <div className="text-stone-500 text-[10px] uppercase">Last Review</div>
+                    <div className="text-stone-200 font-mono" data-testid="kc-registry-last-review">{meta.lastReview || "—"}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-stone-500 text-[10px] uppercase">Owner</div>
+                    <div className="text-stone-200" data-testid="kc-registry-owner">{meta.owner || "—"}</div>
+                  </div>
+                  {schemaFields.length > 0 && (
+                    <div className="col-span-2">
+                      <div className="text-stone-500 text-[10px] uppercase mb-1">Schema</div>
+                      <div className="flex flex-wrap gap-1" data-testid="kc-registry-schema">
+                        {schemaFields.map(f => (
+                          <span key={f} className="text-[10px] px-1.5 py-0.5 rounded border border-indigo-500/30 bg-indigo-500/5 text-indigo-200 font-mono">{f}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
           {(data.relationships?.depends_on?.length > 0 || data.relationships?.used_by?.length > 0) && (
             <div className="p-5 border-b border-white/10 space-y-3" data-testid="kc-doc-relationships">
               <div>
