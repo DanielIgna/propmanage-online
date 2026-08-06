@@ -31,7 +31,7 @@ CATEGORY_ORDER = [
     "System Zero", "Constitution", "Board Directives", "Board Resolutions", "Execution Orders",
     "Enterprise Standards", "Enterprise Principles", "Enterprise Playbooks", "Executive Prompts",
     "CEO Mode", "AI Charters", "Enterprise Metrics", "Enterprise Health", "Enterprise Score",
-    "Governance", "Strategy", "Roadmaps", "Architecture", "Digital Twin", "Finance",
+    "Governance", "Strategy", "Roadmaps", "Architecture", "Platform Audits", "Digital Twin", "Finance",
     "Case Library", "Memory",
 ]
 
@@ -53,6 +53,7 @@ PATH_RULES = [
     ("memory/governance/", "Governance"),
     ("memory/strategy/ROADMAP", "Roadmaps"),
     ("memory/strategy/", "Strategy"),
+    ("memory/audits/", "Platform Audits"),
 ]
 NAME_RULES = [
     ("ENTERPRISE_STANDARDS", "Enterprise Standards"),
