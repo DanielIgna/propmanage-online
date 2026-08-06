@@ -1,3 +1,30 @@
+## 🎨 KC-V2 — KNOWLEDGE CENTER · ARTIFACT TYPE UI · LIVRAT & TESTAT 100% (6 Feb 2026)
+
+**Directivă Fondator**: "Implement complete frontend support for the existing Artifact Type Infrastructure. This is ONLY a UI implementation built on top of the infrastructure already deployed. Zero backend changes, zero new schemas, zero migrations."
+
+**Regula de execuție respectată**: `ARTIFACT_TYPES=(DOCUMENT, REGISTRY, GRAPH, LEDGER, INDEX, CATALOG)` deja expuse de `/api/founder/knowledge/tree` (câmp `artifact_type` per doc + `artifact_type_counts`) și `/api/founder/knowledge/artifact-types` (contract cu descrieri). Doar prezentare — infrastructure ready pentru cele 5 tipuri neimplementate încă.
+
+**Modificări (un singur fișier)** `/app/frontend/src/pages/admin/KnowledgeCenter.jsx` (+137 linii, -18 linii):
+- **ArtifactBadge component** — compact, `text-[9px]` uppercase, culori distincte per tip (DOCUMENT=stone, REGISTRY=indigo, GRAPH=violet, LEDGER=amber, INDEX=cyan, CATALOG=rose), native `title` tooltip cu contract description + aria-label pentru a11y.
+- **Header statistics** — element nou `kc-artifact-counts` afișează `Documents: 276 · Registries: 0 · Graphs: 0 · Ledgers: 0 · Indexes: 0 · Catalogs: 0` (real, zero hardcode; consumat direct din `tree.artifact_type_counts`).
+- **Filter pills** — rând sub tab-uri (doar în tab-ul Documents) cu 7 pill-uri: All 276 + cele 6 tipuri; combinabil cu filtrul de categorii existent.
+- **Doc list badges** — fiecare row în `kc-doc-list` afișează `ArtifactBadge` lângă `StatusBadge`; 276/276 badge-uri randate.
+- **Inspector integration** — panoul dreapta arată `ArtifactBadge` lângă lifecycle status (Artifact Type · Status · Health · Version — cf. spec §4).
+- **Empty state** — filtru pe tip fără documente afișează `"No {Singular} artifacts available yet."` + `"Infrastructure ready."` (ex: `No Registry artifacts available yet.`).
+- **Search parser extins** — recunoaște `artifact:REGISTRY` / `artifact:DOCUMENT` etc. în query. Comportament: (a) doar token → filtrare locală din tree fără backend call; (b) token + text → backend search pe text, filtrare client-side pe tip; (c) fără token → comportamentul original neschimbat. Contract backend zero atins.
+- **Placeholder search updated** cu hint `(ex: artifact:REGISTRY)`.
+
+**Testare**: `test_reports/iteration_176.json` — **frontend 15/15 PASS**. Verificate: header counts din backend, filter pills prezente + interactive, badge pe fiecare doc, tooltip cu contract text în atribut `title`, empty state cu copy exactă spec, inspector cu badge, search parser cu toate cele 3 combinări + regresie search plain, tab regression (map RegistryGraph + review), category × artifact filter combinare corectă, backend contract intact (doar endpoint-uri existente hit-uite).
+
+**Deployment risk**: MINIM. Modificare izolată la un singur fișier React, zero backend/DB/API/schema/migration. Backward-compatible pe toate suprafețele.
+
+**Backward compatibility**: 100%. Toate documentele existente rămân vizibile; filtrele/search-ul/inspector-ul funcționează identic pentru cei care ignoră câmpul `artifact_type`; consumatorii vechi (fără awareness de artifact) primesc DOCUMENT ca default de la backend.
+
+**URMEAZĂ**: (1) Redeploy preview → producție pentru migrare live · (2) Când Fondatorul aprobă implementarea REGISTRY/GRAPH/LEDGER/INDEX/CATALOG (spec structurat), UI-ul funcționează AUTOMAT — badge-uri, count-uri, filter, search parser, empty state — fără modificări frontend.
+
+---
+
+
 ## 🔐 AUTH-GOOGLE-DIRECT — MIGRARE Google OAuth de la Emergent la Google Cloud Propriu · LIVRAT & TESTAT (6 Feb 2026)
 
 **Cerință Fondator**: consent screen Google să afișeze "PropManage" în loc de brandul Emergent implicit. Folosind Client ID + Secret proprii din Google Cloud Console (setare externă făcută de Fondator; JavaScript origins + Authorized Redirect URIs configurate pentru propmanage.ro; preview URI încă de whitelisted).
