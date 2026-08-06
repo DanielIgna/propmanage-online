@@ -1,3 +1,37 @@
+## 🧠 KC-V2-QUERY-ASSISTANT — Enterprise Query Assistant · LIVRAT & TESTAT 24/24 PASS (6 Feb 2026)
+
+**Directivă Fondator**: „Transform Knowledge Center Search dintr-un text input într-un Enterprise Query Assistant. Nu presupune că Founder-ul știe sintaxa. 100% frontend, zero backend."
+
+**Modificări** (`/app/frontend/src/pages/admin/KnowledgeCenter.jsx`, +263 linii net; total 738 linii):
+- **Parser extins**: `parseTokens()` cu 3 operatori (`artifact:` / `status:` / `category:`); case-insensitive; position-agnostic; whitespace-tolerant; suport quoted multi-word (`category:"Board Directives"`). `applyClientFilters()` filtrează client-side pe toate operatorii detectați.
+- **Autocomplete engine** (`suggestions` useMemo):
+  - Type `art` → 6 sugestii `artifact:X` cu contract description + live counts
+  - Type `stat` → 4 sugestii `status:ACTIVE/REVIEW/DRAFT/ARCHIVED` cu counts din tree
+  - Type `cat` → toate 20 categorii cu doc counts
+  - Type `artifact:D` / `category:Arch` → prefix/substring match filtered live
+  - Zero HTTP request pe typing (verified: 0 network calls during type sequence)
+  - Grupare vizuală (Artifact Type · Status · Category) cu antete kc-sug-group-*
+- **Keyboard nav**: ↑↓ cycle + wrap, Enter/Tab accept + inserează token + spațiu trailing + focus la end-of-insertion, Escape închide fără să șteargă input-ul, click-outside via `useEffect` + ref închide dropdown.
+- **Mouse**: `onMouseDown` cu `preventDefault` — evită race-ul blur-before-click.
+- **Help panel**: 3 example chips clickable sub input (`artifact:DOCUMENT audit`, `status:ACTIVE`, `category:Architecture`) — click fills input.
+- **Chips rezultat**: `kc-search-scope-chip` (artifact) + `kc-search-scope-chip-status` + `kc-search-scope-chip-category` — toate 3 vizibile simultan la queries combined.
+- **Empty state extins**: „No {SingularType} artifacts found." + „Infrastructure ready." + sugestii nearest din top-3 tipuri non-zero (currently: `Try artifact:DOCUMENT (276)`).
+- **Placeholder**: „Search documents..." (spec exact) + helper row cu examples.
+
+**Testare** — `test_reports/iteration_178.json`: **24/24 PASS (frontend-only)** cu confirmare explicită **ZERO network requests during typing** (autocomplete 100% client-side).
+
+**Deployment report**:
+- Backend: ZERO modificări. Doar `/api/founder/knowledge/search` hit la submit (existent). API/DB/schema/migration: ZERO.
+- Frontend: 1 fișier modificat (`KnowledgeCenter.jsx`).
+- Risk: MINIM (logică pură client-side).
+- Backward compatibility: 100% (plain search regresie „sprint" → 50 rezultate fără chips; filter pills funcționale; Dependency Map + Review neatinse).
+- File size flag: fișier la 738 linii (>700 threshold); refactor split în componente separate rămâne backlog non-blocking.
+
+**Producție (`propmanage.ro`)**: fix-ul e în preview. Necesită redeploy pentru a fi live.
+
+---
+
+
 ## 🔧 KC-V2-PARSER-HARDEN — Artifact Search Parser + UX Fix · LIVRAT & TESTAT 100% (6 Feb 2026)
 
 **Bug raportat**: „Parser-ul din Search nu interpretează operatorul `artifact:<TYPE>` — 0 rezultate, tratat ca text normal".
