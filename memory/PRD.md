@@ -1,3 +1,41 @@
+## 🔧 KC-V2-PARSER-HARDEN — Artifact Search Parser + UX Fix · LIVRAT & TESTAT 100% (6 Feb 2026)
+
+**Bug raportat**: „Parser-ul din Search nu interpretează operatorul `artifact:<TYPE>` — 0 rezultate, tratat ca text normal".
+
+**Root cause (analiză)**: Parser-ul FUNCȚIONA pe preview — dovadă cu 13 scenarii live testate. UX-ul era ambiguu: când parserul detecta `artifact:REGISTRY` + 0 rezultate (natural, 0 registries există), header-ul spunea doar „0 rezultate pentru „artifact:REGISTRY"" fără să afișeze niciun indicator că filtrul de tip a fost aplicat. Utilizatorul credea că parserul nu a funcționat. Pe producție, dacă redeploy nu s-a făcut, codul V2 lipsește complet → text tratat literal → 0 rezultate reale.
+
+**Fix aplicat** (`/app/frontend/src/pages/admin/KnowledgeCenter.jsx`, zero backend):
+- **Parser regex robust**: `/(?:^|\s)artifact:(DOCUMENT|REGISTRY|GRAPH|LEDGER|INDEX|CATALOG)(?=\s|$)/i` — case-insensitive (`document` = `DOCUMENT` = `Document`), position-agnostic (token la început, sfârșit, sau standalone), tolerant la spații multiple (colapsează la unul singur).
+- **Scope chip vizibil** (`data-testid="kc-search-scope-chip"`) — apare cu badge-ul artifact type ori de câte ori parserul detectează un token valid. Absent pentru query-uri fără token sau cu tip invalid (`artifact:XYZ` → tratat ca plain text).
+- **Empty state scoped** (`data-testid="kc-search-empty-scoped"`) — când `scope` prezent + `total=0`, afișează `"No {Singular} artifacts available yet."` + `"Infrastructure ready."` (identic cu empty state din filter pills, coerență cross-suprafață).
+- **Total counter cu token-stripping** — displayed query strip-uiește token-ul: `artifact:DOCUMENT` → „276 rezultate"; `audit artifact:DOCUMENT` → „50 rezultate pentru „audit"".
+
+**Testare** — `test_reports/iteration_177.json`: **15/15 PASS**
+| Scenariu | Rezultat |
+|---|---|
+| `artifact:DOCUMENT` (uppercase, alone) | 276 · chip vizibil · no empty ✅ |
+| `artifact:document` (lowercase) | 276 · chip vizibil (case-insensitive) ✅ |
+| `ARTIFACT:REGISTRY` (all caps) | 0 · chip · empty "No Registry artifacts…" ✅ |
+| `artifact:GRAPH` / LEDGER / INDEX / CATALOG | 0 · chip · empty per tip ✅ |
+| `artifact:DOCUMENT audit` (token first) | 50 „audit" · chip DOCUMENT ✅ |
+| `audit artifact:DOCUMENT` (token last) | 50 „audit" · chip DOCUMENT ✅ |
+| `artifact:REGISTRY trust` (token+text 0 hits) | 0 „trust" · chip · empty ✅ |
+| `artifact:GRAPH dependency` (0 hits) | 0 „dependency" · chip · empty ✅ |
+| `sprint` (regresie plain search) | 50 „sprint" · fără chip ✅ backward-compat |
+| `artifact:XYZ` (tip invalid) | 0 „artifact:XYZ" · fără chip (tratat ca text) ✅ |
+
+**Deployment report**:
+- **Backend**: ZERO modificări. API contract intact. `/tree`, `/search`, `/artifact-types`, `/doc`, `/review` neschimbate.
+- **DB/schema/migration**: ZERO.
+- **Frontend**: 1 fișier modificat (`KnowledgeCenter.jsx`, +36/-10 linii net față de baseline KC-V2).
+- **Risk**: MINIM — logică pură client-side, funcționează doar când user tastează `artifact:X`.
+- **Backward compatibility**: 100%. Query-uri fără `artifact:` funcționează exact ca înainte (regresie „sprint" verificată). Query-uri cu tip invalid tratate ca text normal.
+
+**Producție (`propmanage.ro`)**: Fix-ul e în preview. Necesită redeploy pentru a fi live.
+
+---
+
+
 ## 🎨 KC-V2 — KNOWLEDGE CENTER · ARTIFACT TYPE UI · LIVRAT & TESTAT 100% (6 Feb 2026)
 
 **Directivă Fondator**: "Implement complete frontend support for the existing Artifact Type Infrastructure. This is ONLY a UI implementation built on top of the infrastructure already deployed. Zero backend changes, zero new schemas, zero migrations."
