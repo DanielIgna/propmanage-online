@@ -149,8 +149,23 @@ export const LoginPage = () => {
           <button
             type="button"
             onClick={() => {
-              const redirectUrl = window.location.origin + "/auth/callback";
-              window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+              const redirectUri = window.location.origin + "/auth/callback";
+              const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID;
+              if (googleClientId) {
+                // Direct Google OAuth (own Cloud project) — brands "PropManage" on Google consent screen
+                const params = new URLSearchParams({
+                  client_id: googleClientId,
+                  redirect_uri: redirectUri,
+                  response_type: "code",
+                  scope: "openid email profile",
+                  access_type: "online",
+                  prompt: "select_account",
+                });
+                window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+              } else {
+                // Fallback: Emergent-managed OAuth (legacy — used if own credentials missing)
+                window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUri)}`;
+              }
             }}
             className="w-full flex items-center justify-center gap-3 bg-white text-black py-3 rounded-xl text-sm font-medium hover:bg-stone-100 transition"
             data-testid="google-login-btn"
