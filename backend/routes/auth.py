@@ -1066,6 +1066,125 @@ async def status_2fa(user: dict = Depends(get_current_user)):
     return {"enabled": bool(full_user.get("totp_enabled"))}
 
 
+# ============= GOOGLE OAUTH (Own project — Direct Google flow) =============
+_GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+_GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
+
+
+class GoogleCallbackIn(BaseModel):
+    code: str = Field(..., min_length=10, max_length=2048)
+    redirect_uri: str = Field(..., min_length=10, max_length=512)
+
+
+@router.post("/auth/google/callback")
+async def google_direct_callback(payload: GoogleCallbackIn, response: Response, request: Request):
+    """Direct Google OAuth flow — uses our own Google Cloud project (not Emergent).
+
+    Frontend sends the `code` returned by Google + the exact redirect_uri that
+    was used. Backend exchanges code → access_token at Google, fetches user
+    profile at Google's userinfo endpoint, then creates/updates the user and
+    issues the same JWT cookies as the Emergent flow. Downstream user model
+    identical (google_auth=True, avatar_source='google', etc.).
+    """
+    started_at = datetime.now(timezone.utc)
+    client_id = os.environ.get("GOOGLE_CLIENT_ID")
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        raise HTTPException(500, "Server misconfigured: GOOGLE_CLIENT_ID/SECRET missing.")
+
+    # Step 1: exchange authorization code for access_token at Google
+    try:
+        async with httpx.AsyncClient(timeout=15) as http:
+            token_r = await http.post(_GOOGLE_TOKEN_URL, data={
+                "code": payload.code,
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "redirect_uri": payload.redirect_uri,
+                "grant_type": "authorization_code",
+            })
+    except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPError) as e:
+        logger.error(f"[google_direct_callback] token network error: {e}")
+        raise HTTPException(503, f"Google OAuth token endpoint unreachable: {type(e).__name__}") from e
+
+    if token_r.status_code != 200:
+        logger.warning(f"[google_direct_callback] token exchange failed status={token_r.status_code} body={token_r.text[:300]}")
+        raise HTTPException(
+            401,
+            f"Google a refuzat schimbul de cod (HTTP {token_r.status_code}). "
+            f"Detaliu: {token_r.text[:200]}. Verifică redirect_uri să fie whitelisted în Google Cloud Console."
+        )
+    tokens = token_r.json()
+    access_token = tokens.get("access_token")
+    if not access_token:
+        raise HTTPException(401, "Google nu a returnat access_token.")
+
+    # Step 2: fetch user profile
+    try:
+        async with httpx.AsyncClient(timeout=10) as http:
+            ui_r = await http.get(_GOOGLE_USERINFO_URL, headers={"Authorization": f"Bearer {access_token}"})
+    except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPError) as e:
+        raise HTTPException(503, f"Google userinfo unreachable: {type(e).__name__}") from e
+
+    if ui_r.status_code != 200:
+        raise HTTPException(401, f"Google userinfo refuzat (HTTP {ui_r.status_code}).")
+    profile = ui_r.json()
+    email = (profile.get("email") or "").lower()
+    if not email:
+        raise HTTPException(400, "Google nu a returnat email.")
+    name = profile.get("name") or ""
+    picture = profile.get("picture") or ""
+
+    # Step 3: upsert user (identical logic to Emergent flow)
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        patch = {"picture": picture, "name": name, "google_auth": True}
+        if existing.get("avatar_source") != "uploaded":
+            patch["avatar"] = picture
+            patch["avatar_source"] = "google" if picture else None
+        await db.users.update_one({"_id": existing["_id"]}, {"$set": patch})
+        user = await db.users.find_one({"_id": existing["_id"]})
+        uid = str(user["_id"])
+    else:
+        new_user = {
+            "email": email, "name": name, "picture": picture,
+            "tenant_id": "main",
+            "avatar": picture or None, "avatar_source": "google" if picture else None,
+            "role": "client", "google_auth": True, "password_hash": "",
+            "wallet_balance": 0.0, "tokens": 0,
+            "rating": None, "reviews_count": 0, "verified": False, "tier": None,
+            "phone": "",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        result = await db.users.insert_one(new_user)
+        uid = str(result.inserted_id)
+        user = new_user
+        user["_id"] = result.inserted_id
+
+    user = await _enforce_admin_role(user)
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"last_seen": datetime.now(timezone.utc).isoformat()}}
+    )
+    access = create_access_token(uid, email, user.get("role", "client"))
+    refresh = create_refresh_token(uid)
+    set_auth_cookies(response, access, refresh)
+    # Track success in oauth_health (same collection as Emergent flow, tag flow=direct)
+    try:
+        await db.oauth_health.insert_one({
+            "event_type": "google_oauth_direct",
+            "flow": "direct",
+            "started_at": started_at.isoformat(),
+            "outcome": "success",
+            "final_status": 200,
+            "duration_ms": int((datetime.now(timezone.utc) - started_at).total_seconds() * 1000),
+            "email": email,
+            "ip": request.client.host if request.client else None,
+        })
+    except Exception:  # noqa: BLE001
+        pass
+    return serialize_doc(user)
+
+
 # ============= GOOGLE OAUTH (Emergent-managed) =============
 @router.post("/auth/google/session")
 async def google_session_exchange(request: Request, response: Response):
