@@ -25,6 +25,37 @@ const StatusBadge = ({ s }) => (
   <span className={`text-[9px] px-2 py-0.5 rounded-full border shrink-0 uppercase ${LIFECYCLE_STYLE[s] || LIFECYCLE_STYLE.Review}`}>{s}</span>
 );
 
+// Enterprise Artifact Type badges (UI extension — infrastructure already exposed by backend).
+// Contract descriptions loaded from /api/founder/knowledge/artifact-types.
+const ARTIFACT_TYPE_STYLE = {
+  DOCUMENT: "bg-stone-500/10 border-stone-500/30 text-stone-300",
+  REGISTRY: "bg-indigo-500/10 border-indigo-500/30 text-indigo-300",
+  GRAPH:    "bg-violet-500/10 border-violet-500/30 text-violet-300",
+  LEDGER:   "bg-amber-500/10 border-amber-500/30 text-amber-300",
+  INDEX:    "bg-cyan-500/10 border-cyan-500/30 text-cyan-300",
+  CATALOG:  "bg-rose-500/10 border-rose-500/30 text-rose-300",
+};
+const ARTIFACT_TYPE_LABEL = {
+  DOCUMENT: "Documents", REGISTRY: "Registries", GRAPH: "Graphs",
+  LEDGER: "Ledgers", INDEX: "Indexes", CATALOG: "Catalogs",
+};
+const ARTIFACT_TYPE_SINGULAR = {
+  DOCUMENT: "Document", REGISTRY: "Registry", GRAPH: "Graph",
+  LEDGER: "Ledger", INDEX: "Index", CATALOG: "Catalog",
+};
+const ArtifactBadge = ({ type, contract, className = "" }) => {
+  const t = (type || "DOCUMENT").toUpperCase();
+  const desc = contract?.[t];
+  return (
+    <span
+      className={`text-[9px] px-2 py-0.5 rounded-full border shrink-0 uppercase font-mono tracking-wide ${ARTIFACT_TYPE_STYLE[t] || ARTIFACT_TYPE_STYLE.DOCUMENT} ${className}`}
+      title={desc ? `${t}\n${desc}` : t}
+      aria-label={desc ? `Artifact Type ${t}. ${desc}` : `Artifact Type ${t}`}
+      data-testid={`kc-artifact-badge-${t}`}
+    >{t}</span>
+  );
+};
+
 const MD = {
   h1: (p) => <h1 className="text-xl font-serif text-white mt-2 mb-3 pb-2 border-b border-white/10" {...p} />,
   h2: (p) => <h2 className="text-base font-serif text-[#d4ff3a] mt-5 mb-2" {...p} />,
@@ -68,7 +99,7 @@ const RelationRow = ({ r, onOpen }) => (
 );
 
 // R5: Inspectorul din dreapta (meta + health + gate + relații + preview)
-const InspectorPane = ({ path, onOpen }) => {
+const InspectorPane = ({ path, onOpen, contract }) => {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   useEffect(() => {
@@ -93,7 +124,10 @@ const InspectorPane = ({ path, onOpen }) => {
           <div className="p-5 border-b border-white/10">
             <div className="flex items-start justify-between gap-2">
               <div className="font-serif text-lg text-white leading-snug" data-testid="kc-doc-title">{m.title}</div>
-              <StatusBadge s={m.status} />
+              <div className="flex items-center gap-1.5 shrink-0">
+                <ArtifactBadge type={m.artifact_type} contract={contract} />
+                <StatusBadge s={m.status} />
+              </div>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-stone-400 mt-2" data-testid="kc-doc-meta">
               <span>v{m.version}</span>
@@ -192,6 +226,9 @@ export default function KnowledgeCenter() {
   const [q, setQ] = useState("");
   const [results, setResults] = useState(null);
   const [searching, setSearching] = useState(false);
+  // Artifact Type layer (UI extension of existing infrastructure)
+  const [artifactFilter, setArtifactFilter] = useState(null); // null = All | "DOCUMENT" | "REGISTRY" ...
+  const [artifactContract, setArtifactContract] = useState(null); // { types, contract, default, note }
 
   const load = useCallback(() => {
     ax.get(`/api/founder/knowledge/tree`)
@@ -199,6 +236,12 @@ export default function KnowledgeCenter() {
       .catch(e => { if (e?.response?.status === 403) setDenied(true); });
   }, []);
   useEffect(() => { load(); }, [load]);
+  // Load artifact-types contract once (source of truth for tooltip descriptions + type enum)
+  useEffect(() => {
+    ax.get(`/api/founder/knowledge/artifact-types`)
+      .then(r => setArtifactContract(r.data))
+      .catch(() => setArtifactContract(null));
+  }, []);
   useEffect(() => {
     const doc = new URLSearchParams(location.search).get("doc");
     if (doc) { setOpenPath(doc); setTab("docs"); }
@@ -206,11 +249,44 @@ export default function KnowledgeCenter() {
 
   const openDoc = (p) => { setOpenPath(p); setTab("docs"); };
 
+  // Search parser — supports `artifact:REGISTRY` (and any of the 6 types) alongside free text.
+  // Client-side extension of the existing backend search: never mutates the API request.
+  const parseArtifactToken = (raw) => {
+    const m = raw.match(/\bartifact:(DOCUMENT|REGISTRY|GRAPH|LEDGER|INDEX|CATALOG)\b/i);
+    if (!m) return { type: null, rest: raw };
+    return { type: m[1].toUpperCase(), rest: raw.replace(m[0], "").trim() };
+  };
+
   const doSearch = async (e) => {
     e?.preventDefault();
-    if (q.trim().length < 2) return;
+    const raw = q.trim();
+    if (raw.length < 2) return;
     setSearching(true);
-    try { const r = await ax.get(`/api/founder/knowledge/search`, { params: { q: q.trim() } }); setResults(r.data); }
+    const { type: artifactType, rest } = parseArtifactToken(raw);
+    try {
+      // If ONLY `artifact:XXX` was typed, list matching docs from the loaded tree (no backend call needed).
+      if (artifactType && !rest) {
+        const allDocs = (tree?.categories || []).flatMap(c => c.docs);
+        const filtered = allDocs.filter(d => (d.artifact_type || "DOCUMENT") === artifactType);
+        setResults({
+          query: raw,
+          total: filtered.length,
+          documents: filtered.map(d => ({ ...d, occurrences: 0, snippet: "" })),
+          registry_nodes: [],
+          _artifact_scope: artifactType,
+        });
+        return;
+      }
+      // Otherwise hit the existing backend search endpoint. If artifact token present,
+      // filter the results client-side (backend contract untouched).
+      const r = await ax.get(`/api/founder/knowledge/search`, { params: { q: rest || raw } });
+      if (artifactType) {
+        const filteredDocs = (r.data.documents || []).filter(d => (d.artifact_type || "DOCUMENT") === artifactType);
+        setResults({ ...r.data, documents: filteredDocs, total: filteredDocs.length, _artifact_scope: artifactType });
+      } else {
+        setResults(r.data);
+      }
+    }
     catch { /* noop */ } finally { setSearching(false); }
   };
 
@@ -225,6 +301,8 @@ export default function KnowledgeCenter() {
 
   const activeCat = tree.categories.find(c => c.name === cat) || null;
   const sc = tree.status_counts || {};
+  const ac = tree.artifact_type_counts || {};
+  const artifactTypes = artifactContract?.types || ["DOCUMENT", "REGISTRY", "GRAPH", "LEDGER", "INDEX", "CATALOG"];
 
   return (
     <div className="min-h-screen bg-[#0a0a0b] text-white">
@@ -239,6 +317,13 @@ export default function KnowledgeCenter() {
             <p className="text-sm text-stone-400 mt-1" data-testid="kc-status-counts">
               {tree.total} documente · <span className="text-emerald-300">{sc.Active || 0} Active</span> · <span className="text-sky-300">{sc.Review || 0} Review</span> · <span className="text-amber-300">{sc.Draft || 0} Draft</span> · {sc.Archived || 0} Archived — doar documentele Active guvernează (R2).
             </p>
+            <p className="text-[11px] text-stone-500 mt-1.5 flex flex-wrap gap-x-3 gap-y-1" data-testid="kc-artifact-counts">
+              {artifactTypes.map(t => (
+                <span key={t} data-testid={`kc-artifact-count-${t}`}>
+                  <span className="text-stone-400">{ARTIFACT_TYPE_LABEL[t] || t}:</span> <span className="text-stone-200 font-mono">{ac[t] ?? 0}</span>
+                </span>
+              ))}
+            </p>
           </div>
           <button onClick={load} className="pm-btn pm-btn-secondary" data-testid="kc-refresh"><RefreshCcw className="w-3.5 h-3.5" /> Refresh</button>
         </div>
@@ -246,7 +331,7 @@ export default function KnowledgeCenter() {
         <form onSubmit={doSearch} className="flex gap-2 mb-5">
           <div className="flex-1 relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Caută în toată guvernanța + registry..."
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Caută în toată guvernanța + registry... (ex: artifact:REGISTRY)"
               className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-3 py-2.5 text-sm outline-none focus:border-[#d4ff3a]/50" data-testid="kc-search-input" />
           </div>
           <button type="submit" className="pm-btn pm-btn-success" disabled={searching} data-testid="kc-search-btn">
@@ -257,11 +342,18 @@ export default function KnowledgeCenter() {
 
         {results && (
           <div className="bg-[#0e0e10] border border-white/10 rounded-2xl p-5 mb-5" data-testid="kc-search-results">
-            <div className="text-xs text-stone-400 mb-3">{results.total} rezultate pentru „{results.query}"</div>
+            <div className="text-xs text-stone-400 mb-3 flex items-center gap-2 flex-wrap">
+              <span>{results.total} rezultate pentru „{results.query}"</span>
+              {results._artifact_scope && (
+                <span className="text-[10px] text-stone-500">
+                  · filtrat pe <ArtifactBadge type={results._artifact_scope} contract={artifactContract?.contract} className="ml-1" />
+                </span>
+              )}
+            </div>
             <div className="space-y-1.5 max-h-[36vh] overflow-y-auto">
               {results.documents.map(d => (
                 <button key={d.path} onClick={() => openDoc(d.path)} className="w-full text-left text-xs bg-white/[0.02] border border-white/10 rounded-lg px-3 py-2 hover:border-[#d4ff3a]/30" data-testid={`kc-result-${d.path.replace(/[/.]/g, "-")}`}>
-                  <div className="flex items-center gap-2"><FileText className="w-3 h-3 text-[#d4ff3a] shrink-0" /><span className="text-stone-200 truncate">{d.title}</span><span className="text-stone-600">· {d.category} · {d.occurrences}×</span><StatusBadge s={d.status} /></div>
+                  <div className="flex items-center gap-2 flex-wrap"><FileText className="w-3 h-3 text-[#d4ff3a] shrink-0" /><span className="text-stone-200 truncate">{d.title}</span><span className="text-stone-600">· {d.category} · {d.occurrences}×</span><ArtifactBadge type={d.artifact_type} contract={artifactContract?.contract} /><StatusBadge s={d.status} /></div>
                   {d.snippet && <div className="text-[10px] text-stone-500 mt-0.5 truncate">{d.snippet}</div>}
                 </button>
               ))}
@@ -285,6 +377,23 @@ export default function KnowledgeCenter() {
 
         {tab === "docs" && (
           <>
+            <div className="flex flex-wrap items-center gap-1.5 mb-4" data-testid="kc-artifact-filter">
+              <span className="text-[10px] uppercase tracking-widest text-stone-500 mr-1">Artifact:</span>
+              <button
+                onClick={() => setArtifactFilter(null)}
+                className={`text-[10px] px-2.5 py-1 rounded-full border transition ${!artifactFilter ? "border-[#d4ff3a]/50 bg-[#d4ff3a]/10 text-white" : "border-white/10 text-stone-400 hover:border-white/25 hover:text-white"}`}
+                data-testid="kc-artifact-filter-ALL"
+              >All <span className="text-stone-500 font-mono">{tree.total}</span></button>
+              {artifactTypes.map(t => (
+                <button
+                  key={t}
+                  onClick={() => setArtifactFilter(t)}
+                  className={`text-[10px] px-2.5 py-1 rounded-full border transition uppercase font-mono tracking-wide ${artifactFilter === t ? `${ARTIFACT_TYPE_STYLE[t]} border-current` : "border-white/10 text-stone-400 hover:border-white/25 hover:text-white"}`}
+                  title={artifactContract?.contract?.[t]}
+                  data-testid={`kc-artifact-filter-${t}`}
+                >{t} <span className="opacity-70">{ac[t] ?? 0}</span></button>
+              ))}
+            </div>
             <div className="grid lg:grid-cols-[230px_330px_1fr] gap-4 items-start">
               <div className="space-y-1 max-h-[70vh] overflow-y-auto" data-testid="kc-categories">
                 <button onClick={() => setCat(null)} className={`w-full text-left text-xs px-3 py-2 rounded-lg border ${!cat ? "border-[#d4ff3a]/40 bg-[#d4ff3a]/5 text-white" : "border-white/10 text-stone-400 hover:text-white"}`} data-testid="kc-cat-all">
@@ -297,18 +406,32 @@ export default function KnowledgeCenter() {
                 ))}
               </div>
               <div className="space-y-1.5 max-h-[70vh] overflow-y-auto" data-testid="kc-doc-list">
-                {(activeCat ? [activeCat] : tree.categories).flatMap(c => c.docs.map(d => (
-                  <button key={d.path} onClick={() => openDoc(d.path)} className={`w-full text-left bg-white/[0.02] border rounded-xl px-3.5 py-2.5 flex items-center gap-2.5 ${openPath === d.path ? "border-[#d4ff3a]/50" : "border-white/10 hover:border-[#d4ff3a]/30"}`} data-testid={`kc-doc-${d.path.replace(/[/.]/g, "-")}`}>
-                    <FileText className="w-3.5 h-3.5 text-[#d4ff3a] shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs text-stone-200 truncate">{d.title}</div>
-                      <div className="text-[10px] text-stone-500">v{d.version} · Health {d.health?.score ?? 0}%</div>
-                    </div>
-                    <StatusBadge s={d.status} />
-                  </button>
-                )))}
+                {(() => {
+                  const scoped = (activeCat ? [activeCat] : tree.categories).flatMap(c => c.docs);
+                  const filtered = artifactFilter ? scoped.filter(d => (d.artifact_type || "DOCUMENT") === artifactFilter) : scoped;
+                  if (!filtered.length) {
+                    const label = artifactFilter ? (ARTIFACT_TYPE_SINGULAR[artifactFilter] || artifactFilter) : "Document";
+                    return (
+                      <div className="text-center py-10 px-4 border border-dashed border-white/10 rounded-xl" data-testid="kc-artifact-empty">
+                        <div className="text-stone-300 text-xs">No {label} artifacts available yet.</div>
+                        <div className="text-stone-500 text-[11px] mt-1">Infrastructure ready.</div>
+                      </div>
+                    );
+                  }
+                  return filtered.map(d => (
+                    <button key={d.path} onClick={() => openDoc(d.path)} className={`w-full text-left bg-white/[0.02] border rounded-xl px-3.5 py-2.5 flex items-center gap-2.5 ${openPath === d.path ? "border-[#d4ff3a]/50" : "border-white/10 hover:border-[#d4ff3a]/30"}`} data-testid={`kc-doc-${d.path.replace(/[/.]/g, "-")}`}>
+                      <FileText className="w-3.5 h-3.5 text-[#d4ff3a] shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs text-stone-200 truncate">{d.title}</div>
+                        <div className="text-[10px] text-stone-500">v{d.version} · Health {d.health?.score ?? 0}%</div>
+                      </div>
+                      <ArtifactBadge type={d.artifact_type} contract={artifactContract?.contract} />
+                      <StatusBadge s={d.status} />
+                    </button>
+                  ));
+                })()}
               </div>
-              <InspectorPane path={openPath} onOpen={openDoc} />
+              <InspectorPane path={openPath} onOpen={openDoc} contract={artifactContract?.contract} />
             </div>
             <div className="mt-5 bg-[#0e0e10] border border-white/10 rounded-2xl p-4" data-testid="kc-timeline">
               <div className="text-[10px] uppercase tracking-widest text-stone-500 mb-2 flex items-center gap-1.5"><Clock className="w-3 h-3" /> Activitate recentă (Enterprise Memory)</div>
