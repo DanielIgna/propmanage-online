@@ -20,8 +20,31 @@
 | `/app/memory/metrics/ENTERPRISE_HEALTH.md` | Formule health | AUDIT raportează scorurile actuale. |
 | `/app/memory/ENTERPRISE_STANDARDS.md` | Standarde de cod/arhitectură | AUDIT identifică zone de non-conformitate. |
 | Knowledge Center (`/api/founder/knowledge`) | Consumatorul acestui doc în Admin | Categorie `Platform Audits` — vezi mai jos. |
+| `RESEARCH_DRIVEN_PRODUCT_EVOLUTION_2026-07-31.md` | **Metodologie oficială evoluție produs** | AUDIT devine sursă de infrastructură pentru Reuse Audit obligatoriu. |
+| `BOARD_DIRECTIVE_RESEARCH_DRIVEN_EVOLUTION.md` | **Guvernanță oficială metodologie** | AUDIT servește ca reference pentru validation levels și pipeline. |
+| `INTERVIEW_TEMPLATE.md`, `PATTERN_TEMPLATE.md`, `RESEARCH_REPORT_TEMPLATE.md`, `REUSE_AUDIT_TEMPLATE.md` | Templates obligatorii research pipeline | AUDIT le referă ca artefacte canonice ale procesului. |
+| `MASTER_PLATFORM_STATE_LIVING_GOVERNANCE_2026-07-31.md` | Living governance analysis | Companion doc — analiză integrare cu 15+ sisteme. |
 
 **Rol SSOT**: Acest document este singurul care declară `implementation_status = TRUE` pentru un modul. Orice alt doc care afirmă „implementat" fără corespondent aici este considerat aspirational.
+
+---
+
+## Metodologie oficială adoptată (2026-07-31)
+
+Începând cu **Board Directive „Research-Driven Product Evolution"** (2026-07-31), PropManage aplică metodologia obligatorie **RESEARCH → KNOWLEDGE → VALIDATION → PRODUCT** pentru orice dezvoltare nouă.
+
+**Reguli active**:
+- **Validation Levels V0-V5** — obligatorii pentru orice feature înainte de ROADMAP.
+- **Infrastructure Reuse Audit** — mandatory înainte de „BUILD NEW".
+- **Product Requirement Pipeline** — flux oficial 7 pași (Interviu → Pattern → Validation → PR → Reuse Audit → Roadmap → Development).
+- **Excepții permise**: bugs critice, security, compliance legal, ops/DevOps.
+
+**Prioritate absolută T+90 zile**: 15+ interviuri validate cu președinți de asociații. Zero build de infrastructură nouă până la acumularea evidenței.
+
+**Documente canonice ale metodologiei**:
+- `RESEARCH_DRIVEN_PRODUCT_EVOLUTION_2026-07-31.md` — metodologia detaliată.
+- `BOARD_DIRECTIVE_RESEARCH_DRIVEN_EVOLUTION.md` — guvernanța oficială.
+- `INTERVIEW_TEMPLATE.md` · `PATTERN_TEMPLATE.md` · `RESEARCH_REPORT_TEMPLATE.md` · `REUSE_AUDIT_TEMPLATE.md` — templates obligatorii.
 
 ---
 
