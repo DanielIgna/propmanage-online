@@ -79,6 +79,32 @@ DRAFT_TOKENS = ("GRAND_STRATEGY", "EVOLUTION_ENGINE", "EXPONENTIAL_GROWTH", "ROA
 # Documente-nucleu ale memoriei, aprobate implicit de guvernanță (R3: Expected Active)
 CORE_ACTIVE_TOKENS = ("MEMORY_RULES", "INDEX.MD", "TEST_CREDENTIALS", "PRD.MD")
 
+# ============================================================
+# Enterprise Artifact Types — Infrastructure only (2026-07-31)
+# ------------------------------------------------------------
+# Prepară platforma pentru multiple tipuri de artefacte în Knowledge Center.
+# Reguli:
+#   - DOCUMENT rămâne default; NIMIC nu se schimbă pentru documentele existente.
+#   - Nu se implementează încă REGISTRY / GRAPH / LEDGER / INDEX / CATALOG.
+#   - Extensibil: adăugarea unui nou tip = un rând în PATH_ / NAME_ARTIFACT_TYPE_RULES.
+#   - Backward-compatible: consumatorii care ignoră `artifact_type` continuă să funcționeze.
+# ============================================================
+ARTIFACT_TYPES = ("DOCUMENT", "REGISTRY", "GRAPH", "LEDGER", "INDEX", "CATALOG")
+PATH_ARTIFACT_TYPE_RULES: list[tuple[str, str]] = []  # (prefix, ARTIFACT_TYPE); reserved for future
+NAME_ARTIFACT_TYPE_RULES: list[tuple[str, str]] = []  # (uppercase_token, ARTIFACT_TYPE); reserved for future
+
+
+def _artifact_type(rel: str) -> str:
+    """Returnează tipul artefactului pentru o cale. Default DOCUMENT (backward-compatible)."""
+    for prefix, atype in PATH_ARTIFACT_TYPE_RULES:
+        if rel.startswith(prefix):
+            return atype
+    name = rel.rsplit("/", 1)[-1].upper()
+    for token, atype in NAME_ARTIFACT_TYPE_RULES:
+        if token in name:
+            return atype
+    return "DOCUMENT"
+
 
 def _require_owner(user: dict) -> None:
     if (user.get("email") or "").lower() not in OWNER_EMAILS:
@@ -173,6 +199,7 @@ def _doc_meta(p: Path, rel: str, ctx: dict | None = None) -> dict:
         "path": rel,
         "title": title[:160],
         "category": _categorize(rel),
+        "artifact_type": _artifact_type(rel),
         "version": vm.group(1) if vm else "1.0",
         "status": status,
         "pending_verbatim": pending,
@@ -247,6 +274,36 @@ async def founder_access(user=Depends(require_role("admin"))):
     return {"is_founder": (user.get("email") or "").lower() in OWNER_EMAILS}
 
 
+@router.get("/artifact-types")
+async def knowledge_artifact_types(user=Depends(require_role("admin"))):
+    """Enterprise Artifact Type metadata (infrastructure only).
+
+    Returnează:
+      - types: enumul complet suportat.
+      - default: tipul aplicat când nicio regulă nu match-uiește.
+      - rules: regulile active (path + name); goale acum, rezervate viitorului.
+      - contract: descriere concisă a fiecărui tip pentru AI context.
+    """
+    _require_owner(user)
+    return {
+        "types": list(ARTIFACT_TYPES),
+        "default": "DOCUMENT",
+        "rules": {
+            "path": [{"prefix": p, "type": t} for p, t in PATH_ARTIFACT_TYPE_RULES],
+            "name": [{"token": tok, "type": t} for tok, t in NAME_ARTIFACT_TYPE_RULES],
+        },
+        "contract": {
+            "DOCUMENT": "Narrative artifact. Explains concepts, decisions, methodology. Prose-based.",
+            "REGISTRY": "Structural artifact. Declares facts (topic → owner). Schema-first. Not implemented yet.",
+            "GRAPH": "Relational artifact. Nodes + edges (dependencies, hierarchies). Not implemented yet.",
+            "LEDGER": "Append-only artifact. Event / decision trail. Not implemented yet.",
+            "INDEX": "Lookup artifact. Fast reverse mapping (name → path). Not implemented yet.",
+            "CATALOG": "Enumeration artifact. Curated list with metadata. Not implemented yet.",
+        },
+        "note": "Infrastructure ready. Only DOCUMENT is populated today; other types remain reserved.",
+    }
+
+
 @router.get("/tree")
 async def knowledge_tree(user=Depends(require_role("admin"))):
     _require_owner(user)
@@ -255,16 +312,20 @@ async def knowledge_tree(user=Depends(require_role("admin"))):
     title_counts = Counter(d["title"] for d in docs)
     cats: dict[str, list] = {}
     status_counts: dict[str, int] = {}
+    artifact_type_counts: dict[str, int] = {t: 0 for t in ARTIFACT_TYPES}
     for meta in docs:
         gate = _quality_gate(meta, title_counts)
         if meta["status"] == "Active" and not gate["passed"]:
             meta["status"] = "Review"  # R8: gate critic eșuat → Review
         meta["quality"] = gate["quality_score"]
         status_counts[meta["status"]] = status_counts.get(meta["status"], 0) + 1
+        atype = meta.get("artifact_type", "DOCUMENT")
+        artifact_type_counts[atype] = artifact_type_counts.get(atype, 0) + 1
         cats.setdefault(meta["category"], []).append(meta)
     ordered = [c for c in CATEGORY_ORDER if c in cats] + [c for c in sorted(cats) if c not in CATEGORY_ORDER]
     recent = sorted(docs, key=lambda d: d["updated"], reverse=True)[:8]
-    return {"total": len(docs), "status_counts": status_counts, "recent": recent,
+    return {"total": len(docs), "status_counts": status_counts,
+            "artifact_type_counts": artifact_type_counts, "recent": recent,
             "categories": [{"name": c, "count": len(cats[c]), "docs": cats[c]} for c in ordered]}
 
 
