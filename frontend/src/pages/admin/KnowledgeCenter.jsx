@@ -250,11 +250,12 @@ export default function KnowledgeCenter() {
   const openDoc = (p) => { setOpenPath(p); setTab("docs"); };
 
   // Search parser — supports `artifact:REGISTRY` (and any of the 6 types) alongside free text.
+  // Case-insensitive, position-agnostic (start/middle/end), tolerates multiple spaces.
   // Client-side extension of the existing backend search: never mutates the API request.
   const parseArtifactToken = (raw) => {
-    const m = raw.match(/\bartifact:(DOCUMENT|REGISTRY|GRAPH|LEDGER|INDEX|CATALOG)\b/i);
+    const m = raw.match(/(?:^|\s)artifact:(DOCUMENT|REGISTRY|GRAPH|LEDGER|INDEX|CATALOG)(?=\s|$)/i);
     if (!m) return { type: null, rest: raw };
-    return { type: m[1].toUpperCase(), rest: raw.replace(m[0], "").trim() };
+    return { type: m[1].toUpperCase(), rest: raw.replace(m[0], " ").replace(/\s+/g, " ").trim() };
   };
 
   const doSearch = async (e) => {
@@ -343,26 +344,46 @@ export default function KnowledgeCenter() {
         {results && (
           <div className="bg-[#0e0e10] border border-white/10 rounded-2xl p-5 mb-5" data-testid="kc-search-results">
             <div className="text-xs text-stone-400 mb-3 flex items-center gap-2 flex-wrap">
-              <span>{results.total} rezultate pentru „{results.query}"</span>
               {results._artifact_scope && (
-                <span className="text-[10px] text-stone-500">
-                  · filtrat pe <ArtifactBadge type={results._artifact_scope} contract={artifactContract?.contract} className="ml-1" />
+                <span className="inline-flex items-center gap-1.5 text-[10px] text-stone-300 border border-[#d4ff3a]/30 bg-[#d4ff3a]/5 rounded-full px-2 py-0.5" data-testid="kc-search-scope-chip">
+                  <span className="opacity-70">artifact:</span>
+                  <ArtifactBadge type={results._artifact_scope} contract={artifactContract?.contract} />
                 </span>
               )}
+              <span data-testid="kc-search-total">
+                {(() => {
+                  const scope = results._artifact_scope;
+                  const q = results.query || "";
+                  // Strip `artifact:X` from displayed query so the chip shows scope, text shows only free text
+                  const displayQ = scope
+                    ? q.replace(new RegExp(`(?:^|\\s)artifact:${scope}(?=\\s|$)`, "i"), "").replace(/\s+/g, " ").trim()
+                    : q;
+                  return displayQ
+                    ? <>{results.total} rezultate pentru „{displayQ}"</>
+                    : <>{results.total} rezultate</>;
+                })()}
+              </span>
             </div>
-            <div className="space-y-1.5 max-h-[36vh] overflow-y-auto">
-              {results.documents.map(d => (
-                <button key={d.path} onClick={() => openDoc(d.path)} className="w-full text-left text-xs bg-white/[0.02] border border-white/10 rounded-lg px-3 py-2 hover:border-[#d4ff3a]/30" data-testid={`kc-result-${d.path.replace(/[/.]/g, "-")}`}>
-                  <div className="flex items-center gap-2 flex-wrap"><FileText className="w-3 h-3 text-[#d4ff3a] shrink-0" /><span className="text-stone-200 truncate">{d.title}</span><span className="text-stone-600">· {d.category} · {d.occurrences}×</span><ArtifactBadge type={d.artifact_type} contract={artifactContract?.contract} /><StatusBadge s={d.status} /></div>
-                  {d.snippet && <div className="text-[10px] text-stone-500 mt-0.5 truncate">{d.snippet}</div>}
-                </button>
-              ))}
-              {results.registry_nodes.map(n => (
-                <div key={n.id} className="text-xs bg-white/[0.02] border border-white/10 rounded-lg px-3 py-2">
-                  <div className="flex items-center gap-2"><Network className="w-3 h-3 shrink-0" style={{ color: TYPE_META[n.type]?.color }} /><span className="text-stone-200">{n.name}</span><span className="text-stone-600">· {TYPE_META[n.type]?.label}</span></div>
-                </div>
-              ))}
-            </div>
+            {results.total === 0 && results._artifact_scope ? (
+              <div className="text-center py-8 px-4 border border-dashed border-white/10 rounded-xl" data-testid="kc-search-empty-scoped">
+                <div className="text-stone-300 text-xs">No {ARTIFACT_TYPE_SINGULAR[results._artifact_scope] || results._artifact_scope} artifacts available yet.</div>
+                <div className="text-stone-500 text-[11px] mt-1">Infrastructure ready.</div>
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-[36vh] overflow-y-auto">
+                {results.documents.map(d => (
+                  <button key={d.path} onClick={() => openDoc(d.path)} className="w-full text-left text-xs bg-white/[0.02] border border-white/10 rounded-lg px-3 py-2 hover:border-[#d4ff3a]/30" data-testid={`kc-result-${d.path.replace(/[/.]/g, "-")}`}>
+                    <div className="flex items-center gap-2 flex-wrap"><FileText className="w-3 h-3 text-[#d4ff3a] shrink-0" /><span className="text-stone-200 truncate">{d.title}</span><span className="text-stone-600">· {d.category} · {d.occurrences}×</span><ArtifactBadge type={d.artifact_type} contract={artifactContract?.contract} /><StatusBadge s={d.status} /></div>
+                    {d.snippet && <div className="text-[10px] text-stone-500 mt-0.5 truncate">{d.snippet}</div>}
+                  </button>
+                ))}
+                {results.registry_nodes.map(n => (
+                  <div key={n.id} className="text-xs bg-white/[0.02] border border-white/10 rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2"><Network className="w-3 h-3 shrink-0" style={{ color: TYPE_META[n.type]?.color }} /><span className="text-stone-200">{n.name}</span><span className="text-stone-600">· {TYPE_META[n.type]?.label}</span></div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
