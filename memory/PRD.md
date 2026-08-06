@@ -1,3 +1,62 @@
+## 📜 REG-001 — SSOT_REGISTRY · Prima Instanță Enterprise Registry · LIVRAT & TESTAT 19/19 PASS (6 Feb 2026)
+
+**Directivă Fondator**: „Instantiate the first real Enterprise Registry. Reuse ArtifactType infrastructure. Schema-first. Reuse before Create. Only ONE registry — do not introduce Graph/Ledger/Ownership/Document/Dependency."
+
+**Reuse-before-Create audit** (obligatoriu, făcut înainte de creare):
+- `MASTER_KNOWLEDGE_GOVERNANCE.md` — constituție narativă, DEFINEȘTE conceptul SSOT dar nu ENUMERĂ topicele. Rămâne DOCUMENT.
+- `ENTERPRISE_REGISTRY_ARCHITECTURE_AUDIT.md` — audit care RECOMANDĂ creare de registries; meta-doc.
+- `BOARD_DIRECTIVE_151_ENTERPRISE_HEALTH_FORMULA_REGISTRY.md` — directive care AUTORIZEAZĂ un formula registry; nu conține registry-ul.
+- `/app/docs/PPOS/COMPONENT_REGISTRY.md` — este ÎNTR-ADEVĂR un registry structural (UI components), dar schema diferită de SSOT (Topic → OwnerDocument). Rămâne DOCUMENT în acest sprint (spec exclude introducerea de tipuri suplimentare).
+- **Concluzie**: Niciun candidat existent nu enumeră mapping-ul `Topic → OwnerDocument → AuthorityTier → Status → LastReview`. Creare justificată.
+
+**Creat**: `/app/memory/registries/SSOT_REGISTRY.md` (~40 linii, schema-first, zero paragrafe narative):
+- Metadata header (`**Owner**`, `**Last Review**`, `**Schema**`, `**Purpose**`)
+- Schema Fields table (definește fiecare câmp)
+- Entries table cu **6 topics validate**: Governance Hierarchy · Master Platform State · Artifact Types · Board Directives · Knowledge Center · Research-Driven Product Evolution — toate pointând la Active/Approved OwnerDocuments cu AuthorityTier (Constitutional / Board Directive).
+
+**Backend** (`/app/backend/routes/knowledge_center.py`, 3 rule updates):
+- `PATH_ARTIFACT_TYPE_RULES`: `[("memory/registries/", "REGISTRY")]` — activează detecția automată a artifact_type pe locația canonică (era listă goală „reserved for future"). Reutilizează 100% mecanismul `_artifact_type()`.
+- `PATH_RULES`: `("memory/registries/", "Registries")` — categorie dedicată.
+- `CATEGORY_ORDER`: „Registries" inserat între „Platform Audits" și „Digital Twin".
+- **ZERO API contract changes. ZERO schema changes. ZERO migrations.**
+
+**Frontend** (`/app/frontend/src/pages/admin/KnowledgeCenter.jsx`):
+- Nou helper `parseRegistryMeta(md)` — parser client-side pentru markdown-ul unui registry: extrage Owner, Last Review, Schema, Purpose din liniile `**Field**:` și numără rândurile din tabelul de sub `## Entries`.
+- Bloc nou `kc-registry-details` în InspectorPane — randat **exclusiv** când `m.artifact_type === "REGISTRY"`. Afișează: Entries count (font-mono, indigo highlight), Last Review, Owner, Schema fields (ca 6 pill-uri).
+- **Zero contract change** — folosește `data.content` care e deja disponibil în răspunsul `/api/founder/knowledge/doc`.
+
+**Testare** — `test_reports/iteration_179.json`: **19/19 PASS · backend 100% · frontend 100%**.
+
+Rezultate live confirmate:
+- Header: `Documents: 276 · Registries: 1 · Graphs: 0 · Ledgers: 0 · Indexes: 0 · Catalogs: 0`
+- Filter pill `REGISTRY 1` → click → doar SSOT REGISTRY în listă cu badge indigo
+- Inspector pentru SSOT: Entries=**6**, Last Review=**2026-02-06**, Owner=Fondator, Schema=6 pills (Topic/OwnerDocument/AuthorityTier/Status/LastReview/Notes)
+- `kc-registry-details` **absent** pentru documente DOCUMENT (verificat pe SYSTEM ZERO)
+- Search `artifact:REGISTRY` → 1 rezultat + scope chip · `SSOT` plain → 11 rezultate (include SSOT_REGISTRY) · `Governance Hierarchy` plain → 2 (include SSOT_REGISTRY)
+- Regresie: `sprint` plain → 50 rezultate fără chip; alte categorii intact (Board Directives=112, Constitution=6, etc.)
+- Backward compat: spot-check 6 docs random non-registry → toate rămân `artifact_type=DOCUMENT`
+
+**Deployment report**:
+| Item | Value |
+|---|---|
+| Files created | 1 (`memory/registries/SSOT_REGISTRY.md`) |
+| Files modified | 2 (`backend/routes/knowledge_center.py`, `frontend/src/pages/admin/KnowledgeCenter.jsx`) |
+| Backend API changes | 0 |
+| Schema/DB changes | 0 |
+| Detection mechanism | `PATH_ARTIFACT_TYPE_RULES` (existent, activat pentru prima dată) |
+| Backward compat | 100% (spot-check verificat) |
+| Enterprise compliance | ✅ Reuse-before-Create respectat · ✅ Schema-first (no prose) · ✅ Single new registry (spec `Only the first`) |
+
+**Code review notes** (non-blocking, backlog):
+- `KnowledgeCenter.jsx` la 799 linii — depășește pragul de 700; refactor split SearchPanel + InspectorPane recomandat.
+- `parseRegistryMeta` rulează la fiecare deschidere inspector — se poate memoize cu `useMemo` (micro-optimization).
+- Menținere ordonare pe specificitate în `PATH_ARTIFACT_TYPE_RULES` pentru viitoarele tipuri.
+
+**Producție (`propmanage.ro`)**: fix-ul e în preview. Redeploy required pentru live.
+
+---
+
+
 ## 🧠 KC-V2-QUERY-ASSISTANT — Enterprise Query Assistant · LIVRAT & TESTAT 24/24 PASS (6 Feb 2026)
 
 **Directivă Fondator**: „Transform Knowledge Center Search dintr-un text input într-un Enterprise Query Assistant. Nu presupune că Founder-ul știe sintaxa. 100% frontend, zero backend."
