@@ -1,6 +1,6 @@
 // Enterprise Knowledge Center — IDE mode (EO-002 R5): stânga categorii · centru documente ·
 // dreapta inspector; jos timeline. Lifecycle (R2/R3), Health Score (R4), Review Mode (R7).
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import axios from "axios";
 import ReactMarkdown from "react-markdown";
@@ -11,6 +11,14 @@ import { RegistryGraph, STATUS_STYLE, TYPE_META } from "../../components/founder
 
 const API = process.env.REACT_APP_BACKEND_URL;
 const ax = axios.create({ baseURL: API, withCredentials: true });
+
+// Enterprise Query Assistant — operator config (client-side only, zero backend contract touched)
+const QUERY_OPERATORS = ["artifact", "status", "category"];
+const STATUS_VALUES = ["Active", "Review", "Draft", "Archived"]; // spec: exact 4 statuses shown as suggestions
+
+// Regex helpers: quoted values captured with surrounding quotes; unquoted are non-space runs.
+// Position-agnostic (start/middle/end), whitespace-tolerant, case-insensitive.
+const TOKEN_REGEX = (op) => new RegExp(`(?:^|\\s)${op}:("[^"]+"|\\S+)(?=\\s|$)`, "i");
 
 const LIFECYCLE_STYLE = {
   Active: "bg-emerald-500/10 border-emerald-500/30 text-emerald-300",
@@ -229,6 +237,12 @@ export default function KnowledgeCenter() {
   // Artifact Type layer (UI extension of existing infrastructure)
   const [artifactFilter, setArtifactFilter] = useState(null); // null = All | "DOCUMENT" | "REGISTRY" ...
   const [artifactContract, setArtifactContract] = useState(null); // { types, contract, default, note }
+  // Enterprise Query Assistant — autocomplete state (frontend only, uses already-loaded data)
+  const [sugOpen, setSugOpen] = useState(false);
+  const [sugIndex, setSugIndex] = useState(0);
+  const [caret, setCaret] = useState(0);
+  const inputRef = useRef(null);
+  const searchWrapRef = useRef(null);
 
   const load = useCallback(() => {
     ax.get(`/api/founder/knowledge/tree`)
@@ -249,47 +263,187 @@ export default function KnowledgeCenter() {
 
   const openDoc = (p) => { setOpenPath(p); setTab("docs"); };
 
-  // Search parser — supports `artifact:REGISTRY` (and any of the 6 types) alongside free text.
-  // Case-insensitive, position-agnostic (start/middle/end), tolerates multiple spaces.
-  // Client-side extension of the existing backend search: never mutates the API request.
-  const parseArtifactToken = (raw) => {
-    const m = raw.match(/(?:^|\s)artifact:(DOCUMENT|REGISTRY|GRAPH|LEDGER|INDEX|CATALOG)(?=\s|$)/i);
-    if (!m) return { type: null, rest: raw };
-    return { type: m[1].toUpperCase(), rest: raw.replace(m[0], " ").replace(/\s+/g, " ").trim() };
+  // Search parser — supports `artifact:<TYPE>`, `status:<STATUS>`, `category:<NAME>`
+  // Case-insensitive, position-agnostic, tolerates multiple spaces, quoted multi-word values.
+  // Backend contract untouched: only free text is sent to /api/founder/knowledge/search.
+  const parseTokens = (raw) => {
+    const tokens = { artifact: null, status: null, category: null };
+    let rest = raw;
+    for (const op of QUERY_OPERATORS) {
+      const m = rest.match(TOKEN_REGEX(op));
+      if (m) {
+        // Strip surrounding quotes if present
+        tokens[op] = m[1].replace(/^"|"$/g, "");
+        rest = rest.replace(m[0], " ").replace(/\s+/g, " ").trim();
+      }
+    }
+    return { tokens, rest };
   };
+  // Normalizers so values compare correctly against tree data:
+  //  - artifact_type is UPPERCASE in the backend enum
+  //  - lifecycle status is Capitalized ("Active", not "ACTIVE") — we normalize case-insensitive
+  //  - category is arbitrary string, matched case-insensitive
+  const normalizeArtifact = (v) => (v || "").toUpperCase();
+  const matchesStatus = (docStatus, tokenValue) => (docStatus || "").toLowerCase() === (tokenValue || "").toLowerCase();
+  const matchesCategory = (docCategory, tokenValue) => (docCategory || "").toLowerCase() === (tokenValue || "").toLowerCase();
+
+  const applyClientFilters = (docs, tokens) => {
+    return docs.filter(d => {
+      if (tokens.artifact && (d.artifact_type || "DOCUMENT") !== normalizeArtifact(tokens.artifact)) return false;
+      if (tokens.status && !matchesStatus(d.status, tokens.status)) return false;
+      if (tokens.category && !matchesCategory(d.category, tokens.category)) return false;
+      return true;
+    });
+  };
+
+  const anyToken = (tokens) => !!(tokens.artifact || tokens.status || tokens.category);
 
   const doSearch = async (e) => {
     e?.preventDefault();
+    setSugOpen(false);
     const raw = q.trim();
     if (raw.length < 2) return;
     setSearching(true);
-    const { type: artifactType, rest } = parseArtifactToken(raw);
+    const { tokens, rest } = parseTokens(raw);
     try {
-      // If ONLY `artifact:XXX` was typed, list matching docs from the loaded tree (no backend call needed).
-      if (artifactType && !rest) {
+      // If ONLY operator tokens (no free text), list matching docs locally from the loaded tree.
+      if (anyToken(tokens) && !rest) {
         const allDocs = (tree?.categories || []).flatMap(c => c.docs);
-        const filtered = allDocs.filter(d => (d.artifact_type || "DOCUMENT") === artifactType);
+        const filtered = applyClientFilters(allDocs, tokens);
         setResults({
           query: raw,
           total: filtered.length,
           documents: filtered.map(d => ({ ...d, occurrences: 0, snippet: "" })),
           registry_nodes: [],
-          _artifact_scope: artifactType,
+          _tokens: tokens,
         });
         return;
       }
-      // Otherwise hit the existing backend search endpoint. If artifact token present,
-      // filter the results client-side (backend contract untouched).
+      // Otherwise hit the existing backend search endpoint with free text only, then filter client-side by tokens.
       const r = await ax.get(`/api/founder/knowledge/search`, { params: { q: rest || raw } });
-      if (artifactType) {
-        const filteredDocs = (r.data.documents || []).filter(d => (d.artifact_type || "DOCUMENT") === artifactType);
-        setResults({ ...r.data, documents: filteredDocs, total: filteredDocs.length, _artifact_scope: artifactType });
-      } else {
-        setResults(r.data);
-      }
+      const filteredDocs = anyToken(tokens) ? applyClientFilters(r.data.documents || [], tokens) : (r.data.documents || []);
+      setResults({
+        ...r.data,
+        documents: filteredDocs,
+        total: filteredDocs.length,
+        _tokens: anyToken(tokens) ? tokens : null,
+      });
     }
     catch { /* noop */ } finally { setSearching(false); }
   };
+
+  // ————————————————————————————————————————————————
+  // Enterprise Query Assistant — autocomplete engine
+  // Uses only already-loaded state: tree.artifact_type_counts, tree.status_counts, tree.categories,
+  // artifactContract.contract. Zero extra HTTP requests. Instant.
+  // ————————————————————————————————————————————————
+  const suggestions = useMemo(() => {
+    if (!tree) return [];
+    const cp = Math.min(caret, q.length);
+    const before = q.slice(0, cp);
+    const tokenMatch = before.match(/(\S+)$/);
+    const currentToken = tokenMatch ? tokenMatch[1] : "";
+    const lower = currentToken.toLowerCase();
+    if (!lower) return [];
+
+    const artifactTypesLocal = artifactContract?.types || ["DOCUMENT", "REGISTRY", "GRAPH", "LEDGER", "INDEX", "CATALOG"];
+    const artifactCounts = tree.artifact_type_counts || {};
+    const statusCounts = tree.status_counts || {};
+    const categories = tree.categories || [];
+    const items = [];
+
+    if (lower.includes(":")) {
+      const [op, valRaw] = lower.split(":");
+      const val = valRaw || "";
+      if (op === "artifact") {
+        artifactTypesLocal.filter(a => a.toLowerCase().startsWith(val)).forEach(a => items.push({
+          key: `artifact:${a}`, label: `artifact:${a}`, insert: `artifact:${a}`,
+          group: "Artifact Type", meta: `${artifactCounts[a] ?? 0}`, hint: artifactContract?.contract?.[a] || "",
+        }));
+      } else if (op === "status") {
+        STATUS_VALUES.filter(s => s.toLowerCase().startsWith(val)).forEach(s => items.push({
+          key: `status:${s}`, label: `status:${s.toUpperCase()}`, insert: `status:${s.toUpperCase()}`,
+          group: "Status", meta: `${statusCounts[s] ?? 0}`,
+        }));
+      } else if (op === "category") {
+        categories.filter(c => c.name.toLowerCase().includes(val)).slice(0, 20).forEach(c => items.push({
+          key: `category:${c.name}`, label: `category:${c.name}`,
+          insert: c.name.includes(" ") ? `category:"${c.name}"` : `category:${c.name}`,
+          group: "Category", meta: `${c.count}`,
+        }));
+      }
+      return items;
+    }
+
+    // No colon yet — suggest operator prefixes matching the partial word
+    QUERY_OPERATORS.forEach(op => {
+      if (!op.startsWith(lower)) return;
+      if (op === "artifact") {
+        artifactTypesLocal.forEach(a => items.push({
+          key: `artifact:${a}`, label: `artifact:${a}`, insert: `artifact:${a}`,
+          group: "Artifact Type", meta: `${artifactCounts[a] ?? 0}`, hint: artifactContract?.contract?.[a] || "",
+        }));
+      } else if (op === "status") {
+        STATUS_VALUES.forEach(s => items.push({
+          key: `status:${s}`, label: `status:${s.toUpperCase()}`, insert: `status:${s.toUpperCase()}`,
+          group: "Status", meta: `${statusCounts[s] ?? 0}`,
+        }));
+      } else if (op === "category") {
+        categories.slice(0, 20).forEach(c => items.push({
+          key: `category:${c.name}`, label: `category:${c.name}`,
+          insert: c.name.includes(" ") ? `category:"${c.name}"` : `category:${c.name}`,
+          group: "Category", meta: `${c.count}`,
+        }));
+      }
+    });
+    return items;
+  }, [q, caret, tree, artifactContract]);
+
+  // Reset highlight when suggestions change (avoid stale indices)
+  useEffect(() => { setSugIndex(0); }, [suggestions.length]);
+
+  const acceptSuggestion = useCallback((sug) => {
+    if (!sug) return;
+    const cp = Math.min(caret, q.length);
+    const before = q.slice(0, cp);
+    const after = q.slice(cp);
+    const tokenMatch = before.match(/(\S+)$/);
+    const start = tokenMatch ? cp - tokenMatch[1].length : cp;
+    const newQ = q.slice(0, start) + sug.insert + " " + after.replace(/^\s*/, "");
+    const newCaret = start + sug.insert.length + 1;
+    setQ(newQ);
+    setSugOpen(false);
+    setSugIndex(0);
+    requestAnimationFrame(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.setSelectionRange(newCaret, newCaret);
+        setCaret(newCaret);
+      }
+    });
+  }, [q, caret]);
+
+  // Click outside closes the dropdown
+  useEffect(() => {
+    if (!sugOpen) return;
+    const handler = (e) => {
+      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target)) setSugOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [sugOpen]);
+
+  // Fill-in-example helper for the empty-state and help panel
+  const setExampleQuery = (example) => {
+    setQ(example);
+    setSugOpen(false);
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(example.length, example.length);
+      setCaret(example.length);
+    });
+  };
+
 
   if (denied) return (
     <div className="min-h-screen bg-[#0a0a0b] flex flex-col items-center justify-center text-stone-400 gap-3" data-testid="kc-denied">
@@ -329,45 +483,155 @@ export default function KnowledgeCenter() {
           <button onClick={load} className="pm-btn pm-btn-secondary" data-testid="kc-refresh"><RefreshCcw className="w-3.5 h-3.5" /> Refresh</button>
         </div>
 
-        <form onSubmit={doSearch} className="flex gap-2 mb-5">
-          <div className="flex-1 relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Caută în toată guvernanța + registry... (ex: artifact:REGISTRY)"
-              className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-3 py-2.5 text-sm outline-none focus:border-[#d4ff3a]/50" data-testid="kc-search-input" />
+        <form onSubmit={doSearch} className="mb-3" data-testid="kc-search-form">
+          <div className="flex gap-2" ref={searchWrapRef}>
+            <div className="flex-1 relative">
+              <Search className="w-4 h-4 absolute left-3 top-3.5 text-stone-500 pointer-events-none" />
+              <input
+                ref={inputRef}
+                value={q}
+                onChange={(e) => { setQ(e.target.value); setCaret(e.target.selectionStart || 0); setSugOpen(true); }}
+                onFocus={() => setSugOpen(true)}
+                onClick={(e) => setCaret(e.target.selectionStart || 0)}
+                onKeyUp={(e) => setCaret(e.target.selectionStart || 0)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") { e.preventDefault(); setSugOpen(false); return; }
+                  if (sugOpen && suggestions.length) {
+                    if (e.key === "ArrowDown") { e.preventDefault(); setSugIndex(i => (i + 1) % suggestions.length); return; }
+                    if (e.key === "ArrowUp") { e.preventDefault(); setSugIndex(i => (i - 1 + suggestions.length) % suggestions.length); return; }
+                    if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); acceptSuggestion(suggestions[sugIndex]); return; }
+                  }
+                  // Enter without open dropdown → form submit continues naturally
+                }}
+                placeholder="Search documents..."
+                className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-3 py-2.5 text-sm outline-none focus:border-[#d4ff3a]/50"
+                data-testid="kc-search-input"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {sugOpen && suggestions.length > 0 && (
+                <div
+                  className="absolute z-30 left-0 right-0 mt-1.5 bg-[#0e0e10] border border-white/15 rounded-xl shadow-2xl max-h-[320px] overflow-y-auto"
+                  data-testid="kc-search-suggestions"
+                  role="listbox"
+                >
+                  {(() => {
+                    const groups = [];
+                    const seen = new Set();
+                    suggestions.forEach((s, i) => {
+                      if (!seen.has(s.group)) { seen.add(s.group); groups.push({ name: s.group, items: [] }); }
+                      groups[groups.length - 1].items.push({ ...s, _idx: i });
+                    });
+                    return groups.map(g => (
+                      <div key={g.name}>
+                        <div className="px-3 pt-2 pb-1 text-[9px] uppercase tracking-widest text-stone-500" data-testid={`kc-sug-group-${g.name.replace(/\s/g, "-")}`}>{g.name}</div>
+                        {g.items.map(s => (
+                          <button
+                            key={s.key}
+                            type="button"
+                            onMouseEnter={() => setSugIndex(s._idx)}
+                            onMouseDown={(e) => { e.preventDefault(); acceptSuggestion(s); }}
+                            className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between gap-3 border-l-2 transition ${sugIndex === s._idx ? "bg-[#d4ff3a]/10 border-[#d4ff3a]" : "border-transparent hover:bg-white/[0.03]"}`}
+                            data-testid={`kc-sug-${s.key.replace(/[:"\s]/g, "-")}`}
+                            role="option"
+                            aria-selected={sugIndex === s._idx}
+                          >
+                            <span className="flex items-center gap-2 min-w-0">
+                              <span className={`font-mono ${sugIndex === s._idx ? "text-white" : "text-stone-300"}`}>{s.label}</span>
+                              {s.hint && <span className="text-[10px] text-stone-500 truncate hidden md:inline">— {s.hint}</span>}
+                            </span>
+                            <span className="text-[10px] text-stone-500 font-mono shrink-0">{s.meta}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ));
+                  })()}
+                  <div className="border-t border-white/10 px-3 py-1.5 text-[9px] text-stone-500 flex flex-wrap gap-x-3 gap-y-0.5">
+                    <span>↑ ↓ navigate</span><span>Enter accept</span><span>Esc close</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <button type="submit" className="pm-btn pm-btn-success" disabled={searching} data-testid="kc-search-btn">
+              {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : "Caută"}
+            </button>
+            {(results || q) && <button type="button" onClick={() => { setResults(null); setQ(""); setSugOpen(false); }} className="pm-btn pm-btn-secondary" data-testid="kc-search-clear"><X className="w-3.5 h-3.5" /></button>}
           </div>
-          <button type="submit" className="pm-btn pm-btn-success" disabled={searching} data-testid="kc-search-btn">
-            {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : "Caută"}
-          </button>
-          {results && <button type="button" onClick={() => { setResults(null); setQ(""); }} className="pm-btn pm-btn-secondary" data-testid="kc-search-clear"><X className="w-3.5 h-3.5" /></button>}
+          <div className="text-[10px] text-stone-500 mt-1.5 flex flex-wrap gap-x-2 gap-y-1 items-center" data-testid="kc-search-help">
+            <span className="text-stone-600">Examples:</span>
+            {["artifact:DOCUMENT audit", "status:ACTIVE", "category:Architecture"].map(ex => (
+              <button
+                key={ex} type="button"
+                onClick={() => setExampleQuery(ex)}
+                className="font-mono text-[10px] px-1.5 py-0.5 rounded border border-white/10 bg-white/[0.02] hover:border-[#d4ff3a]/40 hover:text-white transition"
+                data-testid={`kc-search-example-${ex.split(" ")[0].replace(/[:\s]/g, "-")}`}
+              >{ex}</button>
+            ))}
+          </div>
         </form>
 
         {results && (
           <div className="bg-[#0e0e10] border border-white/10 rounded-2xl p-5 mb-5" data-testid="kc-search-results">
             <div className="text-xs text-stone-400 mb-3 flex items-center gap-2 flex-wrap">
-              {results._artifact_scope && (
+              {results._tokens?.artifact && (
                 <span className="inline-flex items-center gap-1.5 text-[10px] text-stone-300 border border-[#d4ff3a]/30 bg-[#d4ff3a]/5 rounded-full px-2 py-0.5" data-testid="kc-search-scope-chip">
                   <span className="opacity-70">artifact:</span>
-                  <ArtifactBadge type={results._artifact_scope} contract={artifactContract?.contract} />
+                  <ArtifactBadge type={results._tokens.artifact} contract={artifactContract?.contract} />
+                </span>
+              )}
+              {results._tokens?.status && (
+                <span className="inline-flex items-center gap-1.5 text-[10px] text-stone-300 border border-[#d4ff3a]/30 bg-[#d4ff3a]/5 rounded-full px-2 py-0.5" data-testid="kc-search-scope-chip-status">
+                  <span className="opacity-70">status:</span>
+                  <StatusBadge s={STATUS_VALUES.find(s => s.toLowerCase() === results._tokens.status.toLowerCase()) || results._tokens.status} />
+                </span>
+              )}
+              {results._tokens?.category && (
+                <span className="inline-flex items-center gap-1.5 text-[10px] text-stone-300 border border-[#d4ff3a]/30 bg-[#d4ff3a]/5 rounded-full px-2 py-0.5" data-testid="kc-search-scope-chip-category">
+                  <span className="opacity-70">category:</span>
+                  <span className="font-mono text-[10px] text-white">{results._tokens.category}</span>
                 </span>
               )}
               <span data-testid="kc-search-total">
                 {(() => {
-                  const scope = results._artifact_scope;
-                  const q = results.query || "";
-                  // Strip `artifact:X` from displayed query so the chip shows scope, text shows only free text
-                  const displayQ = scope
-                    ? q.replace(new RegExp(`(?:^|\\s)artifact:${scope}(?=\\s|$)`, "i"), "").replace(/\s+/g, " ").trim()
-                    : q;
+                  const t = results._tokens || {};
+                  let displayQ = results.query || "";
+                  // Strip all operator tokens from displayed query
+                  QUERY_OPERATORS.forEach(op => {
+                    if (t[op]) {
+                      displayQ = displayQ.replace(TOKEN_REGEX(op), " ");
+                    }
+                  });
+                  displayQ = displayQ.replace(/\s+/g, " ").trim();
                   return displayQ
                     ? <>{results.total} rezultate pentru „{displayQ}"</>
                     : <>{results.total} rezultate</>;
                 })()}
               </span>
             </div>
-            {results.total === 0 && results._artifact_scope ? (
+            {results.total === 0 && results._tokens ? (
               <div className="text-center py-8 px-4 border border-dashed border-white/10 rounded-xl" data-testid="kc-search-empty-scoped">
-                <div className="text-stone-300 text-xs">No {ARTIFACT_TYPE_SINGULAR[results._artifact_scope] || results._artifact_scope} artifacts available yet.</div>
+                <div className="text-stone-300 text-xs">
+                  {results._tokens.artifact
+                    ? <>No {ARTIFACT_TYPE_SINGULAR[normalizeArtifact(results._tokens.artifact)] || results._tokens.artifact} artifacts found.</>
+                    : <>No matching artifacts found.</>}
+                </div>
                 <div className="text-stone-500 text-[11px] mt-1">Infrastructure ready.</div>
+                {/* Nearest suggestions: pick top 3 non-zero artifact types */}
+                <div className="mt-3 flex flex-wrap gap-1.5 justify-center" data-testid="kc-search-suggested-queries">
+                  {(() => {
+                    const ac = tree.artifact_type_counts || {};
+                    const nonZero = Object.entries(ac).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
+                    if (!nonZero.length) return <span className="text-stone-600 text-[10px]">No populated artifact types yet.</span>;
+                    return nonZero.map(([type, count]) => (
+                      <button
+                        key={type} type="button"
+                        onClick={() => setExampleQuery(`artifact:${type}`)}
+                        className="text-[10px] px-2 py-0.5 rounded-full border border-white/15 hover:border-[#d4ff3a]/50 hover:text-white text-stone-400 transition font-mono"
+                        data-testid={`kc-suggest-${type}`}
+                      >Try artifact:{type} ({count})</button>
+                    ));
+                  })()}
+                </div>
               </div>
             ) : (
               <div className="space-y-1.5 max-h-[36vh] overflow-y-auto">
