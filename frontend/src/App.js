@@ -40,6 +40,7 @@ import { BookDemoModal } from "./pages/BookDemoModal";
 import { LandingDemo3D } from "./components/LandingDemo3D";
 const PublicDemoPage = lazy(() => import("./pages/PublicDemoPage").then(m => ({ default: m.PublicDemoPage })));
 const AdminAuthHealthPage = lazy(() => import("./pages/admin/AdminAuthHealthPage").then(m => ({ default: m.AdminAuthHealthPage })));
+const ResearchCoveragePage = lazy(() => import("./pages/admin/ResearchCoveragePage"));
 const AdminSupportInboxPage = lazy(() => import("./pages/admin/AdminSupportInboxPage").then(m => ({ default: m.AdminSupportInboxPage })));
 import { PrivacyPage, TermsPage, CookiePolicyPage } from "./pages/LegalPages";
 const TrustCenterPage = lazy(() => import("./pages/TrustCenterPage").then(m => ({ default: m.TrustCenterPage })));
@@ -1727,6 +1728,7 @@ function App() {
               <Route path="/specialist" element={<SpecialistDashboard />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/auth-health" element={<AdminAuthHealthPage />} />
+              <Route path="/admin/research-coverage" element={<ResearchCoveragePage />} />
               <Route path="/admin/support-inbox" element={<AdminSupportInboxPage />} />
               <Route path="/operator" element={<OperatorDashboard />} />
               <Route path="/projects/:id" element={<ProjectWorkspace />} />

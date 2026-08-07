@@ -1,3 +1,47 @@
+## 🧭 FRI-COV-001 — Research Coverage Matrix · Instrument Intern Founder · LIVRAT (7 Feb 2026)
+
+**Directivă**: modul intern Founder Research Intelligence · zero features utilizator · zero backend changes · reutilizează infrastructura existentă.
+
+**Reuse Audit: PASS · Duplicate Detected: NONE**
+
+| Componentă | Reuse |
+|---|---|
+| Backend `/api/founder/knowledge/tree` + `/doc` | ✅ Reuse (zero endpoint nou) |
+| FounderGate access control | ✅ Reuse (același guard 403 dacă nu Fondator) |
+| INTERVIEW_REGISTRY.md + PATTERN_REGISTRY.md | ✅ **Sursa unică de date** (parse client-side) |
+| Design language (stone/lime/pill) | ✅ Reuse din KnowledgeCenter |
+| `parseRegistryMeta` model | ✅ Extins ca `parseMarkdownTable` reutilizabil |
+
+**Creat** (1 fișier + 1 route):
+- `/app/frontend/src/pages/admin/ResearchCoveragePage.jsx` (~330 linii)
+- `/app/frontend/src/App.js` — 2 linii (lazy import + route `/admin/research-coverage`)
+
+**Ce afișează**:
+- **Section 1 — Coverage Matrix**: 5 dimensiuni × buckets (an construcție, apartamente, tip participant, experiență, localizare) cu count live per bucket
+- **Section 2 — Coverage Gaps**: bucket-urile neacoperite listate automat cu semnale vizuale (▲/●)
+- **Section 3 — Next Best Interview**: bucket-urile cu min. coverage pe fiecare dimensiune + rationale bias-reduction
+- **Section 4 — Coverage Score**: 5 scoruri % (persoane, tip bloc, vechime, apartamente, localizare) cu bar-uri color-coded
+- **Section 5 — Bias Analysis**: sub/supra-reprezentări + risc bias detectate automat
+- **Section 6 — Research Progress**: pipeline vizual Interview → Observation → Emerging → Validated → Report + estimare optimistă (câte interviuri mai sunt)
+
+**Live values verificate (state actual)**:
+- 2/15 Validated Interviews · 13 patterns tracked
+- Coverage scores: persoane=25% · tipBloc=67% · vechime=67% · apartamente=67% · localizare=**0%**
+- Next Best Interview: **Administrator** · bloc **1980-2000** · **>50** apts · exp **2-10 ani** · localitate declarată explicit
+- Gap CRITIC identificat: 100% interviuri fără localitate declarată
+
+**Impact**:
+- Backend: **0 changes**
+- Frontend: 1 file created + 2 linii App.js
+- API contract: **0 changes** (foloseşte doar `/tree` + `/doc` existente)
+- Metodologie: **0 changes** — pipeline Interview → Observation → Emerging → Validated Pattern Candidate → Research Report → Product Blueprint → Roadmap → Build **CONFIRMAT INTACT**
+- Product Blueprint / Marketplace / Association / Twin / Personas / Roadmap: **NEATINSE**
+
+**Access**: `https://phased-document.preview.emergentagent.com/admin/research-coverage` (Founder-only). Producție: necesită redeploy.
+
+---
+
+
 ## 🔬 RES-AP-002 — Al 2-lea Interviu Validated (Ilie · Mehedinți) · LIVRAT (6 Feb 2026)
 
 **Reuse Audit: PASS** · **Duplicate Detected: NONE**
