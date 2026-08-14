@@ -5,7 +5,7 @@ import { Link, useLocation } from "react-router-dom";
 import axios from "axios";
 import ReactMarkdown from "react-markdown";
 import {
-  BookOpenCheck, Loader2, Search, Network, FileText, ShieldAlert, X, RefreshCcw, ClipboardCheck, Clock,
+  BookOpenCheck, Loader2, Search, Network, FileText, ShieldAlert, X, RefreshCcw, ClipboardCheck, Clock, Compass,
 } from "lucide-react";
 import { RegistryGraph, STATUS_STYLE, TYPE_META } from "../../components/founder/RegistryGraph";
 
@@ -542,7 +542,17 @@ export default function KnowledgeCenter() {
               ))}
             </p>
           </div>
-          <button onClick={load} className="pm-btn pm-btn-secondary" data-testid="kc-refresh"><RefreshCcw className="w-3.5 h-3.5" /> Refresh</button>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/admin/research-coverage"
+              className="pm-btn pm-btn-secondary"
+              data-testid="kc-nav-research-coverage"
+              title="Deschide Research Coverage Matrix — instrument intern Founder"
+            >
+              <Compass className="w-3.5 h-3.5" /> Research Coverage
+            </Link>
+            <button onClick={load} className="pm-btn pm-btn-secondary" data-testid="kc-refresh"><RefreshCcw className="w-3.5 h-3.5" /> Refresh</button>
+          </div>
         </div>
 
         <form onSubmit={doSearch} className="mb-3" data-testid="kc-search-form">
