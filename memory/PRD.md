@@ -1,3 +1,32 @@
+## 🔬 RES-RECONCILE-v1.0 — Research Reconciliation AP-001 → AP-010 · LIVRAT (06 Feb 2026)
+
+**Sprint tip**: Research Reconciliation exclusiv (evidence-only, zero fabricație). Fără AP-011+, fără cod, fără produs.
+
+**Livrabil unic**: `/app/memory/audits/RESEARCH_RECONCILIATION_AP001_AP010_v1.0.md` (14 secțiuni A-N).
+
+**Rezultate cheie evidence-based**:
+- **Evidence coverage**: 2/10 interviuri complete (AP-002, AP-003) · 3/10 exclusiv Competitor (AP-006, AP-007, AP-009) · 5/10 profile-only pure
+- **Pattern reconciliation**: **0 patterns promovate**. 9 la Observation, 4 la Emerging (P-002/P-003/P-004/P-005), 0 la Validated Pattern Candidate. Adăugarea AP-001, AP-004..AP-010 NU a schimbat niciun număr de confirmări (profile-only, zero evidence pe patterns).
+- **Contradicții reale**: **0**. Identificate 4 nuanțe care indică segmentare potențială (comunicare cu vârsta, platformă cu size, docs cu an, tipuri investiții cu an) — nu contradicții.
+- **AP-006 competitive evidence**: 5 câmpuri EVIDENCE (foloseste eBloc + structural), 10 câmpuri UNKNOWN. Zero Product Requirement derivabil. Follow-up structurat obligatoriu.
+- **WTP status**: **DECLARED 0/10 · DEMONSTRATED 0/10 · UNKNOWN 10/10**. Blocant absolut pentru business case.
+
+**Research gaps identificate** (17 gaps totale G1-G17): 8/10 profile-only, localizare 9/10 UNKNOWN, vechime 4/10 UNKNOWN, interval 1980-2000 = 0 clădiri, bucket 51-100 apts = 0, feature-set eBloc/Bloc Sistem = UNKNOWN, WTP evidence = 0.
+
+**Next interview priorities** (evidence-first, nu features):
+1. AP-006 follow-up (Răzvan · eBloc) — cel mai valoros competitive + WTP evidence
+2. AP-004 follow-up (Mihăilă, 10+ ani exp) — candidat natural pentru P-002/P-011/P-014 → Emerging/Validated
+3. AP-009 follow-up (Sandu Pop · eBloc + bloc vechi + large) — multi-segment competitor
+4. AP-005 follow-up (Bradea · post-2000 large + 7+ ani exp) — P-001 potential second conf
+5. AP-007, AP-010, AP-001, AP-008 (cohort completion)
+
+Toate viitoarele interviuri **obligatoriu** conțin 3 întrebări WTP structurate + secțiuni Competitor + Furnizori.
+
+**Confirmări contractuale**: NEW INTERVIEWS: 0 · NEW FEATURES: 0 · BLUEPRINT / ROADMAP / BACKEND / FRONTEND / DATABASE / API CHANGE: NO · TYPOLOGY PILOT: NOT STARTED · METHODOLOGY CHANGE: NO · Building Typology Foundation Audit v1.0: UNCHANGED · PATTERN_REGISTRY / INTERVIEW_REGISTRY: UNCHANGED.
+
+---
+
+
 ## 🧭 RES-FOUNDATION-v1.0 — Building Typology Foundation Audit · LIVRAT (06 Feb 2026)
 
 **Reuse Audit: PASS · Duplicate Detected: NONE**
