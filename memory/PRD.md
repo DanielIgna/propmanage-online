@@ -1,3 +1,35 @@
+## 🧭 RES-FOUNDATION-v1.0 — Building Typology Foundation Audit · LIVRAT (06 Feb 2026)
+
+**Reuse Audit: PASS · Duplicate Detected: NONE**
+- Termenii `typology`, `tipologie`, `HartaBlocuri`, `reference plan/apartment/3D`, `typology match/family/variant` NU există anterior în `/app/memory`, `/app/docs`, `/app/backend`, `/app/frontend`.
+- Reutilizat conceptual: `buildings` collection (community_buildings.py, building_admin.py), PROPERTY_DNA v2 provenance-first model, Digital Twin Maturity L0-L5, Property Knowledge Graph, Reference Libraries actuariale (GI5P §7), INTERVIEW_REGISTRY (AP-001..AP-010).
+- Zero sistem paralel. Zero registry paralel.
+
+**Livrabil unic**:
+- `/app/memory/audits/BUILDING_TYPOLOGY_FOUNDATION_AUDIT_v1.0.md` — audit conceptual research-only cu 23 secțiuni (Reuse Audit, Canonical Vocabulary, Source Separation Model cu Official Documentation + Source Conflict Model, Typology Data Model conceptual, HartaBlocuri = strict Reference Data Source cu availability=UNKNOWN, Typology Match concept, Research Integration Model, Candidate Risk Profile, Pilot Proposal 5-10 clădiri din cohortă, Decision Gate = A NOT READY, confirmări contractuale NO CHANGE).
+
+**Vocabular canonic introdus (fără implementare)**:
+- BUILDING · APARTMENT INSTANCE · TYPOLOGY · TYPOLOGY FAMILY · TYPOLOGY VARIANT · REFERENCE PLAN · REFERENCE APARTMENT · REFERENCE 3D · REFERENCE DATA · OFFICIAL/ADMINISTRATIVE DOCUMENTATION · REPORTED · OBSERVED · VERIFIED · CURRENT PROPERTY STATE · DIGITAL TWIN · EVIDENCE · VERIFICATION.
+- Reguli invariante: `TYPOLOGY ≠ BUILDING INSTANCE`, `Source Provenance ≠ Verification Status`, `Reference ≠ Verified`, `Official ≠ Verified automat`, `Digital Twin ≠ Reference Data`.
+
+**Decision Gate**: **A. NOT READY** for build. Ready doar pentru Methodology + Pilot Proposal, doar la autorizare explicită Fondator + Board Directive.
+
+**Impact**:
+- Backend: **NO CHANGE**
+- Frontend: **NO CHANGE**
+- Database: **NO CHANGE**
+- API: **NO CHANGE**
+- Digital Twin: **NO CHANGE**
+- Blueprint: **NO CHANGE**
+- Roadmap: **NO CHANGE**
+- Marketplace / Association / Owner / President Journey: **NO CHANGE**
+- Methodology: **NO CHANGE** (pipeline Interview → Observation → Emerging → Validated → Report rămâne intact)
+
+**Recommended Next Research Step**: continuă cohorta AP-011 → AP-020. Nu se demarează pilot Typology până la ≥3 Validated Pattern Candidates specifice tipologiilor.
+
+---
+
+
 ## 📚 RES-COHORT-v1.0 — Master Cohort Consolidation AP-001 → AP-010 · LIVRAT (14 Aug 2026)
 
 **Reuse Audit: PASS · Duplicate Detected: NO**
