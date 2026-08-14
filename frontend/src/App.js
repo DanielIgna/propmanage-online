@@ -131,6 +131,7 @@ const FeatureConfiguratorPage = lazy(() => import("./pages/admin/FeatureConfigur
 const SpecialistProgressionPage = lazy(() => import("./pages/admin/SpecialistProgressionPage"));
 const BIMoePage = lazy(() => import("./pages/admin/BIMoePage"));
 const AnalyticsGrowthPage = lazy(() => import("./pages/admin/AnalyticsGrowthPage"));
+const FunctionMap = lazy(() => import("./pages/admin/FunctionMap"));
 const GrowthIntelligencePage = lazy(() => import("./pages/admin/GrowthIntelligencePage"));
 const LeadIntelligencePage = lazy(() => import("./pages/admin/LeadIntelligencePage"));
 const MarketingIntelligencePage = lazy(() => import("./pages/admin/MarketingIntelligencePage"));
@@ -1692,6 +1693,7 @@ function App() {
               <Route path="/admin/specialist-progression" element={<SpecialistProgressionPage />} />
               <Route path="/admin/bi-moe" element={<BIMoePage />} />
               <Route path="/admin/analytics-growth" element={<AnalyticsGrowthPage />} />
+              <Route path="/admin/function-map" element={<FunctionMap />} />
               <Route path="/admin/growth-intel" element={<GrowthIntelligencePage />} />
               <Route path="/admin/lead-intel" element={<LeadIntelligencePage />} />
               <Route path="/admin/marketing-intel" element={<MarketingIntelligencePage />} />

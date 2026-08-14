@@ -493,3 +493,131 @@ async def architecture_blocks(user=Depends(require_role("admin"))):
         return json.loads(ARCH_PATH.read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001
         raise HTTPException(500, "Architecture Registry indisponibil.")
+
+
+
+# ═══════════════════════ MASTER FUNCTION MAP (Founder) ═══════════════════════
+FUNCTION_MAP_PATH = MEMORY_ROOT / "registries" / "FUNCTION_MAP.md"
+
+# Câmpuri parsate per funcție din FUNCTION_MAP.md (bullet-list markdown)
+_FN_FIELDS = {
+    "category", "subcategory", "lifecycle", "description",
+    "frontend", "backend", "api", "db", "engine", "automation",
+    "ai involvement", "human decision", "autonomy", "metric",
+    "enterprise health domain", "kpi", "verification",
+    "test", "production verified", "health", "risk", "owner",
+    "knowledge center", "next action",
+}
+
+
+def _parse_function_map() -> dict:
+    """Parsează FUNCTION_MAP.md → structură: {functions: [...], summary: {...}, matrix: [...]}.
+
+    Format sursă: fiecare funcție este introdusă cu heading `### FN-XXX · Name`.
+    Câmpurile sunt bullet-uri `- **Field**: value`. Matricea este un tabel markdown.
+    """
+    if not FUNCTION_MAP_PATH.exists():
+        return {"functions": [], "matrix": [], "summary": {}, "meta": {}, "error": "FUNCTION_MAP.md not found"}
+    text = FUNCTION_MAP_PATH.read_text(encoding="utf-8", errors="replace")
+
+    # meta din frontmatter simplu (linii `**Key**: value` la top, before first ###)
+    meta_zone = text.split("\n## ", 1)[0]
+    meta = {}
+    for m in re.finditer(r"\*\*([^*]+)\*\*:\s*([^\n]+)", meta_zone):
+        meta[m.group(1).strip().lower()] = m.group(2).strip()
+
+    # parse fiecare funcție
+    functions = []
+    for match in re.finditer(r"### (FN-\d+)\s*·?\s*([^\n]+)\n(.*?)(?=\n### FN-|\n---|\Z)",
+                             text, re.DOTALL):
+        fid, fname, body = match.group(1), match.group(2).strip(), match.group(3)
+        fn = {"id": fid, "name": fname}
+        # bulleted fields
+        for line in body.splitlines():
+            m = re.match(r"\s*-\s*\*\*([^*]+)\*\*:\s*(.*)$", line)
+            if m:
+                key = m.group(1).strip().lower()
+                val = m.group(2).strip()
+                # normalize keys with spaces → snake_case
+                fn[key.replace(" ", "_")] = val
+        functions.append(fn)
+
+    # parse matrix (căutăm blocul MATRIX HIGH-LEVEL)
+    matrix = []
+    matrix_headers = []
+    matrix_block = re.search(r"## MATRIX HIGH-LEVEL(.*?)(?=\n## |\Z)", text, re.DOTALL)
+    if matrix_block:
+        lines = [l for l in matrix_block.group(1).splitlines() if l.strip().startswith("|")]
+        # skip header + separator
+        for i, line in enumerate(lines):
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            if i == 0:
+                matrix_headers = cells
+            elif i == 1:
+                continue  # separator
+            else:
+                if len(cells) == len(matrix_headers):
+                    row = dict(zip(matrix_headers, cells))
+                    # extract function id from first cell (ex: "FN-001 Analytics&Growth" → id="FN-001")
+                    first = cells[0]
+                    m = re.match(r"(FN-\d+)", first)
+                    if m:
+                        row["function_id"] = m.group(1)
+                    matrix.append(row)
+
+    # summary
+    lifecycle_counts: dict[str, int] = {}
+    verification_counts: dict[str, int] = {}
+    health_counts: dict[str, int] = {}
+    risk_counts: dict[str, int] = {}
+    category_counts: dict[str, int] = {}
+    autonomy_counts: dict[str, int] = {}
+
+    def _canon(v: str) -> str:
+        # ia primul token înainte de " (" pentru bucketing canonic
+        return (v.split("(", 1)[0].strip() or "UNKNOWN").upper()
+
+    for fn in functions:
+        for key, bucket in (
+            ("lifecycle", lifecycle_counts), ("verification", verification_counts),
+            ("health", health_counts), ("risk", risk_counts),
+            ("category", category_counts), ("autonomy", autonomy_counts),
+        ):
+            v = _canon(fn.get(key, "UNKNOWN"))
+            bucket[v] = bucket.get(v, 0) + 1
+
+    summary = {
+        "total": len(functions),
+        "lifecycle": lifecycle_counts,
+        "verification": verification_counts,
+        "health": health_counts,
+        "risk": risk_counts,
+        "category": category_counts,
+        "autonomy": autonomy_counts,
+    }
+    return {"meta": meta, "functions": functions, "matrix": matrix,
+            "matrix_headers": matrix_headers, "summary": summary}
+
+
+@router.get("/function-map")
+async def function_map(user=Depends(require_role("admin"))):
+    """Master Function/Capability Map — LIVE view din FUNCTION_MAP.md.
+
+    Read-only. Zero DB. Zero business logic modification. Foloseste ca sursă unicul
+    fișier canonic `/app/memory/registries/FUNCTION_MAP.md` (parseat markdown).
+    Datele UNKNOWN/UNVERIFIED sunt returnate așa cum sunt — zero fabricație.
+    """
+    _require_owner(user)
+    return _parse_function_map()
+
+
+@router.get("/function-map/{fn_id}")
+async def function_map_detail(fn_id: str, user=Depends(require_role("admin"))):
+    """Detaliu individual pentru un Function ID (ex: FN-001)."""
+    _require_owner(user)
+    data = _parse_function_map()
+    fn = next((f for f in data["functions"] if f["id"].upper() == fn_id.upper()), None)
+    if not fn:
+        raise HTTPException(404, f"Function {fn_id} nu există în FUNCTION_MAP.md")
+    matrix_row = next((m for m in data["matrix"] if m.get("function_id") == fn["id"]), None)
+    return {"function": fn, "matrix": matrix_row, "meta": data["meta"]}

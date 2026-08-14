@@ -723,9 +723,10 @@ export default function KnowledgeCenter() {
           </div>
         )}
 
-        <div className="flex gap-2 mb-5">
+        <div className="flex gap-2 mb-5 flex-wrap">
           <button onClick={() => setTab("docs")} className={`pm-btn pm-btn-sm ${tab === "docs" ? "pm-btn-success" : "pm-btn-secondary"}`} data-testid="kc-tab-docs"><FileText className="w-3.5 h-3.5" /> Documente</button>
           <button onClick={() => setTab("map")} className={`pm-btn pm-btn-sm ${tab === "map" ? "pm-btn-success" : "pm-btn-secondary"}`} data-testid="kc-tab-map"><Network className="w-3.5 h-3.5" /> Dependency Map</button>
+          <a href="/admin/function-map" className="pm-btn pm-btn-sm pm-btn-secondary" data-testid="kc-tab-function-map"><Network className="w-3.5 h-3.5" /> Function Map</a>
           <button onClick={() => setTab("review")} className={`pm-btn pm-btn-sm ${tab === "review" ? "pm-btn-success" : "pm-btn-secondary"}`} data-testid="kc-tab-review"><ClipboardCheck className="w-3.5 h-3.5" /> Review</button>
         </div>
 
