@@ -14,7 +14,6 @@ Collection: service_contracts
 import uuid
 import logging
 from datetime import datetime, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field

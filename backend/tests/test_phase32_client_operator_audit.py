@@ -4,7 +4,6 @@ Tests are stateful and rely on demo seed accounts in /app/memory/test_credential
 Cookie auth (httpOnly) — use requests.Session().
 """
 import os
-import time
 import uuid
 import pytest
 import requests

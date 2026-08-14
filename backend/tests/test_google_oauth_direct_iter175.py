@@ -8,10 +8,8 @@ Covers:
 - Regression: email/password login + register
 """
 import os
-import time
 import uuid
 import requests
-import pytest
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://phased-document.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"

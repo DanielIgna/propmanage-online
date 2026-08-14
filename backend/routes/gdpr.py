@@ -563,9 +563,7 @@ async def gdpr_audit(limit: int = Query(100, le=500), user: dict = Depends(requi
 
 def _build_pdf_styles():
     from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.units import cm
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
 
@@ -599,7 +597,7 @@ def _build_pdf_styles():
 async def _build_ropa_pdf() -> io.BytesIO:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import cm
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.lib import colors
 
     styles, BASE, BOLD = _build_pdf_styles()

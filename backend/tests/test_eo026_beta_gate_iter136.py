@@ -1,6 +1,5 @@
 """EO-026 Go-Live/Public Beta Gate — Passport Analytics + Beta Cockpit + VoC + Purge + OG/QR regression."""
 import os
-import time
 import uuid
 import pytest
 import requests

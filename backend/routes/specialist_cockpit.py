@@ -2,7 +2,7 @@
 
 Business Assistant v1 (rule-based): „Cum câștigi mai mult luna asta?"
 """
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 

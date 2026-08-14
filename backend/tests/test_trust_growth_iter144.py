@@ -9,7 +9,6 @@ Covers:
 Run: pytest /app/backend/tests/test_trust_growth_iter144.py -v
 """
 import os
-import time
 import uuid
 
 import pytest

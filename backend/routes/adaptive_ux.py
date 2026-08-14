@@ -14,7 +14,7 @@ Onboarding checklist:
 """
 import logging
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException

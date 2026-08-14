@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 
 from db import db
-from propbenefits import eligibility, membership, ledger, opportunities
+from propbenefits import eligibility, ledger, opportunities
 from propbenefits.health import subscription_health, ecosystem_health
 
 logger = logging.getLogger("propmanage.propbenefits")

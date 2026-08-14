@@ -3,7 +3,6 @@ Tier-specific demo accounts for Admin QA testing.
 Idempotent — only creates accounts that don't exist yet.
 Allows the admin to test progressive disclosure at each tier level.
 """
-import uuid
 import logging
 from datetime import datetime, timezone
 

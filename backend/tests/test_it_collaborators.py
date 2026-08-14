@@ -1,6 +1,5 @@
 """Tests for IT Collaborators Hub endpoints + regression smoke."""
 import os
-import time
 import uuid
 import pytest
 import requests

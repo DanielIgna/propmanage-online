@@ -8,7 +8,6 @@ Covers:
 - POST /api/interior-design/assistant rate limit (10 req / 10 min per IP)
 """
 import os
-import time
 import pytest
 import requests
 

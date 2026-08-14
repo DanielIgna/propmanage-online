@@ -1,6 +1,5 @@
 """Iteration 152 — Customer Journey Guardian backend tests."""
 import os
-import time
 import pytest
 import requests
 

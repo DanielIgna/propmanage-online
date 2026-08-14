@@ -6,7 +6,6 @@ Cash flow = daily paid amounts over the last 30 days.
 """
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any
 
 from fastapi import APIRouter, Depends
 

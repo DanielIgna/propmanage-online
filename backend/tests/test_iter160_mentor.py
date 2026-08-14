@@ -1,6 +1,5 @@
 """Iter 160 — AI Mentor (AIB-004) backend tests (HTTP, sync)."""
 import os
-import uuid
 
 import pytest
 import requests

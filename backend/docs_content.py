@@ -24,7 +24,6 @@ Structure per doc:
     faq: [{q: str, a: str}, ...]
 """
 from __future__ import annotations
-from datetime import datetime, timezone
 
 UPDATED = "2026-06-23"
 

@@ -1,6 +1,5 @@
 """Phase 26: Stripe Checkout topup (DEMO), Tutorial flag, Milestone renegotiation."""
 import os
-import time
 import uuid
 import pytest
 import requests

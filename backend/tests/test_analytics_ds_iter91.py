@@ -9,7 +9,6 @@ Covers:
 
 Auth is cookie-based (login sets httpOnly cookie; response has no top-level token).
 """
-import os
 import pytest
 import requests
 from tests.test_config import (

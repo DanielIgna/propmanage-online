@@ -8,7 +8,6 @@
 5. (în orchestrator/playbooks.py) Self-Healing Smoke: retry automat + fix-uri din Bug Memory
 """
 import logging
-import uuid
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Body, Depends

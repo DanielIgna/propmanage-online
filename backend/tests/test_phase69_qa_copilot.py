@@ -1,6 +1,5 @@
 """Phase 69 QA Copilot - backend tests."""
 import os
-import time
 import pytest
 import requests
 from tests.test_config import OWNER_ADMIN_PASSWORD

@@ -1,6 +1,5 @@
 """Phase 47B backend tests — AI Repair Suggester + CORS + Resend wiring."""
 import os
-import time
 
 import pytest
 import requests

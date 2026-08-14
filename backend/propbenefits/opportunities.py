@@ -6,7 +6,6 @@ eligibilitate × relevanță contextuală (twin, HH, oraș, nivel, urgență exp
 """
 from datetime import datetime, timezone
 
-from db import db
 from propbenefits import eligibility, membership, campaigns, ledger
 
 KIND_LABEL = {

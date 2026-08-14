@@ -1,6 +1,5 @@
 """GI-3 / Board 007 — Marketing Intelligence+ backend tests."""
 import os
-import time
 import pytest
 import requests
 

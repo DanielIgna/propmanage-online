@@ -29,7 +29,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from db import db
-from deps import get_current_user, require_role
+from deps import require_role
 from core_utils import serialize_doc
 from email_service import send_email
 

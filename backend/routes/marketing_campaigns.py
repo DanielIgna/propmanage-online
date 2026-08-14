@@ -18,13 +18,12 @@ Collection: marketing_campaigns
     avatar, audience, ad_texts[], cta, kpis, images[base64], generated_at,
     generated_by, source ('manual'|'auto_trigger'), trigger_reason, approved_at }
 """
-import base64
 import json
 import logging
 import os
 import uuid as _uuid
-from datetime import datetime, timedelta, timezone
-from typing import Optional, List
+from datetime import datetime, timezone
+from typing import Optional
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException

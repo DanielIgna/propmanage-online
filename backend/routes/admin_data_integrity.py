@@ -18,10 +18,9 @@ Checks performed:
 import logging
 import time
 from datetime import datetime, timezone
-from typing import Optional
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
 from db import db
 from deps import require_role

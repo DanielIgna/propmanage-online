@@ -3,7 +3,6 @@ Phase 10 tests: Portfolio CRUD + Email console fallback (via backend logs).
 """
 import os
 import time
-import base64
 import subprocess
 import pytest
 import requests

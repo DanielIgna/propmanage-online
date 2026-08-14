@@ -19,7 +19,6 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 
 from db import db
-from deps import require_role
 from sub_admin_deps import require_admin_scope
 
 logger = logging.getLogger("propmanage.admin_smoketest")

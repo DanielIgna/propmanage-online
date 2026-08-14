@@ -6,7 +6,6 @@ Covers:
   - /api/admin/legal/* (audit, contracts/{email}, documents POST/PATCH, seed)
 """
 import os
-import time
 import uuid
 import pytest
 import requests

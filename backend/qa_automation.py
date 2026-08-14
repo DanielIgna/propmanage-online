@@ -23,7 +23,7 @@ import logging
 import tempfile
 import subprocess
 from datetime import datetime, timezone
-from typing import Callable, Optional, Awaitable
+from typing import Optional
 ADMIN_SEED_PW = os.environ.get("SEED_ADMIN_PASSWORD", "Admin123!")  # env-driven, no hardcoded secret
 
 

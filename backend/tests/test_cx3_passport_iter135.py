@@ -4,7 +4,6 @@ Covers: owner auth, public payload, privacy enforcement, security, OG social pre
 trust score integrity. Uses cookie-based auth via requests.Session().
 """
 import os
-import re
 import uuid
 
 import pytest

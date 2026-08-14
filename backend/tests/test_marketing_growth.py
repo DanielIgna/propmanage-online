@@ -1,6 +1,5 @@
 """Backend tests for AI Marketing & Growth Department (Phase 1)."""
 import os
-import time
 
 import pytest
 import requests

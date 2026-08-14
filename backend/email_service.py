@@ -7,7 +7,7 @@ import os
 import asyncio
 import logging
 from typing import Optional, List
-from datetime import datetime, timezone
+from datetime import datetime
 
 logger = logging.getLogger("propmanage.email")
 

@@ -9,7 +9,6 @@ Covers:
 - Export PDF: 200, application/pdf, non-empty, starts with %PDF
 - Regression: unauth 401/403 on all phase-2 endpoints
 """
-import io
 import os
 import uuid
 import time

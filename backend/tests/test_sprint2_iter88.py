@@ -13,7 +13,6 @@ Covers:
 """
 import os
 import time
-import io
 import pytest
 import requests
 from pymongo import MongoClient

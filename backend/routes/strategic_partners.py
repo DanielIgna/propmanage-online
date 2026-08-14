@@ -14,11 +14,9 @@ import logging
 import os
 import uuid as _uuid
 from datetime import datetime, timezone
-from typing import Optional
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 
 from db import db
 from deps import get_current_user

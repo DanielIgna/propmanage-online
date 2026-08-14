@@ -13,7 +13,6 @@ Covers:
 - In-app notification of type 'dt_report_reminder' delivered to recipient (if known user)
 """
 import os
-import io
 import time
 import pytest
 import requests

@@ -153,7 +153,6 @@ async def seed():
     if client_id:
         prop_for_twin = await db.properties.find_one({"owner_id": client_id})
         if prop_for_twin:
-            from bson import ObjectId  # local import to avoid top-level coupling
             prop_id_str = str(prop_for_twin["_id"])
             existing_twin = await db.twins.find_one({"property_id": prop_id_str})
             now_iso = datetime.now(timezone.utc).isoformat()

@@ -9,7 +9,6 @@ Covers:
 - Existing login flows still work
 """
 import os
-import time
 import uuid
 import requests
 import pytest

@@ -18,7 +18,6 @@ ML-ready: pipelines emit consistent shape that can feed sklearn/pytorch later.
 """
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, Depends, Query
 

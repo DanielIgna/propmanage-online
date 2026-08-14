@@ -29,7 +29,6 @@ Feature flag: ``app_settings.house_health.enabled`` (default False).
 """
 import logging
 import asyncio
-import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path

@@ -11,7 +11,7 @@ from bson import ObjectId
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from db import db
-from deps import get_current_user, require_role
+from deps import require_role
 from event_bus import emit
 from revenue_hunter import SERVICES, is_enabled, run_revenue_hunter_tick, scan_property_throttled
 from services import notify

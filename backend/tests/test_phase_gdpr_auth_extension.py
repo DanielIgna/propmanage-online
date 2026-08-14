@@ -11,7 +11,6 @@ Tests:
  - Login regression for 3 seeded accounts
 """
 import os
-import time
 import uuid
 import requests
 import pytest

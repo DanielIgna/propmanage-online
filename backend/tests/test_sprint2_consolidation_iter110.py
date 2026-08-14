@@ -9,7 +9,6 @@ Covers:
 - Public content (service_pages / interior-design content)
 """
 import os
-import time
 import uuid
 import requests
 import pytest

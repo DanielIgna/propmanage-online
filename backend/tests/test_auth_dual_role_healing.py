@@ -6,7 +6,6 @@ guard to bounce the user to the wrong dashboard.
 """
 import asyncio
 import os
-import pytest
 import requests
 from dotenv import load_dotenv
 from tests.test_config import OWNER_ADMIN_PASSWORD

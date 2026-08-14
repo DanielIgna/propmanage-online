@@ -6,7 +6,6 @@ Also covers two bug fixes:
 """
 import os
 import io
-import base64
 import pytest
 import requests
 from tests.test_config import OWNER_ADMIN_PASSWORD

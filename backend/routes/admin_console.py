@@ -2144,7 +2144,7 @@ async def incident_cadence_heatmap(
     """GitHub-style activity heatmap for incident-response cadence across ALL presets.
     Returns daily aggregation for the last `days` days, plus weekday distribution.
     """
-    from datetime import date as _date, timedelta as _td
+    from datetime import timedelta as _td
     today = datetime.now(timezone.utc).date()
     start_date = today - _td(days=days - 1)
     cutoff_iso = start_date.isoformat()  # YYYY-MM-DD compares fine with sent_at prefix

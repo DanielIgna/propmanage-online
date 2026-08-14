@@ -16,12 +16,11 @@ import io
 import re
 import uuid
 import logging
-import base64
 from collections import Counter
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 
 from deps import get_current_user, require_role

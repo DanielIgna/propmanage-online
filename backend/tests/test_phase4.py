@@ -281,7 +281,6 @@ class TestReviewFlow:
         spec_doc_after = db.users.find_one({"email": "specialist@propmanage.io"})
         assert spec_doc_after["reviews_count"] == rev_count_before + 1
         # Review was saved
-        from bson import ObjectId
         rev = db.reviews.find_one({"request_id": req_id, "rating": 5, "comment": "TEST_excellent"})
         assert rev is not None
 

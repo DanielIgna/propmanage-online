@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 from db import db
-from deps import get_current_user, require_role
+from deps import get_current_user
 from services import notify
 from routes.community_buildings import (
     _building_property_ids, _building_owner_ids, _serialize_campaign, _first_name, detect_opportunities,

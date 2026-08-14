@@ -65,7 +65,7 @@ def _page_anatomy(src: str) -> dict:
 
 
 def _anatomy_hash(anatomy: dict) -> str:
-    return hashlib.sha1(str(sorted(anatomy.items())).encode()).hexdigest()[:12]
+    return hashlib.sha1(str(sorted(anatomy.items())).encode(), usedforsecurity=False).hexdigest()[:12]
 
 
 async def _grounding(user: dict, path: str) -> tuple:
@@ -125,7 +125,7 @@ async def _store(key: str, kind: str, path: str, role: str, text: str, model: st
 async def explain_page(user: dict, path: str) -> dict:
     ctx, grounding, anatomy = await _grounding(user, path)
     route_pattern = (ctx["location"].get("route") or {}).get("path") or path
-    key = hashlib.sha1(f"page|{route_pattern}|{ctx['user']['role']}|{_anatomy_hash(anatomy)}".encode()).hexdigest()
+    key = hashlib.sha1(f"page|{route_pattern}|{ctx['user']['role']}|{_anatomy_hash(anatomy)}".encode(), usedforsecurity=False).hexdigest()
     cached = await _cached(key)
     if cached:
         return {"explanation": cached["text"], "cached": True, "model": cached.get("model"),
@@ -168,7 +168,7 @@ async def explain_component(user: dict, path: str, component_ref: str) -> dict:
             snippet = src[max(0, idx - 300):idx + 500]
             found_in = str(f.relative_to(FRONTEND_SRC))
             break
-    key = hashlib.sha1(f"component|{path}|{ctx['user']['role']}|{ref}".encode()).hexdigest()
+    key = hashlib.sha1(f"component|{path}|{ctx['user']['role']}|{ref}".encode(), usedforsecurity=False).hexdigest()
     cached = await _cached(key)
     if cached:
         return {"explanation": cached["text"], "cached": True, "found_in": cached.get("found_in")}
@@ -222,7 +222,7 @@ async def explain_process(user: dict, path: str) -> dict:
         pkey = (f"{pstate['process']['id']}|{pstate.get('current_state')}|"
                 f"{(pstate.get('entity') or {}).get('id')}|{len(pstate.get('blockers') or [])}")
     key = hashlib.sha1(
-        f"process|{path}|{ctx['user']['role']}|{pkey}|{'>'.join(grounding['navigation_trail'][:5])}".encode()).hexdigest()
+        f"process|{path}|{ctx['user']['role']}|{pkey}|{'>'.join(grounding['navigation_trail'][:5])}".encode(), usedforsecurity=False).hexdigest()
     cached = await _cached(key)
     if cached:
         return {"explanation": cached["text"], "cached": True,

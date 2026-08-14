@@ -18,7 +18,6 @@ Data seeded via pymongo (sync). Prefix TEST_ + explicit cleanup at end.
 """
 import os
 import uuid
-from datetime import datetime, timezone
 
 import pytest
 import requests

@@ -250,7 +250,7 @@ async def explain_relationship(user: dict, question: str) -> dict:
         grounding.append({"node": n, "used_by": d["used_by"][:12], "depends_on": d["depends_on"][:12],
                           "related_modules": rel})
     role = user.get("role") or ""
-    key = hashlib.sha1(f"rel|{role}|{question.strip().lower()[:120]}".encode()).hexdigest()
+    key = hashlib.sha1(f"rel|{role}|{question.strip().lower()[:120]}".encode(), usedforsecurity=False).hexdigest()
     cached = await db.ai_brain_explanations.find_one({"key": key}, {"_id": 0})
     if cached:
         await db.ai_brain_explanations.update_one({"key": key}, {"$inc": {"hits": 1}})

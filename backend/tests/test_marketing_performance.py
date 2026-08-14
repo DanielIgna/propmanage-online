@@ -11,7 +11,6 @@ Covers:
 - Critical loop test: calibration injection into generator
 """
 import os
-import time
 import pytest
 import requests
 from tests.test_config import OWNER_ADMIN_PASSWORD

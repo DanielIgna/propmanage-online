@@ -4,8 +4,6 @@ End-to-end backend validation of the flows a real user would follow on the
 preview URL. Reports every step PASS/FAIL, does not stop at first failure.
 """
 import os
-import time
-import io
 import uuid
 import requests
 import pytest

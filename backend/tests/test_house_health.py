@@ -10,7 +10,6 @@ Validates the end-to-end lifecycle:
 """
 import io
 import os
-import uuid
 
 import pytest
 import requests

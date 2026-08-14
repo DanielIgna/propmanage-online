@@ -5,7 +5,6 @@ admin overview/campaigns CRUD/config/health/impact/tick/growth-advisor,
 security (401/403), referral gating (pending -> paid -> activated), mentor pb_ action.
 """
 import os
-import time
 import uuid
 import pytest
 import requests

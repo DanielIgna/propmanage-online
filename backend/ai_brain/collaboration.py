@@ -187,7 +187,7 @@ def escalation_options(collab: dict) -> list:
 async def _notify_intent(kind: str, target: str, proc: dict, state: str, count: int,
                          priority: int, why: str, example: str) -> bool:
     """O singură notificare AGREGATĂ per (kind, target, proces, stare) — zero duplicate."""
-    key = hashlib.sha1(f"{kind}|{target}|{proc['id']}|{state}".encode()).hexdigest()[:16]
+    key = hashlib.sha1(f"{kind}|{target}|{proc['id']}|{state}".encode(), usedforsecurity=False).hexdigest()[:16]
     existing = await db.ai_brain_notifications.find_one({"key": key, "status": "active"})
     if existing:
         await db.ai_brain_notifications.update_one(

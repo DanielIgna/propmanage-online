@@ -9,7 +9,6 @@ NO LLM credits are spent on detection — only on legitimate replies.
 All blocking events are persisted in `security_events` AND mirrored to
 `admin_ai_findings` so the Admin Investigator surfaces them automatically.
 """
-import os
 import re
 import logging
 from datetime import datetime, timezone, timedelta
@@ -18,7 +17,7 @@ from typing import Optional
 from fastapi import APIRouter, Request, HTTPException, Depends, Body, Query
 
 from db import db
-from deps import require_role, get_current_user
+from deps import get_current_user
 from sub_admin_deps import require_admin_scope
 
 logger = logging.getLogger("propmanage.security_guard")

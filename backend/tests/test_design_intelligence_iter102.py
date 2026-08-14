@@ -6,7 +6,6 @@ Coverage:
   · Apply→Rollback with token snapshot restoration (leave tokens as original)
 """
 import os
-import time
 import pytest
 import requests
 

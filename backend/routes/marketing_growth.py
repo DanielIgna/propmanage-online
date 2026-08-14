@@ -23,7 +23,7 @@ import os
 import statistics
 import uuid as _uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional, List
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel

@@ -28,7 +28,7 @@ The user.rating field (legacy) = average of all client→specialist dimension av
 """
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import Optional, Dict, List, Literal
+from typing import Optional, Literal
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query

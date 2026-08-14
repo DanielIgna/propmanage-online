@@ -31,7 +31,7 @@ def _now() -> str:
 
 
 def _did(*parts) -> str:
-    return hashlib.sha1("|".join(str(p) for p in parts).encode()).hexdigest()[:12]
+    return hashlib.sha1("|".join(str(p) for p in parts).encode(), usedforsecurity=False).hexdigest()[:12]
 
 
 def _role_homes() -> dict:
@@ -436,7 +436,7 @@ async def explain_decision(user: dict, decision_id: str, question: str = "") -> 
     pstate = await process_state(user, process_id=d["process_id"]) if d.get("process_id") else None
 
     role = user.get("role") or ""
-    key = hashlib.sha1(f"decision|{role}|{decision_id}|{d['score']}|{question.strip().lower()[:80]}".encode()).hexdigest()
+    key = hashlib.sha1(f"decision|{role}|{decision_id}|{d['score']}|{question.strip().lower()[:80]}".encode(), usedforsecurity=False).hexdigest()
     cached = await db.ai_brain_explanations.find_one({"key": key}, {"_id": 0})
     if cached:
         await db.ai_brain_explanations.update_one({"key": key}, {"$inc": {"hits": 1}})
