@@ -1,3 +1,56 @@
+## 📚 RES-COHORT-v1.0 — Master Cohort Consolidation AP-001 → AP-010 · LIVRAT (14 Aug 2026)
+
+**Reuse Audit: PASS · Duplicate Detected: NO**
+- AP-002 (Mehedinți-Ilie) + AP-003 (Negoiu-8D) există → **NU recreate** (verificate)
+- AP-009 și AP-010 (aceeași stradă+dimensiune) — NU deduplicate (asociații distincte, presidenți distincți)
+- Registries infrastructure REUTILIZATĂ (INTERVIEW_REGISTRY + PATTERN_REGISTRY) — zero paralel
+- Pattern Library REUTILIZATĂ (13 patterns tracked) — zero pattern-uri promovate (motiv: batch nou = doar profile snapshots, insufficient evidence for pattern confirmations)
+
+**Fișiere create/actualizate**:
+- **8 interview files noi** (profile snapshots cu `[NECUNOSCUT]` flags conform metodologie): AP-001, AP-004..AP-010
+- **INTERVIEW_REGISTRY.md**: actualizat cu toate 10 rows + coverage analytics complet re-calculate + coloană nouă Platform
+- **PROPMANAGE_PRESIDENT_RESEARCH_COHORT_v1.0.md**: master synthesis document canonic (17 secțiuni: scope → executive summary)
+- Zero pattern files atinse (state neschimbat — data insufficient pentru confirmări)
+
+**Realitate metodologică cheie**:
+- 8/10 interviuri = profile-only. Doar AP-002 și AP-003 au evidence completă pe cele 11 secțiuni.
+- Nici un pattern nu poate fi promovat la Validated (3+ confirmări independente).
+- 30% cohort declară platformă existentă (eBloc x2, Bloc Sistem x1) → market NON-virgin.
+- WTP (willingness-to-pay): 0/10 interviuri chestionează direct → BLOCHER pentru business case.
+
+**PropManage Hypothesis Validation** (13 ipoteze):
+- 8 PARTIALLY SUPPORTED (majoritatea din AP-002 + AP-003 only, deci Confidence Low)
+- 1 NOT SUPPORTED (L — differentiation vs eBloc/Bloc Sistem, 0 evidence comparativ)
+- 4 UNKNOWN (Comunicare, Decision Support, Digital Twin, WTP)
+- 0 fully SUPPORTED
+
+**Coverage now vs before**:
+| Metric | Before (AP-002+003) | After (10 interviuri) |
+|---|---|---|
+| Interviews Validated | 2/15 | **10/15** |
+| Coverage: An construcție | 67% | 67% (1980-2000 rămâne 0%) |
+| Coverage: Apartamente | 67% | **100%** (toate bucket-urile ≤20 / 20-50 / >50 populate) |
+| Coverage: Vechime | 67% | **100%** (0-2, 2-10, >10 toate populate) |
+| Coverage: Persoane | 25% | 25% (doar Președinți — Administrators/Owners/Specialists gap) |
+| Coverage: Localizare | 0% | 0% (9/10 fără declarare) |
+
+**Impact**:
+- Backend: **0 changes**
+- Frontend: **0 changes** (Research Coverage Matrix consumă automat INTERVIEW_REGISTRY updated)
+- API: **0 changes**
+- Metodologie: **0 changes** (pipeline confirmat intact)
+- Product Blueprint / Roadmap / Marketplace / Association / Twin / Owner+President Journey: **NEATINSE**
+
+**Next Best Interview Profiles (top 3, per master report)**:
+1. Administrator profesional din bloc 1980-2000 → completează 3 gap-uri simultan
+2. Follow-up in-depth AP-006 (Răzvan, eBloc, 286 apts) → competitive gaps
+3. President segment 1980-2000, 50-100 apts, experiență medie → central bucket
+
+**Producție**: fișierele sunt în preview. Redeploy necesar pentru live pe propmanage.ro (docs sunt read-only din KC, nu blochează runtime).
+
+---
+
+
 ## 🧭 FRI-COV-001 — Research Coverage Matrix · Instrument Intern Founder · LIVRAT (7 Feb 2026)
 
 **Directivă**: modul intern Founder Research Intelligence · zero features utilizator · zero backend changes · reutilizează infrastructura existentă.
