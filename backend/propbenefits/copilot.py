@@ -203,7 +203,9 @@ def _fallback_summary(d: dict) -> str:
 
 async def _ai_summary(uid: str, d: dict) -> dict:
     sig = f"{d['score']}|{d['book_score']}|{d['benefits_available']}|{d['deals_negotiating']}|{d['next_id']}|{d['storage_pct']}"
-    h = hashlib.md5(sig.encode()).hexdigest()
+    # MD5 utilizat exclusiv ca CACHE KEY (invalidare rezumat AI la schimbare context) — NU pentru securitate.
+    # Non-security digest: coliziunile nu au impact (cel mult regenerare LLM). nosec B303.
+    h = hashlib.md5(sig.encode(), usedforsecurity=False).hexdigest()
     cached = await db.copilot_reports.find_one({"user_id": uid}, {"_id": 0})
     if cached and cached.get("hash") == h and cached.get("generated_at", "") > _iso(_now() - timedelta(hours=6)):
         return {"text": cached["text"], "source": "ai_cached"}
