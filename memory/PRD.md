@@ -1,3 +1,38 @@
+## 📊 ANALYTICS-EXT-v1.0 — Extindere Analytics & Growth pe intervale până la 12 luni · LIVRAT (06 Feb 2026)
+
+**Cerere**: Fondator dorea extinderea /admin/analytics-growth de la Azi/7z/30z la intervale până la 12 luni, cu istoric persistent pentru comparație campanii.
+
+**Verificare DB preview**: `analytics_sessions` are retention nelimitat (fără TTL). Preview conține 14 zile cu date reale (7 iul → 14 aug 2026). Producția va acumula 12L pe măsură ce aplicația rulează.
+
+**Implementare (reutilizare 100% infrastructură existentă)**:
+
+Backend `/app/backend/routes/analytics_growth.py`:
+- `_period_range()` extins pentru presete noi: `60d`, `90d`, `6m`, `12m`, `ytd` (plus vechile day/week/month/custom).
+- Helper `_auto_granularity()` — day ≤60z · week 90z-6L (183z threshold) · month 12L+
+- Helper `_aggregate_series()` — agregă seria zilnică la săptămână (ISO week Monday) sau lună (YYYY-MM-01).
+- Endpoint `/analytics/overview` extins cu:
+  - Parametru nou `granularity=auto|day|week|month` (default `auto`)
+  - Field nou `kpi_yoy` (year-over-year, cu -365 zile) — apare doar când perioada ≥60 zile
+  - `series` agregată automat conform granularity
+- Endpoint nou `GET /admin/analytics/campaign-markers?period=X` — returnează campaniile cu prima activitate în interval, pentru afișare markers pe graficul de trafic.
+- Endpoint nou `GET /admin/growth/campaigns/compare?ids=id1,id2,id3&period=X` — comparație side-by-side pentru 2-3 campanii cu series + stats per campanie.
+
+Frontend `/app/frontend/src/pages/admin/AnalyticsGrowthPage.jsx`:
+- Constantă `PERIOD_PRESETS`: Azi / 7z / 30z / 60z / 90z / 6L / 12L / YTD (8 butoane).
+- `ActionBar` primește `periods={PERIOD_PRESETS}`.
+- **YoY Strip** violet-gradient sub KPI cards când perioada e ≥60 zile — arată delta % pentru fiecare metric vs. anul trecut.
+- Chart „Trafic zilnic/săptămânal/lunar" cu X-axis formatter adaptiv + `ReferenceLine` markers pentru campanii active în interval.
+- Tab „Campanii" — buton nou **Comparator** care activează un panel violet cu selector 2-3 campanii checkbox, chart BarChart grupat pe zi/săptămână/lună și tabel side-by-side cu 9 metrici (Canal, Recipients, Vizitatori, 30s+, Început înreg., Conturi, Abonamente, Revenit 7z, Conversie %).
+
+**Testing**: `testing_agent` iter180 · **43/44 backend tests passed (97.7%)** · 1 issue minor fixat single-line (`_auto_granularity` threshold 180 → 183 pentru semantic corect „6 luni ≈ 26 săptămâni"). Frontend smoke-tested vizual în preview (8 presete afișate, YoY strip apare pe 12L, chart aggregation lunar 12L, 1 marker detectat).
+
+**Impact**: Zero cod nou paralel. Zero DB change. Zero migrare. Retention deja nelimitat — istoric 12L se acumulează natural.
+
+**Deploy**: gata pentru user redeploy la propmanage.ro.
+
+---
+
+
 ## 🔬 RES-RECONCILE-v1.0 — Research Reconciliation AP-001 → AP-010 · LIVRAT (06 Feb 2026)
 
 **Sprint tip**: Research Reconciliation exclusiv (evidence-only, zero fabricație). Fără AP-011+, fără cod, fără produs.

@@ -3,10 +3,11 @@ import axios from "axios";
 import {
   BarChart3, Users, MousePointerClick, UserPlus, Building2, Wallet, Plus, QrCode, Trash2,
   Link2, Megaphone, Settings2, CheckCircle2, Flame, FlaskConical, Repeat, TrendingDown, MessageCircle,
+  GitCompareArrows, X,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
-  BarChart, Bar, PieChart, Pie, Cell, LabelList,
+  BarChart, Bar, PieChart, Pie, Cell, LabelList, ReferenceLine, Legend,
 } from "recharts";
 import { AdminLayoutMetronic } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
@@ -23,10 +24,23 @@ import { WhatsAppTab } from "./analytics/WhatsAppTab";
 
 const SOURCE_COLORS = { whatsapp: "#25D366", facebook: "#1877F2", google: "#EA4335", direct: "#64748b", qr: "#8b5cf6", admin: "#f59e0b", other: "#0ea5e9" };
 
+// Presete extinse — de la Azi la 12 luni (istoric persistent pentru comparații)
+const PERIOD_PRESETS = [
+  ["day", "Azi"], ["week", "7z"], ["month", "30z"],
+  ["60d", "60z"], ["90d", "90z"], ["6m", "6L"], ["12m", "12L"], ["ytd", "YTD"],
+];
+
 const trendOf = (k, kp, key) => {
   const prev = kp?.[key];
   if (!prev) return null;
   return Math.round(((k[key] ?? 0) - prev) / prev * 100);
+};
+
+// Format X-axis adaptiv în funcție de granularitate (day/week/month)
+const formatBucket = (day, granularity) => {
+  if (!day) return "";
+  if (granularity === "month") return day.slice(0, 7); // YYYY-MM
+  return day.slice(5); // MM-DD (day/week)
 };
 
 export default function AnalyticsGrowthPage() {
@@ -40,22 +54,47 @@ export default function AnalyticsGrowthPage() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: "", administrator: "", association: "", apartments_count: 0, channel: "whatsapp", recipients_count: 0 });
+  // markers campanii pe grafic "Trafic zilnic"
+  const [campaignMarkers, setCampaignMarkers] = useState([]);
+  // comparator campanii (2-3 side-by-side)
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareSelectedIds, setCompareSelectedIds] = useState([]);
+  const [compareData, setCompareData] = useState(null);
+  const [compareLoading, setCompareLoading] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [o, p, c, i, ins] = await Promise.all([
+      const [o, p, c, i, ins, m] = await Promise.all([
         axios.get(`${API}/admin/analytics/overview?period=${period}`),
         axios.get(`${API}/admin/analytics/pages?period=${period}`),
         axios.get(`${API}/admin/growth/campaigns`),
         axios.get(`${API}/admin/analytics/integrations`),
         axios.get(`${API}/admin/analytics/insights?period=${period}`),
+        axios.get(`${API}/admin/analytics/campaign-markers?period=${period}`),
       ]);
       setOverview(o.data); setPages(p.data.items); setCampaigns(c.data.items); setIntegrations(i.data); setInsights(ins.data);
+      setCampaignMarkers(m.data.markers || []);
     } catch (e) { toast.error("Eroare la încărcarea datelor analytics"); }
     setLoading(false);
   };
   useEffect(() => { load(); }, [period]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Comparator campanii — încarcă/refresh când se schimbă selecția sau perioada
+  const runCompare = async (ids) => {
+    if (ids.length < 2) { setCompareData(null); return; }
+    setCompareLoading(true);
+    try {
+      const { data } = await axios.get(`${API}/admin/growth/campaigns/compare?ids=${ids.join(",")}&period=${period}`);
+      setCompareData(data);
+    } catch (e) { toast.error(e?.response?.data?.detail || "Eroare la comparație"); }
+    setCompareLoading(false);
+  };
+  useEffect(() => { if (compareMode) runCompare(compareSelectedIds); }, [compareSelectedIds, period, compareMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleCompareId = (id) => {
+    setCompareSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : prev.length >= 3 ? prev : [...prev, id]);
+  };
 
   const exportCsv = (report) => window.open(`${API}/admin/analytics/export.csv?report=${report}&period=${period}`, "_blank");
 
@@ -105,6 +144,7 @@ export default function AnalyticsGrowthPage() {
           {/* 2. Action Bar standard: perioadă · CSV · PDF · refresh */}
           <div className="ml-auto">
             <ActionBar
+              periods={PERIOD_PRESETS}
               period={period} onPeriod={setPeriod} onRefresh={load} loading={loading}
               onExportCsv={() => exportCsv("overview")}
               onExportPdf={() => window.open(`${API}/admin/analytics/export.pdf?period=${period}`, "_blank")}
@@ -127,6 +167,46 @@ export default function AnalyticsGrowthPage() {
               <KpiCard icon={Wallet} label="Bounce rate" value={`${k.bounce_rate_pct ?? 0}%`} trend={trendOf(k, kp, "bounce_rate_pct")} invertTrend accent="critical" />
             </div>
 
+            {/* 3b. Year-over-Year strip — apare doar când perioada e ≥ 60 zile */}
+            {overview.kpi_yoy && (
+              <div className="rounded-2xl border border-violet-200 dark:border-violet-500/30 bg-gradient-to-r from-violet-50/70 to-blue-50/50 dark:from-violet-500/10 dark:to-blue-500/10 px-4 py-3" data-testid="ag-yoy-strip">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-[11px] uppercase tracking-wider font-black text-violet-600 dark:text-violet-300">Year-over-Year</span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                    {overview.kpi_yoy.period?.from} → {overview.kpi_yoy.period?.to}
+                  </span>
+                  <div className="ml-auto grid grid-cols-3 md:grid-cols-6 gap-3 text-center">
+                    {[
+                      ["Vizitatori", k.unique_visitors, overview.kpi_yoy.unique_visitors],
+                      ["Sesiuni", k.sessions, overview.kpi_yoy.sessions],
+                      ["Conturi", k.accounts_created, overview.kpi_yoy.accounts_created],
+                      ["Specialiști", k.specialists_signed, overview.kpi_yoy.specialists_signed],
+                      ["Proprietăți", k.properties_added, overview.kpi_yoy.properties_added],
+                      ["Bounce", `${k.bounce_rate_pct ?? 0}%`, `${overview.kpi_yoy.bounce_rate_pct ?? 0}%`],
+                    ].map(([label, cur, yoy]) => {
+                      const curN = typeof cur === "number" ? cur : parseFloat(cur) || 0;
+                      const yoyN = typeof yoy === "number" ? yoy : parseFloat(yoy) || 0;
+                      const delta = yoyN ? Math.round((curN - yoyN) / yoyN * 100) : null;
+                      const isPositive = (delta ?? 0) > 0;
+                      const isBounce = label === "Bounce";
+                      const good = isBounce ? !isPositive : isPositive;
+                      return (
+                        <div key={label} className="min-w-[60px]">
+                          <div className="text-[9px] uppercase font-bold text-slate-400">{label}</div>
+                          <div className="text-xs font-black text-slate-700 dark:text-slate-200">vs {yoy ?? 0}</div>
+                          {delta !== null && (
+                            <div className={`text-[10px] font-bold ${good ? "text-emerald-600" : "text-rose-600"}`}>
+                              {delta > 0 ? "+" : ""}{delta}%
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* 4. AI Insights — obligatoriu după KPI */}
             <AIInsightCard
               bullets={insights?.bullets || []} alerts={insights?.alerts || []}
@@ -137,17 +217,21 @@ export default function AnalyticsGrowthPage() {
 
             {/* 5. Grafice standard */}
             <div className="grid lg:grid-cols-3 gap-4">
-              <ChartCard title="Trafic zilnic" className="lg:col-span-2" testid="ag-chart-traffic"
+              <ChartCard title={`Trafic ${overview.granularity === "month" ? "lunar" : overview.granularity === "week" ? "săptămânal" : "zilnic"}${campaignMarkers.length > 0 ? ` · ${campaignMarkers.length} marker${campaignMarkers.length > 1 ? "e" : ""}` : ""}`} className="lg:col-span-2" testid="ag-chart-traffic"
                 actions={<DSButton variant="ghost" onClick={() => exportCsv("overview")} data-testid="ag-export-overview">CSV</DSButton>}>
-                <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={overview.series}>
+                <ResponsiveContainer width="100%" height={240}>
+                  <AreaChart data={overview.series} margin={{ top: 15, right: 20, left: 0, bottom: 0 }}>
                     <defs><linearGradient id="gv" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={CHART_COLORS[0]} stopOpacity={0.5} /><stop offset="100%" stopColor={CHART_COLORS[0]} stopOpacity={0} /></linearGradient></defs>
                     <CartesianGrid strokeDasharray={CHART.gridDash} strokeOpacity={CHART.gridOpacity} />
-                    <XAxis dataKey="day" tick={{ fontSize: CHART.tickFontSize }} tickFormatter={(d) => d.slice(5)} />
+                    <XAxis dataKey="day" tick={{ fontSize: CHART.tickFontSize }} tickFormatter={(d) => formatBucket(d, overview.granularity)} />
                     <YAxis tick={{ fontSize: CHART.tickFontSize }} allowDecimals={false} />
-                    <Tooltip />
+                    <Tooltip labelFormatter={(d) => `${overview.granularity === "week" ? "Săpt. de la " : overview.granularity === "month" ? "Luna " : ""}${d}`} />
                     <Area type="monotone" dataKey="visitors" name="Vizitatori" stroke={CHART_COLORS[0]} fill="url(#gv)" strokeWidth={CHART.strokeWidth} />
                     <Area type="monotone" dataKey="sessions" name="Sesiuni" stroke={CHART_COLORS[1]} fill="none" strokeWidth={CHART.strokeWidth} />
+                    {campaignMarkers.map(m => (
+                      <ReferenceLine key={m.id} x={m.day} stroke="#f59e0b" strokeDasharray="4 4"
+                        label={{ value: `📣 ${m.name}`, position: "top", fill: "#f59e0b", fontSize: 10, fontWeight: 700 }} />
+                    ))}
                   </AreaChart>
                 </ResponsiveContainer>
               </ChartCard>
@@ -212,13 +296,109 @@ export default function AnalyticsGrowthPage() {
           />
         ) : tab === "campaigns" ? (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <p className="text-xs text-slate-500">Indicatori per campanie: primit → deschis → 30s+ → înregistrare → cont → revenit 7z</p>
               <div className="flex gap-2">
+                <DSButton variant={compareMode ? "primary" : "secondary"} icon={GitCompareArrows}
+                  onClick={() => { setCompareMode(v => !v); if (compareMode) { setCompareSelectedIds([]); setCompareData(null); } }}
+                  data-testid="ag-toggle-compare">
+                  {compareMode ? "Închide comparator" : "Comparator"}
+                </DSButton>
                 <DSButton variant="secondary" onClick={() => exportCsv("campaigns")} data-testid="ag-export-campaigns">CSV</DSButton>
                 <DSButton variant="primary" icon={Plus} onClick={() => setShowCreate(true)} data-testid="ag-new-campaign">Campanie nouă</DSButton>
               </div>
             </div>
+            {compareMode && (
+              <div className="rounded-2xl border-2 border-violet-200 dark:border-violet-500/30 bg-violet-50/40 dark:bg-violet-500/5 p-4 space-y-3" data-testid="ag-compare-panel">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-black text-slate-900 dark:text-white text-sm">Compară 2-3 campanii side-by-side</h4>
+                    <p className="text-[11px] text-slate-500">Selectat: {compareSelectedIds.length}/3 · Perioada: {period.toUpperCase()}</p>
+                  </div>
+                  {compareSelectedIds.length > 0 && (
+                    <button onClick={() => { setCompareSelectedIds([]); setCompareData(null); }}
+                      className="text-xs text-slate-500 hover:text-rose-500 flex items-center gap-1" data-testid="ag-compare-clear">
+                      <X className="w-3.5 h-3.5" /> Golește
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {campaigns.map(c => (
+                    <button key={c.id} onClick={() => toggleCompareId(c.id)} data-testid={`ag-compare-pick-${c.code}`}
+                      disabled={!compareSelectedIds.includes(c.id) && compareSelectedIds.length >= 3}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${compareSelectedIds.includes(c.id) ? "bg-violet-500 text-white" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"}`}>
+                      {compareSelectedIds.includes(c.id) ? "✓ " : ""}{c.name}
+                    </button>
+                  ))}
+                </div>
+                {compareLoading && <DSSkeleton blocks={1} />}
+                {compareData && compareData.campaigns?.length >= 2 && (
+                  <>
+                    {/* Chart bare grupate — vizitatori pe campanie */}
+                    <ChartCard title="Evoluție vizitatori per campanie" testid="ag-compare-chart">
+                      <ResponsiveContainer width="100%" height={220}>
+                        <BarChart data={(() => {
+                          // Merge series pe key `day` cu column per campanie
+                          const map = {};
+                          compareData.campaigns.forEach((camp, i) => {
+                            (camp.series || []).forEach(row => {
+                              if (!map[row.day]) map[row.day] = { day: row.day };
+                              map[row.day][`c${i}`] = row.visitors;
+                            });
+                          });
+                          return Object.values(map).sort((a, b) => a.day.localeCompare(b.day));
+                        })()}>
+                          <CartesianGrid strokeDasharray={CHART.gridDash} strokeOpacity={CHART.gridOpacity} />
+                          <XAxis dataKey="day" tick={{ fontSize: CHART.tickFontSize }} tickFormatter={(d) => formatBucket(d, compareData.granularity)} />
+                          <YAxis tick={{ fontSize: CHART.tickFontSize }} allowDecimals={false} />
+                          <Tooltip />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          {compareData.campaigns.map((camp, i) => (
+                            <Bar key={camp.id} dataKey={`c${i}`} name={camp.name} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[4, 4, 0, 0]} />
+                          ))}
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                    {/* Tabel side-by-side */}
+                    <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800" data-testid="ag-compare-table">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-slate-50 dark:bg-slate-700/50">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-[10px] font-black uppercase text-slate-500">Metric</th>
+                            {compareData.campaigns.map((camp, i) => (
+                              <th key={camp.id} className="px-3 py-2 text-right text-[10px] font-black uppercase" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>{camp.name}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[
+                            ["Canal", (c) => c.channel],
+                            ["Recipients", (c) => c.recipients],
+                            ["Vizitatori unici", (c) => c.stats.unique_visitors],
+                            ["30s+ pe site", (c) => c.stats.over_30s],
+                            ["Început înregistrare", (c) => c.stats.signup_started],
+                            ["Conturi create", (c) => c.stats.accounts_created],
+                            ["Abonamente", (c) => c.stats.subscriptions],
+                            ["Revenit 7z", (c) => c.stats.returned_7d],
+                            ["Conversie %", (c) => `${c.stats.conversion_pct}%`],
+                          ].map(([label, getter]) => (
+                            <tr key={label} className="border-t border-slate-100 dark:border-slate-700/50">
+                              <td className="px-3 py-2 font-semibold text-slate-600 dark:text-slate-300">{label}</td>
+                              {compareData.campaigns.map(camp => (
+                                <td key={camp.id} className="px-3 py-2 text-right font-mono font-bold text-slate-900 dark:text-white">{getter(camp) ?? 0}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+                {compareSelectedIds.length === 1 && (
+                  <div className="text-xs text-slate-500 italic">Alege încă o campanie pentru a începe comparația.</div>
+                )}
+              </div>
+            )}
             {showCreate && (
               <div className="rounded-2xl border-2 border-blue-200 dark:border-blue-500/30 bg-white dark:bg-slate-800 p-4 grid md:grid-cols-3 gap-3" data-testid="ag-create-form">
                 {[["name", "Nume campanie *"], ["administrator", "Administrator"], ["association", "Asociație"]].map(([kk, label]) => (

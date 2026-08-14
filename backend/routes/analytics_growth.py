@@ -401,22 +401,73 @@ def _period_range(period: str, date_from: str = "", date_to: str = "") -> tuple:
         start = today - timedelta(days=6)
     elif period == "month":
         start = today - timedelta(days=29)
+    elif period == "60d":
+        start = today - timedelta(days=59)
+    elif period == "90d":
+        start = today - timedelta(days=89)
+    elif period == "6m":
+        start = today - timedelta(days=181)
+    elif period == "12m":
+        start = today - timedelta(days=364)
+    elif period == "ytd":
+        start = today.replace(month=1, day=1)
     else:  # custom
         start = datetime.fromisoformat(date_from).date() if date_from else today - timedelta(days=29)
         today = datetime.fromisoformat(date_to).date() if date_to else today
     return start.isoformat(), today.isoformat()
 
 
+# Pattern regex pentru toate endpoint-urile care acceptă `period`
+_PERIOD_PATTERN = "^(day|week|month|60d|90d|6m|12m|ytd|custom)$"
+
+
+def _auto_granularity(d_from: str, d_to: str) -> str:
+    """Alege granularitatea optimă în funcție de lungimea intervalului."""
+    days = (datetime.fromisoformat(d_to).date() - datetime.fromisoformat(d_from).date()).days + 1
+    if days <= 60:
+        return "day"
+    if days <= 183:  # ~6 luni → agregat săptămânal
+        return "week"
+    return "month"
+
+
+def _bucket_key(iso_day: str, granularity: str) -> str:
+    """Cheia de bucket pentru un ISO day, în funcție de granularitate."""
+    d = datetime.fromisoformat(iso_day).date()
+    if granularity == "day":
+        return d.isoformat()
+    if granularity == "week":
+        # ISO week Monday
+        monday = d - timedelta(days=d.weekday())
+        return monday.isoformat()
+    # month
+    return d.strftime("%Y-%m-01")
+
+
+def _aggregate_series(series_daily: list, granularity: str) -> list:
+    """Agregă seria zilnică la săptămână/lună. Păstrează keys `day`, `sessions`, `visitors`."""
+    if granularity == "day":
+        return series_daily
+    buckets = defaultdict(lambda: {"sessions": 0, "visitors": 0})
+    for row in series_daily:
+        k = _bucket_key(row["day"], granularity)
+        buckets[k]["sessions"] += row.get("sessions", 0)
+        buckets[k]["visitors"] += row.get("visitors", 0)
+    return [{"day": k, "sessions": v["sessions"], "visitors": v["visitors"]}
+            for k, v in sorted(buckets.items())]
+
+
 @admin_router.get("/analytics/overview")
 async def analytics_overview(
-    period: str = Query("week", pattern="^(day|week|month|custom)$"),
+    period: str = Query("week", pattern="^(day|week|month|60d|90d|6m|12m|ytd|custom)$"),
     date_from: str = "", date_to: str = "",
+    granularity: str = Query("auto", pattern="^(auto|day|week|month)$"),
     user: dict = Depends(require_role("admin")),
 ):
     d_from, d_to = _period_range(period, date_from, date_to)
     q = {"day": {"$gte": d_from, "$lte": d_to}}
 
-    sessions = await db.analytics_sessions.find(q).to_list(20000)
+    sessions = await db.analytics_sessions.find(q).to_list(50000)
     visitors = {s["visitor_id"] for s in sessions}
     bounces = sum(1 for s in sessions if (s.get("pageviews") or 0) <= 1)
     total_dur = sum(s.get("duration_ms", 0) for s in sessions)
@@ -449,19 +500,23 @@ async def analytics_overview(
     ]
 
     # Serie zilnică completă (zile fără trafic = 0)
-    series = []
+    series_daily = []
     cur = datetime.fromisoformat(d_from).date()
     end = datetime.fromisoformat(d_to).date()
     while cur <= end:
         k = cur.isoformat()
-        series.append({"day": k, "sessions": daily[k]["sessions"], "visitors": len(daily[k]["visitors"])})
+        series_daily.append({"day": k, "sessions": daily[k]["sessions"], "visitors": len(daily[k]["visitors"])})
         cur += timedelta(days=1)
 
-    # Comparație cu perioada anterioară (trend KPI — Design System standard)
+    # Agregare adaptivă: zilnic ≤60z, săptămânal 90z-6L, lunar 12L
+    effective_granularity = _auto_granularity(d_from, d_to) if granularity == "auto" else granularity
+    series = _aggregate_series(series_daily, effective_granularity)
+
+    # ── Comparație vs perioada anterioară (previous period, aceeași lungime) ──
     days_len = (datetime.fromisoformat(d_to).date() - datetime.fromisoformat(d_from).date()).days + 1
     p_to = (datetime.fromisoformat(d_from).date() - timedelta(days=1)).isoformat()
     p_from = (datetime.fromisoformat(d_from).date() - timedelta(days=days_len)).isoformat()
-    prev_sessions = await db.analytics_sessions.find({"day": {"$gte": p_from, "$lte": p_to}}).to_list(20000)
+    prev_sessions = await db.analytics_sessions.find({"day": {"$gte": p_from, "$lte": p_to}}).to_list(50000)
     prev_visitors = {s["visitor_id"] for s in prev_sessions}
     prev_bounces = sum(1 for s in prev_sessions if (s.get("pageviews") or 0) <= 1)
     pf, pt = p_from, p_to + "T23:59:59"
@@ -476,8 +531,31 @@ async def analytics_overview(
         "bounce_rate_pct": round(prev_bounces / len(prev_sessions) * 100, 1) if prev_sessions else 0.0,
     }
 
+    # ── Comparație Year-over-Year (aceeași perioadă din anul anterior) ──
+    # Se calculează doar când perioada e ≥ 60 zile (relevant pentru trend anual).
+    kpi_yoy = None
+    if days_len >= 60:
+        y_from = (datetime.fromisoformat(d_from).date() - timedelta(days=365)).isoformat()
+        y_to = (datetime.fromisoformat(d_to).date() - timedelta(days=365)).isoformat()
+        yoy_sessions = await db.analytics_sessions.find({"day": {"$gte": y_from, "$lte": y_to}}).to_list(50000)
+        yoy_visitors = {s["visitor_id"] for s in yoy_sessions}
+        yoy_bounces = sum(1 for s in yoy_sessions if (s.get("pageviews") or 0) <= 1)
+        yf, yt = y_from, y_to + "T23:59:59"
+        kpi_yoy = {
+            "period": {"from": y_from, "to": y_to},
+            "unique_visitors": len(yoy_visitors),
+            "sessions": len(yoy_sessions),
+            "accounts_created": await db.users.count_documents({"created_at": {"$gte": yf, "$lte": yt}}),
+            "specialists_signed": await db.users.count_documents({"role": "specialist", "created_at": {"$gte": yf, "$lte": yt}}),
+            "properties_added": await db.properties.count_documents({"created_at": {"$gte": yf, "$lte": yt}}),
+            "specialist_requests": await db.requests.count_documents({"created_at": {"$gte": yf, "$lte": yt}}),
+            "subscriptions": await db.hh_subscriptions.count_documents({"created_at": {"$gte": yf, "$lte": yt}}),
+            "bounce_rate_pct": round(yoy_bounces / len(yoy_sessions) * 100, 1) if yoy_sessions else 0.0,
+        }
+
     return {
-        "period": {"from": d_from, "to": d_to},
+        "period": {"from": d_from, "to": d_to, "days": days_len},
+        "granularity": effective_granularity,
         "kpi": {
             "unique_visitors": len(visitors),
             "sessions": len(sessions),
@@ -490,6 +568,7 @@ async def analytics_overview(
             "avg_session_sec": round(total_dur / len(sessions) / 1000) if sessions else 0,
         },
         "kpi_prev": kpi_prev,
+        "kpi_yoy": kpi_yoy,
         "sources": [
             {"source": k, "sessions": v["sessions"], "visitors": len(v["visitors"])}
             for k, v in sorted(by_source.items(), key=lambda x: -x[1]["sessions"])
@@ -501,12 +580,12 @@ async def analytics_overview(
 
 @admin_router.get("/analytics/insights")
 async def analytics_insights(
-    period: str = Query("week", pattern="^(day|week|month|custom)$"),
+    period: str = Query("week", pattern="^(day|week|month|60d|90d|6m|12m|ytd|custom)$"),
     date_from: str = "", date_to: str = "",
     user: dict = Depends(require_role("admin")),
 ):
     """AI Insights standard (Design System): bullets + alerts + recomandări derivate din KPI."""
-    data = await analytics_overview(period, date_from, date_to, user)
+    data = await analytics_overview(period, date_from, date_to, "auto", user)
     k, kp = data["kpi"], data.get("kpi_prev", {})
     bullets, alerts, recs = [], [], []
 
@@ -547,7 +626,7 @@ async def analytics_insights(
 
 @admin_router.get("/analytics/pages")
 async def analytics_pages(
-    period: str = Query("week", pattern="^(day|week|month|custom)$"),
+    period: str = Query("week", pattern="^(day|week|month|60d|90d|6m|12m|ytd|custom)$"),
     date_from: str = "", date_to: str = "",
     user: dict = Depends(require_role("admin")),
 ):
@@ -605,7 +684,7 @@ async def export_csv(
         for i in data["items"]:
             w.writerow([i["path"], i["views"], i["avg_time_sec"], i["bounce_rate_pct"]])
     else:
-        data = await analytics_overview(period, date_from, date_to, user)
+        data = await analytics_overview(period, date_from, date_to, "auto", user)
         w.writerow(["zi", "vizitatori", "sesiuni"])
         for s in data["series"]:
             w.writerow([s["day"], s["visitors"], s["sessions"]])
@@ -632,7 +711,7 @@ WA_MEDIUM_LABELS = {"group": "Grupuri", "channel": "Canale", "private": "Privat"
 
 @admin_router.get("/analytics/whatsapp")
 async def analytics_whatsapp(
-    period: str = Query("month", pattern="^(day|week|month|custom)$"),
+    period: str = Query("month", pattern="^(day|week|month|60d|90d|6m|12m|ytd|custom)$"),
     date_from: str = "", date_to: str = "",
     user: dict = Depends(require_role("admin")),
 ):
@@ -670,7 +749,7 @@ async def analytics_whatsapp(
 
 @admin_router.get("/analytics/heatmap")
 async def analytics_heatmap(
-    period: str = Query("month", pattern="^(day|week|month|custom)$"),
+    period: str = Query("month", pattern="^(day|week|month|60d|90d|6m|12m|ytd|custom)$"),
     date_from: str = "", date_to: str = "", path: str = "",
     user: dict = Depends(require_role("admin")),
 ):
@@ -688,7 +767,7 @@ async def analytics_heatmap(
 
 @admin_router.get("/analytics/bounce")
 async def analytics_bounce(
-    period: str = Query("week", pattern="^(day|week|month|custom)$"),
+    period: str = Query("week", pattern="^(day|week|month|60d|90d|6m|12m|ytd|custom)$"),
     date_from: str = "", date_to: str = "",
     user: dict = Depends(require_role("admin")),
 ):
@@ -908,7 +987,7 @@ async def delete_ab_experiment(eid: str, user: dict = Depends(require_role("admi
 
 @admin_router.get("/analytics/export.pdf")
 async def export_pdf(
-    period: str = Query("month", pattern="^(day|week|month|custom)$"),
+    period: str = Query("month", pattern="^(day|week|month|60d|90d|6m|12m|ytd|custom)$"),
     date_from: str = "", date_to: str = "",
     user: dict = Depends(require_role("admin")),
 ):
@@ -1004,3 +1083,120 @@ async def export_pdf(
     doc.build(story)
     return Response(content=buf.getvalue(), media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="propmanage_raport_{p["from"]}_{p["to"]}.pdf"'})
+
+
+
+# ═══════════════════════ CAMPAIGN MARKERS & COMPARE (admin) ═══════════════════════
+
+@admin_router.get("/analytics/campaign-markers")
+async def analytics_campaign_markers(
+    period: str = Query("month", pattern="^(day|week|month|60d|90d|6m|12m|ytd|custom)$"),
+    date_from: str = "", date_to: str = "",
+    user: dict = Depends(require_role("admin")),
+):
+    """Returnează campaniile cu prima activitate în intervalul cerut → markers pe graficul de trafic."""
+    d_from, d_to = _period_range(period, date_from, date_to)
+    camps = await db.growth_campaigns.find({}).to_list(500)
+    markers = []
+    for c in camps:
+        # prima sesiune atribuită campaniei
+        first = await db.analytics_sessions.find_one(
+            {"campaign_code": c.get("code")},
+            sort=[("day", 1)],
+        )
+        anchor = None
+        if first and first.get("day"):
+            anchor = first["day"]
+        elif c.get("created_at"):
+            anchor = c["created_at"][:10]
+        if not anchor:
+            continue
+        # doar dacă e în intervalul cerut
+        if anchor < d_from or anchor > d_to:
+            continue
+        markers.append({
+            "id": c.get("id"),
+            "code": c.get("code"),
+            "name": c.get("name"),
+            "channel": c.get("channel"),
+            "day": anchor,
+        })
+    markers.sort(key=lambda x: x["day"])
+    return {"period": {"from": d_from, "to": d_to}, "markers": markers}
+
+
+async def _campaign_stats_in_period(camp: dict, d_from: str, d_to: str) -> dict:
+    """Stats per campanie filtrate pe interval — pentru comparator."""
+    code = camp.get("code")
+    sessions = await db.analytics_sessions.find({
+        "campaign_code": code,
+        "day": {"$gte": d_from, "$lte": d_to},
+    }).to_list(10000)
+    visitors = {}
+    for s in sessions:
+        v = visitors.setdefault(s["visitor_id"], {"days": set(), "dur": 0})
+        v["days"].add(s.get("day"))
+        v["dur"] = max(v["dur"], s.get("duration_ms", 0))
+        for f in ("signup_started", "account_created", "subscription", "specialist_request", "property_added"):
+            if s.get(f"funnel_{f}"):
+                v[f] = True
+    unique_visitors = len(visitors)
+    over_30s = sum(1 for v in visitors.values() if v["dur"] >= 30_000)
+    signup_started = sum(1 for v in visitors.values() if v.get("signup_started"))
+    accounts = sum(1 for v in visitors.values() if v.get("account_created"))
+    subscriptions = sum(1 for v in visitors.values() if v.get("subscription"))
+    returned_7d = sum(1 for v in visitors.values() if len(v["days"]) >= 2)
+    conversion = round(accounts / unique_visitors * 100, 1) if unique_visitors else 0.0
+    # serie zilnică pentru chart-ul comparator
+    daily = defaultdict(lambda: {"sessions": 0, "visitors": set()})
+    for s in sessions:
+        daily[s.get("day")]["sessions"] += 1
+        daily[s.get("day")]["visitors"].add(s["visitor_id"])
+    series_daily = []
+    cur = datetime.fromisoformat(d_from).date()
+    end = datetime.fromisoformat(d_to).date()
+    while cur <= end:
+        k = cur.isoformat()
+        series_daily.append({"day": k, "sessions": daily[k]["sessions"], "visitors": len(daily[k]["visitors"])})
+        cur += timedelta(days=1)
+    granularity = _auto_granularity(d_from, d_to)
+    series = _aggregate_series(series_daily, granularity)
+    return {
+        "id": camp.get("id"),
+        "code": code,
+        "name": camp.get("name"),
+        "channel": camp.get("channel"),
+        "recipients": camp.get("recipients_count", 0),
+        "stats": {
+            "unique_visitors": unique_visitors,
+            "over_30s": over_30s,
+            "signup_started": signup_started,
+            "accounts_created": accounts,
+            "subscriptions": subscriptions,
+            "returned_7d": returned_7d,
+            "conversion_pct": conversion,
+        },
+        "series": series,
+    }
+
+
+@admin_router.get("/growth/campaigns/compare")
+async def compare_campaigns(
+    ids: str = Query("", description="Comma-separated campaign ids (max 3)"),
+    period: str = Query("month", pattern="^(day|week|month|60d|90d|6m|12m|ytd|custom)$"),
+    date_from: str = "", date_to: str = "",
+    user: dict = Depends(require_role("admin")),
+):
+    """Comparator side-by-side pentru 2-3 campanii pe intervalul selectat."""
+    id_list = [x.strip() for x in ids.split(",") if x.strip()][:3]
+    if len(id_list) < 2:
+        raise HTTPException(400, "Selectează minim 2 campanii pentru comparație (max 3).")
+    d_from, d_to = _period_range(period, date_from, date_to)
+    granularity = _auto_granularity(d_from, d_to)
+    results = []
+    for cid in id_list:
+        camp = await db.growth_campaigns.find_one({"id": cid})
+        if not camp:
+            continue
+        results.append(await _campaign_stats_in_period(camp, d_from, d_to))
+    return {"period": {"from": d_from, "to": d_to}, "granularity": granularity, "campaigns": results}
