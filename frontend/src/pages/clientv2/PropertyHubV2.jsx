@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Building2, Box, HeartPulse, Clock, Wallet, Settings2, CreditCard, Dna, Fingerprint, Wrench, FileText, Share2, CalendarClock, Radio, Sparkles, Check, Gauge, Layers, Plus, ShieldCheck } from "lucide-react";
+import { Building2, Box, HeartPulse, Clock, Wallet, Settings2, CreditCard, Dna, Fingerprint, Wrench, FileText, Share2, CalendarClock, Radio, Sparkles, Check, Gauge, Layers, Plus, ShieldCheck, ClipboardList } from "lucide-react";
 import { API } from "../DashShared";
 import { formatApiError } from "../../auth";
 import { GREEN, GREEN_SOFT, ListItem, Sheet, CTA, AmountInput } from "./ui";
 import { DocumentVaultCard } from "./DocumentVault";
 import { PassportCard } from "./PassportCard";
+import { PropertyTechnicalRecord } from "./PropertyTechnicalRecord";
 
 export const WalletSheet = ({ user, onClose }) => {
   const [amount, setAmount] = useState("");
@@ -544,6 +545,7 @@ const DnaAttributesCard = ({ propId }) => {
 // PPOS P3d — Property Hub „Casa mea": desktop = record page (left sub-nav + main + right panel sticky); mobil = stivă neschimbată.
 const HUB_SECTIONS = [
   { id: "rezumat", label: "Rezumat", icon: Building2 },
+  { id: "dosar", label: "Dosar Tehnic", icon: ClipboardList },
   { id: "carte", label: "Cartea casei", icon: FileText },
   { id: "twin", label: "Twin & Active", icon: Box },
   { id: "istoric", label: "Istoric & Riscuri", icon: Clock },
@@ -646,6 +648,7 @@ export const PropertyHubV2 = ({ user, prop, properties, setSelectedPropId, actio
           <div className={sec("carte")}><DocumentVaultCard prop={prop} /></div>
           <div className={sec("pasaport")}><PassportCard prop={prop} /></div>
           <div className={sec("rezumat")}><PropertyDnaCard propId={prop.id} /></div>
+          <div className={sec("dosar")}><PropertyTechnicalRecord propId={prop.id} /></div>
           <div className={sec("twin")}><TwinMaturityCard propId={prop.id} actions={actions} /></div>
           <div className={sec("istoric")}><PropertyRisksCard propId={prop.id} actions={actions} /></div>
           <div className={sec("twin")}>

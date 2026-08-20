@@ -1,3 +1,45 @@
+## 🏗️ PROPERTY-TECHNICAL-RECORD-v1 — Dosar Tehnic al Proprietății · LIVRAT (20 Feb 2026)
+
+**Cerere**: Fondator dorea prima piesă REALĂ de produs care să concretizeze conceptul de "dosar tehnic viu" al unei proprietăți, agregând Domain A (Property Core existent), Domain B (Building Context) și Domain C (Regulatory Diagnostics) — fără să comaseze semantica celor trei domenii și fără să duplice infrastructura existentă.
+
+**Constraint-uri respectate strict**:
+- Non-destructiv: 0 migrare, 0 ștergeri, 0 modificări la flow-urile existente (Documente, Twin, Timeline, Marketplace, Billing, Stripe)
+- Domain A/B/C rămân distincte semantic — NICIODATĂ merge într-un singur model
+- Diagnostic nou = mereu `verification_status="unverified"` (niciodată VERIFIED automat)
+- `jurisdiction` OBLIGATORIU pentru orice diagnostic (FR/RO/EU/OTHER)
+- Fără scor numeric în Transaction Readiness — doar statusuri (COMPLETE/PARTIAL/MISSING/NOT_VERIFIED)
+- HartaBlocuri = doar `source_type=external_reference`, fără scraping/import automat
+
+**Implementare**:
+
+Backend `/app/backend/routes/property_technical_record.py` (router nou, ~770 linii):
+- `GET /api/technical-record/vocabulary` — categorii extensibile (diagnostic_types × 13, jurisdictions × 4, building_types × 6, verification_levels × 4, source_types × 4)
+- `GET /api/properties/{id}/technical-record` — agregare completă (property_core reutilizat din properties/documents/assets/twins/requests/warranties, building_context, regulatory_diagnostics, transaction_readiness)
+- `GET/POST /api/properties/{id}/building-context` — crează/atașează building context (merge non-destructiv pe câmp `context` din `buildings`)
+- `PATCH /api/buildings/{id}/context` — update non-destructiv (owner-of-property sau admin)
+- `GET/POST /api/properties/{id}/diagnostics` · `PATCH/DELETE /api/diagnostics/{id}` — CRUD peste colecție nouă `property_diagnostics` (izolată, soft-delete via `deleted:true`, history stack)
+- `GET /api/properties/{id}/transaction-readiness` — 10 criterii cu status per criteriu + overall_status (worst-case) + disclaimer
+
+Frontend `/app/frontend/src/pages/clientv2/PropertyTechnicalRecord.jsx` (~770 linii):
+- Header cu property name/address + status badge global + 3 summary tiles (Documente/Ultima actualizare/Diagnostice)
+- Desktop: sub-nav vertical sticky cu 7 secțiuni (Proprietatea / Contextul clădirii / Diagnostice tehnice / Sisteme & Active / Documente & Evidență / Istoric / Pregătire tranzacție)
+- Mobile: accordion cu toggle expand/collapse pe fiecare secțiune
+- CRUD complet UI pentru Building Context și Diagnostics (form-uri validate, badge-uri VerifBadge/StatusBadge, disclaimers vizibili)
+- Reutilizare TOTALĂ: SystemsSection preia /assets, DocumentsSection preia stats.documents_by_category, HistorySection preia /timeline — fără duplicare
+- Integrat în `PropertyHubV2` ca item nou `HUB_SECTIONS.dosar` cu icon ClipboardList; păstrează 100% cele 5 secțiuni existente
+
+Colecții impact:
+- NEW: `property_diagnostics` (izolată)
+- EXTENDED: `buildings.context` (câmp nou opțional, aditiv, NU modifică existing fields)
+- REUSED: `properties`, `property_documents`, `property_assets`, `twins`, `requests`, `warranties`, `maintenance_logs`, `activity_events`
+
+**Testing**: `testing_agent_v3_fork` iter181 · **21/21 backend tests passed (100%)** · **Frontend 100% flow-uri critice** · 0 bug-uri critice / 0 minore · pytest suite `/app/backend/tests/test_property_technical_record_iter181.py`
+
+**Impact**: Prima piesă reală care conectează cele 3 domenii strategice fără a le contamina semantic. Bază pentru future work (asset audit trail, diagnostic upload de la specialist, verified-by-admin flow).
+
+---
+
+
 ## 📊 ANALYTICS-EXT-v1.0 — Extindere Analytics & Growth pe intervale până la 12 luni · LIVRAT (06 Feb 2026)
 
 **Cerere**: Fondator dorea extinderea /admin/analytics-growth de la Azi/7z/30z la intervale până la 12 luni, cu istoric persistent pentru comparație campanii.
