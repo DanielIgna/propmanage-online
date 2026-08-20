@@ -336,7 +336,14 @@ def _diag_out(d: dict) -> dict:
         ),
         "confidence": d.get("confidence", "low"),
         "document_ref": d.get("document_ref"),
+        "document_snapshot": d.get("document_snapshot"),
         "notes": d.get("notes"),
+        "verified_at": d.get("verified_at"),
+        "verified_by": d.get("verified_by"),
+        "verified_by_name": d.get("verified_by_name"),
+        "verification_notes": d.get("verification_notes"),
+        "rejected_at": d.get("rejected_at"),
+        "rejection_reason": d.get("rejection_reason"),
         "created_at": d.get("created_at"),
         "created_by": d.get("created_by"),
         "created_by_name": d.get("created_by_name"),
@@ -390,6 +397,11 @@ async def add_diagnostic(
     )
     provenance = "documented" if role in ("specialist", "admin", "operator") else "declared"
 
+    # Validează document_ref (dacă e furnizat): trebuie să aparțină acestei proprietăți.
+    doc_snapshot = None
+    if data.document_ref:
+        doc_snapshot = await _validate_and_snapshot_document(prop_id, data.document_ref)
+
     now = datetime.now(timezone.utc).isoformat()
     doc = {
         "property_id": prop_id,
@@ -406,9 +418,30 @@ async def add_diagnostic(
         "updated_at": now,
         "history": [{"at": now, "by": user.get("name"), "event": "create"}],
     }
+    if doc_snapshot:
+        doc["document_snapshot"] = doc_snapshot
     ins = await db.property_diagnostics.insert_one(doc)
     doc["_id"] = ins.inserted_id
     return {"diagnostic": _diag_out(doc)}
+
+
+async def _validate_and_snapshot_document(prop_id: str, doc_id: str) -> dict:
+    """Verifică documentul aparține proprietății și returnează un snapshot minim."""
+    try:
+        pdoc = await db.property_documents.find_one(
+            {"_id": ObjectId(doc_id), "property_id": prop_id, "deleted": {"$ne": True}}
+        )
+    except Exception:
+        pdoc = None
+    if not pdoc:
+        raise HTTPException(400, "document_ref invalid pentru această proprietate")
+    return {
+        "id": str(pdoc["_id"]),
+        "title": pdoc.get("title"),
+        "category": pdoc.get("category"),
+        "filename": pdoc.get("filename"),
+        "uploaded_at": pdoc.get("uploaded_at"),
+    }
 
 
 @router.patch("/diagnostics/{diag_id}")
@@ -753,6 +786,10 @@ async def technical_record(prop_id: str, user: dict = Depends(get_current_user))
             "last_updated": last_updated,
             "overall_status": readiness["overall_status"],
         },
+        "viewer": {
+            "role": user.get("active_view") or user.get("role"),
+            "is_verifier": (user.get("active_view") or user.get("role")) in ("admin", "operator"),
+        },
         "endpoints": {
             "documents": f"/api/properties/{prop_id}/documents",
             "assets": f"/api/properties/{prop_id}/assets",
@@ -772,3 +809,382 @@ def _by_jurisdiction(items: list) -> dict:
         j = d.get("jurisdiction") or "OTHER"
         out[j] = out.get(j, 0) + 1
     return out
+
+
+# =============================================================================
+# ADMIN VERIFICATION FLOW — un diagnostic devine VERIFIED doar prin această cale
+# =============================================================================
+def _require_verifier(user: dict):
+    role = user.get("active_view") or user.get("role")
+    if role not in ("admin", "operator"):
+        raise HTTPException(403, "Doar admin/operator poate verifica.")
+    return role
+
+
+class VerifyPayload(BaseModel):
+    notes: Optional[str] = Field(default=None, max_length=2000)
+
+
+class RejectPayload(BaseModel):
+    reason: str = Field(min_length=3, max_length=2000)
+
+
+@router.post("/admin/diagnostics/{diag_id}/verify")
+async def verify_diagnostic(
+    diag_id: str,
+    payload: VerifyPayload = Body(default_factory=VerifyPayload),
+    user: dict = Depends(get_current_user),
+):
+    """Promovează un diagnostic la VERIFIED. Necesită evidence (document_ref sau source_reference)."""
+    _require_verifier(user)
+    try:
+        d = await db.property_diagnostics.find_one(
+            {"_id": ObjectId(diag_id), "deleted": {"$ne": True}}
+        )
+    except Exception:
+        d = None
+    if not d:
+        raise HTTPException(404, "Diagnostic inexistent")
+    if not (d.get("document_ref") or d.get("source_reference")):
+        raise HTTPException(
+            400,
+            "Diagnosticul nu poate fi verificat fără evidență (document atașat sau referință sursă).",
+        )
+    now = datetime.now(timezone.utc).isoformat()
+    entry = {
+        "at": now, "by": user.get("name"), "event": "verify",
+        "notes": (payload.notes or None),
+    }
+    await db.property_diagnostics.update_one(
+        {"_id": d["_id"]},
+        {
+            "$set": {
+                "verification_status": "verified",
+                "confidence": "high",
+                "verified_at": now,
+                "verified_by": user.get("id"),
+                "verified_by_name": user.get("name"),
+                "verification_notes": payload.notes,
+                "updated_at": now,
+            },
+            "$push": {"history": entry},
+        },
+    )
+    d2 = await db.property_diagnostics.find_one({"_id": d["_id"]})
+    return {"diagnostic": _diag_out(d2)}
+
+
+@router.post("/admin/diagnostics/{diag_id}/reject")
+async def reject_diagnostic(
+    diag_id: str,
+    payload: RejectPayload = Body(...),
+    user: dict = Depends(get_current_user),
+):
+    """Respinge verificarea: readuce diagnosticul la UNVERIFIED cu motiv."""
+    _require_verifier(user)
+    try:
+        d = await db.property_diagnostics.find_one(
+            {"_id": ObjectId(diag_id), "deleted": {"$ne": True}}
+        )
+    except Exception:
+        d = None
+    if not d:
+        raise HTTPException(404, "Diagnostic inexistent")
+    now = datetime.now(timezone.utc).isoformat()
+    entry = {
+        "at": now, "by": user.get("name"), "event": "reject",
+        "reason": payload.reason,
+    }
+    await db.property_diagnostics.update_one(
+        {"_id": d["_id"]},
+        {
+            "$set": {
+                "verification_status": "unverified",
+                "confidence": "low",
+                "rejected_at": now,
+                "rejection_reason": payload.reason,
+                "updated_at": now,
+            },
+            "$push": {"history": entry},
+        },
+    )
+    d2 = await db.property_diagnostics.find_one({"_id": d["_id"]})
+    return {"diagnostic": _diag_out(d2)}
+
+
+@router.post("/admin/buildings/{building_id}/verify")
+async def verify_building_context(
+    building_id: str,
+    payload: VerifyPayload = Body(default_factory=VerifyPayload),
+    user: dict = Depends(get_current_user),
+):
+    """Marchează context-ul unei clădiri ca VERIFIED — devine sursă comună pentru toți vecinii."""
+    _require_verifier(user)
+    try:
+        b = await db.buildings.find_one({"_id": ObjectId(building_id)})
+    except Exception:
+        b = None
+    if not b:
+        raise HTTPException(404, "Clădirea nu există")
+    now = datetime.now(timezone.utc).isoformat()
+    ctx = {**(b.get("context") or {})}
+    ctx["verification_status"] = "verified"
+    ctx["verified_at"] = now
+    ctx["verified_by"] = user.get("id")
+    ctx["verified_by_name"] = user.get("name")
+    ctx["verification_notes"] = payload.notes
+    ctx["updated_at"] = now
+    await db.buildings.update_one({"_id": b["_id"]}, {"$set": {"context": ctx}})
+    b2 = await db.buildings.find_one({"_id": b["_id"]})
+    return {"building": _serialize_building(b2)}
+
+
+# =============================================================================
+# DOCUMENT PICKER — helper pentru UI care leagă un diagnostic de un document existent
+# =============================================================================
+@router.get("/properties/{prop_id}/documents-picker")
+async def documents_picker(prop_id: str, user: dict = Depends(get_current_user)):
+    """Listă compactă de documente pentru selector în formularul de diagnostic."""
+    await _load_property_for(user, prop_id)
+    docs = []
+    async for d in db.property_documents.find(
+        {"property_id": prop_id, "deleted": {"$ne": True}, "superseded": {"$ne": True}}
+    ).sort("uploaded_at", -1):
+        docs.append({
+            "id": str(d["_id"]),
+            "title": d.get("title"),
+            "category": d.get("category"),
+            "filename": d.get("filename"),
+            "uploaded_at": d.get("uploaded_at"),
+            "verification_status": d.get("verification_status", "unverified"),
+        })
+    return {"documents": docs, "total": len(docs)}
+
+
+# =============================================================================
+# BUILDING NEIGHBOURS — a doua axă: BUILDING → multiple PROPERTIES
+# =============================================================================
+@router.get("/properties/{prop_id}/building-neighbours")
+async def building_neighbours(prop_id: str, user: dict = Depends(get_current_user)):
+    """Alte proprietăți din aceeași clădire. Doar identitate minimă (nu date personale)."""
+    prop = await _load_property_for(user, prop_id)
+    bid = prop.get("building_id")
+    if not bid:
+        return {"building": None, "neighbours": [], "total": 0}
+    building = await _load_building_for_property(prop)
+    others = []
+    async for p in db.properties.find(
+        {"building_id": bid, "_id": {"$ne": ObjectId(prop_id)}},
+        {"name": 1, "type": 1, "rooms": 1, "surface": 1, "created_at": 1},
+    ):
+        others.append({
+            "id": str(p["_id"]),
+            "name": p.get("name"),
+            "type": p.get("type"),
+            "rooms": p.get("rooms"),
+            "surface": p.get("surface"),
+        })
+    return {
+        "building": _serialize_building(building) if building else None,
+        "neighbours": others,
+        "total": len(others),
+        "shared_context_verified": (building or {}).get("context", {}).get("verification_status") == "verified",
+    }
+
+
+class AttachBuildingPayload(BaseModel):
+    building_id: str = Field(min_length=8)
+
+
+@router.post("/properties/{prop_id}/attach-building")
+async def attach_existing_building(
+    prop_id: str,
+    payload: AttachBuildingPayload = Body(...),
+    user: dict = Depends(get_current_user),
+):
+    """Conectează o proprietate existentă la o clădire deja înregistrată (o clădire verificată).
+
+    Nu modifică contextul clădirii, doar face legătura. Astfel toți vecinii moștenesc
+    Building Context-ul verificat, fără duplicare de date.
+    """
+    prop = await _load_property_for(user, prop_id)
+    try:
+        b = await db.buildings.find_one({"_id": ObjectId(payload.building_id)})
+    except Exception:
+        b = None
+    if not b:
+        raise HTTPException(404, "Clădirea specificată nu există")
+    # doar owner-ul proprietății sau admin poate conecta
+    role = user.get("active_view") or user.get("role")
+    if role not in ("admin", "operator", "franchise_admin") and str(prop.get("owner_id")) != str(user.get("id")):
+        raise HTTPException(403, "Nu ai acces la această proprietate")
+    await db.properties.update_one(
+        {"_id": ObjectId(prop_id)},
+        {"$set": {"building_id": payload.building_id}},
+    )
+    return {"attached": True, "building": _serialize_building(b)}
+
+
+@router.get("/buildings/search")
+async def search_buildings_for_ptr(
+    q: str = "",
+    limit: int = 20,
+    user: dict = Depends(get_current_user),
+):
+    """Caută clădiri după nume/adresă pentru „conectează la o clădire existentă"."""
+    _ = user  # any authenticated user
+    limit = max(1, min(limit, 50))
+    query = {}
+    if q and len(q) >= 2:
+        import re as _re
+        rx = {"$regex": _re.escape(q), "$options": "i"}
+        query = {"$or": [{"name": rx}, {"address": rx}, {"city": rx}]}
+    else:
+        return {"buildings": [], "total": 0}
+    items = []
+    async for b in db.buildings.find(query).limit(limit):
+        s = _serialize_building(b)
+        s["units_registered"] = await db.properties.count_documents({"building_id": s["id"]})
+        items.append(s)
+    return {"buildings": items, "total": len(items)}
+
+
+# =============================================================================
+# TRANSACTION READINESS — export PDF (indicator de completitudine, nu certificare)
+# =============================================================================
+@router.get("/properties/{prop_id}/transaction-readiness.pdf")
+async def transaction_readiness_pdf(prop_id: str, user: dict = Depends(get_current_user)):
+    """One-page PDF cu checklist-ul de pregătire, disclaimer vizibil."""
+    from fastapi.responses import Response as _R
+    prop = await _load_property_for(user, prop_id)
+    readiness = await _compute_transaction_readiness(prop_id, prop)
+    building = await _load_building_for_property(prop)
+    diags_count = await db.property_diagnostics.count_documents(
+        {"property_id": prop_id, "deleted": {"$ne": True}}
+    )
+    pdf_bytes = _render_readiness_pdf(prop, readiness, building, diags_count)
+    filename = f"pregatire-tranzactie-{prop_id[:8]}.pdf"
+    return _R(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _render_readiness_pdf(prop: dict, readiness: dict, building: Optional[dict], diags_count: int) -> bytes:
+    """Randează un raport A4 simplu cu reportlab. Nu depinde de resurse externe."""
+    from io import BytesIO
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas
+    from reportlab.lib import colors as _c
+
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    W, H = A4
+    x = 20 * mm
+    y = H - 20 * mm
+
+    def line(text, font="Helvetica", size=10, color=_c.black, dy=6 * mm):
+        nonlocal y
+        c.setFont(font, size)
+        c.setFillColor(color)
+        c.drawString(x, y, text)
+        y -= dy
+
+    # Header
+    c.setFillColor(_c.HexColor("#0f172a"))
+    c.rect(0, H - 15 * mm, W, 15 * mm, fill=1, stroke=0)
+    c.setFillColor(_c.white)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(x, H - 10 * mm, "PropManage · Pregătire tranzacție")
+    c.setFont("Helvetica", 9)
+    c.setFillColor(_c.HexColor("#94a3b8"))
+    c.drawRightString(W - 20 * mm, H - 10 * mm, datetime.now(timezone.utc).strftime("%d %b %Y %H:%M UTC"))
+    y = H - 25 * mm
+
+    line(prop.get("name") or "Proprietate", "Helvetica-Bold", 14, _c.HexColor("#0f172a"), dy=6 * mm)
+    if prop.get("address"):
+        line(prop["address"], "Helvetica", 10, _c.HexColor("#475569"), dy=4 * mm)
+    y -= 3 * mm
+
+    # Status global
+    status = readiness.get("overall_status", "MISSING")
+    status_colors = {
+        "COMPLETE": _c.HexColor("#059669"),
+        "PARTIAL": _c.HexColor("#d97706"),
+        "MISSING": _c.HexColor("#64748b"),
+        "NOT_VERIFIED": _c.HexColor("#0284c7"),
+    }
+    labels = {"COMPLETE": "Complet", "PARTIAL": "Parțial", "MISSING": "Lipsă", "NOT_VERIFIED": "Neverificat"}
+    c.setFillColor(status_colors.get(status, _c.gray))
+    c.rect(x, y - 2 * mm, 40 * mm, 8 * mm, fill=1, stroke=0)
+    c.setFillColor(_c.white)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(x + 3 * mm, y + 1 * mm, f"Status general: {labels.get(status, status)}")
+    y -= 12 * mm
+
+    # Meta
+    if building:
+        meta = f"Clădire: {building.get('name') or '—'} · An: {building.get('construction_year') or '—'} · Tip: {building.get('building_type_label') or '—'}"
+        line(meta, "Helvetica", 9, _c.HexColor("#475569"), dy=5 * mm)
+    line(f"Diagnostice înregistrate: {diags_count}", "Helvetica", 9, _c.HexColor("#475569"), dy=5 * mm)
+    y -= 2 * mm
+
+    # Criteria list
+    c.setFont("Helvetica-Bold", 11)
+    c.setFillColor(_c.HexColor("#0f172a"))
+    c.drawString(x, y, "Criterii de completitudine")
+    y -= 6 * mm
+    for crit in readiness.get("criteria", []):
+        crit_status = crit["status"]
+        col = status_colors.get(crit_status, _c.gray)
+        # bullet
+        c.setFillColor(col)
+        c.circle(x + 1.5 * mm, y + 1 * mm, 1.5 * mm, fill=1, stroke=0)
+        c.setFillColor(_c.HexColor("#0f172a"))
+        c.setFont("Helvetica-Bold", 9.5)
+        c.drawString(x + 5 * mm, y + 0.5 * mm, crit["label"])
+        c.setFont("Helvetica", 8.5)
+        c.setFillColor(_c.HexColor("#64748b"))
+        c.drawString(x + 5 * mm, y - 2 * mm, crit["detail"])
+        c.setFont("Helvetica-Bold", 8.5)
+        c.setFillColor(col)
+        c.drawRightString(W - 20 * mm, y + 0.5 * mm, labels.get(crit_status, crit_status).upper())
+        y -= 8 * mm
+        if y < 40 * mm:
+            c.showPage()
+            y = H - 20 * mm
+
+    # Missing evidence
+    missing = readiness.get("missing_evidence") or []
+    if missing:
+        y -= 3 * mm
+        c.setFont("Helvetica-Bold", 10)
+        c.setFillColor(_c.HexColor("#0f172a"))
+        c.drawString(x, y, "Ce lipsește / de completat")
+        y -= 5 * mm
+        c.setFont("Helvetica", 9)
+        c.setFillColor(_c.HexColor("#475569"))
+        for m in missing[:8]:
+            c.drawString(x + 4 * mm, y, f"• {m}")
+            y -= 4.5 * mm
+
+    # Footer disclaimer
+    c.setFillColor(_c.HexColor("#f1f5f9"))
+    c.rect(0, 0, W, 18 * mm, fill=1, stroke=0)
+    c.setFillColor(_c.HexColor("#475569"))
+    c.setFont("Helvetica-Oblique", 8)
+    disclaimer_lines = [
+        readiness.get("disclaimer", ""),
+        "Nu este un certificat juridic sau un scor de conformitate. Documentele individuale își păstrează statusul propriu de verificare.",
+        "Generat de PropManage · propmanage.ro",
+    ]
+    yy = 12 * mm
+    for ln in disclaimer_lines:
+        c.drawString(x, yy, ln)
+        yy -= 3.5 * mm
+
+    c.showPage()
+    c.save()
+    return buf.getvalue()
