@@ -1,3 +1,38 @@
+## 🔒 TASK 1 — Subscription/Entitlement Gate · LIVRAT (24 Feb 2026)
+
+**Cerere**: Layer centralizat de acces care traduce `hh_subscriptions` existent într-un vocabular stabil de FEATURES + TIERS. Technical existence ≠ user access. Reutilizează infrastructura Stripe/hh_subscriptions/hh_plans existentă, nu o duplică.
+
+**Implementare (minimă, non-destructivă)**:
+
+Backend NEW:
+- `/app/backend/entitlements.py` — modul central: `TIER_FREE|CLIENT_BASIC|CLIENT_PRO|CLIENT_PREMIUM`, constants FEATURE (`house_health_basic`, `property_technical_record`, `property_create`, etc.), `get_user_entitlements(user)` cu contract stabil, `require_entitlement(feature)` FastAPI dependency care aruncă 402 Payment Required cu payload structurat.
+- `/app/backend/routes/entitlements_api.py` — 3 endpoints: `GET /api/me/entitlements` (frontend), `GET /api/admin/entitlements/catalog` (admin only), `GET /api/admin/users/{id}/entitlements` (admin lookup).
+
+Backend MODIFIED (chirurgical):
+- `/app/backend/routes/house_health.py`:
+  - Adăugat `_assert_house_health_entitlement()` helper local
+  - `/dashboard` returnează `lock_reason=no_subscription` pentru FREE users cu twin (nu doar `no_twin`)
+  - `POST /documents` blocat pentru FREE cu HTTP 402 (mutation gate — frontend deja gestiona statul locked prin card)
+- `/app/backend/routes/register.py` — înregistrare router nou
+
+Frontend NEW (utilitare reutilizabile pentru viitor):
+- `/app/frontend/src/hooks/useEntitlements.js` — hook cu cache session-level + `hasFeature(name)` + `refresh()`
+- `/app/frontend/src/components/LockedFeature.jsx` — component reutilizabil (mode: full|compact) cu CTA către `/pricing`
+
+**Maparea plan → tier**: basic→CLIENT_BASIC, pro→CLIENT_PRO, premium→CLIENT_PREMIUM, custom→CLIENT_PRO.
+
+**Regulă critică respectată**: Admin/operator/franchise_admin bypass automat (returnat `is_admin_bypass=true`). Specialist e pe canal separat, nu e afectat de gate-uri client.
+
+**Testing**: `testing_agent_v3_fork` iter183 · **14/14 backend pytest PASS (100%)** · Zero regresiuni pe `/eligibility`, GET `/documents`, DELETE `/documents/{id}`. Frontend UI existent HouseHealthCard.jsx afișa deja locked-sub state — funcționează automat cu noul răspuns backend.
+
+**Impact**: 
+- FREE users (nou înregistrați) → tier=FREE, doar 2 features (property_create + property_technical_record); HH mutations respins cu 402 payload; UI card locked cu CTA "Activează PropManage Basic".
+- Existing subscribers (plan=basic/pro/premium) → funcționează neschimbat, tier detectat corect.
+- Admin → bypass automat, poate verifica alți useri via `/api/admin/users/{id}/entitlements`.
+
+---
+
+
 ## 🔐 PROPERTY-TECHNICAL-RECORD-v2 — Verification Chain + Building Axis + PDF · LIVRAT (24 Feb 2026)
 
 **Cerere**: Fondator a aprobat 4 enhancement-uri P0/P0/P1/P2 care transformă PTR dintr-o pagină de agregare într-un sistem real de memorie tehnică verificabilă cu două axe:

@@ -39,6 +39,7 @@ from pydantic import BaseModel, Field
 
 from db import db
 from deps import get_current_user, require_role
+from entitlements import F_HOUSE_HEALTH_BASIC, get_user_entitlements
 import storage_service
 from storage_client import get_object as st_get_object, put_object as st_put_object
 
@@ -94,6 +95,27 @@ async def _user_active_subscription(user_id: str) -> Optional[dict]:
         ],
     }, {"_id": 0})
     return sub
+
+
+async def _assert_house_health_entitlement(user: dict) -> dict:
+    """Central gate: aruncă 402 dacă user-ul nu are house_health_basic.
+    Specialiștii care produc evaluări sunt exceptați (role check separat)."""
+    role = user.get("active_view") or user.get("role")
+    if role == "specialist":
+        return user
+    ent = await get_user_entitlements(user)
+    if F_HOUSE_HEALTH_BASIC in set(ent["features"]):
+        return user
+    raise HTTPException(
+        status_code=402,
+        detail={
+            "error": "entitlement_required",
+            "feature": F_HOUSE_HEALTH_BASIC,
+            "current_tier": ent["tier"],
+            "current_tier_label": ent["tier_label"],
+            "message": "House Health Basic este inclus în abonamentul PropManage. Activează abonamentul pentru a accesa această funcție.",
+        },
+    )
 
 
 @router.get("/feature-flag")
@@ -178,6 +200,21 @@ async def dashboard(user=Depends(get_current_user)):
             "lock_message": "Serviciul House Health este disponibil doar proprietăților cu Digital Twin activ.",
         }
 
+    # Central entitlement gate — FREE users see locked upgrade state
+    role = user.get("active_view") or user.get("role")
+    if role not in ("admin", "operator", "franchise_admin", "specialist"):
+        ent = await get_user_entitlements(user)
+        if F_HOUSE_HEALTH_BASIC not in set(ent["features"]):
+            return {
+                "enabled": True,
+                "locked": True,
+                "lock_reason": "no_subscription",
+                "lock_message": "House Health Basic este inclus în abonamentul PropManage. Activează abonamentul pentru a accesa această funcție.",
+                "required_tier": "CLIENT_BASIC",
+                "current_tier": ent["tier"],
+                "cta_label": "Activează PropManage Basic",
+            }
+
     twin_id = twin.get("id")
 
     # Score (latest)
@@ -256,6 +293,7 @@ async def upload_document(
     """
     if not await _is_feature_enabled():
         raise HTTPException(403, "House Health nu este activ.")
+    await _assert_house_health_entitlement(user)
     if category not in ALLOWED_DOC_CATEGORIES:
         raise HTTPException(400, f"Categorie invalidă. Permise: {ALLOWED_DOC_CATEGORIES}")
     await _assert_twin_owner(twin_project_id, user["id"])

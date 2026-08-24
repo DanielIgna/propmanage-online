@@ -148,6 +148,7 @@ from routes.property_dna import router as property_dna_router
 from routes.property_documents import router as property_documents_router
 from routes.property_passport import router as property_passport_router, public_router as passport_public_router
 from routes.property_technical_record import router as property_technical_record_router
+from routes.entitlements_api import router as entitlements_api_router
 from routes.passport_analytics import router as passport_analytics_router
 from routes.beta_cockpit import router as beta_cockpit_router
 from routes.beta_issues import router as beta_issues_router
@@ -321,6 +322,7 @@ ALL_ROUTERS = (
     property_passport_router,
     passport_public_router,
     property_technical_record_router,
+    entitlements_api_router,
     passport_analytics_router,
     beta_cockpit_router,
     beta_issues_router,
