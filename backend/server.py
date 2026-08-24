@@ -324,6 +324,18 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=3600,
         )
+        # Task 8 · Renewal Reminder — daily at 09:15 Bucharest.
+        try:
+            from routes.renewal_reminders import renewal_reminder_tick
+            scheduler.add_job(
+                renewal_reminder_tick,
+                CronTrigger(hour=9, minute=15, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+                id="renewal_reminder_daily",
+                replace_existing=True,
+                misfire_grace_time=3600,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("renewal_reminder scheduler wire failed: %s", exc)
         # Self-Driving Automations — țintă 90%+ autonomie
         scheduler.add_job(
             low_risk_autopilot_tick,

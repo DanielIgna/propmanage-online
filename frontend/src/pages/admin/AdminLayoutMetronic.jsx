@@ -7,7 +7,7 @@ import {
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
   LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, ChevronRight, Sparkles, Bot, Zap, Inbox,
   UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb, Bug, Compass, Layers, BookOpenCheck, GraduationCap, Gamepad2, Trophy, BarChart3, Eye, Heart,
-  Star, Clock, Command, Network, Megaphone, Brain, Rocket, Activity, KeyRound, Server, Palette, Map, Target
+  Star, Clock, Command, Network, Megaphone, Brain, Rocket, Activity, KeyRound, Server, Palette, Map, Target, Download
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { useTheme as useGlobalTheme } from "../../contexts/ThemeContext";
@@ -120,6 +120,8 @@ const NAV_SECTIONS = [
       { id: "interior_design", label: "Design Interior · Serviciu", icon: Palette, badge: "LEADS", href: "/admin/interior-design" },
       { id: "menu_manager", label: "Menu Manager", icon: Map, badge: "CMS", href: "/admin/menu-manager" },
       { id: "page_registry", label: "Page Registry", icon: FileText, badge: "CFG", href: "/admin/page-registry" },
+      { id: "design_tokens", label: "Design Tokens", icon: Palette, badge: "P2", href: "/admin/design-tokens" },
+      { id: "config_io", label: "Config Import/Export", icon: Download, badge: "P2", href: "/admin/config-io" },
       { id: "xos_builder", label: "Experience Center", icon: LayoutDashboard, badge: "XOS", href: "/admin/xos-builder" },
       { id: "ui_rules", label: "XOS · UI Rules", icon: ShieldCheck, badge: "XOS", href: "/admin/ui-rules" },
       { id: "content_manager", label: "XOS · Content Manager", icon: Sparkles, badge: "XOS", href: "/admin/content-manager" },

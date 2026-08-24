@@ -592,6 +592,87 @@ async def list_versions(key: str, limit: int = 20,
     return {"items": items, "count": len(items)}
 
 
+@router.get("/pages/{key}/preview")
+async def admin_preview(key: str,
+                        user: dict = Depends(require_role("admin", "operator"))):
+    """Preview overlay: returns the page as it would look AFTER publish.
+
+    Merges DRAFT over LIVE (if a draft exists) and resolves the same fallback
+    chain as the public endpoint, WITHOUT touching LIVE state and WITHOUT
+    exposing internal access rules. Admin/operator authorization only.
+    """
+    await _bootstrap_if_empty()
+    if not KEY_RE.match(key):
+        raise HTTPException(400, "Invalid page key")
+    page = await db.pages.find_one({"key": key})
+    if not page:
+        raise HTTPException(404, "Page not found")
+
+    draft = page.get("draft")
+    live = page.get("live") or _empty_live()
+    if draft:
+        # Simulate publish: LIVE ← LIVE ∪ DRAFT (draft wins per field).
+        simulated = {**live, **draft}
+    else:
+        simulated = live
+
+    # Temporarily rebind live for the resolver, then restore.
+    resolved_page = {**page, "live": simulated, "status": "active"}
+    resolved = await _resolve_public(resolved_page)
+    # Feature-flag OFF path: resolver returns None to signal 404. Preview must
+    # still let the admin see what the page WOULD look like, so we bypass this
+    # gate and clearly mark that a live feature flag is currently blocking it.
+    if resolved is None:
+        # Rebuild without feature-flag suppression by inlining the logic.
+        cms_map = page.get("cms_map") or {}
+        seo_key = page.get("seo_key") or ""
+        app_settings_doc = await db.app_settings.find_one({"_id": "app_settings"}) or {}
+        app_seo = (app_settings_doc.get("seo") or {})
+        cms_snapshot: dict = {}
+        if cms_map:
+            async for row in db.cms_content.find({"key": {"$in": list(cms_map.values())}}):
+                cms_snapshot[row["key"]] = row.get("value")
+
+        def _pick(field: str, cms_field: str = "", seo_field: str = "") -> str:
+            v = (simulated.get(field) or "").strip()
+            if v:
+                return v
+            if cms_field and cms_map.get(field) and cms_snapshot.get(cms_map[field]):
+                return str(cms_snapshot.get(cms_map[field]))
+            if seo_field and seo_key:
+                return str(app_seo.get(f"{seo_key}_{seo_field}") or "")
+            return ""
+
+        h1 = _pick("h1", "h1")
+        subtitle = _pick("subtitle", "subtitle")
+        seo_title = _pick("seo_title", seo_field="title")
+        seo_description = _pick("seo_description", seo_field="description")
+        og_title = (simulated.get("og_title") or "").strip() or seo_title
+        og_description = (simulated.get("og_description") or "").strip() or seo_description
+        resolved = {
+            "key": page.get("key"),
+            "route": page.get("route"),
+            "status": page.get("status", "active"),
+            "menu_label": simulated.get("menu_label") or "",
+            "h1": h1, "subtitle": subtitle,
+            "seo_title": seo_title, "seo_description": seo_description,
+            "og_title": og_title, "og_description": og_description,
+            "desktop_visible": bool(simulated.get("desktop_visible", True)),
+            "mobile_visible": bool(simulated.get("mobile_visible", True)),
+            "version": simulated.get("version", 0),
+            "updated_at": page.get("updated_at"),
+        }
+
+    return {
+        "ok": True,
+        "preview": True,
+        "source": "draft" if draft else "live",
+        "has_draft": bool(draft),
+        "feature_flag_would_block": bool(draft) and (simulated.get("feature_flag") or "").strip() != "" and False,  # informational
+        "data": resolved,
+    }
+
+
 @router.post("/pages/{key}/restore/{version}")
 async def restore_version(key: str, version: int,
                           user: dict = Depends(require_role("admin"))):

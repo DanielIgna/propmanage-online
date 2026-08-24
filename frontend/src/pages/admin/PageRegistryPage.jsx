@@ -408,6 +408,17 @@ const PageEditor = ({ page, onClose, onSaved }) => {
             <RotateCcw className="w-4 h-4" /> Reset defaults
           </button>
           {hasDraft && (
+            <a
+              href={`${API}/api/admin/pages/${page.key}/preview`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300"
+              data-testid="page-editor-preview-draft"
+            >
+              <Eye className="w-4 h-4" /> Preview draft
+            </a>
+          )}
+          {hasDraft && (
             <button
               onClick={discard}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm bg-white/5 hover:bg-white/10 border border-white/10"

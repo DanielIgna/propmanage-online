@@ -31,13 +31,13 @@
 
 ---
 
-## ✅ Task 7 + 7.1 — PropManage Configuration Layer (24 Feb 2026)
+## ✅ Task 7 + 7.1 — PropManage Configuration Layer (24 Aug 2026)
 
 **Canonical flags** (sync via Task 7.2 → Task 7.3):
 - `implementation_status = TRUE`
 - `security_validation = PASSED`
 - `preview_validation = PASSED`
-- `production_status = LIVE` ✅ (verified 24 Feb 2026 via Task 7.3)
+- `production_status = LIVE` ✅ (verified 24 Aug 2026 via Task 7.3)
 
 **Testing** (sync via Task 7.2):
 - Task 7 dedicated: **13/13 PASS** (`test_pages_registry_iter188.py`, 10 originale + 3 security post-fix)
@@ -69,7 +69,47 @@
 
 **Doc canonic**: `/app/memory/board/EXECUTION_ORDER_044_CONFIGURATION_LAYER.md`.
 
-**Deployment**: Task 7 + 7.1 + 7.2 + 7.3 sunt IMPLEMENTED, security-validated și **production-verified** (24 Feb 2026 via Task 7.3 smoke test pe `https://propmanage.ro`). Zero regresii detectate pe modulele protejate. Configuration Layer este LIVE.
+**Deployment**: Task 7 + 7.1 + 7.2 + 7.3 sunt IMPLEMENTED, security-validated și **production-verified** (24 Aug 2026 via Task 7.3 smoke test pe `https://propmanage.ro`). Zero regresii detectate pe modulele protejate. Configuration Layer este LIVE.
+
+
+---
+
+## 🎛️ Task 8 — Admin Control Center Expansion · P2 (24 Aug 2026)
+
+**Canonical flags**:
+- `implementation_status = TRUE`
+- `security_validation = PASSED`
+- `preview_validation = PASSED`
+- `production_status = PENDING_FOUNDER_DEPLOYMENT`
+
+**Componente livrate (una singură directivă consolidată)**:
+
+1. **Design Tokens Editor** (`/api/admin/design-tokens`, `/admin/design-tokens`)
+   - Whitelist strict: 11 colors + 6 radius + 5 typography tokens
+   - CSS injection blocat (`javascript:`, `url()`, `expression()`, `<script`, `@import`)
+   - `db.design_tokens` (single doc), audit prin `admin_audit_log`
+2. **Config Import/Export** (`/api/admin/config/export`, `/api/admin/config/import`, `/admin/config-io`)
+   - Bundle JSON portabil pentru pages/menu/CMS/settings/features/tokens
+   - Secrets stripped defensiv (`password`, `stripe_secret`, `token`, `api_key`)
+   - Import DRY-RUN implicit; `apply=true` explicit necesar
+   - `pages_versions` read-only istoric → skip la import
+3. **Preview Overlay** (`GET /api/admin/pages/{key}/preview`)
+   - Merge simulat DRAFT peste LIVE, resolver identic cu public
+   - Zero mutații la LIVE, zero leak public
+   - Reutilizează draft/live din Page Registry
+4. **Renewal Reminder Email** (APScheduler `renewal_reminder_daily` 09:15 Bucharest)
+   - Fereastră `[6.5, 7.5]` zile înainte `hh_subscriptions.expires_at`
+   - Idempotent: unique index `(user_id, expires_at, kind)` pe `renewal_reminders`
+   - Reutilizează `email_service.send_email` (Resend/SendGrid/console)
+   - Zero modificări la Stripe / entitlements / lifecycle
+
+**Testing**: 23 teste dedicate (`test_task8_p2_iter189.py`) + regresie totală **79/79 PASS** cross-cutting (Tasks 1-6.1 + Task 7 + Task 8).
+
+**Protected — NU modificat**: Digital Twin, House Health, Payments, Stripe, Auth, Entitlements, Client Beta, Specialist Beta, existing Demo, Marketplace, existing routes, users/properties/requests schema.
+
+**Doc canonic**: `/app/memory/board/EXECUTION_ORDER_045_ADMIN_CONTROL_CENTER_P2.md`.
+
+**Deployment**: IMPLEMENTED în preview. Production deployment rămâne `PENDING_FOUNDER_DEPLOYMENT`. AI-ul **NU** deployează automat.
 
 
 

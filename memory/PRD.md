@@ -1,4 +1,72 @@
-## ✅ TASK 7.3 — Production Validation + Close · LIVRAT (24 Feb 2026)
+## 🎛️ TASK 8 — Admin Control Center Expansion · P2 · LIVRAT (24 Aug 2026)
+
+**Cerere**: O directivă consolidată cu 4 componente P2 pe Configuration Layer: Design Tokens Editor + Config Import/Export + Preview Overlay + Renewal Reminder Email. Zero features noi, zero arhitectură duplicată, zero break la Digital Twin/Payments/Auth/etc.
+
+### Componente livrate
+
+| # | Componentă | Backend | Frontend | Test coverage |
+|---|---|---|---|---|
+| A | Design Tokens Editor | `routes/design_tokens.py` (allowlist strict, CSS injection blocked) | `pages/admin/DesignTokensPage.jsx` | 6 teste |
+| B | Config Import/Export | `routes/config_io.py` (schema v1.0, dry-run implicit, secrets stripped) | `pages/admin/ConfigIOPage.jsx` | 6 teste |
+| C | Preview Overlay | `routes/pages_registry.py` (endpoint nou `/{key}/preview`) | Buton „Preview draft" în editor | 4 teste |
+| D | Renewal Reminder | `routes/renewal_reminders.py` + APScheduler job 09:15 Bucharest | (admin trigger via `/api/admin/renewal-reminders/run-now`) | 4 teste |
+
+### Infrastructure REUSED (zero duplicate)
+
+- `admin_audit_log` — audit unificat pentru toate 4 componente
+- `require_role` — autorizare admin/operator
+- `email_service.send_email` — Resend/SendGrid/console fallback existent
+- `AsyncIOScheduler` din `server.py` — 21-lea cron job pentru renewal
+- `db.hh_subscriptions.expires_at` — source-of-truth expiry
+- `db.pages` draft/live — preview reutilizează, zero nou draft system
+- CSS vars `--pm-*` — frontend consumă tokenii publicați
+
+### Security
+
+**Zero CRITICAL/HIGH/MEDIUM** găsite/introduse:
+- Design Tokens: CSS injection blocked (`javascript:`, `url()`, `expression()`, `<script`, `@import`), unknown keys rejected, malformed values rejected
+- Config Export: sensitive fields stripped (password/secret/token/api_key), dangerous sections rejected (users, subscriptions)
+- Config Import: dry-run implicit, `apply=true` explicit, unknown sections rejected, schema_version guard
+- Preview: admin-only, invalid key rejected, zero mutation la LIVE, zero leak public
+- Renewal: idempotent (unique index), fereastră strictă, admin-only endpoints
+
+### Testing
+
+- 23 teste noi în `tests/test_task8_p2_iter189.py` → **23/23 PASS**
+- Cross-cutting cu Tasks 1-6.1 + Task 7 + Task 8 → **79/79 PASS**
+
+### Docs sincronizate
+
+| Doc | Update |
+|---|---|
+| `/app/memory/board/EXECUTION_ORDER_045_ADMIN_CONTROL_CENTER_P2.md` | NOU — doc canonic Task 8 cu toate 15 secțiuni cerute (A-O) |
+| `/app/memory/audits/MASTER_PLATFORM_STATE.md` | Task 8 cu 4 flags canonice + protecții |
+| `/app/memory/INDEX.md` | Referință EO_045 |
+| `/app/memory/PRD.md` (acest fișier) | Task 8 entry |
+| **Corecție istorică**: `24 Feb 2026 → 24 Aug 2026` în toate 4 fișiere Task 7 series | ✅ |
+
+### Production status
+
+- **Implemented** în cod / build: ✅
+- **Verified** în preview: ✅ (smoke + 79 teste PASS)
+- **Deploy pe production**: ⏳ **PENDING FOUNDER DEPLOYMENT**
+- **NU** marcat ca LIVE. Fondatorul execută deployment separat.
+
+### NOT IMPLEMENTED / FUTURE
+
+- ❌ Preview Overlay **visual** (endpoint returnează JSON; render React cu draft = P3 eventual)
+- ❌ Forms configuration UI (schema-only, aliniat cu constraint fondator „NU UI gigant")
+- ❌ Workflow configuration UI (schema-only)
+- ❌ Renewal reminder pentru alte tier-uri (PRO/PREMIUM) — rămâne backlog
+- ❌ Multi-tenant scope pentru design tokens
+
+**Blocker**: NICIUN.
+
+---
+
+
+
+## ✅ TASK 7.3 — Production Validation + Close · LIVRAT (24 Aug 2026)
 
 **Cerere**: După ce fondatorul a executat deployment-ul, verifică efectiv `propmanage.ro`, confirmă security fixes live, actualizează Knowledge Center la `production_status = LIVE` și închide seria Task 7 / 7.1 / 7.2 / 7.3.
 
@@ -10,7 +78,7 @@
 | Task 7.1 · Security Audit | ✅ **IMPLEMENTED / SECURITY VALIDATED** |
 | Task 7.2 · Knowledge Center Sync | ✅ **IMPLEMENTED** |
 | Task 7.3 · Production Validation + Close | ✅ **IMPLEMENTED** |
-| Production | ✅ **LIVE** (verificat 24 Feb 2026) |
+| Production | ✅ **LIVE** (verificat 24 Aug 2026) |
 
 ### Production Smoke Report (live pe `https://propmanage.ro`)
 
@@ -50,7 +118,7 @@ Deployment succeeded · Production smoke passed · Page Registry verified · Men
 |---|---|
 | `/app/memory/board/EXECUTION_ORDER_044_CONFIGURATION_LAYER.md` | Header extins la 4 sub-task-uri, `PRODUCTION STATUS: LIVE`, secțiune Deployment Status extinsă cu Task 7.3 smoke report + Close Checklist 13/13 |
 | `/app/memory/audits/MASTER_PLATFORM_STATE.md` | Flag `production_status = LIVE` (canonicalizat) + linia „Deployment" reformulată live |
-| `/app/memory/INDEX.md` | Wording EO_044 aliniat: „PRODUCTION LIVE 24 Feb 2026" |
+| `/app/memory/INDEX.md` | Wording EO_044 aliniat: „PRODUCTION LIVE 24 Aug 2026" |
 | `/app/memory/PRD.md` (acest fișier) | Task 7.3 entry cu smoke report + Close Checklist |
 
 ### NOT IMPLEMENTED / FUTURE (nu marcat ca livrat)
@@ -68,7 +136,7 @@ Deployment succeeded · Production smoke passed · Page Registry verified · Men
 
 
 
-## 📌 TASK 7.2 — Knowledge Center Sync · LIVRAT (24 Feb 2026)
+## 📌 TASK 7.2 — Knowledge Center Sync · LIVRAT (24 Aug 2026)
 
 **Cerere**: Sincronizare docs canonice, ZERO cod modificat, ZERO deploy, ZERO P2. Strict aliniere status.
 
@@ -111,7 +179,7 @@ Deployment succeeded · Production smoke passed · Page Registry verified · Men
 
 
 
-## 🛡️ TASK 7.1 — Security Audit + Production Readiness · LIVRAT (24 Feb 2026)
+## 🛡️ TASK 7.1 — Security Audit + Production Readiness · LIVRAT (24 Aug 2026)
 
 **Cerere**: Audit read-only al Task 7 (Configuration Layer) înainte de deploy prod + Knowledge Center update. Fără P2, fără feature nou.
 
@@ -154,7 +222,7 @@ Deployment succeeded · Production smoke passed · Page Registry verified · Men
 
 
 
-## 🧭 TASK 7 — PropManage Configuration Layer (Page Registry + Publishing) · LIVRAT (24 Feb 2026)
+## 🧭 TASK 7 — PropManage Configuration Layer (Page Registry + Publishing) · LIVRAT (24 Aug 2026)
 
 **Cerere**: Extinde Menu Manager într-un **Configuration Layer** platform-wide fără sisteme paralele. Priority: Page Registry ca **sursă canonică** pentru menu_label, H1, subtitle, SEO, OG, visibility, feature_flag + workflow DRAFT → PUBLISH → LIVE cu versioning + Config History unificat. Backward-compatible cu CMS și app_settings existente.
 
@@ -235,7 +303,7 @@ Tests:
 
 
 
-## 🔧 TASK 6.1 — Deployment Verification + Beta Visibility · LIVRAT (24 Feb 2026)
+## 🔧 TASK 6.1 — Deployment Verification + Beta Visibility · LIVRAT (24 Aug 2026)
 
 **Phase A — Task 6 Production Fix**:
 - **ROOT CAUSE**: Task 6 a aliniat CMS + app_settings DOAR pe **preview DB**. Prod DB e separată (schimbări NU se propagă automat cu deploy-ul frontend). Build-ul frontend era deployat corect (index.html static title, 4× JSON-LD + Twitter title confirmă), dar H1/title/description DINAMIC vin din DB → serveau valorile vechi.
@@ -278,7 +346,7 @@ Tests:
 
 
 
-## 🔎 TASK 6 — SEO + Homepage Semantic Positioning · LIVRAT (24 Feb 2026)
+## 🔎 TASK 6 — SEO + Homepage Semantic Positioning · LIVRAT (24 Aug 2026)
 
 **Cerere**: Elimină inconsecvența badge/H1 (badge = „CARTEA DIGITALĂ A CASEI TALE" vs H1 = „Cartea de service a casei tale."). Repoziționează homepage-ul + metadata SEO pe axa unică **„Cartea Digitală a Casei Tale"** — pentru proprietari care caută documentare, istoric lucrări, mentenanță și specialiști verificați. Targeted SEO + copy alignment, ZERO redesign, ZERO infrastructure change.
 
@@ -340,7 +408,7 @@ Aliniere CMS + app-settings (DB, DOAR text values, ZERO schema/route change):
 
 
 
-## 🎯 TASK 5 — Basic Upgrade Nudges · LIVRAT (24 Feb 2026)
+## 🎯 TASK 5 — Basic Upgrade Nudges · LIVRAT (24 Aug 2026)
 
 **Cerere**: Pattern consistent de upgrade contextual pentru FREE users. Un singur loc de conversie (`/pricing`), copy central, zero mesaje tehnice ("HTTP 402", "entitlement_required") leaked către useri normali. Analytics extension point (fără provider nou). Reutilizare 100% Tasks 1-4.
 
@@ -386,7 +454,7 @@ window.addEventListener('pm:entitlement_denied', e => ...)
 ---
 
 
-## 🔁 TASK 4 — Subscription Lifecycle Handling · LIVRAT (24 Feb 2026)
+## 🔁 TASK 4 — Subscription Lifecycle Handling · LIVRAT (24 Aug 2026)
 
 **Cerere**: Când un abonament plătit expiră/anulează, user-ul pierde entitlement-urile paid și revine la FREE, FĂRĂ să piardă date. Reutilizare completă Task 1-3.
 
@@ -427,7 +495,7 @@ Frontend MODIFIED:
 ---
 
 
-## 🎨 TASK 3 — Digital Twin Advanced Entitlement Gate · LIVRAT (24 Feb 2026)
+## 🎨 TASK 3 — Digital Twin Advanced Entitlement Gate · LIVRAT (24 Aug 2026)
 
 **Cerere**: Aplic entitlement gate pe Digital Twin Advanced. Preview vizibil pentru FREE (LockedScreen existent), editare/mutations blocate cu 402 semantic. Reutilizare completă a infrastructurii Task 1 + Task 2.
 
@@ -474,7 +542,7 @@ POST/PATCH/DELETE `/api/digital-twin/projects`, `/pins`, `/comments`, `/plans`, 
 ---
 
 
-## 💳 TASK 2 — PropManage Basic 9€/lună · LIVRAT (24 Feb 2026)
+## 💳 TASK 2 — PropManage Basic 9€/lună · LIVRAT (24 Aug 2026)
 
 **Cerere**: Completează fluxul comercial minim viabil pentru PropManage Basic la 9€/lună. Reutilizează 100% infrastructura existentă (hh_plans, hh_subscriptions, Stripe via emergentintegrations, entitlements.py din Task 1). Un singur CTA (Hick's Law).
 
@@ -509,7 +577,7 @@ Backend: **ZERO modificări** — refolosește complet infrastructura existentă
 ---
 
 
-## 🔒 TASK 1 — Subscription/Entitlement Gate · LIVRAT (24 Feb 2026)
+## 🔒 TASK 1 — Subscription/Entitlement Gate · LIVRAT (24 Aug 2026)
 
 **Cerere**: Layer centralizat de acces care traduce `hh_subscriptions` existent într-un vocabular stabil de FEATURES + TIERS. Technical existence ≠ user access. Reutilizează infrastructura Stripe/hh_subscriptions/hh_plans existentă, nu o duplică.
 
@@ -544,7 +612,7 @@ Frontend NEW (utilitare reutilizabile pentru viitor):
 ---
 
 
-## 🔐 PROPERTY-TECHNICAL-RECORD-v2 — Verification Chain + Building Axis + PDF · LIVRAT (24 Feb 2026)
+## 🔐 PROPERTY-TECHNICAL-RECORD-v2 — Verification Chain + Building Axis + PDF · LIVRAT (24 Aug 2026)
 
 **Cerere**: Fondator a aprobat 4 enhancement-uri P0/P0/P1/P2 care transformă PTR dintr-o pagină de agregare într-un sistem real de memorie tehnică verificabilă cu două axe:
 - **Verification chain**: DOCUMENT → EVIDENCE → DIAGNOSTIC → REVIEW → VERIFIED → PTR → TRANSACTION
