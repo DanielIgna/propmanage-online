@@ -33,7 +33,16 @@
 
 ## ✅ Task 7 + 7.1 — PropManage Configuration Layer (24 Feb 2026)
 
-**Status**: `implementation_status = TRUE` pentru Configuration Layer P0+P1. Security validat (Task 7.1). **Deploy production PENDING** — necesită autorizare fondator.
+**Canonical flags** (sync via Task 7.2):
+- `implementation_status = TRUE`
+- `security_validation = PASSED`
+- `preview_validation = PASSED`
+- `production_status = PENDING_FOUNDER_DEPLOYMENT`
+
+**Testing** (sync via Task 7.2):
+- Task 7 dedicated: **13/13 PASS** (`test_pages_registry_iter188.py`, 10 originale + 3 security post-fix)
+- Regression Tasks 1–6.1 + Task 7: **56/56 PASS**
+- Cross-cutting (Entitlements iter100 + PTR iter181/182 + Task 7): **109/109 PASS**
 
 **Ce introduce** (fără sisteme paralele — reuse la maxim):
 
@@ -54,11 +63,13 @@
 | P3.1 | Unique index `(page_key, version)` pe `db.pages_versions` — concurrent publish safe |
 | P3.2 | Public payload strips `allowed_roles`, `allowed_tiers`, `feature_flag` — admin-only |
 
-**Testing**: 13 teste dedicate (`test_pages_registry_iter188.py`) + regresie completă. **109/109 PASS** cross-cutting (Tasks 1–6.1 + PTR v1/v2 + Task 7 + Entitlements).
+**Protected — NU modificat**: Stripe, entitlements, Digital Twin, House Health, auth, Client/Specialist Beta, existing Demo, existing routes, users/properties/requests/hh_subscriptions/property_technical_record schema. **Zero regresii detectate**.
 
-**Protected — NU modificat**: Stripe, entitlements, Digital Twin, House Health, auth, Client/Specialist Beta, existing Demo, existing routes, users/properties/requests schema.
+**Coverage capability**: ~65–70% din stratul de conținut/UX/visibility acum configurabil din Admin fără cod (față de ~35% înainte).
 
-**Coverage capability**: ~65–70% din stratul de conținut/UX/visibility acum configurabil din Admin fără cod (față de ~35% înainte). Detalii + follow-up P2 în `board/EXECUTION_ORDER_044_CONFIGURATION_LAYER.md`.
+**Doc canonic**: `/app/memory/board/EXECUTION_ORDER_044_CONFIGURATION_LAYER.md`.
+
+**Deployment**: Task 7 + 7.1 sunt IMPLEMENTED în preview. Production deployment rămâne `PENDING_FOUNDER_DEPLOYMENT`. AI-ul **NU** deployează automat; **NU** marchează production ca LIVE.
 
 
 

@@ -1,3 +1,46 @@
+## 📌 TASK 7.2 — Knowledge Center Sync · LIVRAT (24 Feb 2026)
+
+**Cerere**: Sincronizare docs canonice, ZERO cod modificat, ZERO deploy, ZERO P2. Strict aliniere status.
+
+### Task 7 / 7.1 · Consolidated Status
+
+**IMPLEMENTED** ✅
+- Configuration Layer P0 (Page Registry, `db.pages`, seed 20 pagini, endpoints, Admin UI)
+- Configuration Layer P1 (Draft → LIVE publishing, `db.pages_versions`, versioning monotonic, restore, discard, reset)
+- Menu ↔ Page linking (`db.site_menu.items[].page_key` opțional, backward-compat)
+- Config History (VIEW peste `admin_audit_log`, zero al doilea sistem audit)
+- Security fixes (SEC-001 scope config-history, SEC-002 feature flag 404, P3.1 unique index versions, P3.2 public payload stripped)
+- Testing: 13/13 Task 7 + 56/56 regression + 109/109 cross-cutting
+
+**PENDING** ⏳ (aștept fondator)
+- Production deployment (`propmanage.ro`)
+- Production smoke verification (H1, `/admin/page-registry`, `/api/public/pages/home`)
+
+**NOT IMPLEMENTED / NEXT PHASE** ❌
+- Design Tokens Editor
+- Config Import/Export (JSON backup + migrare)
+- Preview Overlay (`?preview=<token>`)
+- Forms configuration UI (`forms_config` schema idea only)
+- Workflow configuration UI (`workflows_config` schema idea only)
+- Renewal Reminder Email (backlog separat)
+
+### Knowledge Center — Documente sincronizate
+
+| Doc | Update aplicat |
+|---|---|
+| `/app/memory/board/EXECUTION_ORDER_044_CONFIGURATION_LAYER.md` | Header canonic cu 3 flags (Task 7 IMPLEMENTED, Task 7.1 IMPLEMENTED/SECURITY VALIDATED, Production PENDING_FOUNDER_DEPLOYMENT) + secțiuni Deployment Status, Immediate Next Step, IMPLEMENTED vs RECOMMENDED |
+| `/app/memory/audits/MASTER_PLATFORM_STATE.md` | Secțiune Task 7 + 7.1 canonicalizată cu 4 flags: `implementation_status=TRUE`, `security_validation=PASSED`, `preview_validation=PASSED`, `production_status=PENDING_FOUNDER_DEPLOYMENT` |
+| `/app/memory/INDEX.md` | Referință EO_044 aliniată la wording canonic |
+| `/app/memory/PRD.md` (acest fișier) | Task 7.2 entry cu separare IMPLEMENTED / PENDING / NOT IMPLEMENTED |
+
+**Duplicate check**: PASS. Zero documente paralele/contradictorii create. Production NU e marcat ca LIVE nicăieri.
+
+**Zero cod modificat**. Zero deploy. Zero P2.
+
+---
+
+
+
 ## 🛡️ TASK 7.1 — Security Audit + Production Readiness · LIVRAT (24 Feb 2026)
 
 **Cerere**: Audit read-only al Task 7 (Configuration Layer) înainte de deploy prod + Knowledge Center update. Fără P2, fără feature nou.

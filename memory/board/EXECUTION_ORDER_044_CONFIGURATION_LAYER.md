@@ -1,9 +1,11 @@
 # EXECUTION_ORDER_044 — Configuration Layer (Task 7 + 7.1)
 
-> **Status**: COMPLETED în build/preview curent, securitate validată, **pending deploy production**.
+> **Task 7 — Configuration Layer P0 + P1 · STATUS: IMPLEMENTED**
+> **Task 7.1 — Security Audit + Production Readiness · STATUS: IMPLEMENTED / SECURITY VALIDATED**
+> **PRODUCTION STATUS: PENDING FOUNDER DEPLOYMENT**
 > **Doctrine**: „Reuse existing infrastructure; do not create duplicate configuration engines."
 > **Owner**: Founder + AI CPO.
-> **Emitent**: 24 Feb 2026.
+> **Emitent**: 24 Feb 2026. **Sync doc**: Task 7.2.
 
 ---
 
@@ -88,12 +90,14 @@ Extinde Menu Manager într-un **Configuration Layer** platform-wide fără siste
 
 | Layer | Status |
 |---|---|
-| Implementat în cod / build | ✅ COMPLET |
-| Verificat în preview | ✅ COMPLET (smoke + pytest) |
+| Implementat în cod / build | ✅ IMPLEMENTED |
+| Verificat în preview | ✅ PASSED |
 | Verificat prin teste | ✅ 109/109 PASS |
-| Deploy pe production | ⏳ **PENDING** — necesită deploy explicit al build-ului |
+| Security validation | ✅ PASSED (0 CRITICAL/HIGH/MEDIUM outstanding) |
+| Deploy pe production | ⏳ **PENDING FOUNDER DEPLOYMENT** |
+| Production smoke verification | ⏳ **PENDING FOUNDER VERIFICATION** |
 
-**Production readiness verdict**: **READY (security validated)**. Fondator poate autoriza deploy când decide.
+**Production readiness verdict**: READY for deployment. **NU** marcat ca LIVE. Deploy-ul executiv rămâne în sarcina fondatorului.
 
 ## NEXT PHASE (NU IMPLEMENTAT — doar documentat)
 
@@ -110,7 +114,35 @@ P2 este strict `schema-only` conform constraint fondator „NU UI gigant":
 
 ## Immediate Next Step
 
-După Task 7.1 (COMPLETED), următoarea acțiune posibilă este **production deployment** (dacă fondatorul autorizează). **NU** începe P2 până când producția nu e sincronizată cu preview.
+Task 7.1 este COMPLETED. Următoarea acțiune este **production deployment executat de fondator**. AI-ul **NU** deployează automat și **NU** marchează production ca LIVE.
+
+După deployment:
+1. Fondatorul verifică production smoke (H1, `/admin/page-registry`, `/api/public/pages/home`).
+2. Se poate începe P2 doar după ce production e sincronizată cu preview.
+
+Distincție canonică:
+- **preview-validated** = ✅ (aici, în build curent)
+- **production-validated** = ⏳ pending
+
+## IMPLEMENTED vs RECOMMENDED — distincție canonică
+
+**IMPLEMENTED (Task 7 + 7.1)**:
+- Page Registry P0 + P1 (schema, endpoints, admin UI, publishing workflow, versioning, restore)
+- Menu ↔ Page linking (`page_key` opțional)
+- Configuration History VIEW peste `admin_audit_log`
+- Security fixes: SEC-001, SEC-002, P3.1, P3.2
+
+**PENDING (aștept fondator)**:
+- Production deployment
+- Production smoke verification
+
+**RECOMMENDED (nu implementat — P2 sau backlog)**:
+- Design Tokens Editor (schema idea, UI absent)
+- Config Import/Export (JSON backup + migrare)
+- Real-time Preview Overlay (`?preview=<token>`)
+- Forms configuration UI (`forms_config` schema-only rămâne teoretic)
+- Workflow configuration UI (`workflows_config` schema-only rămâne teoretic)
+- Renewal Reminder Email (backlog separat, aliniat cu subscription lifecycle)
 
 ---
 
