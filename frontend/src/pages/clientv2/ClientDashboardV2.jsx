@@ -20,6 +20,7 @@ import { SettingsPanel } from "../SettingsPanel";
 import HouseHealthCard from "../HouseHealthCard";
 import { HelpButton } from "../../components/HelpButton";
 import { BetaFeedbackEntry } from "../../components/BetaFeedbackWidget";
+import { SubscriptionNotice } from "../../components/SubscriptionNotice";
 import { ReferralHub, claimPendingInvite } from "../../components/ReferralHub";
 import { TrustedSpecialists } from "../../components/TrustedSpecialists";
 import { useMobileDock } from "../../components/floating";
@@ -203,6 +204,9 @@ export default function ClientDashboardV2() {
         </div>
 
         {TITLES[tab] && <h1 className="px-5 pb-3 xos-display text-2xl lg:text-[38px] font-medium lg:font-bold tracking-tight text-slate-900">{TITLES[tab]}</h1>}
+
+        {/* Subscription lifecycle notice (expired / cancelled_grace) — reused across tabs */}
+        <div className="px-5 pb-3 lg:max-w-3xl"><SubscriptionNotice /></div>
 
         {tab === "home" && (!loaded ? <HomeSkeleton /> : <HomeV2 user={user} prop={prop} properties={properties} requests={requests} notifs={notifs} offersCount={offersCount} go={setTab} actions={actions} />)}
         {tab === "jobs" && <div className="lg:max-w-3xl"><JobsV2 requests={requests} actions={actions} /><TrustedSpecialists properties={properties} onRebooked={loadRequests} /></div>}

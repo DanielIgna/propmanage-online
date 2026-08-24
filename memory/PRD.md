@@ -1,3 +1,44 @@
+## 🔁 TASK 4 — Subscription Lifecycle Handling · LIVRAT (24 Feb 2026)
+
+**Cerere**: Când un abonament plătit expiră/anulează, user-ul pierde entitlement-urile paid și revine la FREE, FĂRĂ să piardă date. Reutilizare completă Task 1-3.
+
+**Descoperit existent**: `_fetch_active_subscription` deja filtra prin `status ∈ [active, trial, grace]` + `expires_at > now` → user cu subscription expirat era deja resolv la FREE. Ce lipsea: (1) recunoașterea explicită a stării "am fost paid, acum sunt expired" pentru UI notice, (2) suport pentru status='cancelled' cu grace period, (3) endpoint self-cancel, (4) banner UI.
+
+**Implementat (minimal, non-destructiv)**:
+
+Backend MODIFIED:
+- `/app/backend/entitlements.py`:
+  - `_fetch_active_subscription` acceptă acum status='cancelled' (păstrează acces până la `expires_at`)
+  - `_fetch_last_subscription(user_id)` NEW — cel mai recent doc indiferent de status/expiry (folosit doar când nu e active)
+  - `_compute_lifecycle(role, sub_active, sub_last)` NEW — returnează `never_subscribed | active | cancelled_grace | expired | admin_bypass`
+  - `get_user_entitlements` extins cu 3 câmpuri noi: `lifecycle`, `last_subscription`, `notice` (kind, message, cta_href, cta_label)
+- `/app/backend/routes/entitlements_api.py`:
+  - `POST /api/me/subscription/cancel` NEW — self-cancel, setează `status='cancelled'` + `cancelled_at` + `cancelled_by`; păstrează `expires_at`. Idempotent pe subscription deja cancelled/expired. **NU șterge nimic.**
+
+Frontend NEW:
+- `/app/frontend/src/components/SubscriptionNotice.jsx` — banner reutilizabil care citește `entitlements.notice`. Testids: `subscription-notice-{kind}`, `subscription-notice-cta`, `subscription-notice-dismiss`. Auto-dismiss cu sessionStorage.
+
+Frontend MODIFIED:
+- `/app/frontend/src/pages/clientv2/ClientDashboardV2.jsx` — o linie: `<SubscriptionNotice/>` deasupra conținutului dashboard-ului (vizibil pe toate tabs).
+
+**Stări gestionate**:
+| Lifecycle | Tier | Notice UI | Comportament |
+|---|---|---|---|
+| never_subscribed | FREE | — | Fresh user |
+| active | BASIC/PRO/PREMIUM | — | Plătit + activ |
+| cancelled_grace | BASIC/PRO/PREMIUM | Albastru "Ai acces până la {data}" | Cancelled dar în perioada de grație |
+| expired | FREE | Amber "Datele tale sunt păstrate — reactivează" | Post-expirare, downgrade automat |
+| admin_bypass | PREMIUM | — | Admin/operator |
+
+**Data integrity**: `hh_subscriptions` doc rămâne în DB pentru istoric. `properties`, `property_documents`, `property_technical_record`, `activity_events` etc. TOATE rămân intacte după downgrade. Verificat via testing agent — GET-urile la aceste resurse răspund normal (200) pentru expired user.
+
+**Testing**: `testing_agent_v3_fork` iter186 · **14/14 backend pytest PASS (100%)** · **Frontend 100% pass** · Zero regresiuni pe Tasks 1-3. Regresiune 402 pe paid features confirmat.
+
+**Blocker**: NICIUN. Toate 5 stări lifecycle funcționează, notice UI apare corect, self-cancel funcțional, data integrity confirmată.
+
+---
+
+
 ## 🎨 TASK 3 — Digital Twin Advanced Entitlement Gate · LIVRAT (24 Feb 2026)
 
 **Cerere**: Aplic entitlement gate pe Digital Twin Advanced. Preview vizibil pentru FREE (LockedScreen existent), editare/mutations blocate cu 402 semantic. Reutilizare completă a infrastructurii Task 1 + Task 2.

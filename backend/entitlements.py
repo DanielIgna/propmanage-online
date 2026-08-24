@@ -89,12 +89,22 @@ TIER_LABELS = {
 # CORE — starea de entitlement pentru un user
 # =============================================================================
 async def _fetch_active_subscription(user_id: str) -> Optional[dict]:
-    """Reutilizează structura existentă hh_subscriptions (status active/trial/grace)."""
+    """Reutilizează structura existentă hh_subscriptions.
+
+    Semantica statusurilor:
+      * active    → plătit, în perioadă activă
+      * trial     → trial gratuit valid
+      * grace     → plată eșuată, perioadă de grație
+      * cancelled → user a cerut anulare, dar acces valabil PÂNĂ la expires_at
+
+    Un abonament e considerat ACCESIBIL doar dacă status ∈ {active, trial, grace, cancelled}
+    ȘI expires_at este în viitor (sau lipsește).
+    """
     now_iso = datetime.now(timezone.utc).isoformat()
     return await db.hh_subscriptions.find_one(
         {
             "user_id": user_id,
-            "status": {"$in": ["active", "trial", "grace"]},
+            "status": {"$in": ["active", "trial", "grace", "cancelled"]},
             "$or": [
                 {"expires_at": {"$gt": now_iso}},
                 {"expires_at": None},
@@ -103,6 +113,34 @@ async def _fetch_active_subscription(user_id: str) -> Optional[dict]:
         },
         {"_id": 0},
     )
+
+
+async def _fetch_last_subscription(user_id: str) -> Optional[dict]:
+    """Ultimul document hh_subscriptions al user-ului (indiferent de status/expiry).
+
+    Folosit doar când user-ul e resolv la FREE dar a avut cândva abonament —
+    frontend-ul afișează un notice friendly în loc de tăcere.
+    """
+    return await db.hh_subscriptions.find_one(
+        {"user_id": user_id},
+        {"_id": 0},
+        sort=[("updated_at", -1), ("expires_at", -1)],
+    )
+
+
+def _compute_lifecycle(role: Optional[str], sub_active: Optional[dict], sub_last: Optional[dict]) -> str:
+    """Stare de ciclu de viață — orientată UI. Sursa de adevăr rămâne entitlement layer.
+
+    Return: never_subscribed | active | cancelled_grace | expired | admin_bypass
+    """
+    if role in ("admin", "operator", "franchise_admin"):
+        return "admin_bypass"
+    if sub_active:
+        return "cancelled_grace" if sub_active.get("status") == "cancelled" else "active"
+    if sub_last:
+        # user a avut cândva abonament, dar acum nu mai are acces
+        return "expired"
+    return "never_subscribed"
 
 
 def _tier_from_role_and_sub(role: Optional[str], sub: Optional[dict]) -> str:
@@ -136,14 +174,45 @@ async def get_user_entitlements(user: dict) -> dict:
         user_id, role, tier, tier_label,
         subscription: {plan, status, expires_at} sau None,
         features: [feature_ids],
-        is_admin_bypass: bool
+        is_admin_bypass: bool,
+        lifecycle: "never_subscribed"|"active"|"cancelled_grace"|"expired"|"admin_bypass",
+        last_subscription: {plan, status, expires_at} — doar dacă lifecycle == "expired",
+        notice: {kind, message, cta_href} sau None — pentru banner UI
       }
     """
     role = user.get("active_view") or user.get("role")
     is_admin_bypass = role in ("admin", "operator", "franchise_admin")
-    sub = None if is_admin_bypass else await _fetch_active_subscription(str(user["id"]))
-    tier = _tier_from_role_and_sub(role, sub)
+    sub_active = None if is_admin_bypass else await _fetch_active_subscription(str(user["id"]))
+    tier = _tier_from_role_and_sub(role, sub_active)
     features = _resolve_features(tier)
+
+    sub_last = None
+    if not is_admin_bypass and not sub_active:
+        sub_last = await _fetch_last_subscription(str(user["id"]))
+
+    lifecycle = _compute_lifecycle(role, sub_active, sub_last)
+
+    notice = None
+    if lifecycle == "expired":
+        plan_label = TIER_LABELS.get(
+            PLAN_SLUG_TO_TIER.get((sub_last or {}).get("plan", "").lower(), TIER_FREE),
+            "PropManage",
+        )
+        notice = {
+            "kind": "subscription_expired",
+            "message": f"Abonamentul {plan_label} a expirat. Datele tale sunt păstrate — reactivează pentru a debloca funcțiile.",
+            "cta_href": "/pricing",
+            "cta_label": "Reactivează",
+        }
+    elif lifecycle == "cancelled_grace" and sub_active:
+        exp = sub_active.get("expires_at")
+        notice = {
+            "kind": "subscription_cancelled",
+            "message": f"Abonamentul a fost anulat. Ai acces până la {exp[:10] if exp else 'expirare'}.",
+            "cta_href": "/pricing",
+            "cta_label": "Reactivează",
+        }
+
     return {
         "user_id": str(user["id"]),
         "role": role,
@@ -151,15 +220,26 @@ async def get_user_entitlements(user: dict) -> dict:
         "tier_label": TIER_LABELS.get(tier, tier),
         "subscription": (
             {
-                "plan": sub.get("plan"),
-                "status": sub.get("status"),
-                "expires_at": sub.get("expires_at"),
+                "plan": sub_active.get("plan"),
+                "status": sub_active.get("status"),
+                "expires_at": sub_active.get("expires_at"),
             }
-            if sub
+            if sub_active
             else None
         ),
         "features": sorted(features),
         "is_admin_bypass": is_admin_bypass,
+        "lifecycle": lifecycle,
+        "last_subscription": (
+            {
+                "plan": sub_last.get("plan"),
+                "status": sub_last.get("status"),
+                "expires_at": sub_last.get("expires_at"),
+            }
+            if sub_last
+            else None
+        ),
+        "notice": notice,
     }
 
 

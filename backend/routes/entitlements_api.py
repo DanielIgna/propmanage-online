@@ -2,10 +2,13 @@
 
 Endpoints:
   GET  /api/me/entitlements              — user curent (auto-hidratat)
+  POST /api/me/subscription/cancel       — self-cancel (păstrează acces până la expires_at)
   GET  /api/admin/entitlements/catalog   — catalog tier→features (admin)
   GET  /api/admin/users/{user_id}/entitlements — lookup admin pe alt user
 """
 from __future__ import annotations
+
+from datetime import datetime, timezone
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
@@ -21,6 +24,34 @@ router = APIRouter(prefix="/api", tags=["entitlements"])
 async def me_entitlements(user: dict = Depends(get_current_user)):
     """Snapshot-ul de entitlement pentru user-ul curent. Frontend-ul îl folosește
     ca sursă unică pentru gating UI."""
+    return await get_user_entitlements(user)
+
+
+@router.post("/me/subscription/cancel")
+async def cancel_my_subscription(user: dict = Depends(get_current_user)):
+    """Self-cancel subscription. Access rămâne activ până la expires_at, apoi
+    lifecycle devine automat 'expired' și user resolvă la FREE.
+
+    Non-destructiv: NU șterge date, doar setează status='cancelled'.
+    Reutilizează modelul existent (Stripe billing cycles pot fi oprite separat).
+    """
+    uid = str(user["id"])
+    sub = await db.hh_subscriptions.find_one({"user_id": uid})
+    if not sub:
+        raise HTTPException(404, "Nu ai un abonament activ.")
+    if sub.get("status") not in ("active", "trial", "grace"):
+        # deja cancelled/expired — răspuns idempotent
+        return await get_user_entitlements(user)
+    now = datetime.now(timezone.utc).isoformat()
+    await db.hh_subscriptions.update_one(
+        {"user_id": uid},
+        {"$set": {
+            "status": "cancelled",
+            "cancelled_at": now,
+            "cancelled_by": uid,
+            "updated_at": now,
+        }},
+    )
     return await get_user_entitlements(user)
 
 
