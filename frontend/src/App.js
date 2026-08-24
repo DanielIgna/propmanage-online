@@ -118,6 +118,7 @@ const AISearchPage = lazy(() => import("./pages/admin/AISearchPage"));
 const InteriorDesignLanding = lazy(() => import("./pages/InteriorDesignLanding"));
 const InteriorDesignAdminPage = lazy(() => import("./pages/admin/InteriorDesignAdminPage"));
 const MenuManagerPage = lazy(() => import("./pages/admin/MenuManagerPage"));
+const PageRegistryPage = lazy(() => import("./pages/admin/PageRegistryPage"));
 const XOSBuilderPage = lazy(() => import("./pages/admin/XOSBuilderPage"));
 const ServiceHubLanding = lazy(() => import("./pages/ServiceHubLanding"));
 const FranchiseDashboard = lazy(() => import("./pages/FranchiseDashboard"));
@@ -1664,6 +1665,7 @@ function App() {
               <Route path="/admin/design-intelligence" element={<DesignIntelligencePage />} />
               <Route path="/admin/interior-design" element={<InteriorDesignAdminPage />} />
               <Route path="/admin/menu-manager" element={<MenuManagerPage />} />
+              <Route path="/admin/page-registry" element={<PageRegistryPage />} />
               <Route path="/admin/xos-builder" element={<XOSBuilderPage />} />
               <Route path="/admin/ui-rules" element={<UIRulesPage />} />
               <Route path="/admin/content-manager" element={<ContentManagerPage />} />

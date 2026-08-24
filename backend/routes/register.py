@@ -152,6 +152,7 @@ from routes.entitlements_api import router as entitlements_api_router
 from routes.passport_analytics import router as passport_analytics_router
 from routes.beta_cockpit import router as beta_cockpit_router
 from routes.beta_issues import router as beta_issues_router
+from routes.pages_registry import router as pages_registry_router, public_router as pages_registry_public_router
 from routes.trust_growth import router as trust_growth_router
 from routes.trusted_specialists import router as trusted_specialists_router
 from routes.maintenance_calendar import router as maintenance_calendar_router
@@ -326,6 +327,8 @@ ALL_ROUTERS = (
     passport_analytics_router,
     beta_cockpit_router,
     beta_issues_router,
+    pages_registry_router,
+    pages_registry_public_router,
     trust_growth_router,
     trusted_specialists_router,
     maintenance_calendar_router,

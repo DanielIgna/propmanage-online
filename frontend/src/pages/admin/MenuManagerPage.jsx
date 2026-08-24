@@ -3,7 +3,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import {
   ArrowUp, ArrowDown, Trash2, Plus, Save, RotateCcw, Eye, EyeOff, GripVertical, Menu as MenuIco,
-  Settings2, Globe, Store,
+  Settings2, Globe, Store, FileCog,
 } from "lucide-react";
 import { AdminLayoutMetronic } from "./AdminLayoutMetronic";
 
@@ -104,7 +104,7 @@ const newItem = () => ({
   children: [],
 });
 
-const ItemRow = ({ item, onChange, onMove, onDelete, isChild }) => {
+const ItemRow = ({ item, onChange, onMove, onDelete, isChild, pageKeys = [] }) => {
   const [showDetails, setShowDetails] = useState(false);
   return (
   <div className={`py-2 px-3 rounded-xl ${isChild ? "bg-white/[0.03]" : "bg-white/[0.06]"} border border-white/10`}>
@@ -140,6 +140,28 @@ const ItemRow = ({ item, onChange, onMove, onDelete, isChild }) => {
     >
       {VIS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
+    <select
+      value={item.page_key || ""}
+      onChange={(e) => onChange({ ...item, page_key: e.target.value })}
+      className="bg-black/30 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-stone-400"
+      title="Leagă acest item la o pagină din Page Registry (opțional)"
+      data-testid={`mm-pagekey-${item.id}`}
+    >
+      <option value="">— fără page config —</option>
+      {pageKeys.map((pk) => <option key={pk} value={pk}>{pk}</option>)}
+    </select>
+    {item.page_key && (
+      <a
+        href={`/admin/page-registry?edit=${item.page_key}`}
+        target="_blank"
+        rel="noreferrer"
+        className="p-1.5 rounded-lg border text-lime-400 border-lime-400/30 bg-lime-400/10 hover:bg-lime-400/20"
+        title="Edit Page Config (deschide Page Registry)"
+        data-testid={`mm-editpage-${item.id}`}
+      >
+        <FileCog className="w-4 h-4" />
+      </a>
+    )}
     <button
       onClick={() => onChange({ ...item, active: !item.active })}
       className={`p-1.5 rounded-lg border ${item.active ? "text-[#d4ff3a] border-[#d4ff3a]/30 bg-[#d4ff3a]/10" : "text-stone-500 border-white/10"}`}
@@ -172,11 +194,17 @@ export default function MenuManagerPage() {
   const [saving, setSaving] = useState(false);
   const [autoReorder, setAutoReorder] = useState(true);
   const [running, setRunning] = useState(false);
+  const [pageKeys, setPageKeys] = useState([]);
 
   const load = () =>
     axios.get(`${API}/api/admin/site-menu`, { withCredentials: true })
       .then((r) => { setItems(r.data.items || []); setAutoReorder(r.data.auto_reorder !== false); })
       .catch(() => toast.error("Nu am putut încărca meniul."));
+
+  const loadPageKeys = () =>
+    axios.get(`${API}/api/admin/pages`, { withCredentials: true })
+      .then((r) => setPageKeys((r.data.items || []).map(p => p.key)))
+      .catch(() => setPageKeys([]));
 
   const toggleAutoReorder = async () => {
     const next = !autoReorder;
@@ -196,7 +224,7 @@ export default function MenuManagerPage() {
     } catch { toast.error("Eroare la rulare."); } finally { setRunning(false); }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); loadPageKeys(); }, []);
 
   const move = (arr, idx, dir) => {
     const j = idx + dir;
@@ -271,6 +299,7 @@ export default function MenuManagerPage() {
             <ItemRow
               item={it}
               isChild={false}
+              pageKeys={pageKeys}
               onChange={(v) => setItems(items.map((x, xi) => (xi === i ? v : x)))}
               onMove={(dir) => setItems(move(items, i, dir))}
               onDelete={() => setItems(items.filter((_, xi) => xi !== i))}
@@ -282,6 +311,7 @@ export default function MenuManagerPage() {
                     key={c.id}
                     item={c}
                     isChild
+                    pageKeys={pageKeys}
                     onChange={(v) => setItems(items.map((x, xi) => xi === i ? { ...x, children: x.children.map((y, yi) => (yi === ci ? v : y)) } : x))}
                     onMove={(dir) => setItems(items.map((x, xi) => (xi === i ? { ...x, children: move(x.children, ci, dir) } : x)))}
                     onDelete={() => setItems(items.map((x, xi) => (xi === i ? { ...x, children: x.children.filter((_, yi) => yi !== ci) } : x)))}

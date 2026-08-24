@@ -1,3 +1,84 @@
+## 🧭 TASK 7 — PropManage Configuration Layer (Page Registry + Publishing) · LIVRAT (24 Feb 2026)
+
+**Cerere**: Extinde Menu Manager într-un **Configuration Layer** platform-wide fără sisteme paralele. Priority: Page Registry ca **sursă canonică** pentru menu_label, H1, subtitle, SEO, OG, visibility, feature_flag + workflow DRAFT → PUBLISH → LIVE cu versioning + Config History unificat. Backward-compatible cu CMS și app_settings existente.
+
+**SOURCE-OF-TRUTH MAP (canonic + fallback backward)**:
+
+| Config | Sursă canonică | Fallback |
+|---|---|---|
+| Menu structure/label | `db.site_menu.items` | DEFAULT_MENU |
+| Route (URL) | React Router (App.js) | 🔒 read-only în UI |
+| Page H1 | `db.pages.live.h1` **NEW** | `db.cms_content.hero.title*` |
+| Page Subtitle | `db.pages.live.subtitle` **NEW** | `db.cms_content.hero.subtitle` |
+| Page SEO title/desc | `db.pages.live.seo_*` **NEW** | `db.app_settings.seo.{seo_key}_*` |
+| Page OG title/desc | `db.pages.live.og_*` **NEW** | fallback → seo → app_settings |
+| Visibility (roles/tiers/device) | `db.pages.live.allowed_roles/tiers + device + feature_flag` **NEW** | undefined = public |
+| Feature ON/OFF | `db.feature_config` | (neschimbat) |
+| CMS fragments (hero.badge, cta.*) | `db.cms_content` | DEFAULT_CMS |
+| App settings global | `db.app_settings` | DEFAULT_SETTINGS |
+| Audit | `admin_audit_log` (agregat via `/api/admin/config-history`) | — |
+| Page versions | `db.pages_versions` **NEW** (snapshot per publish) | — |
+| Menu ↔ Page link | `db.site_menu.items[].page_key` **NEW opțional** | null (backward-compat) |
+
+**Fișiere modificate/create**:
+
+Backend:
+1. **`/app/backend/routes/pages_registry.py`** (nou) — 8 endpoint-uri admin + 1 public:
+   - `GET /api/admin/pages` (list + filter status)
+   - `GET /api/admin/pages/{key}` (detail LIVE + DRAFT)
+   - `PUT /api/admin/pages/{key}` (write to DRAFT slot, LIVE untouched)
+   - `POST /api/admin/pages/{key}/publish` (DRAFT → LIVE + snapshot vechiul live în `pages_versions`)
+   - `POST /api/admin/pages/{key}/discard-draft`
+   - `POST /api/admin/pages/{key}/reset` (revert la seed defaults + snapshot)
+   - `POST /api/admin/pages/{key}/restore/{version}` (restore ca NEW DRAFT, nu șterge istoric)
+   - `GET /api/admin/pages/{key}/versions` (istoric snapshot-uri)
+   - `GET /api/admin/config-history?entity_type=page` (VIEW peste `admin_audit_log`, zero sistem paralel)
+   - `GET /api/public/pages/{key}` (LIVE + fallback chain resolved)
+2. **`/app/backend/routes/site_menu.py`** — adăugat `page_key` opțional la `_ALLOWED_KEYS` + `_sanitize_items` (backward-compat, meniuri fără `page_key` continuă să funcționeze)
+3. **`/app/backend/routes/register.py`** — înregistrat pages_registry_router + public router
+
+Frontend:
+4. **`/app/frontend/src/pages/admin/PageRegistryPage.jsx`** (nou) — UI admin cu 6 secțiuni în modal editor + tabel filtrabil + deep-link `?edit=<key>` + LIVE vs DRAFT diff + version history + restore
+5. **`/app/frontend/src/pages/admin/MenuManagerPage.jsx`** — extins ItemRow cu `page_key` dropdown + buton `FileCog` deep-link către Page Registry editor
+6. **`/app/frontend/src/pages/admin/AdminLayoutMetronic.jsx`** — sidebar entry nou „Page Registry" cu badge CFG
+7. **`/app/frontend/src/App.js`** — ruta `/admin/page-registry` (lazy)
+8. **`/app/frontend/src/lib/useDynamicSEO.js`** (rescris) — cascade: db.pages → app_settings.seo → fallback prop → document.title. Setează și `og:title/description`, `twitter:title/description` din Page Registry.
+
+Tests:
+9. **`/app/backend/tests/test_pages_registry_iter188.py`** (nou) — **10 teste PASS**: bootstrap seed, list, public LIVE-only (draft nu leak), publish + version chain, monotonic version pe restore→publish, discard-draft, reset defaults, backward fallback la app_settings, role/tier/device visibility, config-history VIEW, site_menu backward-compat cu page_key, public key validator (blocked traversal + uppercase).
+
+**Bootstrap seed = 20 pagini**: home, pricing, whyus, estate, sell, marketplace, interior_design, design_exterior, arhitectura, digital_twin, community, demo, login, register, devino_specialist, devino_francizat, privacy, terms, cookies, trust.
+
+**Ce e configurabil ACUM din Admin fără cod**:
+- ✅ Menu structure + labels + icons + visibility + auto-reorder (Menu Manager, existent)
+- ✅ Per-page menu_label, H1, subtitle, SEO title/description, OG title/description (Page Registry, nou)
+- ✅ Per-page visibility: roles, tiers, desktop_visible, mobile_visible, feature_flag (Page Registry, nou)
+- ✅ Per-page status: active/hidden/draft cu publish workflow (Page Registry, nou)
+- ✅ CMS fragments (hero.badge, cta.*, footer.*, promo.*) (CMS existent)
+- ✅ App settings globale: seo defaults, pricing display, social, contact, company (existent)
+- ✅ Feature flags matrix (role × tier × enabled) + quest-uri + vouchers (Feature Configurator existent)
+- ✅ Menu ↔ Page linking (`page_key` opțional pe menu items)
+- ✅ Version history + restore + config history unificat
+
+**Ce încă necesită cod**:
+- ❌ Route-uri (URL) — protejate în React Router, nu configurabile din Admin (by design)
+- ❌ Componentele React în sine (structura) — Page Registry configurează CONȚINUTUL, nu structura JSX
+- ❌ Forms (form_config = schema-only pregătit ulterior în P2, UI editor absent)
+- ❌ Workflows (workflow_config = schema-only ulterior, UI editor absent)
+- ❌ Design tokens globale (light/dark theme, primary/accent colors) — CSS vars în cod
+
+**Regresii Tasks 1-6.1 + Task 7**: `pytest 5 files` → **53/53 PASS** ✓
+**Blocker**: NICIUN. Zero modificări la Digital Twin, payments, auth, entitlements, Client/Specialist Beta, existing Demo.
+
+**Follow-up prod**:
+- Publish frontend build pe prod → `/admin/page-registry` va fi accesibil
+- Colecția `db.pages` se auto-bootstrap la prima accesare a endpoint-ului `/api/public/pages/{key}` sau `/api/admin/pages`
+- Colecția `db.pages_versions` se creează la primul publish
+
+---
+
+
+
 ## 🔧 TASK 6.1 — Deployment Verification + Beta Visibility · LIVRAT (24 Feb 2026)
 
 **Phase A — Task 6 Production Fix**:

@@ -90,7 +90,7 @@ DEFAULT_MENU = [
 
 _ALLOWED_KEYS = {"id", "label", "href", "icon", "active", "visibility", "children",
                  "description", "image", "category", "dest_type", "providers",
-                 "visible_site", "visible_marketplace"}
+                 "visible_site", "visible_marketplace", "page_key"}
 _VISIBILITIES = {"all", "guests", "auth"}
 _DEST_TYPES = {"internal", "marketplace", "external", "none"}
 
@@ -136,6 +136,7 @@ def _sanitize_items(items: list, depth: int = 0) -> list:
             "providers": _sanitize_providers(it.get("providers")),
             "visible_site": bool(it.get("visible_site", True)),
             "visible_marketplace": bool(it.get("visible_marketplace", False)),
+            "page_key": str(it.get("page_key") or "")[:60],  # optional link to db.pages
             "children": _sanitize_items(it.get("children") or [], depth + 1),
         }
         out.append(clean)
