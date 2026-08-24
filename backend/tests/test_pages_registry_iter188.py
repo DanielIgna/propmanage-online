@@ -190,3 +190,52 @@ def test_public_key_validator():
     assert r.status_code in (400, 404)
     r2 = requests.get(f"{API}/public/pages/UPPERCASE", timeout=15)
     assert r2.status_code in (400, 404)
+
+
+# ------------------------------------------------------------------
+# Task 7.1 · Security fixes
+# ------------------------------------------------------------------
+def test_sec001_config_history_scope_enforced_with_actor(admin):
+    """SEC-001: config-history MUST always constrain to config-surface target types,
+    even when caller supplies an `actor` filter (previous bug: actor filter bypassed scope).
+    """
+    r = admin.get(f"{API}/admin/config-history?limit=50&actor=admin@propmanage.io", timeout=15)
+    assert r.status_code == 200
+    data = r.json()
+    allowed = {"page", "cms_key", "menu", "app_settings", "feature", "feature_config"}
+    for item in data["items"]:
+        t = (item.get("target") or {}).get("type")
+        assert t in allowed, f"config-history leaked non-config entry with target.type={t!r}"
+
+
+def test_sec002_feature_flag_off_page_returns_404(admin):
+    """SEC-002: a public page whose feature_flag is OFF in feature_config MUST 404."""
+    # 1. Publish a page with feature_flag pointing at a known key.
+    flag_key = "client_early_access"  # exists in DEFAULT_FEATURES; we'll toggle OFF.
+    admin.put(f"{API}/admin/pages/community", json={"feature_flag": flag_key}, timeout=15)
+    admin.post(f"{API}/admin/pages/community/publish", timeout=15)
+
+    # 2. Toggle the feature flag OFF.
+    r_flag = admin.put(f"{API}/admin/feature-configurator/config/feature",
+                       json={"key": flag_key, "enabled": False}, timeout=15)
+    assert r_flag.status_code == 200
+
+    # 3. Public MUST 404.
+    pub = requests.get(f"{API}/public/pages/community", timeout=15)
+    assert pub.status_code == 404, f"feature_flag OFF page still exposed publicly: {pub.status_code}"
+
+    # 4. Cleanup: turn feature back ON and unset flag.
+    admin.put(f"{API}/admin/feature-configurator/config/feature",
+              json={"key": flag_key, "enabled": True}, timeout=15)
+    admin.put(f"{API}/admin/pages/community", json={"feature_flag": ""}, timeout=15)
+    admin.post(f"{API}/admin/pages/community/publish", timeout=15)
+
+
+def test_p3_public_payload_omits_access_rules():
+    """Public payload MUST NOT expose internal access rules (allowed_roles,
+    allowed_tiers, feature_flag key name)."""
+    r = requests.get(f"{API}/public/pages/home", timeout=15)
+    assert r.status_code == 200
+    data = r.json()
+    for leaked in ("allowed_roles", "allowed_tiers", "feature_flag", "feature_flag_state"):
+        assert leaked not in data, f"public payload leaked '{leaked}'"

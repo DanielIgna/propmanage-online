@@ -1,3 +1,46 @@
+## 🛡️ TASK 7.1 — Security Audit + Production Readiness · LIVRAT (24 Feb 2026)
+
+**Cerere**: Audit read-only al Task 7 (Configuration Layer) înainte de deploy prod + Knowledge Center update. Fără P2, fără feature nou.
+
+**Security audit executat** (agent `security_audit_agent`, 6 fișiere scope): 2 MEDIUM + 3 LOW/INFO. Zero CRITICAL/HIGH.
+
+**Fixuri aplicate (minim invaziv)**:
+
+| ID | Severity | Fix |
+|---|---|---|
+| **SEC-001** | MEDIUM | `/api/admin/config-history`: `target.type` restriction ALWAYS aplicat (chiar când caller pasează `actor` filter). Anterior: operator putea extrage tot `admin_audit_log` bypass-uind scope-ul config. |
+| **SEC-002** | MEDIUM | `_resolve_public` returnează `None` când `feature_flag` OFF → endpoint returnează 404. Anterior: pages gated de feature flag OFF încă expuneau content + numele flag-ului. |
+| **P3.1** | LOW | Unique index `(page_key, version)` pe `db.pages_versions` — concurrent publish nu mai poate duplica silent version numbers. |
+| **P3.2** | LOW | Public payload strips `allowed_roles`, `allowed_tiers`, `feature_flag` — nu leak access rules către consumeri anonimi. |
+| P3.3 | INFO | Schema mismatch legacy audit (`target_type` flat) vs nou (`target.type` nested) — documentat, non-blocher. |
+
+**Fișiere modificate**:
+- `/app/backend/routes/pages_registry.py` — 4 fix-uri chirurgicale (2 MEDIUM + 2 LOW)
+- `/app/backend/tests/test_pages_registry_iter188.py` — 3 teste noi post-fix (`test_sec001_*`, `test_sec002_*`, `test_p3_public_payload_omits_access_rules`)
+
+**Testing**:
+- `tests/test_pages_registry_iter188.py` → **13/13 PASS** (10 originale + 3 security)
+- Regresie Tasks 1–6.1 + Task 7 → **56/56 PASS**
+- Cross-cutting extins (Entitlements iter100 + PTR iter181/182 + Task 7) → **109/109 PASS**
+- Frontend `useDynamicSEO.js` folosește doar `seo_title/description/og_*` din public payload → NU afectat de stripping-ul P3.2.
+
+**Zero regresii pe protected core**: Stripe, entitlements, Digital Twin, House Health, auth, Client/Specialist Beta, existing routes.
+
+**Production readiness**: ✅ **READY**. Zero CRITICAL/HIGH/MEDIUM outstanding. Deploy prod = decizie fondator (nu executat automat).
+
+**Knowledge Center update**:
+- ✅ Doc canonic nou: `/app/memory/board/EXECUTION_ORDER_044_CONFIGURATION_LAYER.md`
+- ✅ SSOT audit actualizat: `/app/memory/audits/MASTER_PLATFORM_STATE.md` (secțiune Task 7 + 7.1)
+- ✅ Index catalog actualizat: `/app/memory/INDEX.md` (referință EO_044)
+- ✅ PRD.md (acest fișier) — Task 7 + 7.1 entries
+- ❌ Fără duplicate — reutilizat categoria existentă „Execution Orders" în Knowledge Center (`/api/founder/knowledge`), fără sistem paralel
+
+**Blocker**: NICIUN.
+
+---
+
+
+
 ## 🧭 TASK 7 — PropManage Configuration Layer (Page Registry + Publishing) · LIVRAT (24 Feb 2026)
 
 **Cerere**: Extinde Menu Manager într-un **Configuration Layer** platform-wide fără sisteme paralele. Priority: Page Registry ca **sursă canonică** pentru menu_label, H1, subtitle, SEO, OG, visibility, feature_flag + workflow DRAFT → PUBLISH → LIVE cu versioning + Config History unificat. Backward-compatible cu CMS și app_settings existente.

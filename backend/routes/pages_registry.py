@@ -279,6 +279,13 @@ def _live_from_default(default: dict) -> dict:
 async def _bootstrap_if_empty() -> None:
     count = await db.pages.count_documents({})
     if count > 0:
+        # Ensure the concurrent-publish safety index exists (P3.1) — cheap idempotent op.
+        try:
+            await db.pages_versions.create_index(
+                [("page_key", 1), ("version", 1)], unique=True, name="uniq_page_version"
+            )
+        except Exception:  # noqa: BLE001
+            pass
         return
     now = _now()
     docs = []
@@ -297,6 +304,14 @@ async def _bootstrap_if_empty() -> None:
         })
     if docs:
         await db.pages.insert_many(docs)
+        # Create unique index on pages_versions so concurrent publish cannot
+        # duplicate a version number silently (P3.1).
+        try:
+            await db.pages_versions.create_index(
+                [("page_key", 1), ("version", 1)], unique=True, name="uniq_page_version"
+            )
+        except Exception:  # noqa: BLE001
+            pass
         logger.info("[pages] bootstrap seeded %d pages", len(docs))
 
 
@@ -328,7 +343,15 @@ def _sanitize_patch(patch: dict) -> dict:
 # Public resolver (LIVE + backward fallback to CMS + app_settings).
 # ------------------------------------------------------------------
 async def _resolve_public(page: dict) -> dict:
-    """Merge LIVE + backward CMS/app_settings fallbacks, respecting feature_flag."""
+    """Merge LIVE + backward CMS/app_settings fallbacks, respecting feature_flag.
+
+    Security:
+    - If feature_flag is set AND its state is False, the public resolver signals
+      a 404 to the caller by returning None. The caller endpoint MUST 404 in that
+      case. (SEC-002 fix.)
+    - The public payload NEVER exposes `allowed_roles`, `allowed_tiers` or the
+      internal `feature_flag` key name — those are admin-only access rules. (P3.2)
+    """
     live = page.get("live") or _empty_live()
 
     # CMS fallback for h1/subtitle when live is empty (backward compat).
@@ -358,16 +381,14 @@ async def _resolve_public(page: dict) -> dict:
             return str(app_seo.get(f"{seo_key}_{fallback_from_seo}") or "")
         return ""
 
-    # Feature flag gate.
+    # Feature flag gate — SEC-002: when flag exists and is OFF, refuse to serve.
     ff = (live.get("feature_flag") or "").strip()
-    ff_state: Optional[bool] = None
     if ff:
-        # cheap probe: check feature_config table for on/off — else default ON.
         cfg = await db.feature_config.find_one({"_id": "config"}) or {}
         feats = cfg.get("features") or []
         found = next((f for f in feats if f.get("key") == ff), None)
-        if found is not None:
-            ff_state = bool(found.get("enabled", True))
+        if found is not None and not bool(found.get("enabled", True)):
+            return None  # public MUST 404
 
     h1 = _pick("h1", fallback_from_cms="h1")
     subtitle = _pick("subtitle", fallback_from_cms="subtitle")
@@ -376,6 +397,7 @@ async def _resolve_public(page: dict) -> dict:
     og_title = (live.get("og_title") or "").strip() or seo_title
     og_description = (live.get("og_description") or "").strip() or seo_description
 
+    # P3.2: strip internal access rules from public payload.
     return {
         "key": page.get("key"),
         "route": page.get("route"),
@@ -387,12 +409,8 @@ async def _resolve_public(page: dict) -> dict:
         "seo_description": seo_description,
         "og_title": og_title,
         "og_description": og_description,
-        "allowed_roles": live.get("allowed_roles") or [],
-        "allowed_tiers": live.get("allowed_tiers") or [],
         "desktop_visible": bool(live.get("desktop_visible", True)),
         "mobile_visible": bool(live.get("mobile_visible", True)),
-        "feature_flag": ff,
-        "feature_flag_state": ff_state,
         "version": live.get("version", 0),
         "updated_at": page.get("updated_at"),
     }
@@ -601,16 +619,21 @@ async def restore_version(key: str, version: int,
 async def config_history(limit: int = 50, entity_type: Optional[str] = None,
                          actor: Optional[str] = None,
                          _user: dict = Depends(require_role("admin", "operator"))):
-    """Unified admin config history (VIEW over admin_audit_log). No new audit system."""
+    """Unified admin config history (VIEW over admin_audit_log). No new audit system.
+
+    Security: the config-surface allowlist is ALWAYS applied, even when the caller
+    supplies `actor` or `entity_type` filters. This prevents an operator from using
+    the actor filter as an escape hatch to read non-config audit entries (SEC-001).
+    """
     limit = max(1, min(limit, 200))
+    config_types = ["page", "cms_key", "menu", "app_settings", "feature", "feature_config"]
     q: dict = {}
-    if entity_type:
+    if entity_type and entity_type in config_types:
         q["target.type"] = entity_type
+    else:
+        q["target.type"] = {"$in": config_types}
     if actor:
         q["actor_email"] = actor
-    else:
-        # Restrict to config-surface entities by default (page, menu, cms, feature, settings).
-        q["target.type"] = {"$in": ["page", "cms_key", "menu", "app_settings", "feature", "feature_config"]}
     cur = db.admin_audit_log.find(q, {"_id": 0}).sort("created_at", -1).limit(limit)
     items = [d async for d in cur]
     return {"items": items, "count": len(items)}
@@ -630,4 +653,8 @@ async def public_get_page(key: str):
     if page.get("status") != "active":
         # Hide draft/hidden pages from public consumers.
         raise HTTPException(404, "Page not published")
-    return await _resolve_public(page)
+    resolved = await _resolve_public(page)
+    if resolved is None:
+        # Feature flag OFF — refuse (SEC-002).
+        raise HTTPException(404, "Page not available")
+    return resolved

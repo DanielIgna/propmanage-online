@@ -29,6 +29,39 @@
 
 ---
 
+---
+
+## ✅ Task 7 + 7.1 — PropManage Configuration Layer (24 Feb 2026)
+
+**Status**: `implementation_status = TRUE` pentru Configuration Layer P0+P1. Security validat (Task 7.1). **Deploy production PENDING** — necesită autorizare fondator.
+
+**Ce introduce** (fără sisteme paralele — reuse la maxim):
+
+- Colecție nouă `db.pages` — 20 pagini seedate. Source-of-truth pentru: `menu_label`, `h1`, `subtitle`, `seo_title`, `seo_description`, `og_title`, `og_description`, `allowed_roles[]`, `allowed_tiers[]`, `desktop_visible`, `mobile_visible`, `feature_flag`, `status` (active/hidden/draft), `version`.
+- Colecție nouă `db.pages_versions` — append-only snapshots per publish. Unique index `(page_key, version)`.
+- Câmp opțional `db.site_menu.items[].page_key` — leagă un item de meniu la config pagină. Backward-compatible (menu items fără page_key funcționează normal).
+- Admin UI: `/admin/page-registry` — 20 pagini, editor cu 6 secțiuni (identitate, conținut, SEO/OG, visibility, LIVE vs DRAFT diff, versions), deep-link `?edit=<key>`.
+- Publishing workflow DRAFT → PUBLISH → LIVE cu versioning monotonic + restore ca NEW DRAFT (nu șterge istoric).
+- API public strict LIVE-only: `GET /api/public/pages/{key}` (draft NU se scurge).
+- Config History unified VIEW: `GET /api/admin/config-history` peste `admin_audit_log` (**zero** al doilea sistem audit).
+
+**Security post-Task 7.1** (2 MEDIUM + 2 LOW fixate):
+
+| ID | Fix |
+|---|---|
+| SEC-001 | `target.type` restriction ALWAYS aplicat, indiferent de filtre `actor`/`entity_type` |
+| SEC-002 | `feature_flag` OFF → `_resolve_public` returnează `None` → endpoint returnează 404 |
+| P3.1 | Unique index `(page_key, version)` pe `db.pages_versions` — concurrent publish safe |
+| P3.2 | Public payload strips `allowed_roles`, `allowed_tiers`, `feature_flag` — admin-only |
+
+**Testing**: 13 teste dedicate (`test_pages_registry_iter188.py`) + regresie completă. **109/109 PASS** cross-cutting (Tasks 1–6.1 + PTR v1/v2 + Task 7 + Entitlements).
+
+**Protected — NU modificat**: Stripe, entitlements, Digital Twin, House Health, auth, Client/Specialist Beta, existing Demo, existing routes, users/properties/requests schema.
+
+**Coverage capability**: ~65–70% din stratul de conținut/UX/visibility acum configurabil din Admin fără cod (față de ~35% înainte). Detalii + follow-up P2 în `board/EXECUTION_ORDER_044_CONFIGURATION_LAYER.md`.
+
+
+
 ## Metodologie oficială adoptată (2026-07-31)
 
 Începând cu **Board Directive „Research-Driven Product Evolution"** (2026-07-31), PropManage aplică metodologia obligatorie **RESEARCH → KNOWLEDGE → VALIDATION → PRODUCT** pentru orice dezvoltare nouă.
