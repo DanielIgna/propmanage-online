@@ -5,6 +5,27 @@ import axios from "axios";
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 axios.defaults.withCredentials = true;
 
+// Task 5: global 402 interceptor. Când server-ul răspunde cu 402 entitlement_required,
+// emitem un CustomEvent pe window ca UI-ul să afișeze un nudge friendly în loc de eroare
+// tehnică. NU înghițim eroarea — componenta care a făcut cererea poate face al său flow.
+axios.interceptors.response.use(
+  (r) => r,
+  (error) => {
+    try {
+      if (error?.response?.status === 402) {
+        const detail = error.response.data?.detail || {};
+        const feature = detail.feature || detail.required_feature;
+        if (feature && typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("pm:entitlement_denied", {
+            detail: { feature, message: detail.message, current_tier: detail.current_tier },
+          }));
+        }
+      }
+    } catch { /* silent */ }
+    return Promise.reject(error);
+  }
+);
+
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {

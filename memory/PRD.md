@@ -1,3 +1,49 @@
+## 🎯 TASK 5 — Basic Upgrade Nudges · LIVRAT (24 Feb 2026)
+
+**Cerere**: Pattern consistent de upgrade contextual pentru FREE users. Un singur loc de conversie (`/pricing`), copy central, zero mesaje tehnice ("HTTP 402", "entitlement_required") leaked către useri normali. Analytics extension point (fără provider nou). Reutilizare 100% Tasks 1-4.
+
+**Zone auditate**:
+- HouseHealthCard (dashboard/property) — CTA "Activează abonament" → `/house-health/upgrade` (custom copy) → REFACTORIZAT la `/pricing` + copy central
+- DigitalTwinPage LockedScreen (Task 3) — deja alinat, doar copy central
+- LockedFeature.jsx — extended cu copy central + tracking
+- Orice apel axios care returnează 402 — interceptor global emite CustomEvent
+- **Neatins**: PropertyTechnicalRecord (feature FREE, nu are gate)
+
+**Implementat (minimal, non-destructiv)**:
+
+Frontend NEW:
+- `/app/frontend/src/lib/upgradeNudge.js` — `NUDGE_COPY` map centralizat + `trackNudge(id, event)` helper via CustomEvent (extension point analytics, fără provider nou)
+- `/app/frontend/src/components/EntitlementToast.jsx` — global toast listener; când axios primește 402, arată Sonner toast cu titlu + CTA "Activează Basic — 9 €/lună" (dedupe 3s per feature)
+
+Frontend MODIFIED:
+- `/app/frontend/src/components/LockedFeature.jsx` — refactorizat să folosească copy central, emit `pm:upgrade_nudge` view+click cu `nudgeId`, mode compact | full
+- `/app/frontend/src/auth.js` — interceptor axios pe 402 → dispatch `pm:entitlement_denied` cu detail {feature, message, current_tier}
+- `/app/frontend/src/App.js` — mount `<Toaster>` (Sonner deja instalat) + `<EntitlementToast>`
+- `/app/frontend/src/pages/HouseHealthCard.jsx` — locked-sub state refactorizat: `HouseHealthNudge` component folosește copy central, CTA nou "Activează Basic — 9 €/lună" → `/pricing` (era `/house-health/upgrade`), tracking pe view+click
+
+**Copy central per feature** (single source of truth):
+- `house_health_basic` → titlu "Documentează istoricul casei tale" · CTA "Activează Basic — 9 €/lună" · destinație `/pricing`
+- `house_health_advanced` / `digital_twin_advanced` → titlu specific · CTA "Vezi planurile PropManage" · `/pricing`
+
+**Analytics extension point**:
+```js
+window.addEventListener('pm:upgrade_nudge', e => sendToAnalytics(e.detail))
+// e.detail = {nudge_id, event: 'view'|'click', timestamp, path}
+window.addEventListener('pm:entitlement_denied', e => ...)
+// e.detail = {feature, message, current_tier}
+```
+
+**Zero technical leaks**: user-ii nu văd "HTTP 402", "entitlement_required" sau "feature=xxx" în UI — doar copy prietenos + CTA.
+
+**Backend**: **ZERO modificări**.
+
+**Testing**: `testing_agent_v3_fork` iter187 · **8/8 backend pytest PASS + 100% frontend UX PASS**. Zero regresiuni pe Tasks 1-4. Verificat: rate limiting toast, admin bypass, PRO/PREMIUM unchanged, mobile 390x844 fără overflow, zero jargon tehnic.
+
+**Blocker**: NICIUN.
+
+---
+
+
 ## 🔁 TASK 4 — Subscription Lifecycle Handling · LIVRAT (24 Feb 2026)
 
 **Cerere**: Când un abonament plătit expiră/anulează, user-ul pierde entitlement-urile paid și revine la FREE, FĂRĂ să piardă date. Reutilizare completă Task 1-3.

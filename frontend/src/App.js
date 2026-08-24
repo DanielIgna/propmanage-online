@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./auth";
 import { ServiceGate } from "./components/ServiceGate";
+import { Toaster } from "sonner";
+import { EntitlementToast } from "./components/EntitlementToast";
 import { I18nProvider, useI18n } from "./i18n";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { DesignTokensProvider } from "./contexts/DesignTokensProvider";
@@ -1747,6 +1749,8 @@ function App() {
             <BetaFeedbackWidget />
             <AssistantDock />
             <LegalGate />
+            <EntitlementToast />
+            <Toaster position="top-right" richColors closeButton />
             </ErrorBoundary>
           </BrowserRouter>
         </AuthProvider>
