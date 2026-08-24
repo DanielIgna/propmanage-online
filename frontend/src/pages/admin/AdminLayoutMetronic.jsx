@@ -470,7 +470,9 @@ const LiveActivityRail = ({ theme }) => {
 const ROLE_PROFILES = [
   // Base demo accounts (existing)
   { role: "client", label: "Client (demo)", icon: Home, color: "blue", demoEmail: "client@propmanage.io", tier: "VERIFIED", group: "base" },
+  { role: "client", label: "Client Beta", icon: Sparkles, color: "amber", demoEmail: "client.beta@propmanage.io", tier: null, group: "base", badge: "BETA" },
   { role: "specialist", label: "Specialist (demo)", icon: Wrench, color: "emerald", demoEmail: "specialist@propmanage.io", tier: "VERIFIED", group: "base" },
+  { role: "specialist", label: "Specialist Beta", icon: Sparkles, color: "amber", demoEmail: "spec.beta@propmanage.io", tier: null, group: "base", badge: "BETA" },
   { role: "operator", label: "Operator", icon: Briefcase, color: "amber", demoEmail: "operator@propmanage.io", tier: null, group: "base" },
   // Client tiers
   { role: "client", label: "Client JUNIOR", icon: Home, color: "slate", demoEmail: "client.junior@propmanage.io", tier: "JUNIOR", group: "client_tiers" },
@@ -559,7 +561,7 @@ const QuickProfileSwitch = ({ dark }) => {
 
             {/* Base demo accounts */}
             <div className={`px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider font-bold ${dark ? "text-slate-500" : "text-slate-400"}`}>
-              Conturi demo principale
+              Demo / Test Accounts
             </div>
             {ROLE_PROFILES.filter(p => p.group === "base").map(p => (
               <button
@@ -569,13 +571,18 @@ const QuickProfileSwitch = ({ dark }) => {
                 className={`w-full text-left px-3 py-2 flex items-center gap-3 text-sm transition-colors ${
                   dark ? "hover:bg-slate-800 text-slate-200" : "hover:bg-slate-50 text-slate-700"
                 } disabled:opacity-60`}
-                data-testid={`quick-profile-${p.role}`}
+                data-testid={`quick-profile-${p.badge === "BETA" ? "beta-" : ""}${p.role}`}
               >
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-${p.color}-500/15`}>
                   <p.icon className={`w-4 h-4 text-${p.color}-500`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium">{p.label}</div>
+                  <div className="font-medium flex items-center gap-1.5">
+                    {p.label}
+                    {p.badge === "BETA" && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500 uppercase">BETA</span>
+                    )}
+                  </div>
                   <div className={`text-[11px] truncate ${dark ? "text-slate-500" : "text-slate-400"}`}>
                     {busy === p.demoEmail ? "Se inițializează..." : p.demoEmail}
                   </div>

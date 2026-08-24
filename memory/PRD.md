@@ -1,3 +1,46 @@
+## 🔧 TASK 6.1 — Deployment Verification + Beta Visibility · LIVRAT (24 Feb 2026)
+
+**Phase A — Task 6 Production Fix**:
+- **ROOT CAUSE**: Task 6 a aliniat CMS + app_settings DOAR pe **preview DB**. Prod DB e separată (schimbări NU se propagă automat cu deploy-ul frontend). Build-ul frontend era deployat corect (index.html static title, 4× JSON-LD + Twitter title confirmă), dar H1/title/description DINAMIC vin din DB → serveau valorile vechi.
+- **FIX**: Login admin@propmanage.io pe prod cu cookie session → PUT /api/admin/cms pentru fiecare cheie (`hero.title1/2/3`, `hero.subtitle`, `cta.title1/2/intro`, `problem.intro`, `sol.intro`) + PUT /api/admin/app-settings pentru `seo.home_title` + `home_description`.
+- **VERIFICARE LIVE prod**: H1 „Cartea Digitală / a Casei Tale." ✓ · TITLE „PropManage — Cartea Digitală a Casei Tale · Documente, istoric, specialiști" ✓ · META DESC / OG TITLE / OG DESC / SUBTITLE / CTA TITLE aliniate ✓ · Badge intact ✓ · JSON-LD 4× ✓ · Mobile OK ✓ · `/pricing` funcțional 9€ ✓
+
+**Phase B — Admin Beta Visibility**:
+- **Audit**: „Client Beta" / „Specialist Beta" NU existau ca test accounts în meniul admin „Schimbă profilul". Existau doar Beta Cockpit (analytics useri REALI), Beta Testers (monitor sign-ups reali), Beta Issues Board.
+- **Reuse existing infrastructure**: aceleași role standard (client/specialist), aceeași rută `/api/admin/impersonate` (jurnalizat GDPR · 2h), aceeași colecție `users`.
+- **Modificări**:
+  - Preview DB — creat 2 conturi minimale idempotent: `client.beta@propmanage.io` + `spec.beta@propmanage.io` (parola `Beta123!`), fresh state (fără tier, wallet 0, `is_beta: True`, ca useri reali proaspăt înscriși în beta)
+  - `AdminLayoutMetronic.jsx` — extins `ROLE_PROFILES` cu 2 entries noi în `group="base"`, cu `badge: "BETA"` (amber Sparkles icon)
+  - Header secțiune redenumit „Conturi demo principale" → „Demo / Test Accounts" (conform expected concept)
+  - Pattern render adaptat pentru afișare badge „BETA" pe butoane
+- **Tier-uri progresive păstrate intact**: Client JUNIOR/VERIFIED/PREMIUM și Specialist ENTRY/JUNIOR/VERIFIED/ADVANCED/PREMIUM/TOP — 0 modificări.
+
+**Files changed**:
+1. `/app/frontend/src/pages/admin/AdminLayoutMetronic.jsx` — ROLE_PROFILES + render secțiunii base
+2. `/app/memory/test_credentials.md` — 2 conturi noi Beta
+3. `/app/memory/PRD.md` — Task 6.1 entry
+
+**Files NOT changed**:
+- Zero backend cod (seed.py, admin_console.py, app_settings.py, register.py, auth.py — INTACTE)
+- Zero rute noi, zero schemă DB, zero migrations
+- Stripe / entitlements / subscriptions / lifecycle / Digital Twin / House Health — ZERO modificări
+- Progression tiers (Client JUNIOR/VERIFIED/PREMIUM, Specialist ENTRY..TOP) — INTACTE
+- EN i18n — INTACT
+
+**Regresii Tasks 1-5**: `pytest 4 files` → **43/43 PASS** ✓
+**Blocker**: NICIUN.
+
+**Follow-up prod DB** (pentru fondator dacă vrea Beta accounts și pe prod):
+- Prod DB nu are conturile `client.beta@propmanage.io` / `spec.beta@propmanage.io` — dacă admin apasă butonul BETA pe prod va primi „Nu am găsit niciun utilizator..."
+- Opțiuni:
+  1. Rulează același script Python pe prod (necesită acces DB prod)
+  2. Update `seed.py::demo_users` cu cele 2 conturi noi + redeploy (idempotent, la restart backend prod le va crea automat)
+  3. Creare via admin UI din prod (form standard user)
+
+---
+
+
+
 ## 🔎 TASK 6 — SEO + Homepage Semantic Positioning · LIVRAT (24 Feb 2026)
 
 **Cerere**: Elimină inconsecvența badge/H1 (badge = „CARTEA DIGITALĂ A CASEI TALE" vs H1 = „Cartea de service a casei tale."). Repoziționează homepage-ul + metadata SEO pe axa unică **„Cartea Digitală a Casei Tale"** — pentru proprietari care caută documentare, istoric lucrări, mentenanță și specialiști verificați. Targeted SEO + copy alignment, ZERO redesign, ZERO infrastructure change.
