@@ -1530,7 +1530,10 @@ const PromoBanner = () => {
 
 // ============= LANDING PAGE =============
 const LandingPage = () => {
-  useDynamicSEO("home", { title: "PropManage · Cartea digitală a casei tale" });
+  useDynamicSEO("home", {
+    title: "PropManage — Cartea Digitală a Casei Tale · Documente, istoric, specialiști",
+    description: "Cartea Digitală a Casei Tale — documentele proprietății, istoricul lucrărilor, mentenanța și specialiștii verificați ai casei, într-un singur loc.",
+  });
   const { t, showSection, isPreview } = useI18n();
   const promoText = t("landing.promo_banner");
   const hasPromo = !!promoText && promoText !== "landing.promo_banner" && sessionStorage.getItem("pm_promo_dismissed") !== "1";

@@ -48,8 +48,8 @@ const translations = {
     "cat.other": "Altele",
     // Landing - Hero
     "hero.badge": "CARTEA DIGITALĂ A CASEI TALE",
-    "hero.title1": "Cartea de service", "hero.title2": "a casei", "hero.title3": "tale.",
-    "hero.subtitle": "Documentele, istoricul lucrărilor și specialiștii verificați ai casei tale — într-un singur loc. Știi mereu ce s-a făcut, cine a făcut și cât a costat.",
+    "hero.title1": "Cartea Digitală", "hero.title2": "a Casei", "hero.title3": "Tale.",
+    "hero.subtitle": "Documentele casei, istoricul lucrărilor, mentenanța și specialiștii verificați — într-un singur loc. Cartea Digitală a Casei Tale, pregătită în câteva minute.",
     "hero.cta1": "Creează contul gratuit", "hero.cta2": "Vezi cum funcționează",
     "hero.cta1.variant_a": "Creează contul gratuit", "hero.cta1.variant_b": "Creează contul gratuit",
     "hero.cta2.variant_a": "Vezi cum funcționează", "hero.cta2.variant_b": "Vezi cum funcționează",
@@ -63,14 +63,14 @@ const translations = {
     "sec.value": "Value Proposition", "sec.golden": "Golden Path",
     // Problem
     "problem.title1": "Proprietatea ta e o", "problem.title2": "cutie neagră.",
-    "problem.intro": "85% dintre proprietari nu au nicio documentație despre instalațiile, echipamentele sau intervențiile din propria casă. Asta înseamnă risc, costuri și pierdere de valoare.",
+    "problem.intro": "Majoritatea proprietarilor nu au un loc unde să păstreze documentele, istoricul lucrărilor și intervențiile din propria casă. Fără Cartea Digitală a Casei Tale, informațiile se pierd, iar deciziile se iau pe ghicite.",
     "problem.p1.t": "Nu știi ce e în pereți", "problem.p1.d": "Trasee de instalații, vârste de echipamente, intervenții — totul rămâne ascuns până când ceva se strică.",
     "problem.p2.t": "Zero tracking mentenanță", "problem.p2.d": "Când a fost ultima revizie? Cine a făcut-o? Ce s-a schimbat? Nimeni nu mai știe.",
     "problem.p3.t": "Lipsă de încredere", "problem.p3.d": "Specialiști aleși la întâmplare, fără verificare, fără garanții. Risc constant.",
     "problem.p4.t": "Costuri opace", "problem.p4.d": "Prețuri umflate, lucrări nedocumentate, fără devize transparente sau istoric financiar.",
     // Solution
     "sol.title1": "Un sistem de operare pentru", "sol.title2": "casa ta.",
-    "sol.intro": "PropManage transformă proprietatea fizică într-un activ digital. Diagnostic, analiză, control — toate într-o singură platformă, cu transparență totală și plăți securizate.",
+    "sol.intro": "PropManage îți dă Cartea Digitală a Casei Tale: un loc unic pentru documente, istoricul lucrărilor, mentenanță și specialiștii pe care te bazezi. Informațiile stau ordonat, se actualizează cu fiecare intervenție și rămân cu tine.",
     "sol.tagline": "Nu este un cost. Este o investiție.",
     "sol.p1.t": "Digital Twin", "sol.p1.d": "Replică digitală 3D a proprietății cu toate sistemele și echipamentele mapate.",
     "sol.p2.t": "Marketplace Verificat", "sol.p2.d": "Specialiști triple-verified cu rating real și garanție de servicii.",
@@ -79,7 +79,7 @@ const translations = {
     // CTA
     "cta.badge": "GATA DE LANSARE",
     "cta.title1": "Gata să digitalizezi", "cta.title2": "tot ecosistemul?",
-    "cta.intro": "Contul e gratuit. Adaugi casa într-un minut, iar fiecare document și fiecare lucrare rămân în cartea casei — pentru totdeauna.",
+    "cta.intro": "Contul e gratuit. Adaugi casa într-un minut, iar documentele, lucrările și mentenanța rămân în Cartea Digitală a Casei Tale — pentru totdeauna.",
     "cta.btn1": "Creează cont gratuit", "cta.btn2": "Vorbește cu un specialist",
     "cta.btn1.variant_a": "Creează cont gratuit", "cta.btn1.variant_b": "Creează cont gratuit",
     "cta.footer": "Fără card de credit · Contul rămâne gratuit",

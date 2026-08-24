@@ -1,3 +1,65 @@
+## 🔎 TASK 6 — SEO + Homepage Semantic Positioning · LIVRAT (24 Feb 2026)
+
+**Cerere**: Elimină inconsecvența badge/H1 (badge = „CARTEA DIGITALĂ A CASEI TALE" vs H1 = „Cartea de service a casei tale."). Repoziționează homepage-ul + metadata SEO pe axa unică **„Cartea Digitală a Casei Tale"** — pentru proprietari care caută documentare, istoric lucrări, mentenanță și specialiști verificați. Targeted SEO + copy alignment, ZERO redesign, ZERO infrastructure change.
+
+**Modificări (targeted, non-destructive)**:
+
+Static SEO — `/app/frontend/public/index.html`:
+- `<title>` → „PropManage — Cartea Digitală a Casei Tale · Documente, istoric, specialiști"
+- `meta description` → axa Cartea Digitală (documente, istoric lucrări, mentenanță, specialiști)
+- `meta keywords` → epurat de „escrow imobiliar", „AI concierge"; prioritizate concepte-consumator
+- OG title/description → aliniate pe aceeași axă
+- Twitter title/description → aliniate
+- JSON-LD Organization + Service — `description` + `name` actualizate; **nou** JSON-LD **WebPage** pentru homepage (isPartOf WebSite, about: Cartea Digitală a Casei Tale)
+- Canonical, robots, hreflang, sitemap → NEATINSE
+
+i18n RO — `/app/frontend/src/i18n.js`:
+- `hero.title1/2/3` → „Cartea Digitală" · „a Casei" (italic gradient) · „Tale."
+- `hero.subtitle` → clarifică natural conceptul (documente, istoric lucrări, mentenanță, specialiști verificați)
+- `problem.intro`, `sol.intro`, `cta.intro` → mențiuni naturale ale conceptului (1× per secțiune, fără keyword stuffing)
+- EN → NEATINS
+
+Fallback dynamic SEO — `/app/frontend/src/App.js`:
+- `useDynamicSEO("home", { title, description })` fallback → aliniat cu axa nouă
+
+Aliniere CMS + app-settings (DB, DOAR text values, ZERO schema/route change):
+- `db.cms_content` — upsert override pentru: `hero.title1/2/3`, `hero.subtitle`, `cta.title1`, `cta.title2`, `cta.intro`
+- `cta.title2` → „propria Carte Digitală." (era „o carte de service.")
+- `db.app_settings.seo.home_title` + `home_description` → aliniate cu axa nouă
+
+**Ce NU s-a modificat**:
+- backend cod (rute, models, deps, entitlements)
+- Stripe / subscriptions / entitlements / lifecycle
+- Digital Twin / House Health / dashboards
+- authentication / roles / marketplace
+- pricing logic / `/pricing`
+- DB schema / migrations / API contracts
+- identificatori tehnici (`hh_subscriptions`, `property_technical_record`, `digital_twin_advanced`, `CLIENT_BASIC`, `CLIENT_PRO`, `CLIENT_PREMIUM`)
+- EN i18n bundle
+- vizualul (glass, dark, serif italic, `#d4ff3a` accent, layout, spacing, animații)
+
+**Verificare live (preview)**:
+- H1: „Cartea Digitală\na Casei Tale." · **1× H1** · 12× H2 ✓
+- `<title>` (post-hydrate): „PropManage — Cartea Digitală a Casei Tale · Documente, istoric, specialiști" ✓
+- Meta description: aliniată ✓
+- OG title / OG description / Twitter title / Twitter description: aliniate ✓
+- Canonical: `https://propmanage.ro/` ✓
+- JSON-LD scripts în DOM: 4 (Organization + WebSite + Service + WebPage) ✓
+- CTA: „Creează contul gratuit" → `/register` ✓
+- Secondary CTA: „Vezi cum funcționează" → `#journey` ✓
+- Problem intro / Solution intro / CTA title / CTA intro: aliniate cu axa nouă ✓
+- Desktop 1920×800: fără overflow ✓
+- Mobile 390×844: H1 se împarte natural (Cartea / Digitală / a Casei Tale.), fără overflow pe hero ✓
+- `/pricing`: neatinsă, 9€/lună funcțional ✓
+
+**Regresii Tasks 1-5**: `pytest tests/test_pricing_basic_iter184.py tests/test_digital_twin_gate_iter185.py tests/test_subscription_lifecycle_iter186.py tests/test_task5_regression_iter187.py` → **43/43 PASS** ✓
+
+**Blocker**: NICIUN.
+
+---
+
+
+
 ## 🎯 TASK 5 — Basic Upgrade Nudges · LIVRAT (24 Feb 2026)
 
 **Cerere**: Pattern consistent de upgrade contextual pentru FREE users. Un singur loc de conversie (`/pricing`), copy central, zero mesaje tehnice ("HTTP 402", "entitlement_required") leaked către useri normali. Analytics extension point (fără provider nou). Reutilizare 100% Tasks 1-4.
