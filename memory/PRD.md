@@ -1,3 +1,53 @@
+## 🔐 PROPERTY-TECHNICAL-RECORD-v2 — Verification Chain + Building Axis + PDF · LIVRAT (24 Feb 2026)
+
+**Cerere**: Fondator a aprobat 4 enhancement-uri P0/P0/P1/P2 care transformă PTR dintr-o pagină de agregare într-un sistem real de memorie tehnică verificabilă cu două axe:
+- **Verification chain**: DOCUMENT → EVIDENCE → DIAGNOSTIC → REVIEW → VERIFIED → PTR → TRANSACTION
+- **Building horizontal share**: BUILDING → multiple PROPERTIES (context comun când e verificat)
+
+**Implementare backend** (`/app/backend/routes/property_technical_record.py`):
+
+1. **Diagnostic Verification (P0)** — un diagnostic devine VERIFIED doar prin path explicit admin/operator:
+   - `POST /api/admin/diagnostics/{id}/verify` (admin/operator only): promovează la verified NUMAI dacă există evidence (document_ref sau source_reference); altfel 400. Setează `verified_at`, `verified_by`, `verified_by_name`, `verification_notes`, `confidence=high`, adaugă history entry.
+   - `POST /api/admin/diagnostics/{id}/reject` (admin/operator only): reason obligatoriu ≥3 caractere; setează `verification_status=unverified`, `rejection_reason`, history entry.
+   - Client-role → 403.
+
+2. **Diagnostic Document Attach (P0)** — extindere POST diagnostics:
+   - `document_ref` validat că aparține proprietății (altfel 400)
+   - Salvează `document_snapshot` (id, title, category, filename, uploaded_at) pentru context stabil
+   - Endpoint helper: `GET /api/properties/{id}/documents-picker` — listă compactă pentru UI selector
+
+3. **Building Neighbours Link (P1)** — a doua axă:
+   - `GET /api/properties/{id}/building-neighbours` — alte proprietăți din același building_id (identity minimă, fără date personale) + `shared_context_verified` flag
+   - `GET /api/buildings/search?q=X&limit=20` — caută clădiri (min. 2 char) cu `units_registered` per clădire
+   - `POST /api/properties/{id}/attach-building {building_id}` — conectează o proprietate la o clădire existentă (autorizare owner + admin)
+   - `POST /api/admin/buildings/{id}/verify` — admin marchează contextul clădirii ca verificat → devine sursă comună pentru toți vecinii
+
+4. **Readiness PDF Export (P1/P2)**:
+   - `GET /api/properties/{id}/transaction-readiness.pdf` — one-page A4 randat cu `reportlab` (deja în requirements.txt)
+   - Content-Type application/pdf, Content-Disposition attachment
+   - Conține: header cu property name/address, status global colorat, meta clădire, cele 10 criterii cu bullet colored + status, listă "ce lipsește", disclaimer footer
+
+5. **Viewer metadata în /technical-record**: `viewer.role` + `viewer.is_verifier` (True doar pentru admin/operator) — folosit de UI să afișeze butoanele de verificare condiționat.
+
+**Implementare frontend** (`/app/frontend/src/pages/clientv2/PropertyTechnicalRecord.jsx`):
+- `DiagnosticsSection`: preîncarcă documents-picker; select `ptr-d-doc-picker` în formular; afișează `document_snapshot` în listă (`ptr-diag-doc-{id}`); butoane condiționale `ptr-diag-verify-btn-{id}` (verde) / `ptr-diag-reject-btn-{id}` (roșu) doar când `viewer.is_verifier`; modal `ptr-verify-modal` cu note/reason.
+- `BuildingContextSection`: preîncarcă neighbours; card nou `ptr-neighbours-card` cu listă vecini; `ptr-building-verify-btn` pentru admin; `ptr-building-shared` badge când context verificat + vecini > 0; nou `AttachBuildingSearchBox` cu search + attach dacă proprietatea nu e conectată la clădire.
+- `ReadinessSection`: buton nou `ptr-readiness-pdf-btn` care deschide URL PDF în tab nou.
+
+**Regulă critică respectată**: Orice modificare a Building Context (POST /building-context) resetează automat `verification_status` la `unverified` — verificarea trebuie refăcută după orice update. Comportament intențional și documentat.
+
+Colecții impact:
+- REUSED: `property_diagnostics` (extindere doar cu câmpuri opționale în document: verified_at, verified_by, verified_by_name, verification_notes, rejected_at, rejection_reason, document_snapshot)
+- REUSED: `buildings.context` extins cu opționale verified_at, verified_by, verified_by_name, verification_notes
+- REUSED: `property_documents` (via document-picker helper, doar READ)
+
+**Testing**: `testing_agent_v3_fork` iter182 · **18/18 backend pytest PASS (100%)** · **Frontend 100% flow-uri critice PASS** · 0 bugs critice / 0 minore · 0 regresiuni v1.
+
+**Impact strategic**: PTR transformat din pagină de agregare într-un dosar tehnic verificabil cu proveniență clară. Pregătit pentru observability autonomă (system detects: what's missing, what's expiring, what's unverified, what's common to entire building) fără a presupune că informația neverificată e adevărată.
+
+---
+
+
 ## 🏗️ PROPERTY-TECHNICAL-RECORD-v1 — Dosar Tehnic al Proprietății · LIVRAT (20 Feb 2026)
 
 **Cerere**: Fondator dorea prima piesă REALĂ de produs care să concretizeze conceptul de "dosar tehnic viu" al unei proprietăți, agregând Domain A (Property Core existent), Domain B (Building Context) și Domain C (Regulatory Diagnostics) — fără să comaseze semantica celor trei domenii și fără să duplice infrastructura existentă.
