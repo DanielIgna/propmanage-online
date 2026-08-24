@@ -4,6 +4,10 @@ import axios from "axios";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 axios.defaults.withCredentials = true;
+// Anti-CSRF (SEC-002): header custom pe TOATE apelurile app-ului — formularele
+// HTML cross-site nu pot seta headere custom, deci mutațiile /api/admin fără
+// acest header sunt respinse de backend.
+axios.defaults.headers.common["X-PM-Client"] = "propmanage-app";
 
 // Task 5: global 402 interceptor. Când server-ul răspunde cu 402 entitlement_required,
 // emitem un CustomEvent pe window ca UI-ul să afișeze un nudge friendly în loc de eroare

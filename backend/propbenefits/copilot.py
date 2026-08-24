@@ -375,6 +375,14 @@ async def copilot_dashboard(user: dict) -> dict:
 
     # Timeline: închide recomandările rezolvate + loghează recomandarea curentă
     current_ids = {a["id"] for a in [next_action, community_action, *secondary] if a}
+    # Coordonare anti-duplicat cu Renewal Reminder Email: dacă servim nudge-ul
+    # de renewal, scriem ledger-ul comun (fereastră 24h).
+    if "renew_subscription" in current_ids:
+        try:
+            from routes.renewal_reminders import record_copilot_renew_nudge
+            await record_copilot_renew_nudge(uid)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[copilot] renew nudge ledger failed: {e}")
     signals = {"documents": ctx["documents"], "benefits_available": benefits["available"],
                "house_score": score["score"]}
     try:

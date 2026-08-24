@@ -8,6 +8,13 @@ import { AdminLayoutMetronic } from "./AdminLayoutMetronic";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
+const errText = (e) => {
+  const d = e?.response?.data?.detail;
+  if (typeof d === "string") return d;
+  if (d) return JSON.stringify(d);
+  return e.message;
+};
+
 export default function ConfigIOPage() {
   const [downloading, setDownloading] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -31,7 +38,7 @@ export default function ConfigIOPage() {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setError(e?.response?.data?.detail || e.message);
+      setError(errText(e));
     } finally { setDownloading(false); }
   };
 
@@ -52,7 +59,7 @@ export default function ConfigIOPage() {
                                         { bundle, apply: false });
       setPlan(data.plan);
     } catch (e) {
-      setError(e?.response?.data?.detail || e.message);
+      setError(errText(e));
     } finally { setImporting(false); }
   };
 
@@ -67,7 +74,7 @@ export default function ConfigIOPage() {
                                         { bundle, apply: true });
       setApplied(data.applied);
     } catch (e) {
-      setError(e?.response?.data?.detail || e.message);
+      setError(errText(e));
     } finally { setImporting(false); }
   };
 
@@ -164,6 +171,8 @@ export default function ConfigIOPage() {
         <div className="text-xs text-stone-500 space-y-1 pt-2 border-t border-white/10">
           <p>• Sensitive fields (password, secret, token, api_key) sunt <b>excluse defensiv</b> din export.</p>
           <p>• Secțiunile permise: pages, pages_versions, site_menu, cms_content, app_settings, feature_config, design_tokens.</p>
+          <p>• <code>design_tokens</code> = starea RUNTIME-ACTIVĂ (Design Studio, doc <code>_id:"active"</code>) — restore-ul chiar schimbă tema vizibilă.</p>
+          <p>• Rol: strat de portabilitate JSON brut. Snapshot-urile canonice in-DB: Admin Console → Snapshots.</p>
           <p>• <code>pages_versions</code> este read-only istoric — la import va fi <b>skipped</b>.</p>
         </div>
       </div>

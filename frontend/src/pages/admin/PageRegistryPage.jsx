@@ -156,6 +156,74 @@ const VersionHistory = ({ pageKey, onRestore }) => {
   );
 };
 
+const PreviewOverlay = ({ data, onClose }) => {
+  if (!data) return null;
+  const d = data.data || {};
+  return (
+    <div
+      className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+      data-testid="preview-overlay"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border border-amber-500/30 bg-[#0d0d0f]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-5 py-3 bg-[#1a1408] border-b border-amber-500/30">
+          <div className="flex items-center gap-2 text-amber-300 text-xs font-bold uppercase tracking-wider">
+            <Eye className="w-4 h-4" /> Mod Preview · simulare post-publish · LIVE neatins
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-stone-300" data-testid="preview-overlay-close">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-6 space-y-5">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-stone-400">
+            <span className="px-2 py-0.5 rounded-full border border-white/10 bg-white/5 font-mono">{d.route}</span>
+            <span className={`px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase ${data.source === "draft" ? "border-amber-500/30 bg-amber-500/10 text-amber-300" : "border-lime-500/30 bg-lime-500/10 text-lime-300"}`}>
+              sursă: {data.source}
+            </span>
+            <span className="text-stone-500">v{d.version}</span>
+          </div>
+          {data.feature_flag_would_block && (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-xs px-3 py-2" data-testid="preview-flag-blocked">
+              Atenție: feature flag-ul curent ar bloca pagina publică (404) — preview-ul îl ignoră intenționat.
+            </div>
+          )}
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <div className="text-[10px] uppercase tracking-wider font-bold text-stone-500 mb-3">Conținut pagină (după publish)</div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight" data-testid="preview-h1">{d.h1 || "—"}</h1>
+            <p className="text-sm text-stone-400 mt-2" data-testid="preview-subtitle">{d.subtitle || "—"}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white p-4">
+            <div className="text-[10px] uppercase tracking-wider font-bold text-stone-400 mb-2">Google · SEO snippet</div>
+            <div className="text-[#1a0dab] text-base leading-snug" data-testid="preview-seo-title">{d.seo_title || d.h1 || "—"}</div>
+            <div className="text-[#006621] text-xs mt-0.5">propmanage.ro{d.route}</div>
+            <div className="text-[#545454] text-xs mt-1 leading-snug" data-testid="preview-seo-desc">{d.seo_description || "—"}</div>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            <div className="text-[10px] uppercase tracking-wider font-bold text-stone-500 mb-2">Social share (Open Graph)</div>
+            <div className="rounded-lg border border-white/10 overflow-hidden">
+              <div className="h-20 bg-gradient-to-r from-lime-400/20 to-stone-800 flex items-center px-4">
+                <span className="text-lg font-bold text-white" data-testid="preview-og-title">{d.og_title || d.seo_title || "—"}</span>
+              </div>
+              <div className="px-4 py-2 bg-black/40">
+                <div className="text-xs text-stone-400">{d.og_description || d.seo_description || "—"}</div>
+                <div className="text-[10px] text-stone-600 mt-1 uppercase">propmanage.ro</div>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-3 text-xs text-stone-400">
+            <span>Menu label: <b className="text-stone-200">{d.menu_label || "—"}</b></span>
+            <span>Desktop: <b className="text-stone-200">{d.desktop_visible ? "da" : "nu"}</b></span>
+            <span>Mobil: <b className="text-stone-200">{d.mobile_visible ? "da" : "nu"}</b></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const PageEditor = ({ page, onClose, onSaved }) => {
   const live = page.live || {};
   const [draft, setDraft] = useState(page.draft || live);
@@ -163,6 +231,20 @@ const PageEditor = ({ page, onClose, onSaved }) => {
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  const openPreview = async () => {
+    setPreviewLoading(true);
+    try {
+      const { data } = await axios.get(`${API}/api/admin/pages/${page.key}/preview`);
+      setPreview(data);
+    } catch (e) {
+      alert(e?.response?.data?.detail || e.message);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
 
   const hasDraft = !!page.draft;
   const patch = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
@@ -408,16 +490,16 @@ const PageEditor = ({ page, onClose, onSaved }) => {
             <RotateCcw className="w-4 h-4" /> Reset defaults
           </button>
           {hasDraft && (
-            <a
-              href={`${API}/api/admin/pages/${page.key}/preview`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300"
+            <button
+              onClick={openPreview}
+              disabled={previewLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 disabled:opacity-50"
               data-testid="page-editor-preview-draft"
             >
-              <Eye className="w-4 h-4" /> Preview draft
-            </a>
+              <Eye className="w-4 h-4" /> {previewLoading ? "Se încarcă..." : "Preview draft"}
+            </button>
           )}
+          {preview && <PreviewOverlay data={preview} onClose={() => setPreview(null)} />}
           {hasDraft && (
             <button
               onClick={discard}

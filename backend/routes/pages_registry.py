@@ -619,9 +619,10 @@ async def admin_preview(key: str,
     # Temporarily rebind live for the resolver, then restore.
     resolved_page = {**page, "live": simulated, "status": "active"}
     resolved = await _resolve_public(resolved_page)
-    # Feature-flag OFF path: resolver returns None to signal 404. Preview must
-    # still let the admin see what the page WOULD look like, so we bypass this
-    # gate and clearly mark that a live feature flag is currently blocking it.
+    # Feature-flag OFF → resolver returns None (public would get 404). Preview
+    # must still show the admin what the page WOULD look like, so we rebuild it
+    # below and mark honestly that the flag currently blocks the public page.
+    flag_blocked = resolved is None
     if resolved is None:
         # Rebuild without feature-flag suppression by inlining the logic.
         cms_map = page.get("cms_map") or {}
@@ -668,7 +669,7 @@ async def admin_preview(key: str,
         "preview": True,
         "source": "draft" if draft else "live",
         "has_draft": bool(draft),
-        "feature_flag_would_block": bool(draft) and (simulated.get("feature_flag") or "").strip() != "" and False,  # informational
+        "feature_flag_would_block": flag_blocked,
         "data": resolved,
     }
 
@@ -707,7 +708,9 @@ async def config_history(limit: int = 50, entity_type: Optional[str] = None,
     the actor filter as an escape hatch to read non-config audit entries (SEC-001).
     """
     limit = max(1, min(limit, 200))
-    config_types = ["page", "cms_key", "menu", "app_settings", "feature", "feature_config"]
+    config_types = ["page", "cms_key", "menu", "app_settings", "feature",
+                    "feature_config", "design_tokens", "config_io", "snapshot",
+                    "renewal_reminder"]
     q: dict = {}
     if entity_type and entity_type in config_types:
         q["target.type"] = entity_type

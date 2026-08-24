@@ -11,7 +11,14 @@ Exported sections (safe, portable):
 - cms_content (public content fragments)
 - app_settings (SEO + social + pricing + company)
 - feature_config (feature × role × tier)
-- design_tokens (from db.design_tokens)
+- design_tokens (starea RUNTIME-ACTIVĂ: db.design_tokens {_id:"active"} — Design Studio)
+
+ROL ÎN ARHITECTURĂ (post-remediere Iun 2026):
+- config_io = strat de PORTABILITATE JSON brut (migrare între medii / backup fișier).
+- Snapshot-urile canonice in-DB rămân în admin_console.py (db.admin_snapshots).
+- app_settings are și snapshot automat zilnic separat (settings_snapshots.py).
+- Disaster recovery full-DB = admin_backups.py (mongodump).
+- Precedența completă e documentată în /app/memory/audits/MASTER_PLATFORM_STATE.md.
 
 Explicitly EXCLUDED (never exported):
 - users, sessions, hh_subscriptions, hh_transactions, payment records
@@ -31,6 +38,7 @@ from pydantic import BaseModel
 
 from db import db
 from deps import require_role
+from routes.design_studio import _reject_dangerous_deep
 
 
 logger = logging.getLogger("propmanage.config_io")
@@ -61,7 +69,18 @@ def _now() -> str:
 
 
 def _strip_sensitive(doc: dict) -> dict:
-    return {k: v for k, v in doc.items() if k not in _ALWAYS_STRIP}
+    """Recursive strip — nested secrets are removed too (defense-in-depth)."""
+    out: Dict[str, Any] = {}
+    for k, v in doc.items():
+        if k in _ALWAYS_STRIP:
+            continue
+        if isinstance(v, dict):
+            out[k] = _strip_sensitive(v)
+        elif isinstance(v, list):
+            out[k] = [_strip_sensitive(x) if isinstance(x, dict) else x for x in v]
+        else:
+            out[k] = v
+    return out
 
 
 async def _load_section(name: str) -> Any:
@@ -85,7 +104,8 @@ async def _load_section(name: str) -> Any:
         doc = await db.feature_config.find_one({"_id": "config"}, {"_id": 0})
         return doc or {}
     if name == "design_tokens":
-        doc = await db.design_tokens.find_one({"_id": "design_tokens"}, {"_id": 0})
+        # RUNTIME-ACTIVE tokens — the doc Design Studio writes and the frontend consumes.
+        doc = await db.design_tokens.find_one({"_id": "active"}, {"_id": 0})
         return doc or {}
     return None
 
@@ -176,6 +196,7 @@ async def _plan_and_apply(bundle: dict, sections_filter: Optional[List[str]],
                           apply: bool, user: dict) -> Dict[str, Any]:
     plan: Dict[str, Any] = {}
     applied_summary: Dict[str, Any] = {}
+    errors: List[Dict[str, str]] = []
 
     incoming = bundle["sections"]
     keys = [k for k in EXPORTABLE_SECTIONS if k in incoming]
@@ -183,7 +204,9 @@ async def _plan_and_apply(bundle: dict, sections_filter: Optional[List[str]],
         keys = [k for k in keys if k in sections_filter]
 
     for name in keys:
+      try:
         raw = _sanitize_docs(name, incoming[name])
+        _reject_dangerous_deep(raw)  # SEC-003: uniform pe TOATE secțiunile importate
 
         if name == "pages" and isinstance(raw, list):
             existing_keys = {d["key"] async for d in db.pages.find({}, {"key": 1})}
@@ -254,24 +277,38 @@ async def _plan_and_apply(bundle: dict, sections_filter: Optional[List[str]],
                 applied_summary[name] = plan[name]["features_count"]
 
         elif name == "design_tokens" and isinstance(raw, dict) and raw:
-            plan[name] = {"replace": True, "keys": sorted(list(raw.keys()))[:20]}
+            tokens = raw.get("tokens")
+            if not isinstance(tokens, dict) or not tokens:
+                raise HTTPException(400, "design_tokens: bundle-ul trebuie să conțină obiectul 'tokens' "
+                                          "(forma runtime-activă exportată de Design Studio)")
+            _reject_dangerous_deep(tokens)
+            plan[name] = {"replace": True, "target": '_id:"active"',
+                          "sections": sorted(list(tokens.keys()))[:20]}
             if apply:
                 await db.design_tokens.update_one(
-                    {"_id": "design_tokens"},
-                    {"$set": {**raw, "updated_at": _now(),
+                    {"_id": "active"},
+                    {"$set": {"tokens": tokens,
+                              "preset_id": raw.get("preset_id") or "imported",
+                              "updated_at": _now(),
                               "updated_by": str(user.get("email") or "import")}},
                     upsert=True,
                 )
-                applied_summary[name] = "replaced"
+                applied_summary[name] = "replaced_runtime_active"
 
         elif name == "pages_versions":
             # NEVER re-import history — it must remain append-only via publish flow.
             plan[name] = {"skipped_reason": "pages_versions is append-only history, never imported"}
+      except HTTPException:
+        raise  # validation errors → 400 vizibil, fără mutații ascunse
+      except Exception as exc:  # noqa: BLE001
+        logger.error("[config_io] section %s failed: %s", name, exc)
+        errors.append({"section": name, "error": str(exc)[:300]})
 
     return {
         "dry_run": not apply,
         "plan": plan,
         "applied": applied_summary if apply else None,
+        "errors": errors,
     }
 
 
@@ -283,12 +320,24 @@ async def import_config(body: ImportRequest, user: dict = Depends(require_role("
     apply action is audited. Never touches users, subscriptions or secrets.
     """
     _validate_bundle(body.bundle)
+    if body.apply:
+        # Pas de validare completă (dry-run intern) ÎNAINTE de orice mutație —
+        # un bundle invalid nu poate lăsa importul aplicat pe jumătate.
+        await _plan_and_apply(body.bundle, body.sections, False, user)
     result = await _plan_and_apply(body.bundle, body.sections, body.apply, user)
     await _audit(
         "config.import.apply" if body.apply else "config.import.dry_run",
         user, "bundle",
         before={"schema_version": body.bundle.get("schema_version")},
         after={"plan_keys": sorted(list((result.get("plan") or {}).keys())),
-               "applied": result.get("applied")},
+               "applied": result.get("applied"),
+               "errors": result.get("errors") or None},
     )
+    if body.apply and result.get("errors"):
+        # NO false-success: dacă o secțiune a eșuat, operațiunea eșuează vizibil.
+        raise HTTPException(500, detail={
+            "message": "Import parțial eșuat — verifică secțiunile raportate",
+            "failed_sections": result["errors"],
+            "applied": result.get("applied"),
+        })
     return {"ok": True, **result}

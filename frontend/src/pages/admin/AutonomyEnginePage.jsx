@@ -651,7 +651,7 @@ export const AutonomyEnginePage = () => {
                   try {
                     const r = await fetch(`${API}/api/admin/autonomy/generate-tasks`, {
                       method: "POST", credentials: "include",
-                      headers: { "Content-Type": "application/json" },
+                      headers: { "Content-Type": "application/json", "X-PM-Client": "propmanage-app" },
                       body: JSON.stringify({ max_items: 6 }),
                     });
                     const data = await r.json();

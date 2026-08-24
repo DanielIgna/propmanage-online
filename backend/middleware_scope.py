@@ -59,10 +59,15 @@ SCOPE_RULES = [
     (re.compile(r"^/api/admin/(cms|texts|emails?|zones|content-audit|term-audit)"), "frontend"),
     (re.compile(r"^/api/admin/feature-configurator"),    "frontend"),
     (re.compile(r"^/api/admin/design"),                  "frontend"),
+    # Config surfaces (SEC-001 remediere Iun 2026):
+    (re.compile(r"^/api/admin/config-history"),          "frontend"),  # read VIEW peste audit config
+    (re.compile(r"^/api/admin/pages"),                   "frontend"),  # Page Registry (conținut/SEO)
     # ----- BACKEND -----
     (re.compile(r"^/api/admin/(backup|data-)"),          "backend"),
     (re.compile(r"^/api/admin/app-settings"),            "backend"),
     (re.compile(r"^/api/admin/architecture-board"),      "backend"),
+    # ----- OPS (extindere SEC-001) -----
+    (re.compile(r"^/api/admin/renewal-reminders"),       "ops"),
     # ----- GENERAL (everything else under /api/admin/) -----
     # Sub-admins management itself is a super-admin (general) area
     # — but /me/scope must be readable by ANY admin
@@ -74,6 +79,10 @@ SCOPE_RULES = [
     (re.compile(r"^/api/admin/stats"),                   "general"),
     (re.compile(r"^/api/admin/finance"),                 "general"),
     (re.compile(r"^/api/admin/users"),                   "general"),
+    # Config I/O import/export + Snapshots restore ating TOATE suprafețele de
+    # config (design + cms + pages + settings + fees) → doar super-admin.
+    (re.compile(r"^/api/admin/config"),                  "general"),
+    (re.compile(r"^/api/admin/snapshots"),               "general"),
 ]
 
 

@@ -88,10 +88,19 @@ async def success_manager(user: dict) -> dict:
         try:
             days = (datetime.fromisoformat(str(ctx["subscription_expires_at"]).replace("Z", "+00:00")) - _now()).days
             if 0 <= days <= 14:
-                candidates.append(_act("renew_subscription",
-                                       f"Grija pentru casa ta expiră în {days} zile",
-                                       "Reînnoiește abonamentul ca să păstrezi beneficiile active, scorul House Health și puterea comunității de partea ta.",
-                                       "/house-health/upgrade", 10))
+                # Coordonare 24h cu Renewal Reminder Email: dacă email-ul a fost
+                # trimis recent, nu dublăm mesajul de renewal în aceeași zi.
+                email_recent = False
+                try:
+                    from routes.renewal_reminders import renewal_email_sent_recently
+                    email_recent = await renewal_email_sent_recently(ctx["uid"])
+                except Exception:  # noqa: BLE001
+                    email_recent = False
+                if not email_recent:
+                    candidates.append(_act("renew_subscription",
+                                           f"Grija pentru casa ta expiră în {days} zile",
+                                           "Reînnoiește abonamentul ca să păstrezi beneficiile active, scorul House Health și puterea comunității de partea ta.",
+                                           "/house-health/upgrade", 10))
         except Exception:  # noqa: BLE001
             pass
     if ctx["referrals_claimed"] == 0 and ctx["completed_jobs"] >= 1:

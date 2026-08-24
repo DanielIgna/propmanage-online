@@ -202,7 +202,8 @@ def test_sec001_config_history_scope_enforced_with_actor(admin):
     r = admin.get(f"{API}/admin/config-history?limit=50&actor=admin@propmanage.io", timeout=15)
     assert r.status_code == 200
     data = r.json()
-    allowed = {"page", "cms_key", "menu", "app_settings", "feature", "feature_config"}
+    allowed = {"page", "cms_key", "menu", "app_settings", "feature", "feature_config",
+               "design_tokens", "config_io", "snapshot", "renewal_reminder"}
     for item in data["items"]:
         t = (item.get("target") or {}).get("type")
         assert t in allowed, f"config-history leaked non-config entry with target.type={t!r}"

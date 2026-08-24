@@ -1,9 +1,16 @@
 # EXECUTION_ORDER_045 — Admin Control Center Expansion · P2
 
-> **Task 8 — CONSOLIDATED · Design Tokens + Config I/O + Preview Overlay + Renewal Reminder · STATUS: IMPLEMENTED**
+> ⚠️ **REMEDIAT (Iun 2026)** — Auditul Forensic de Duplicare a dat verdict 🔴 DO NOT PUBLISH pe implementarea inițială Task 8. Remedierea completă e documentată CANONIC în **EXECUTION_ORDER_046_REMEDIATION_CANONICALIZATION.md**. Corecții față de acest doc:
+> 1. **Secțiunea D e ISTORICĂ/INVALIDĂ**: `routes/design_tokens.py` + `DesignTokensPage.jsx` erau un dead parallel write path (`{_id:"design_tokens"}` — frontend-ul consuma `{_id:"active"}` din Design Studio) și au fost **ȘTERSE**. Canonic = `design_studio.py` + `DesignStudioPage.jsx`. `db.design_tokens` **PRE-EXISTA** (nu era colecție nouă).
+> 2. Config I/O capturează acum starea **runtime-activă** `{_id:"active"}` (înainte exporta doc-ul mort → backup-ul NU restaura tema vizibilă).
+> 3. „Preview Overlay" avea doar JSON în tab nou — acum există **overlay real** în admin (PageRegistryPage).
+> 4. Claim-ul „al **21-lea** job scheduler" era **FALS** — numărătoarea reală: **72 job-uri** înregistrate (70 server.py + 2 email_sequences).
+> 5. Fereastra renewal `[6.5,7.5]` → `[4.5,7.5]` zile + coordonare 24h cu Copilot nudge.
+>
+> **Task 8 — CONSOLIDATED · STATUS: IMPLEMENTED + REMEDIATED (vezi EO_046)**
 > **Doctrine**: „Reuse existing infrastructure; do not create duplicate configuration engines."
 > **Owner**: Founder + AI CPO.
-> **Emitent**: 24 Aug 2026.
+> **Emitent**: 24 Aug 2026 · Remediere: Iun 2026.
 
 ---
 
@@ -33,7 +40,7 @@ Infrastructură deja existentă identificată:
 | `admin_audit_log` | Toate 4 componente scriu audit prin `_audit()` (zero al doilea sistem) |
 | `require_role` | Autorizare admin/operator pe toate endpoint-urile noi |
 | `email_service.send_email` | Renewal reminder folosește provider-ul deja configurat |
-| `AsyncIOScheduler` | Renewal reminder ca 21-lea job cron zilnic la 09:15 Bucharest |
+| `AsyncIOScheduler` | Renewal reminder ca job cron zilnic 09:15 Bucharest — unul din cele **72 job-uri** înregistrate (corecție EO_046; claim-ul inițial „21-lea" era fals) |
 | `db.hh_subscriptions` | Source-of-truth pentru expiry, zero modificări la subscription/entitlement |
 | `db.pages` draft/live | Preview overlay reutilizează DRAFT existent, zero nou draft system |
 | CSS vars `--pm-*` | Frontend consumă tokenii publicați via API, fără redesign |
@@ -189,7 +196,7 @@ Backend:
 - `/app/backend/routes/renewal_reminders.py` (nou)
 - `/app/backend/routes/pages_registry.py` (extins cu preview endpoint)
 - `/app/backend/routes/register.py` (înregistrare 3 routere noi)
-- `/app/backend/server.py` (scheduler job pentru renewal, 21-lea job)
+- `/app/backend/server.py` (scheduler job pentru renewal — unul din 72 job-uri; corecție EO_046)
 
 Frontend:
 - `/app/frontend/src/pages/admin/DesignTokensPage.jsx` (nou)

@@ -35,11 +35,14 @@ logger = logging.getLogger("propmanage.renewal_reminders")
 router = APIRouter(prefix="/api/admin/renewal-reminders", tags=["renewal-reminders"])
 
 # Window: send when subscription expires in [WINDOW_MIN_DAYS, WINDOW_MAX_DAYS] days.
-# Choosing 6.5–7.5 gives a 1-day slack so daily job never misses the target.
-WINDOW_MIN_DAYS = 6.5
+# Floor-ul e 4.5 (nu 6.5) ca email-ul DEFERAT — când Copilot a arătat deja
+# nudge-ul de renewal în ultimele 24h — să poată fi re-încercat în zilele
+# următoare fără să iasă din fereastră. Idempotența rămâne pe (user, expires_at).
+WINDOW_MIN_DAYS = 4.5
 WINDOW_MAX_DAYS = 7.5
 
 REMINDER_KIND = "basic_expiry_7d"
+COPILOT_NUDGE_KIND = "copilot_renew_nudge"
 
 APP_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://propmanage.ro")
 if APP_URL.endswith("/api"):
@@ -166,6 +169,45 @@ async def _ensure_indexes() -> None:
         pass
 
 
+# ------------------------------------------------------------------
+# Coordonare cu PropBenefits Copilot (anti-duplicat mesaje renewal · 24h)
+# Ledger comun: db.renewal_reminders, diferențiat prin `kind`.
+# ------------------------------------------------------------------
+async def record_copilot_renew_nudge(user_id: str) -> None:
+    """Ledger: Copilot a servit nudge-ul renew_subscription azi (idempotent/zi)."""
+    if not user_id:
+        return
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        await db.renewal_reminders.update_one(
+            {"user_id": user_id, "expires_at": f"nudge:{today}", "kind": COPILOT_NUDGE_KIND},
+            {"$set": {"user_id": user_id, "expires_at": f"nudge:{today}",
+                      "kind": COPILOT_NUDGE_KIND,
+                      "sent_at": datetime.now(timezone.utc).isoformat(),
+                      "success": True}},
+            upsert=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[renewal] copilot nudge ledger failed: %s", exc)
+
+
+async def copilot_nudge_shown_recently(user_id: str, hours: int = 24) -> bool:
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    hit = await db.renewal_reminders.find_one({
+        "user_id": user_id, "kind": COPILOT_NUDGE_KIND, "sent_at": {"$gte": cutoff},
+    })
+    return bool(hit)
+
+
+async def renewal_email_sent_recently(user_id: str, hours: int = 24) -> bool:
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    hit = await db.renewal_reminders.find_one({
+        "user_id": user_id, "kind": REMINDER_KIND,
+        "sent_at": {"$gte": cutoff}, "success": True,
+    })
+    return bool(hit)
+
+
 async def find_due_subscriptions(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
     """Return active BASIC subscriptions expiring in the reminder window."""
     now = now or datetime.now(timezone.utc)
@@ -203,6 +245,12 @@ async def send_reminder_for(sub: Dict[str, Any]) -> Dict[str, Any]:
 
     if await _already_reminded(user_id, expires_at_iso):
         return {"ok": True, "skipped": True, "reason": "already_sent"}
+
+    # Coordonare 24h: dacă Copilot a arătat DEJA nudge-ul de renewal recent,
+    # amânăm email-ul (nu scriem ledger-ul de sent → tick-ul de mâine
+    # re-încearcă atâta timp cât suntem în fereastră).
+    if await copilot_nudge_shown_recently(user_id):
+        return {"ok": True, "skipped": True, "reason": "deferred_copilot_nudge_recent"}
 
     user = await db.users.find_one({"id": user_id}) or await db.users.find_one({"_id": user_id})
     if not user:

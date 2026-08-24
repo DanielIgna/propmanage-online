@@ -1,4 +1,49 @@
+## 🛠️ TASK 8R — Remediere & Canonicalizare Task 8 · P0 RELEASE BLOCKER · LIVRAT (Iun 2026)
+
+**Cerere**: Remediere completă a verdictului 🔴 DO NOT PUBLISH din Auditul Forensic de Duplicare — eliminarea dead parallel path-ului Design Tokens, fixarea Config I/O pe starea runtime-activă, precedență deterministă backup/restore, Preview Overlay real, coordonare Renewal↔Copilot, corectarea documentației false, security audit + fixuri.
+
+### Blockere originale → toate FIXED (detalii: `board/EXECUTION_ORDER_046_REMEDIATION_CANONICALIZATION.md`)
+
+| Blocker | Fix |
+|---|---|
+| Dead write path Design Tokens (`routes/design_tokens.py` → `{_id:"design_tokens"}`) | **ȘTERS** (backend + frontend + sidebar). Canonic UNIC: `design_studio.py` → `{_id:"active"}` → `DesignTokensProvider` → CSS vars `--pm-*`. Capabilități portate înainte de ștergere: sanitizare anti-injection + audit `admin_audit_log` pe toate write path-urile. Ruta `/admin/design-tokens` → redirect `/admin/design-studio` |
+| `db.design_tokens` clasificat fals ca NOU | Corectat: PRE-EXISTENT. Doc-ul mort `{_id:"design_tokens"}` eliminat prin **migrare reversibilă** (`scripts/migration_remove_dead_design_tokens_doc.py`, backup în `migration_backups`, pre=2→post=1, `_id:"active"` intact) |
+| Config I/O exporta doc-ul mort → restore NU restaura tema vizibilă | Export/import fixat pe `{_id:"active"}` (forma `{tokens, preset_id}`); bundle-uri cu forma veche → 400; **no-false-success**: validare pre-apply + 500 cu `failed_sections` la eșec parțial |
+| 4 sisteme backup fără precedență | Model documentat: Runtime (autoritar) → Admin Console Snapshots (canonic, extins cu design_tokens/pages/site_menu/feature_config + restore no-false-success) → settings_snapshots (auto, app_settings) → config_io (portabilitate JSON) → admin_backups (mongodump DR). `pages_versions` append-only, niciodată restaurat |
+| „Preview Overlay" = JSON în tab nou | **Overlay REAL** în PageRegistryPage: modal cu banner „MOD PREVIEW · LIVE neatins", H1+subtitle randate, snippet Google SERP, card OG, vizibilitate, warning feature-flag. Backend fix: `feature_flag_would_block` calculat real (era hardcodat False) |
+| Renewal email ↔ Copilot nudge necoordonate | Ledger comun 24h în `renewal_reminders` (kind `copilot_renew_nudge`, idempotent/zi): email amânat dacă nudge servit recent (fereastră lărgită `[4.5,7.5]` zile pentru retry), nudge suprimat dacă email trimis recent |
+| Claim fals „al 21-lea scheduled job" | Numărătoare reală: **72 job-uri** (70 server.py + 2 email_sequences), id-uri unice, 0 duplicate. EO_045/MASTER_STATE/PRD corectate |
+
+### Security audit post-remediere (agent dedicat) → 3 findings, toate FIXED
+
+- **SEC-001 (HIGH)**: sub-admini cu scope limitat puteau muta config prin endpoint-uri nemapate → `middleware_scope.py` extins (`config`/`snapshots`→general, `pages`/`config-history`→frontend, `renewal-reminders`→ops)
+- **SEC-002 (MED)**: CSRF pe mutații admin → middleware guard în `server.py` (Origin permis + header custom `X-PM-Client: propmanage-app`, setat global de axios în `auth.js`; formularele HTML nu pot seta headere). Verificat: atac form-post 403, app 200, curl/tests 200
+- **SEC-003 (LOW)**: sanitizare uniformă `_reject_dangerous_deep` pe preset apply + snapshot restore + toate secțiunile import; `_strip_sensitive` recursiv
+
+### Fișiere modificate
+
+Backend: `design_studio.py` (sanitizare+audit+SSOT docstring), `config_io.py` (runtime-active + no-false-success + strip recursiv), `admin_console.py` (snapshots extinse + restore failed-report), `pages_registry.py` (config-history allowlist + preview flag fix), `renewal_reminders.py` (coordonare + fereastră), `propbenefits/ai_agents.py` + `copilot.py` (ledger), `middleware_scope.py` (SEC-001), `server.py` (CSRF guard), `register.py` (dezînregistrare dead routers). ȘTERSE: `routes/design_tokens.py`.
+Frontend: `PageRegistryPage.jsx` (PreviewOverlay), `ConfigIOPage.jsx` (errText + copy precedență), `AdminLayoutMetronic.jsx` (sidebar curățat), `App.js` (redirect), `auth.js` (header CSRF), `AutonomyEnginePage.jsx` (header pe fetch). ȘTERSE: `DesignTokensPage.jsx`.
+
+### Testing
+
+- `tests/test_task8_p2_iter189.py` rescris: **29 teste PASS** (canonic design studio, config I/O runtime, snapshot capture→restore E2E, preview, renewal, CSRF, scope map)
+- Regresie totală iter181–189: **124/124 PASS**
+- E2E browser: token schimbat în Design Studio → `--pm-primary` se schimbă LIVE pe homepage public → reset OK; Preview Overlay randează draft real, non-mutant; redirect OK
+- Migrare verificată cu pre/post counts
+
+### Production status
+
+- Implemented + verificat în preview: ✅ · Deploy production: ⏳ **PENDING FOUNDER DEPLOYMENT**
+- Verdictul 🔴 DO NOT PUBLISH: **ÎNCHIS** — audit re-rulat, toate blockerele demonstrabil rezolvate
+
+---
+
+
+
 ## 🎛️ TASK 8 — Admin Control Center Expansion · P2 · LIVRAT (24 Aug 2026)
+
+> ⚠️ **REMEDIAT (Iun 2026)** — vezi TASK 8R mai sus. Componenta A (Design Tokens Editor separat) era un dead parallel path și a fost eliminată; canonic = Design Studio. `db.design_tokens` PRE-EXISTA. Claim-ul „21-lea cron job" era fals (real: 72).
 
 **Cerere**: O directivă consolidată cu 4 componente P2 pe Configuration Layer: Design Tokens Editor + Config Import/Export + Preview Overlay + Renewal Reminder Email. Zero features noi, zero arhitectură duplicată, zero break la Digital Twin/Payments/Auth/etc.
 

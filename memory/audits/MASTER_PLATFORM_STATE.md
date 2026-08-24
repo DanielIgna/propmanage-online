@@ -74,7 +74,41 @@
 
 ---
 
+## 🛠️ Task 8R — Remediere & Canonicalizare Admin Config/Design (Iun 2026)
+
+**Canonical flags**:
+- `remediation_status = COMPLETE`
+- `security_validation = PASSED post-fix (SEC-001 HIGH + SEC-002 MED + SEC-003 LOW remediate)`
+- `preview_validation = PASSED (124/124 pytest + E2E browser)`
+- `production_status = PENDING_FOUNDER_DEPLOYMENT`
+
+Auditul Forensic de Duplicare a dat 🔴 DO NOT PUBLISH pe Task 8 inițial. Remedierea (doc canonic: `EXECUTION_ORDER_046_REMEDIATION_CANONICALIZATION.md`) a închis TOATE blockerele:
+
+**SOURCE-OF-TRUTH MAP (design + config · canonic, deterministic)**:
+
+| Subsistem | Source of truth | Write path unic | Runtime consumer | Backup canonic |
+|---|---|---|---|---|
+| Design Tokens | `db.design_tokens {_id:"active"}` (PRE-EXISTENT) | `design_studio.py` | `DesignTokensProvider.jsx` → CSS vars `--pm-*` | Admin Console Snapshots (partea `design_tokens`) |
+| Pages (H1/SEO/OG) | `db.pages` | `pages_registry.py` | `useDynamicSEO` + public API | Snapshots (partea `pages`) + config_io |
+| Site menu | `db.site_menu` | `site_menu.py` | public site-menu API | Snapshots (partea `site_menu`) + config_io |
+| Feature flags | `db.feature_config` | feature configurator | entitlements/pages gate | Snapshots (partea `feature_config`) + config_io |
+| App settings | `db.app_settings` | `app_settings.py` | frontend public settings | `app_settings_snapshots` (auto zilnic) + config_io |
+
+**PRECEDENȚĂ backup/restore**: 1·Runtime (autoritar) → 2·Admin Console Snapshots (restore explicit, auditat, no-false-success) → 3·settings_snapshots (auto, DOAR app_settings) → 4·config_io (portabilitate JSON între medii) → 5·admin_backups (mongodump, disaster recovery). `pages_versions` = append-only, NU se restaurează niciodată.
+
+**Ce s-a șters (dovedit mort)**: `routes/design_tokens.py`, `DesignTokensPage.jsx`, sidebar entry, doc `{_id:"design_tokens"}` (migrare reversibilă, backup în `migration_backups`). Ruta `/admin/design-tokens` → redirect la `/admin/design-studio`.
+**Ce s-a portat înainte de ștergere**: sanitizare anti CSS/JS injection + audit unificat `admin_audit_log` → acum în `design_studio.py` pe toate write path-urile.
+**Preview**: overlay REAL în admin (PageRegistryPage → PreviewOverlay: H1/subtitle/SERP/OG, non-mutant, banner „LIVE neatins"); `feature_flag_would_block` calculat corect.
+**Renewal ↔ Copilot**: ledger comun 24h în `renewal_reminders` (kind `copilot_renew_nudge`); email amânat dacă nudge-ul a fost servit; nudge suprimat dacă email-ul a fost trimis; fereastră `[4.5,7.5]` zile.
+**Scheduler**: **72 job-uri** reale (70 server.py + 2 email_sequences), 0 duplicate — claim-ul „21-lea job" corectat.
+**Security fixes**: scope map extins (config/snapshots→general, pages/config-history→frontend, renewal→ops) + CSRF guard (`X-PM-Client` + origin) + sanitizare uniformă + strip recursiv secrets.
+**Teste**: 29 teste task8 rescrise + regresie totală **124/124 PASS** + E2E browser (token change vizibil live pe homepage, snapshot→restore restaurează tema).
+
+
+
 ## 🎛️ Task 8 — Admin Control Center Expansion · P2 (24 Aug 2026)
+
+> ⚠️ Secțiunea de mai jos e ISTORICĂ — componenta 1 (Design Tokens Editor separat) a fost identificată ca dead parallel path și REMEDIATĂ (vezi Task 8R mai sus + EO_046).
 
 **Canonical flags**:
 - `implementation_status = TRUE`

@@ -153,7 +153,6 @@ from routes.passport_analytics import router as passport_analytics_router
 from routes.beta_cockpit import router as beta_cockpit_router
 from routes.beta_issues import router as beta_issues_router
 from routes.pages_registry import router as pages_registry_router, public_router as pages_registry_public_router
-from routes.design_tokens import router as design_tokens_router, public_router as design_tokens_public_router
 from routes.config_io import router as config_io_router
 from routes.renewal_reminders import router as renewal_reminders_router
 from routes.trust_growth import router as trust_growth_router
@@ -332,8 +331,6 @@ ALL_ROUTERS = (
     beta_issues_router,
     pages_registry_router,
     pages_registry_public_router,
-    design_tokens_router,
-    design_tokens_public_router,
     config_io_router,
     renewal_reminders_router,
     trust_growth_router,

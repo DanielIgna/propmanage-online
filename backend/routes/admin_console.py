@@ -1273,7 +1273,12 @@ async def export_audit_log_csv(user: dict = Depends(require_role("admin"))):
 
 
 # ============= SNAPSHOTS (full-state bookmarks) =============
-SNAPSHOT_PARTS = ["cms", "settings", "trust_weights", "presets"]
+# Sistem CANONIC de snapshot/restore pentru configurația admin-owned.
+# Include (post-remediere Iun 2026) și design_tokens RUNTIME-ACTIVE, pages,
+# site_menu, feature_config. pages_versions = istoric append-only, NU se
+# snapshot-uiește/restaurează niciodată (regulă comună cu config_io).
+SNAPSHOT_PARTS = ["cms", "settings", "trust_weights", "presets",
+                  "design_tokens", "pages", "site_menu", "feature_config"]
 
 
 class SnapshotIn(BaseModel):
@@ -1310,6 +1315,25 @@ async def create_snapshot(data: SnapshotIn, user: dict = Depends(require_role("a
             for p in ps
         ]
         counts["presets"] = len(snapshot_data["presets"])
+    if "design_tokens" in parts:
+        dt = await db.design_tokens.find_one({"_id": "active"})
+        snapshot_data["design_tokens"] = {
+            "tokens": (dt or {}).get("tokens") or {},
+            "preset_id": (dt or {}).get("preset_id"),
+        }
+        counts["design_tokens"] = len(snapshot_data["design_tokens"]["tokens"] or {})
+    if "pages" in parts:
+        page_docs = await db.pages.find({}, {"_id": 0}).to_list(500)
+        snapshot_data["pages"] = page_docs
+        counts["pages"] = len(page_docs)
+    if "site_menu" in parts:
+        menu = await db.site_menu.find_one({"key": "main"}, {"_id": 0})
+        snapshot_data["site_menu"] = menu or {}
+        counts["site_menu"] = len((menu or {}).get("items") or [])
+    if "feature_config" in parts:
+        fc = await db.feature_config.find_one({"_id": "config"}, {"_id": 0})
+        snapshot_data["feature_config"] = fc or {}
+        counts["feature_config"] = len((fc or {}).get("features") or [])
     doc = {
         "name": data.name.strip(),
         "description": data.description,
@@ -1378,6 +1402,7 @@ async def restore_snapshot(snapshot_id: str, user: dict = Depends(require_role("
     data = snap.get("data", {})
     now_iso = datetime.now(timezone.utc).isoformat()
     restored = {}
+    failed = []
 
     if "cms" in data:
         # Wipe current overrides and insert snapshot overrides
@@ -1426,9 +1451,56 @@ async def restore_snapshot(snapshot_id: str, user: dict = Depends(require_role("
                 added += 1
         restored["presets_added"] = added
 
+    if "design_tokens" in data and (data.get("design_tokens") or {}).get("tokens"):
+        try:
+            from routes.design_studio import _reject_dangerous_deep
+            _reject_dangerous_deep(data["design_tokens"]["tokens"])  # SEC-003
+            await db.design_tokens.update_one(
+                {"_id": "active"},
+                {"$set": {"tokens": data["design_tokens"]["tokens"],
+                          "preset_id": data["design_tokens"].get("preset_id") or "restored",
+                          "updated_at": now_iso}},
+                upsert=True,
+            )
+            restored["design_tokens"] = len(data["design_tokens"]["tokens"])
+        except Exception as exc:  # noqa: BLE001
+            failed.append({"part": "design_tokens", "error": str(exc)[:200]})
+
+    if "pages" in data and isinstance(data.get("pages"), list):
+        try:
+            n = 0
+            for p in data["pages"]:
+                if isinstance(p, dict) and p.get("key"):
+                    await db.pages.update_one({"key": p["key"]}, {"$set": {**p, "updated_at": now_iso}}, upsert=True)
+                    n += 1
+            restored["pages"] = n
+        except Exception as exc:  # noqa: BLE001
+            failed.append({"part": "pages", "error": str(exc)[:200]})
+
+    if "site_menu" in data and data.get("site_menu"):
+        try:
+            m = data["site_menu"]
+            await db.site_menu.update_one({"key": m.get("key") or "main"},
+                                          {"$set": {**m, "updated_at": now_iso}}, upsert=True)
+            restored["site_menu"] = len(m.get("items") or [])
+        except Exception as exc:  # noqa: BLE001
+            failed.append({"part": "site_menu", "error": str(exc)[:200]})
+
+    if "feature_config" in data and data.get("feature_config"):
+        try:
+            await db.feature_config.update_one({"_id": "config"},
+                                               {"$set": {**data["feature_config"], "updated_at": now_iso}}, upsert=True)
+            restored["feature_config"] = 1
+        except Exception as exc:  # noqa: BLE001
+            failed.append({"part": "feature_config", "error": str(exc)[:200]})
+
     await audit("snapshot.restore", user,
                 target={"type": "snapshot", "id": snapshot_id, "label": snap.get("name")},
-                after={"restored": restored})
+                after={"restored": restored, "failed": failed or None})
+    if failed:
+        # NO false-success: dacă o parte a eșuat, restore-ul eșuează vizibil.
+        raise HTTPException(500, {"message": "Restore parțial eșuat",
+                                  "restored": restored, "failed": failed})
     return {"ok": True, "name": snap.get("name"), "restored": restored}
 
 

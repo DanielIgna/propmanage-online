@@ -97,6 +97,56 @@ app.add_middleware(
 # Admin-scope HTTP middleware (Milestone 2): URL-pattern → required-scope map
 app.middleware("http")(admin_scope_middleware)
 
+# CSRF origin guard (SEC-002 remediere Iun 2026): browserele trimit MEREU
+# header-ul Origin pe mutații cross-site — dacă Origin există și NU e într-un
+# domeniu permis, blocăm. Cererile fără Origin (curl/server-to-server/tests)
+# trec — nu sunt vector CSRF de browser.
+import re as _re  # noqa: E402
+from urllib.parse import urlparse as _urlparse  # noqa: E402
+from starlette.responses import JSONResponse as _JSONResponse  # noqa: E402
+
+# Sufixe de host permise: domeniile produsului + infrastructura de preview
+# (ingress-ul Emergent rescrie Origin către *.emergentcf.cloud).
+_CSRF_ALLOWED_SUFFIXES = ("propmanage.ro", "propmanage.io",
+                          "preview.emergentagent.com", "emergentagent.com",
+                          "emergentcf.cloud", "localhost")
+
+
+def _csrf_origin_ok(origin: str, host: str) -> bool:
+    try:
+        h = (_urlparse(origin).hostname or "").lower()
+    except Exception:  # noqa: BLE001
+        return False
+    if not h:
+        return False
+    if host and h == host.split(":")[0].lower():
+        return True  # same-origin
+    return any(h == s or h.endswith("." + s) for s in _CSRF_ALLOWED_SUFFIXES)
+
+
+@app.middleware("http")
+async def _csrf_origin_guard(request, call_next):
+    """CSRF guard pe mutațiile /api/admin (SEC-002).
+
+    Blocăm DOAR cereri de browser (au header Origin) care fie vin de pe un
+    origin nepermis, fie nu poartă header-ul custom X-PM-Client (formularele
+    HTML cross-site nu pot seta headere custom; fetch cross-site credentialed
+    pică la preflight). Cererile fără Origin (curl/server-to-server/tests)
+    nu sunt vector CSRF de browser și trec.
+    """
+    if request.method in ("POST", "PUT", "PATCH", "DELETE") and request.url.path.startswith("/api/admin"):
+        origin = request.headers.get("origin")
+        if origin:
+            origin_ok = _csrf_origin_ok(origin, request.headers.get("host", ""))
+            header_ok = request.headers.get("x-pm-client") == "propmanage-app"
+            if not origin_ok or not header_ok:
+                logging.getLogger("propmanage.csrf").warning(
+                    "[csrf] blocked origin=%r origin_ok=%s header_ok=%s method=%s path=%s",
+                    origin, origin_ok, header_ok, request.method, request.url.path)
+                return _JSONResponse({"detail": "Cross-site request blocked (CSRF guard)"}, status_code=403)
+    return await call_next(request)
+
+
 # Rate limiting pe endpoint-urile publice (TD-07, EO-026 Phase 1)
 from rate_limit import rate_limit_middleware  # noqa: E402
 app.middleware("http")(rate_limit_middleware)

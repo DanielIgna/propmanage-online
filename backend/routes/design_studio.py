@@ -17,8 +17,22 @@ Endpoints:
   PUT  /api/admin/design-studio/lock          — toggle Design Lock enforcement
 
 The tokens document is a single Mongo doc keyed {_id: "active"}.
+
+════════════════════════════════════════════════════════════════════════
+SOURCE OF TRUTH — Design Tokens (canonic, post-remediere Iun 2026):
+  WRITE PATH (unic):   acest router → db.design_tokens {_id: "active"}
+  READ RUNTIME:        GET /api/admin/design-studio/tokens (public read)
+  FRONTEND CONSUMER:   contexts/DesignTokensProvider.jsx → CSS vars --pm-*
+  ADMIN UI:            pages/admin/DesignStudioPage.jsx (/admin/design-studio)
+  BACKUP CANONIC:      admin_console.py snapshots (partea "design_tokens")
+  PORTABILITATE JSON:  routes/config_io.py (citește/scrie TOT {_id: "active"})
+  AUDIT:               admin_audit_log (target.type = "design_tokens")
+Orice alt path de scriere pentru design tokens este INTERZIS — dead-path-ul
+Task 8 (routes/design_tokens.py, {_id: "design_tokens"}) a fost eliminat.
+════════════════════════════════════════════════════════════════════════
 """
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -30,6 +44,46 @@ from deps import require_role
 
 router = APIRouter(prefix="/api/admin/design-studio", tags=["design-studio"])
 logger = logging.getLogger("propmanage.design_studio")
+
+# ── Value hygiene + audit unificat (portate din dead-path-ul Task 8 eliminat) ─
+_DANGEROUS_SUBSTRINGS = ("javascript:", "expression(", "<script", "</script",
+                         "onerror=", "onload=", "@import", "url(")
+_HEX_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+
+
+def _reject_dangerous_deep(obj: Any, path: str = "") -> None:
+    """Respinge tentative de CSS/JS injection în orice valoare string (recursiv)."""
+    if isinstance(obj, str):
+        lower = obj.lower()
+        for token in _DANGEROUS_SUBSTRINGS:
+            if token in lower:
+                raise HTTPException(400, f"Valoare respinsă ({path or 'token'}): conține '{token}'")
+        if len(obj) > 300:
+            raise HTTPException(400, f"Valoare prea lungă ({path or 'token'})")
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            _reject_dangerous_deep(v, f"{path}.{k}" if path else str(k))
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            _reject_dangerous_deep(v, f"{path}[{i}]")
+
+
+async def _audit_design(action: str, user: Any, before: Any = None, after: Any = None) -> None:
+    """Audit unificat în admin_audit_log (target.type=design_tokens) — vizibil în Config History."""
+    u = user if isinstance(user, dict) else {}
+    try:
+        await db.admin_audit_log.insert_one({
+            "action": action,
+            "actor_id": str(u.get("id") or u.get("_id") or ""),
+            "actor_name": u.get("name") or u.get("email") or "",
+            "actor_email": u.get("email") or "",
+            "target": {"type": "design_tokens", "id": "active", "label": action},
+            "before": before,
+            "after": after,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[design_studio] audit insert failed: %s", exc)
 
 # ── Default token set — the "PropManage Default" preset (lime brand). ────────
 DEFAULT_TOKENS: dict[str, Any] = {
@@ -274,26 +328,34 @@ async def get_tokens():
 
 
 @router.put("/tokens")
-async def update_tokens(payload: TokensPayload, _admin=Depends(require_role("admin"))):
+async def update_tokens(payload: TokensPayload, admin=Depends(require_role("admin"))):
     active = await _get_active()
     current = active["tokens"]
     patch = payload.model_dump(exclude_none=True)
+    _reject_dangerous_deep(patch)
     merged = _deep_merge(current, patch)
     await db.design_tokens.update_one(
         {"_id": "active"},
         {"$set": {"tokens": merged, "preset_id": "custom", "updated_at": datetime.now(timezone.utc).isoformat()}},
         upsert=True,
     )
+    await _audit_design("design_tokens.update", admin,
+                        before={"preset_id": active.get("preset_id"), "tokens": current},
+                        after={"preset_id": "custom", "tokens": merged})
     return {"tokens": merged, "preset_id": "custom"}
 
 
 @router.post("/reset")
-async def reset_tokens(_admin=Depends(require_role("admin"))):
+async def reset_tokens(admin=Depends(require_role("admin"))):
+    active = await _get_active()
     await db.design_tokens.update_one(
         {"_id": "active"},
         {"$set": {"tokens": DEFAULT_TOKENS, "preset_id": "default", "updated_at": datetime.now(timezone.utc).isoformat()}},
         upsert=True,
     )
+    await _audit_design("design_tokens.reset", admin,
+                        before={"preset_id": active.get("preset_id")},
+                        after={"preset_id": "default"})
     return {"tokens": DEFAULT_TOKENS, "preset_id": "default"}
 
 
@@ -326,7 +388,7 @@ async def save_preset(payload: PresetSavePayload, _admin=Depends(require_role("a
 
 
 @router.post("/presets/apply")
-async def apply_preset(preset_id: str = Body(..., embed=True), _admin=Depends(require_role("admin"))):
+async def apply_preset(preset_id: str = Body(..., embed=True), admin=Depends(require_role("admin"))):
     preset = await db.design_presets.find_one({"id": preset_id}, {"_id": 0})
     if not preset:
         # try built-in
@@ -334,11 +396,16 @@ async def apply_preset(preset_id: str = Body(..., embed=True), _admin=Depends(re
         if not preset:
             raise HTTPException(404, f"Preset necunoscut: {preset_id}")
     tokens = preset["tokens"]
+    _reject_dangerous_deep(tokens)  # SEC-003: sanitizare uniformă pe orice write path
+    active = await _get_active()
     await db.design_tokens.update_one(
         {"_id": "active"},
         {"$set": {"tokens": tokens, "preset_id": preset_id, "updated_at": datetime.now(timezone.utc).isoformat()}},
         upsert=True,
     )
+    await _audit_design("design_tokens.preset_apply", admin,
+                        before={"preset_id": active.get("preset_id")},
+                        after={"preset_id": preset_id})
     return {"tokens": tokens, "preset_id": preset_id}
 
 
@@ -437,11 +504,15 @@ async def builder_status(_admin=Depends(require_role("admin"))):
 
 # ── PALETTE CASCADE — derive full 20-color token set from 3-5 base hexes ─────
 @router.post("/palette-cascade")
-async def palette_cascade(payload: CascadePayload, _admin=Depends(require_role("admin"))):
+async def palette_cascade(payload: CascadePayload, admin=Depends(require_role("admin"))):
     """Given 3-5 base hex codes, deterministically derive the full color palette
     (light+dark, borders, muted text, on-primary contrast ink, semantic accents)
     and optionally apply it to the active tokens.
     """
+    for field in ("primary", "accent", "neutral", "surface_light", "surface_dark"):
+        val = getattr(payload, field)
+        if not _HEX_RE.match(val or ""):
+            raise HTTPException(400, f"{field} trebuie să fie hex valid (#rgb sau #rrggbb)")
     derived = _cascade(payload.primary, payload.accent, payload.neutral, payload.surface_light, payload.surface_dark)
     active = await _get_active()
     new_tokens = {**active["tokens"], "colors": derived}
@@ -451,4 +522,7 @@ async def palette_cascade(payload: CascadePayload, _admin=Depends(require_role("
             {"$set": {"tokens": new_tokens, "preset_id": "custom", "updated_at": datetime.now(timezone.utc).isoformat()}},
             upsert=True,
         )
+        await _audit_design("design_tokens.palette_cascade", admin,
+                            before={"preset_id": active.get("preset_id")},
+                            after={"preset_id": "custom", "base": {"primary": payload.primary, "accent": payload.accent}})
     return {"colors": derived, "tokens": new_tokens, "applied": payload.apply}
