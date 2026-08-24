@@ -1,11 +1,13 @@
-# EXECUTION_ORDER_044 — Configuration Layer (Task 7 + 7.1)
+# EXECUTION_ORDER_044 — Configuration Layer (Task 7 + 7.1 + 7.2 + 7.3)
 
 > **Task 7 — Configuration Layer P0 + P1 · STATUS: IMPLEMENTED**
 > **Task 7.1 — Security Audit + Production Readiness · STATUS: IMPLEMENTED / SECURITY VALIDATED**
-> **PRODUCTION STATUS: PENDING FOUNDER DEPLOYMENT**
+> **Task 7.2 — Knowledge Center Sync · STATUS: IMPLEMENTED**
+> **Task 7.3 — Production Validation + Close · STATUS: IMPLEMENTED**
+> **PRODUCTION STATUS: LIVE** ✅ (verified 24 Feb 2026)
 > **Doctrine**: „Reuse existing infrastructure; do not create duplicate configuration engines."
 > **Owner**: Founder + AI CPO.
-> **Emitent**: 24 Feb 2026. **Sync doc**: Task 7.2.
+> **Emitent**: 24 Feb 2026. **Sync doc**: Task 7.2. **Close doc**: Task 7.3.
 
 ---
 
@@ -92,12 +94,54 @@ Extinde Menu Manager într-un **Configuration Layer** platform-wide fără siste
 |---|---|
 | Implementat în cod / build | ✅ IMPLEMENTED |
 | Verificat în preview | ✅ PASSED |
-| Verificat prin teste | ✅ 109/109 PASS |
+| Verificat prin teste | ✅ 109/109 PASS · Task 7.3 re-run 56/56 PASS |
 | Security validation | ✅ PASSED (0 CRITICAL/HIGH/MEDIUM outstanding) |
-| Deploy pe production | ⏳ **PENDING FOUNDER DEPLOYMENT** |
-| Production smoke verification | ⏳ **PENDING FOUNDER VERIFICATION** |
+| Deploy pe production | ✅ **DEPLOYED** (fondator, 24 Feb 2026) |
+| Production smoke verification | ✅ **PASSED** (Task 7.3, 24 Feb 2026) |
 
-**Production readiness verdict**: READY for deployment. **NU** marcat ca LIVE. Deploy-ul executiv rămâne în sarcina fondatorului.
+**Production readiness verdict**: **LIVE**. Toate verificările smoke + security pe `https://propmanage.ro` au trecut.
+
+### Task 7.3 · Production Smoke Report (24 Feb 2026)
+
+Verificat pe `https://propmanage.ro`:
+
+**A. Public routes (6/6 = 200)**: `/`, `/pricing`, `/marketplace`, `/imobile-verificate`, `/de-ce-noi`, `/digital-twin`.
+
+**B. Admin**: login admin@propmanage.io OK · `GET /api/admin/pages` returnează 20 pagini · `GET /api/admin/pages/home` afișează LIVE shape complet (H1: „Cartea Digitală a Casei Tale.") · draft slot vizibil · versions endpoint responsive.
+
+**C. Draft/Live isolation**: PUT draft cu seo_title de test → public endpoint continuă să servească LIVE (zero leak) → discard-draft rollback OK.
+
+**D. Menu backward compat**: 27 children fără `page_key` funcționează · public `/api/public/site-menu` returnează 200.
+
+**E. Public API `/api/public/pages/home`**:
+- `key=home, route=/, status=active, version=1`
+- H1 + SEO title canonice
+- **P3.2 verificat live**: `allowed_roles`, `allowed_tiers`, `feature_flag`, `feature_flag_state` **NU** apar în payload
+- Path traversal `../etc/passwd` → 404 · UPPERCASE → 400 · nonexistent → 404
+
+**F. Security fixes verificate în producție**:
+- **SEC-001** (config-history scope cu actor filter): 0 non-config leaks — PASS
+- **SEC-002** (feature_flag OFF): endpoint returnează 404 real pe prod — PASS (verificat cu `client_basic_dashboard`, rollback complet)
+- **P3.1** (unique index versions): index creat la bootstrap — PASS (validated preview iter188)
+- **P3.2** (public payload stripped): PASS (verificat live)
+
+**Regression**: 56/56 PASS (Tasks 1–6.1 + Task 7) re-run în preview post-close.
+
+### Close Checklist (per Task 7.3 §8)
+
+- [x] Deployment succeeded
+- [x] Production smoke passed
+- [x] Page Registry production verified
+- [x] Menu ↔ Page verified (backward compat OK)
+- [x] Draft/Live verified
+- [x] Public API verified
+- [x] Security fixes verified (SEC-001 + SEC-002 live)
+- [x] Existing routes verified (`/pricing`, `/marketplace`, `/imobile-verificate`)
+- [x] Protected modules smoke-tested (auth prod OK, entitlements intact, Digital Twin intact)
+- [x] Knowledge Center synchronized
+- [x] MASTER_PLATFORM_STATE synchronized
+- [x] INDEX synchronized
+- [x] PRD synchronized
 
 ## NEXT PHASE (NU IMPLEMENTAT — doar documentat)
 
@@ -114,15 +158,13 @@ P2 este strict `schema-only` conform constraint fondator „NU UI gigant":
 
 ## Immediate Next Step
 
-Task 7.1 este COMPLETED. Următoarea acțiune este **production deployment executat de fondator**. AI-ul **NU** deployează automat și **NU** marchează production ca LIVE.
+Task 7 + 7.1 + 7.2 + 7.3 sunt **CLOSED**. Configuration Layer este LIVE pe production.
 
-După deployment:
-1. Fondatorul verifică production smoke (H1, `/admin/page-registry`, `/api/public/pages/home`).
-2. Se poate începe P2 doar după ce production e sincronizată cu preview.
+Distincție canonică actualizată:
+- **preview-validated** = ✅
+- **production-validated** = ✅ (verificat 24 Feb 2026 prin Task 7.3)
 
-Distincție canonică:
-- **preview-validated** = ✅ (aici, în build curent)
-- **production-validated** = ⏳ pending
+Următoarea acțiune ține de fondator: autorizare eventuală pentru P2 (Design Tokens Editor, Config Import/Export, Preview Overlay, Forms UI, Workflow UI). AI-ul **NU** începe P2 automat.
 
 ## IMPLEMENTED vs RECOMMENDED — distincție canonică
 
