@@ -308,32 +308,37 @@ const CreateModal = ({ onClose, onCreated }) => {
   );
 };
 
-const LockedScreen = ({ onRequest }) => (
+const LockedScreen = ({ onRequest, tierLabel }) => (
   <div className="min-h-screen bg-stone-950 text-white flex items-center justify-center px-4">
-    <div className="max-w-md text-center">
+    <div className="max-w-md text-center" data-testid="dt-locked-screen">
       <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center mx-auto mb-4">
         <Lock className="w-7 h-7 text-amber-400" />
       </div>
-      <h1 className="font-serif text-3xl mb-2">Digital Twin Pro</h1>
+      <h1 className="font-serif text-3xl mb-2">Digital Twin Advanced</h1>
+      {tierLabel && (
+        <div className="inline-block text-[10px] font-black uppercase tracking-[0.16em] text-amber-300 px-2 py-0.5 rounded-full bg-amber-500/10 mb-2">
+          Planul tău: {tierLabel} · Funcție blocată
+        </div>
+      )}
       <p className="text-stone-400 mb-6 leading-relaxed">
-        Modulul Digital Twin Pro îți oferă vizualizare 3D profesională (X-Ray, layer toggle, secțiuni dinamice), colaborare cu pin-uri ancorate pe model și workflow inter-specialități. Disponibil pe abonament premium.
+        Poți vedea ce este Digital Twin, dar pentru editarea avansată (pin-uri 3D, tape measure, colaborare cu specialiști) trebuie să activezi planul potrivit.
       </p>
       <div className="space-y-2 mb-6 text-sm text-stone-400 text-left max-w-sm mx-auto">
-        <Feat>🎨 Pereți cu textură, albi, la roșu, transparenți (X-Ray)</Feat>
-        <Feat>🏗️ Layer toggle: AR_PERETI, AR_USI, AR_STALPI etc.</Feat>
-        <Feat>📌 Pin-uri 3D cu thread comentarii și roluri</Feat>
-        <Feat>🤝 Colaborare client / specialist / arhitect</Feat>
-        <Feat>📐 Tape Measure, Section Plane, Camera tours</Feat>
+        <Feat>Pereți cu textură, albi, la roșu, transparenți (X-Ray)</Feat>
+        <Feat>Layer toggle: AR_PERETI, AR_USI, AR_STALPI etc.</Feat>
+        <Feat>Pin-uri 3D cu thread comentarii și roluri</Feat>
+        <Feat>Colaborare client / specialist / arhitect</Feat>
+        <Feat>Tape Measure, Section Plane, Camera tours</Feat>
       </div>
       <button
         onClick={onRequest}
         className="px-6 py-3 rounded-full bg-[#d4ff3a] text-black font-semibold hover:bg-[#c5f02e]"
-        data-testid="dt-request-access"
+        data-testid="dt-cta-pricing"
       >
-        <Sparkles className="w-4 h-4 inline mr-2" /> Cere acces Pro
+        <Sparkles className="w-4 h-4 inline mr-2" /> Vezi planurile PropManage
       </button>
       <p className="text-xs text-stone-600 mt-4">
-        În etapa beta, accesul se acordă manual de admin. Stripe wiring vine în versiunea Pro publică.
+        Digital Twin Advanced este inclus în planul Pro și mai sus. Basic acoperă House Health.
       </p>
     </div>
   </div>
@@ -388,14 +393,15 @@ export default function DigitalTwinPage() {
     }
   };
 
-  const requestAccess = async () => {
-    alert("Cererea ta a fost notată. Un admin îți va acorda acces în scurt timp.\n\nPentru testare imediată, roagă admin-ul să ruleze:\nPOST /api/admin/digital-twin/subscription/grant cu user_id-ul tău.");
+  const requestAccess = () => {
+    // Route unificată către planul PropManage (Task 2 /pricing)
+    window.location.href = "/pricing";
   };
 
   if (loading) {
     return <div className="min-h-screen bg-stone-950 text-stone-400 flex items-center justify-center text-sm">Se încarcă...</div>;
   }
-  if (!sub?.active) return <LockedScreen onRequest={requestAccess} />;
+  if (!sub?.active) return <LockedScreen onRequest={requestAccess} tierLabel={sub?.tier_label} />;
 
   if (showSentReports) {
     return (

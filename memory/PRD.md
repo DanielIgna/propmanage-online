@@ -1,3 +1,50 @@
+## 🎨 TASK 3 — Digital Twin Advanced Entitlement Gate · LIVRAT (24 Feb 2026)
+
+**Cerere**: Aplic entitlement gate pe Digital Twin Advanced. Preview vizibil pentru FREE (LockedScreen existent), editare/mutations blocate cu 402 semantic. Reutilizare completă a infrastructurii Task 1 + Task 2.
+
+**Descoperit existent (reused)**:
+- `_ensure_dt_access(user)` era deja pe TOATE mutations DT (POST/PATCH/DELETE proiecte, pins, comments, plans, reports)
+- `LockedScreen` component vizibil pentru users fără acces (preview complet cu feature list)
+- Backend gate legacy pe `user.digital_twin_pro` flag setat manual de admin
+
+**Implementat (minimal, chirurgical)**:
+
+Backend MODIFIED:
+- `/app/backend/entitlements.py` — mutat `F_DIGITAL_TWIN_ADVANCED` din CLIENT_PREMIUM → CLIENT_PRO. Acum PRO și PREMIUM îl primesc (moștenire cumulativă). PREMIUM = set gol (moștenire pură).
+- `/app/backend/routes/digital_twin.py`:
+  - `_has_dt_access()` verifică ENTITLEMENT layer primar, fallback la `digital_twin_pro` flag legacy (compatibilitate cu users legacy, cu warn log dacă entitlement layer crash)
+  - `_ensure_dt_access()` aruncă **HTTP 402 semantic** cu payload `{error: 'entitlement_required', feature: 'digital_twin_advanced', message}` (înlocuit 403 vechi)
+  - `/api/digital-twin/subscription` raportează tier + tier_label + `cta_href="/pricing"`
+
+Frontend MODIFIED:
+- `/app/frontend/src/pages/DigitalTwinPage.jsx`:
+  - `LockedScreen` primește `tierLabel` prop (afișează "Planul tău: {tier} · Funcție blocată")
+  - Copy actualizat: "Poți vedea ce este Digital Twin, dar pentru editarea avansată trebuie să activezi planul potrivit"
+  - CTA nou "Vezi planurile PropManage" → redirect `/pricing`
+  - Footer clar: "Digital Twin Advanced este inclus în planul Pro și mai sus"
+
+**Feature name folosit**: `digital_twin_advanced` (constant `F_DIGITAL_TWIN_ADVANCED`)
+
+**Tier mapping final**:
+- FREE: property_create + property_technical_record
+- CLIENT_BASIC: + house_health_basic
+- CLIENT_PRO: + house_health_advanced + **digital_twin_advanced**
+- CLIENT_PREMIUM: (moștenire completă)
+
+**Endpoints protejate** (via `_ensure_dt_access` existent — nu am adăugat noi):
+POST/PATCH/DELETE `/api/digital-twin/projects`, `/pins`, `/comments`, `/plans`, `/models`, `/upload`, `/conversions/retry` + toate variantele.
+
+**Testing**: `testing_agent_v3_fork` iter185 · **12/12 backend pytest PASS (100%)** · **Frontend 100% pass** · Zero regresiuni pe Task 1 + Task 2 · Legacy `digital_twin_pro` flag încă funcțional pentru users legacy.
+
+**Fix-uri post-testing (2 non-critical)**:
+- `_has_dt_access` acum log warn când entitlement layer eșuează (visibilitate ops)
+- LockedScreen footer copy clarifică Pro (nu Basic) pentru DT Advanced
+
+**Blocker**: NICIUN. Un user FREE poate vedea LockedScreen → click "Vezi planurile" → /pricing (arată Basic 9€ pentru House Health). Pentru DT Advanced explicit, va trebui viitor Task 4 "Extinde /pricing cu Pro tier" (nu în scope Task 3).
+
+---
+
+
 ## 💳 TASK 2 — PropManage Basic 9€/lună · LIVRAT (24 Feb 2026)
 
 **Cerere**: Completează fluxul comercial minim viabil pentru PropManage Basic la 9€/lună. Reutilizează 100% infrastructura existentă (hh_plans, hh_subscriptions, Stripe via emergentintegrations, entitlements.py din Task 1). Un singur CTA (Hick's Law).

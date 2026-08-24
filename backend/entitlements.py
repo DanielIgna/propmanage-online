@@ -63,10 +63,9 @@ TIER_FEATURES: dict[str, set[str]] = {
     },
     TIER_CLIENT_PRO: {
         F_HOUSE_HEALTH_ADVANCED,
-    },
-    TIER_CLIENT_PREMIUM: {
         F_DIGITAL_TWIN_ADVANCED,
     },
+    TIER_CLIENT_PREMIUM: set(),  # PREMIUM primește tot din PRO prin moștenire
 }
 
 # Metadata prezentabil pentru UI (nu e sursă de adevăr, doar helper)

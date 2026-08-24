@@ -84,16 +84,36 @@ def _user_filter(user_id: str) -> dict:
 
 
 async def _has_dt_access(user: dict) -> bool:
-    """User has Digital Twin Pro access? Admin/operator always; others via flag."""
-    if user.get("role") in ("admin", "operator"):
-        return True
+    """User has Digital Twin Advanced access?
+
+    Sursă unică: entitlement layer (`F_DIGITAL_TWIN_ADVANCED`).
+    Fallback: flag legacy `digital_twin_pro` acordat manual de admin (compatibilitate).
+    Admin/operator/franchise_admin bypass automat prin entitlement layer.
+    """
+    # Sursă principală — entitlement layer
+    try:
+        from entitlements import F_DIGITAL_TWIN_ADVANCED, get_user_entitlements
+        ent = await get_user_entitlements(user)
+        if F_DIGITAL_TWIN_ADVANCED in set(ent.get("features") or []):
+            return True
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[digital_twin] entitlement layer failed, fallback to legacy flag: %s", e)
+    # Fallback legacy — flag setat manual pe user (nu spargem accesul preexistent)
     fresh = await db.users.find_one(_user_filter(user["id"]), {"digital_twin_pro": 1})
     return bool(fresh and fresh.get("digital_twin_pro"))
 
 
 async def _ensure_dt_access(user: dict) -> None:
     if not await _has_dt_access(user):
-        raise HTTPException(403, "Subscription Digital Twin Pro required.")
+        # Semantic corect: 402 Payment Required (același contract ca celelalte gate-uri)
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "error": "entitlement_required",
+                "feature": "digital_twin_advanced",
+                "message": "Editarea avansată a Digital Twin necesită un plan eligibil. Activează planul potrivit pentru a continua.",
+            },
+        )
 
 
 async def _ensure_project_access(project_id: str, user: dict) -> dict:
@@ -143,12 +163,24 @@ def _clean(d: dict) -> dict:
 
 @router.get("/subscription")
 async def my_subscription(user: dict = Depends(get_current_user)):
-    """Tell the frontend whether user can access Digital Twin Pro."""
+    """Tell the frontend whether user can access Digital Twin Advanced."""
     has = await _has_dt_access(user)
+    tier_label = None
+    tier = None
+    try:
+        from entitlements import get_user_entitlements
+        ent = await get_user_entitlements(user)
+        tier = ent.get("tier")
+        tier_label = ent.get("tier_label")
+    except Exception:  # noqa: BLE001
+        pass
     return {
         "active": has,
-        "reason": "role_bypass" if user.get("role") in ("admin", "operator") else ("flag" if has else "inactive"),
-        "tier": "digital_twin_pro" if has else None,
+        "reason": "role_bypass" if user.get("role") in ("admin", "operator") else ("entitled" if has else "inactive"),
+        "tier": tier,
+        "tier_label": tier_label,
+        "required_feature": "digital_twin_advanced",
+        "cta_href": "/pricing",
     }
 
 
