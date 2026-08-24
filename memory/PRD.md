@@ -5956,3 +5956,53 @@ blocate de config Resend). Fix: adăugat handler `resumeBlocked` → POST
 Testat în preview: pagina se încarcă, click → „32 emailuri repuse în coadă — tick imediat:
 0 trimise, 20 re-blocate" (re-blocate = normal, DNS Resend încă neconfigurat — acțiune manuală user).
 ⚠️ Fixul e în PREVIEW — user trebuie să REDEPLOYEZE pentru propmanage.ro.
+
+
+---
+
+## 🛡️ Governance Activation — Verdict Final (2026-02-02)
+
+**Task**: Governance Activation & Anti-Duplication Gate — verificare, nu implementare.
+**Mod**: NO-CODE / NO-MIGRATION / NO-DEPLOY (respectat 100%).
+**Verdict**: 🟢 **GOVERNANCE ACTIVE — NORMAL DEVELOPMENT MAY CONTINUE**
+
+### Documente de guvernanță confirmate ACTIVE (8/8):
+1. `MASTER_PLATFORM_STATE.md` (T2 Canonical)
+2. `SSOT_REGISTRY.md` (Enterprise Standard)
+3. `FUNCTION_MAP.md` (Enterprise Standard)
+4. `MASTER_KNOWLEDGE_GOVERNANCE.md` (T0 Constitutional)
+5. `CANONICAL_SYSTEM_REGISTRY.md` (Enterprise Standard, LIVE)
+6. `PREFLIGHT_GATE.md` (obligatoriu pre-implementare)
+7. `INDEX.md` (referă corect PREFLIGHT + CANONICAL)
+8. `SYSTEM_PROMPT.md` (§8 preflight enforce)
+
+### GAP-uri închise în această task:
+- **GAP-1 (închis)**: PREFLIGHT_GATE §11 acum include rândul G — „silent-fallback pe date runtime în locul source-of-truth-ului declarativ" (lecția incidentului 24 Aug 2026 impersonare pe user real). Text pur, zero cod modificat.
+
+### GAP-uri raportate cu diagnostic dry-run (deciziile Fondatorului):
+- **GAP-2 (diagnostic livrat)**: Script `/app/backend/scripts/audit_demo_accounts_drift.py` verifică toate 14 conturi demo + detectează unlisted @propmanage.io. Zero modificări în DB. Rulare pe preview: 0 role drift, 1 tier drift cosmetic (`client@propmanage.io` are `verified` lowercase), 171 conturi test @propmanage.io (candidați „Purge demo data" P0-2). **User rulează scriptul pe PROD pentru a vedea driftul `client.junior` și alte cazuri similare.**
+- **GAP-3 (amânat conform BD-RDPE)**: Feature freeze activ pentru tier-uri Client PRO/PREMIUM + Specialist native în resolver. Rămâne P1 în backlog.
+
+### Cine face ce next:
+- **Fondator**: rulează pe prod `python -m scripts.audit_demo_accounts_drift`, primește lista drift-urilor, decide dacă autorizează migrare țintită (script separat, ne-livrat aici).
+- **Agent (viitor task)**: nu deschide feature work fără autorizare Fondator + preflight declarativ complet (§2 Change Intent).
+
+### Ce NU s-a făcut (garanție NO-CODE respectată):
+- 0 feature changes
+- 0 DB migrations
+- 0 schema changes
+- 0 production changes
+- 0 deployments
+- 0 new routes / pages / collections / jobs / governance systems
+- 0 modificări în impersonation.py (protecția existentă e canonică)
+
+### Reguli active pentru orice agent viitor:
+1. Preflight §1 (7 întrebări) obligatoriu ÎNAINTE de cod.
+2. Change Intent §2 obligatoriu declarat.
+3. Clasificare NEW/EXISTING/EXTENSION/DUPLICATE/CONFLICT/DEPRECATED obligatorie.
+4. DUPLICATE → REUSE/EXTEND, nu a doua implementare.
+5. CONFLICT → STOP + decizie Fondator.
+6. Audit forensic DOAR pentru cele 9 condiții din §6 — niciodată workflow default.
+7. Sugestiile AI rămân BACKLOG până la autorizare Fondator (§7).
+8. Silent-fallback pe date runtime în locul source-of-truth declarativ = CONFLICT (rândul G nou din §11).
+
