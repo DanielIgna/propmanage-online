@@ -74,6 +74,15 @@
 
 ---
 
+## 🛡️ Governance Hardening — Preflight Gate + Canonical System Registry (Iun 2026)
+
+Ca răspuns direct la clasa de eșec Task 8 (implementări declarate fals „NEW", duplicate, audituri forensice evitabile):
+- **`prompts/PREFLIGHT_GATE.md`** = poartă OBLIGATORIE pre-implementare (7 întrebări, Change Intent, Conflict Protocol, politica de audit, reguli anti-„NEW fără dovadă"). Validat istoric: ar fi prins toate cele 6 eșecuri Task 8 înainte de cod.
+- **`registries/CANONICAL_SYSTEM_REGISTRY.md`** = registrul sistem → implementare canonică (SoT, rute, DB, consumeri, status CANONICAL/LEGACY/DEPRECATED/CONFLICT/REMOVED), populat din stare verificată (Task 7/8R + fix impersonare).
+- Acest document (MASTER_PLATFORM_STATE) rămâne canonicul validat uman; EO-urile sunt înregistrări de task, nu surse de arhitectură concurente; sugestiile AI rămân BACKLOG până la autorizarea Fondatorului.
+
+
+
 ## 🛠️ Task 8R — Remediere & Canonicalizare Admin Config/Design (Iun 2026)
 
 **Canonical flags**:

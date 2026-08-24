@@ -7,7 +7,8 @@ Structură impusă de Fondator (Iun 2026). Guvernată de `MEMORY_RULES.md` (Memo
 - `strategy/` — ROADMAP_V2.md · GRAND_STRATEGY_2035.md* · ENTERPRISE_EVOLUTION_ENGINE.md* · EXPONENTIAL_GROWTH_ENGINE.md*
 - `governance/` — OPERATING_AGREEMENT.md · FOUNDER_AI_COVENANT.md · EXECUTION_CHARTER.md
 - `metrics/` — ENTERPRISE_SCORE.md · ENTERPRISE_HEALTH.md · ENTERPRISE_MATURITY_INDEX.md (derivate) · **NORTH_STAR_TRUSTED_PROPERTIES.md (verbatim — metrica primară)**
-- `prompts/` — MASTER_EXECUTIVE_PROMPT.md (verbatim v3) · SYSTEM_PROMPT.md (derivat) · **EXECUTION_ORDER_007_AI_CPO.md (verbatim — agentul = Chief Product Officer)**
+- `prompts/` — MASTER_EXECUTIVE_PROMPT.md (verbatim v3) · SYSTEM_PROMPT.md (derivat) · **EXECUTION_ORDER_007_AI_CPO.md (verbatim — agentul = Chief Product Officer)** · **PREFLIGHT_GATE.md (OBLIGATORIU pre-implementare — Knowledge before Code, Change Intent, Conflict Protocol, politica de audit · Iun 2026)**
+- `registries/` — SSOT_REGISTRY.md (topic → document canonic) · FUNCTION_MAP.md (capabilități) · **CANONICAL_SYSTEM_REGISTRY.md (sistem → implementare canonică: SoT, rute, DB, consumeri · Iun 2026)** · PATTERN_REGISTRY.md · INTERVIEW_REGISTRY.md
 - Rădăcină: PRD.md · test_credentials.md · BUGS.md · LEARNINGS.md · restul documentelor enterprise istorice
 
 `*` = ÎN AȘTEPTAREA TEXTULUI VERBATIM de la Fondator (pierdut la trecerea între sesiuni).

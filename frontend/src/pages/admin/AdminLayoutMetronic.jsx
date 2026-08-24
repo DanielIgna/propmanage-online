@@ -496,22 +496,13 @@ const QuickProfileSwitch = ({ dark }) => {
   const enterRole = async (profile) => {
     setBusy(profile.demoEmail || profile.role);
     try {
-      // Try demo account first (fast path, predictable)
-      let target = null;
-      try {
-        const { data } = await axios.get(`${API}/admin/users`, { params: { q: profile.demoEmail, limit: 1 } });
-        if (data.items && data.items[0]?.role === profile.role) target = data.items[0];
-      } catch (_) { /* fall through */ }
-
-      // Fallback: first user of that role
-      if (!target) {
-        const { data } = await axios.get(`${API}/admin/users`, { params: { role: profile.role, limit: 1 } });
-        target = data.items?.[0];
-      }
-      if (!target) {
-        alert(`Nu am găsit niciun utilizator cu rolul ${profile.label}.`);
-        return;
-      }
+      // Rezolvare STRICTĂ pe email prin allowlist server-side; contul demo se
+      // creează idempotent dacă lipsește. FĂRĂ fallback pe utilizatori reali
+      // (incident producție 24 Aug 2026 — admin a intrat în cont de client real).
+      const { data: ensured } = await axios.post(`${API}/admin/impersonation/ensure-demo-target`, {
+        email: profile.demoEmail,
+      });
+      const target = ensured.user;
 
       const { data } = await axios.post(`${API}/admin/impersonate`, {
         user_id: target.id,

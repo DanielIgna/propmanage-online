@@ -1,3 +1,30 @@
+## 🚨 FIX P0 — Quick-Switch „Client/Specialist Beta" intra în conturi REALE pe producție (Iun 2026)
+
+**Incident (prod, 24 Aug)**: „Schimbă profilul → Client Beta" a impersonat un CLIENT REAL (conturile demo `client.beta@` / `spec.beta@propmanage.io` nu există pe prod, iar frontend-ul avea **fallback pe PRIMUL user cu rolul respectiv**). „Specialist Beta" a intrat într-un cont E2E rămas de la teste (`lifecycle_spec_*@test.com`).
+
+**Fix (preview · necesită REDEPLOY pe prod)**:
+- Backend: `POST /api/admin/impersonation/ensure-demo-target` în `impersonation.py` — ALLOWLIST server-side cu cele 14 conturi demo de quick-switch; rezolvare STRICTĂ pe email; creare idempotentă dacă lipsesc (`is_demo_account:true`, parolă aleatoare nefolosibilă, email_verified); 400 pentru orice email din afara listei; 409 la mismatch de rol; audit `impersonation.demo_account_created`.
+- Frontend: `QuickProfileSwitch` folosește DOAR ensure+impersonate — **fallback-ul pe useri reali ELIMINAT**.
+- `middleware_scope.py`: regex lărgit `^/api/admin/impersonat` (acoperă și `/impersonate`) → scope `security`.
+- Preview DB: cele 14 conturi demo marcate `is_demo_account:true`.
+- Registru: rânduri noi „Impersonare admin" + „Conturi demo quick-switch" în CANONICAL_SYSTEM_REGISTRY.
+
+**Testare**: curl (existent→resolve, lipsă→create, email real→400) + E2E browser (Client Beta → „Ana Beta (Client)", onboarding limitat de la zero, oferta 9€/lună PropManage Basic vizibilă pe /pricing) + 17/17 teste impersonare PASS.
+
+**Rămas pe prod (acțiuni Fondator)**: redeploy; apoi „Curăță userii de test" pentru conturile `@test.com` rămase (lifecycle_*, e2e_*, pay_ins_*) și scanarea Data Integrity.
+
+---
+
+## 🛡️ GOVERNANCE HARDENING — Preflight Gate + Canonical System Registry (Iun 2026)
+
+**Livrabile (DOAR documente, zero cod de produs, zero features noi, zero deploy)**:
+- `memory/prompts/PREFLIGHT_GATE.md` — poartă OBLIGATORIE pre-implementare: 7 întrebări preflight, clasificare NEW/EXISTING/EXTENSION/DUPLICATE/CONFLICT/DEPRECATED, template CHANGE INTENT, Protocol de Conflict (STOP + decizie Fondator), politica de audit (forensic DOAR la 9 declanșatori), regula „nimic nu e NEW fără dovadă", „task-ul terminat nu creează scope nou" (sugestiile AI = BACKLOG până la autorizare).
+- `memory/registries/CANONICAL_SYSTEM_REGISTRY.md` — registru sistem → implementare canonică (18 rânduri populate din stare VERIFICATĂ: design tokens, snapshots, config_io, backups, preview, renewal, copilot, scheduler 72 job-uri, sidebar, impersonare, demo accounts, audit, scope, CSRF).
+- Extins (nu duplicat): `SSOT_REGISTRY.md` (+2 rânduri), `SYSTEM_PROMPT.md` (regula 8), `MASTER_PLATFORM_STATE.md` (secțiune governance), `INDEX.md` (referințe).
+- Validare istorică: documentat în PREFLIGHT_GATE §11 că gate-ul ar fi prins toate cele 6 eșecuri Task 8 (A–F) ÎNAINTE de cod.
+
+---
+
 ## 🛠️ TASK 8R — Remediere & Canonicalizare Task 8 · P0 RELEASE BLOCKER · LIVRAT (Iun 2026)
 
 **Cerere**: Remediere completă a verdictului 🔴 DO NOT PUBLISH din Auditul Forensic de Duplicare — eliminarea dead parallel path-ului Design Tokens, fixarea Config I/O pe starea runtime-activă, precedență deterministă backup/restore, Preview Overlay real, coordonare Renewal↔Copilot, corectarea documentației false, security audit + fixuri.

@@ -11,3 +11,4 @@ Ierarhia prompturilor: **`SYSTEM_ZERO.md` (SUPREME — Prime Directive)** → `M
 5. EXECUTION ORDER 001 este ordinea de priorități curentă — nicio funcționalitate nouă în afara celor 6 obiective.
 6. Orice execuție autonomă (D156 L2+) scrie Execution Report în `ai_decision_ledger` și este măsurabilă.
 7. Fiecare rezultat se măsoară → actualizează Enterprise Score → se repetă.
+8. **PREFLIGHT GATE obligatoriu** înainte de orice implementare: consultă `PREFLIGHT_GATE.md` + `registries/CANONICAL_SYSTEM_REGISTRY.md`. Nimic nu e „NEW" fără dovadă; REUSE înainte de CREATE; la conflict KC↔runtime → STOP + decizie Fondator.

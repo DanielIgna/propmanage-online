@@ -29,3 +29,5 @@
 | Board Directives | memory/board/directives/ | Constitutional | Active | 2026-02-06 | Every `BD-*` file is authoritative for its stated scope. Feature-freeze BD-RDPE currently in force. |
 | Knowledge Center | memory/audits/MASTER_KNOWLEDGE_GOVERNANCE.md | Constitutional | Active | 2026-07-31 | Enterprise KC exists to be the platform's long-term memory and constitutional archive. |
 | Research-Driven Product Evolution | memory/audits/BOARD_DIRECTIVE_RESEARCH_DRIVEN_EVOLUTION.md | Board Directive | Active | 2026-07-31 | New features frozen until 15-20 field interviews with association presidents complete. |
+| Canonical System Registry | memory/registries/CANONICAL_SYSTEM_REGISTRY.md | Enterprise Standard | Active | 2026-06 | Registrul sistem → implementare canonică (SoT, rute, DB, consumeri). Obligatoriu în preflight. |
+| Preflight Gate (pre-implementare) | memory/prompts/PREFLIGHT_GATE.md | Enterprise Standard | Active | 2026-06 | Poartă obligatorie: Knowledge before Code, Change Intent, Conflict Protocol, politica de audit. Post-Task 8R. |
