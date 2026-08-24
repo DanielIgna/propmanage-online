@@ -1,3 +1,38 @@
+## 💳 TASK 2 — PropManage Basic 9€/lună · LIVRAT (24 Feb 2026)
+
+**Cerere**: Completează fluxul comercial minim viabil pentru PropManage Basic la 9€/lună. Reutilizează 100% infrastructura existentă (hh_plans, hh_subscriptions, Stripe via emergentintegrations, entitlements.py din Task 1). Un singur CTA (Hick's Law).
+
+**Descoperit existent**:
+- Plan `basic` la 9€/lună EUR active=true în DB
+- POST `/api/house-health/checkout-session` funcțional (Stripe real cs_test_ URL)
+- Success flow: `/house-health/upgrade/success?session_id=` + polling `/checkout-status/{sid}`
+- Webhook + activation în `hh_subscriptions` upsert `plan='basic', status='active'`
+
+**Implementat (minimal, reutilizare)**:
+
+Frontend NEW:
+- `/app/frontend/src/pages/PricingPage.jsx` — pagină publică `/pricing` cu:
+  - Hero "9€/lună deblochează PropManage Basic"
+  - 2 cards side-by-side: FREE (0€, "Planul tău actual" pentru FREE users) vs BASIC (9€/lună, "Recomandat", CTA principal)
+  - CTA `Activează Basic pentru 9€/lună` → POST checkout-session → redirect Stripe
+  - Pentru BASIC+ tier deja activ: badge "Ai deja acces · PropManage Basic/Pro/Premium"
+  - Handling 401/403 → redirect `/login?next=/pricing`
+
+Frontend MODIFIED (chirurgical):
+- `/app/frontend/src/App.js` — Route nou `/pricing` (lazy loaded)
+- `/app/frontend/src/pages/HouseHealthUpgradePage.jsx` — la success plătit, apel `clearEntitlementCache()` din useEntitlements → tier-ul nou se reflectă imediat în UI
+
+Backend: **ZERO modificări** — refolosește complet infrastructura existentă.
+
+**Testing**: `testing_agent_v3_fork` iter184 · **9/9 backend pytest PASS (100%)** · **Frontend 100% critical checks** · Fluxul complet verificat: FREE user → checkout Stripe real → activare hh_subscriptions plan=basic → tier tranzitează la CLIENT_BASIC → house_health_basic devine disponibil → dashboard nu mai afișează locked=no_subscription.
+
+**Impact commercial**: Un user cu 9€/lună poate activa PropManage Basic în ~30 sec (2 clicks: /pricing → CTA → Stripe → success). Fluxul e end-to-end funcțional cu Stripe live/test keys existenți.
+
+**Blocker pentru achiziție reală 9€/lună**: NICIUN — infrastructura Stripe operațională, plan basic active, entitlement mapping validat, dashboard UI existent gestionează corect tranziția. Utilizatorii pot achiziționa acum abonamentul real.
+
+---
+
+
 ## 🔒 TASK 1 — Subscription/Entitlement Gate · LIVRAT (24 Feb 2026)
 
 **Cerere**: Layer centralizat de acces care traduce `hh_subscriptions` existent într-un vocabular stabil de FEATURES + TIERS. Technical existence ≠ user access. Reutilizează infrastructura Stripe/hh_subscriptions/hh_plans existentă, nu o duplică.

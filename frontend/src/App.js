@@ -74,6 +74,7 @@ const AdminHouseHealthPage = lazy(() => import("./pages/admin/AdminHouseHealthPa
 const ManualTesterPage = lazy(() => import("./pages/admin/ManualTesterPage"));
 const HouseHealthPage = lazy(() => import("./pages/HouseHealthPage"));
 const HouseHealthUpgradeLazy = lazy(() => import("./pages/HouseHealthUpgradePage"));
+const PricingPageLazy = lazy(() => import("./pages/PricingPage"));
 const HouseHealthUpgradeSuccessLazy = lazy(() => import("./pages/HouseHealthUpgradePage").then(m => ({ default: m.HouseHealthUpgradeSuccess })));
 const AdminTodoBoard = lazy(() => import("./pages/admin/AdminTodoBoard"));
 const ExperienceSpacesPage = lazy(() => import("./pages/admin/ExperienceSpacesPage"));
@@ -1645,6 +1646,7 @@ function App() {
               <Route path="/house-health/:twinId" element={<HouseHealthPage />} />
               <Route path="/house-health/upgrade" element={<HouseHealthUpgradeLazy />} />
               <Route path="/house-health/upgrade/success" element={<HouseHealthUpgradeSuccessLazy />} />
+              <Route path="/pricing" element={<PricingPageLazy />} />
               <Route path="/admin/house-health" element={<AdminHouseHealthPage />} />
               <Route path="/admin/manual-tester" element={<ManualTesterPage />} />
               <Route path="/admin/todo" element={<AdminTodoBoard />} />

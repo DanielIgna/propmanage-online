@@ -228,6 +228,11 @@ export const HouseHealthUpgradeSuccess = () => {
         setDetails(data);
         if (data.payment_status === "paid") {
           setState({ phase: "success", message: "Plată confirmată! Abonament activat." });
+          // Invalidează cache-ul entitlements ca la revenirea în UI să reflecte tier-ul nou
+          try {
+            const mod = await import("../hooks/useEntitlements");
+            mod.clearEntitlementCache?.();
+          } catch { /* silent */ }
           return;
         }
         if (data.status === "expired") {
