@@ -2,7 +2,7 @@
 
 Trei task-uri P1 aprobate de Fondator (GO explicit: 1a, 2a, 3b), construite peste sistemele existente.
 
-**Task 1 — Pașaport PDF A→G**: snapshot-ul A→G (`HouseHealthAxisSnapshot theme="dark"`) are acum stiluri `print:` → în versiunea printabilă (`/p/{slug}` → Print) apare card alb, text negru, badge-uri lizibile (DOCUMENTAT/LIPSĂ/VERIFICAT). Verificat cu `emulate_media(print)`. Bun de dus la bancă/notar.
+**Task 1 — Pașaport PDF A→G**: snapshot-ul A→G (`HouseHealthAxisSnapshot theme="dark"`) are acum stiluri `print:` → în versiunea printabilă (`/p/{slug}` → Print) apare card alb, text negru, badge-uri lizibile (DOCUMENTAT/LIPSĂ/VERIFICAT). Verificat cu `emulate_media(print)`. Bun de dus la bancă/notar. **[27 Aug — Pașaport PDF brandat]** adăugat antet print-only (`hidden print:flex`, `PublicPassportPage.jsx`): logo PropManage + „Pașaportul Casei" (stânga) și identitatea proprietății + „Emis: {data} · propmanage.ro/p/{slug}" (dreapta), cu bordură — arată profesional la bancă. Nav-ul rămâne `print:hidden`.
 
 **Task 3 — `/pricing` dinamic** (`PricingPage.jsx` rescris, frontend-only): afișează 4 carduri (Gratuit + Basic/Pro/Premium) citite DINAMIC din `GET /api/house-health/plans` (admin-managed = SSOT, filtrat `active:True`). Zero prețuri/feature-uri hardcodate. Diferențiere vizuală: PRO = „Recomandat" (evidențiat), PREMIUM = stil dark/violet + badge „Property Intelligence". Checkout Stripe per slug (`POST /checkout-session`, deja existent, auto-provision). Detectare tier curent → „Ai deja acces". Verificat: 4 carduri randează cu conținut real din DB. **Prod va afișa planurile reale ale Fondatorului (Premium 249€) fiindcă citește `hh_plans` per mediu.**
 

@@ -102,6 +102,19 @@ export default function PublicPassportPage() {
         </div>
       </nav>
 
+      {/* Antet brandat — vizibil DOAR pe versiunea printabilă (pentru bancă/notar) */}
+      <div className="hidden print:flex items-start justify-between border-b-2 border-slate-900 mx-8 pt-2 pb-3 mb-4" data-testid="passport-print-header">
+        <div>
+          <div className="font-serif text-2xl font-bold text-slate-900 leading-none">PropManage</div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mt-1">Pașaportul Casei · Profil de încredere</div>
+        </div>
+        <div className="text-right">
+          <div className="text-sm font-bold text-slate-900">{p.name}</div>
+          {p.address && <div className="text-[11px] text-slate-500">{p.address}</div>}
+          <div className="text-[10px] text-slate-500 mt-1">Emis: {fmtDate(new Date().toISOString())} · propmanage.ro/p/{data.slug}</div>
+        </div>
+      </div>
+
       <main className="max-w-3xl mx-auto px-5 pb-16">
         {/* hero */}
         <header className="mt-4" data-testid="passport-hero">
