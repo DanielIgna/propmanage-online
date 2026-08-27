@@ -168,35 +168,42 @@ const SNAP_DARK = {
   lipsa: "bg-white/5 text-stone-500 border-white/5",
   lipsa_date: "bg-amber-400/10 text-amber-300 border-amber-400/20",
 };
+// Print-friendly badge overrides (versiunea printabilă a pașaportului → fundal alb)
+const SNAP_PRINT = {
+  verificat: "print:bg-white print:text-emerald-700 print:border-emerald-600",
+  documentat: "print:bg-white print:text-lime-700 print:border-lime-600",
+  lipsa: "print:bg-white print:text-slate-500 print:border-slate-300",
+  lipsa_date: "print:bg-white print:text-amber-700 print:border-amber-600",
+};
 export const HouseHealthAxisSnapshot = ({ completeness, theme = "light" }) => {
   if (!completeness || !Array.isArray(completeness.items)) return null;
   const dark = theme === "dark";
   return (
     <div data-testid="hh-axis-snapshot"
-      className={dark ? "glass rounded-3xl p-5" : "mt-4 rounded-3xl border border-slate-100 bg-white shadow-sm p-4"}>
+      className={dark ? "glass rounded-3xl p-5 print:bg-white print:border print:border-slate-300 print:shadow-none print:backdrop-blur-none" : "mt-4 rounded-3xl border border-slate-100 bg-white shadow-sm p-4"}>
       <div className="flex items-center gap-2.5">
-        <span className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-[10px] font-black ${dark ? "bg-[#d4ff3a]/10 text-[#d4ff3a] border border-[#d4ff3a]/20" : "bg-slate-900 text-[#d4ff3a]"}`}>A→G</span>
+        <span className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-[10px] font-black ${dark ? "bg-[#d4ff3a]/10 text-[#d4ff3a] border border-[#d4ff3a]/20 print:bg-slate-900 print:text-white print:border-slate-900" : "bg-slate-900 text-[#d4ff3a]"}`}>A→G</span>
         <div className="flex-1 min-w-0">
-          <div className={`text-sm font-medium ${dark ? "text-stone-100" : "text-slate-900 font-black"}`}>Sănătatea casei · A→G</div>
-          <div className={`text-[10px] ${dark ? "text-stone-500" : "text-slate-400"}`}>progresul celor 7 capitole ale locuinței</div>
+          <div className={`text-sm font-medium ${dark ? "text-stone-100 print:text-black" : "text-slate-900 font-black"}`}>Sănătatea casei · A→G</div>
+          <div className={`text-[10px] ${dark ? "text-stone-500 print:text-slate-600" : "text-slate-400"}`}>progresul celor 7 capitole ale locuinței</div>
         </div>
       </div>
       <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
         {HOUSE_HEALTH_AXIS.map((c) => {
           const state = deriveChapterState(c, completeness);
           const meta = STATE_META[state];
-          const badge = dark ? SNAP_DARK[state] : TONE[meta.tone].chip;
+          const badge = dark ? `${SNAP_DARK[state]} ${SNAP_PRINT[state]}` : TONE[meta.tone].chip;
           return (
             <div key={c.code} data-testid={`hh-axis-snapshot-${c.code}`}
-              className={`flex items-center gap-2.5 rounded-2xl border p-2.5 ${dark ? "border-white/5 bg-white/[0.02]" : "border-slate-100 bg-white"}`}>
-              <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-black ${dark ? "bg-white/5 text-stone-300" : "bg-slate-100 text-slate-500"}`}>{c.code}</span>
-              <span className={`min-w-0 flex-1 text-[11px] font-bold truncate ${dark ? "text-stone-300" : "text-slate-700"}`}>{c.title}</span>
+              className={`flex items-center gap-2.5 rounded-2xl border p-2.5 ${dark ? "border-white/5 bg-white/[0.02] print:border-slate-200 print:bg-white" : "border-slate-100 bg-white"}`}>
+              <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-black ${dark ? "bg-white/5 text-stone-300 print:bg-slate-100 print:text-slate-800" : "bg-slate-100 text-slate-500"}`}>{c.code}</span>
+              <span className={`min-w-0 flex-1 text-[11px] font-bold truncate ${dark ? "text-stone-300 print:text-black" : "text-slate-700"}`}>{c.title}</span>
               <span className={`shrink-0 text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full border ${badge}`} title={meta.hint}>{meta.label}</span>
             </div>
           );
         })}
       </div>
-      <p className={`mt-2.5 text-[10px] leading-relaxed ${dark ? "text-stone-600" : "text-slate-400"}`}>{AXIS_DISCLAIMER}</p>
+      <p className={`mt-2.5 text-[10px] leading-relaxed ${dark ? "text-stone-600 print:text-slate-600" : "text-slate-400"}`}>{AXIS_DISCLAIMER}</p>
     </div>
   );
 };
