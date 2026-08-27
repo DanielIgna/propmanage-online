@@ -1,4 +1,26 @@
+## 🧭 DIGITAL TWIN P0 — PROPERTY ANCHOR (BUILD) · LIVRAT ÎN PREVIEW (28 Aug 2026)
+
+Gate HIGH/MEDIUM → **NO HIGH-RISK BLOCKER** → BUILD P0. Doc: `memory/audits/STRATEGIC_AUDIT_PROPERTY_TWIN_2026-08-28.md`. **Necesită redeploy Fondator pentru producție.**
+
+**Ce s-a construit (non-breaking):**
+- **Ancoră proprietate**: `create_project` + operator create acceptă/validează `property_id` (owner-verified, anti-misassignment) și setează `property_link_status` (linked/unresolved). Modelele moștenesc `property_id` + status.
+- **Link manual**: NOU `PATCH /api/digital-twin/projects/{id}/property` — ancorează un proiect unresolved + cascadează pe modele. `ProjectUpdate` neatins.
+- **KG (STEP C)**: muchii semantice `property -has_twin_project-> twin_project` și `-has_twin_model-> twin_model` via `kg.link()` (FK păstrat pt integritate; KG = traversare). `kg/links.py` RELS extins.
+- **Backfill SAFE (admin)**: `POST /api/admin/digital-twin/backfill-property-links` — idempotent, ZERO auto-assignment; proiectele fără property_id → `unresolved`.
+- **Trust/provenance readiness (STEP D)**: modele +`confidence`(inferred/documented/verified) +`verification_status`(owner_declared/official_document/professional_audit/verified) +`completeness`(0–100). Default upload: documented/owner_declared/None. PATCH validează valorile. Vocabular pregătit pt AI-3D/import FĂRĂ maturity nou (L0–L5+PVI rămân canonice).
+- **FE**: CreateModal (client) — selector „Proprietate" (fetch `GET /api/properties`); proiectele noi se ancorează. Compat: fără proprietăți → standalone permis.
+
+**Backfill LIVE (preview):** projects_total=40, already_linked=0, marked_unresolved=40, **auto_assigned=0**; models_total=41, unresolved=41. (Toate = artefacte demo/test; 0 cazuri deterministice → nimic atribuit arbitrar.)
+
+**Validare: 60/60 teste PASS** (iter201 P0 + iter200 P1 + iter185 gate + iter186 lifecycle + phase53 + st001). Anti-misassignment 403/404 ✓. KG scrise ✓. Property DNA neafectat (completeness 80, twin capability intact, 115 KG links). FE smoke: selector prezent, viewer OK. Deploy-readiness scan: PASS, zero blockers.
+
+**Sursă rămasă de orfanare:** fluxul OPERATOR de creare încă nu are selector de proprietate în UI (backend-ul acceptă deja `property_id`). = următorul BUILD (P0.1).
+
+---
+
+
 ## 🏗️ DIGITAL TWIN P1 — CONSOLIDARE (Property Twin 2D+3D) · LIVRAT (27 Aug 2026)
+
 
 Decizii Fondator confirmate (GO explicit) → implementare non-breaking, ZERO migrare/ștergere. Doc canonic: `memory/audits/DIGITAL_TWIN_P1_CONSOLIDATION_2026-08-27.md`. Property Twin = 2 straturi complementare ale aceleiași proprietăți: `twins` (2D) + `digital_twin_projects` (3D). PropManage = strat digital care RECEIVES→ORGANIZES→CONNECTS→VERSIONS→EXPOSES→PRESERVES modelul profesional (NU software de arhitectură).
 

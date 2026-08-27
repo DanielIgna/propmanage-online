@@ -16,7 +16,8 @@ from db import db
 
 logger = logging.getLogger("propmanage.kg")
 
-RELS = ["owned_by", "requested_by", "on_property", "assigned_to", "disputes", "pays_for", "for_work"]
+RELS = ["owned_by", "requested_by", "on_property", "assigned_to", "disputes", "pays_for", "for_work",
+        "has_twin_project", "has_twin_model"]
 
 
 def _now() -> str:

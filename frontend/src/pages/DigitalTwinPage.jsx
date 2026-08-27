@@ -218,8 +218,23 @@ const UploadModal = ({ project, onClose, onUploaded }) => {
 
 const CreateModal = ({ onClose, onCreated }) => {
   const [form, setForm] = useState({ name: "", description: "", model_url: "" });
+  const [properties, setProperties] = useState([]);
+  const [propertyId, setPropertyId] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await axios.get(`${API}/properties`);
+        const list = Array.isArray(data) ? data : (data?.items || []);
+        setProperties(list);
+        if (list.length === 1) setPropertyId(list[0].id);
+      } catch {
+        setProperties([]);
+      }
+    })();
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -230,6 +245,7 @@ const CreateModal = ({ onClose, onCreated }) => {
         name: form.name.trim(),
         description: form.description.trim(),
         model_url: form.model_url.trim() || null,
+        property_id: propertyId || null,
       });
       onCreated(data);
     } catch (e) {
@@ -263,6 +279,28 @@ const CreateModal = ({ onClose, onCreated }) => {
             data-testid="dt-create-name"
           />
         </div>
+        {properties.length > 0 && (
+          <div>
+            <label className="text-xs text-stone-400 block mb-1">Proprietate</label>
+            <select
+              required
+              value={propertyId}
+              onChange={(e) => setPropertyId(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+              data-testid="dt-create-property"
+            >
+              <option value="">Alege proprietatea…</option>
+              {properties.map((p) => (
+                <option key={p.id} value={p.id} className="bg-stone-900">
+                  {p.name || p.address || p.id}
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] text-stone-500 mt-1">
+              Twin-ul 3D se ancorează de această proprietate (camere, active, documente, istoric).
+            </p>
+          </div>
+        )}
         <div>
           <label className="text-xs text-stone-400 block mb-1">Descriere (opțional)</label>
           <textarea

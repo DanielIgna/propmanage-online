@@ -133,6 +133,48 @@ _MODEL_STATUSES = {"processing", "ready", "stored", "superseded", "archived"}
 # `public` = opt-in explicit al proprietarului (expunere pe pașaportul public — nu implicit).
 _MODEL_VISIBILITIES = {"internal", "public"}
 
+# P0/STEP D — Trust & provenance readiness (pregătire pt AI-3D / import / professional; NU un al doilea maturity).
+_MODEL_CONFIDENCE = {"inferred", "documented", "verified"}
+_MODEL_VERIFICATION = {"owner_declared", "official_document", "professional_audit", "verified"}
+_MODEL_SOURCES = {"owner_upload", "owner_declared", "uploaded", "specialist", "professional", "platform", "ai_generated", "imported"}
+
+
+async def _resolve_property_anchor(property_id, user: dict, owner_id=None):
+    """P0 — verifică ancora de proprietate a unui Digital Twin.
+
+    Returnează (property_id | None, link_status). NU atribuie NICIODATĂ o proprietate care nu
+    aparține contextului contului (anti-misassignment, regula Fondator). `owner_id` = proprietarul
+    real al proiectului (ex: operator care creează pentru un client).
+    """
+    if not property_id:
+        return None, "unresolved"
+    try:
+        prop = await db.properties.find_one({"_id": ObjectId(property_id)})
+    except Exception:
+        prop = None
+    if not prop:
+        raise HTTPException(404, "Proprietatea nu există.")
+    role = user.get("active_view") or user.get("role")
+    expected_owner = owner_id or (None if role in ("admin", "operator") else user["id"])
+    if expected_owner is not None and str(prop.get("owner_id")) != str(expected_owner):
+        raise HTTPException(403, "Proprietatea nu aparține contextului contului.")
+    return property_id, "linked"
+
+
+async def _kg_link_twin(property_id, node_type: str, node_id):
+    """P0/STEP C — muchie SEMANTICĂ în Knowledge Graph (FK-ul rămâne pt integritate).
+
+    KG = traversare de cunoaștere; FK = integritate/ownership. Nu înlocuim FK-urile cu KG.
+    """
+    if not (property_id and node_id):
+        return
+    try:
+        from kg.links import link as _kg
+        rel = "has_twin_project" if node_type == "twin_project" else "has_twin_model"
+        await _kg("property", str(property_id), rel, node_type, str(node_id))
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[kg] twin link failed ({node_type} {node_id}): {e}")
+
 
 async def _ensure_project_access(project_id: str, user: dict) -> dict:
     """Returns project doc if user is owner, member, or admin/operator."""
@@ -223,12 +265,14 @@ class ProjectUpdate(BaseModel):
 @router.post("/projects")
 async def create_project(payload: ProjectCreate, user: dict = Depends(get_current_user)):
     await _ensure_dt_ingest_access(user)
+    prop_anchor, link_status = await _resolve_property_anchor(payload.property_id, user)
     pid = _new_id()
     now = _now_iso()
     doc = {
         "id": pid,
         "name": payload.name.strip(),
-        "property_id": payload.property_id,
+        "property_id": prop_anchor,
+        "property_link_status": link_status,
         "description": (payload.description or "").strip(),
         "model_url": (payload.model_url or "").strip() or None,
         "trimble_embed_url": (payload.trimble_embed_url or "").strip() or None,
@@ -242,7 +286,38 @@ async def create_project(payload: ProjectCreate, user: dict = Depends(get_curren
         "updated_at": now,
     }
     await db.digital_twin_projects.insert_one(doc)
+    await _kg_link_twin(prop_anchor, "twin_project", pid)
     return _clean(doc)
+
+
+class ProjectPropertyLink(BaseModel):
+    property_id: str
+
+
+@router.patch("/projects/{project_id}/property")
+async def link_project_property(project_id: str, payload: ProjectPropertyLink,
+                                user: dict = Depends(get_current_user)):
+    """P0 — ancorează un proiect existent (unresolved) de o proprietate, verificat pe ownership.
+
+    Cascadează property_id + status și pe modelele proiectului și scrie muchiile KG. Non-destructiv.
+    """
+    await _ensure_dt_ingest_access(user)
+    p = await _ensure_project_access(project_id, user)
+    if user.get("role") not in ("admin", "operator") and p.get("owner_id") != user["id"]:
+        raise HTTPException(403, "Doar proprietarul proiectului poate seta proprietatea.")
+    prop_anchor, link_status = await _resolve_property_anchor(payload.property_id, user, owner_id=p.get("owner_id"))
+    await db.digital_twin_projects.update_one(
+        {"id": project_id},
+        {"$set": {"property_id": prop_anchor, "property_link_status": link_status, "updated_at": _now_iso()}},
+    )
+    await db.digital_twin_models.update_many(
+        {"project_id": project_id},
+        {"$set": {"property_id": prop_anchor, "property_link_status": link_status}},
+    )
+    await _kg_link_twin(prop_anchor, "twin_project", project_id)
+    async for m in db.digital_twin_models.find({"project_id": project_id}, {"id": 1}):
+        await _kg_link_twin(prop_anchor, "twin_model", m["id"])
+    return {"ok": True, "property_id": prop_anchor, "property_link_status": link_status}
 
 
 @router.get("/projects")
@@ -473,6 +548,11 @@ async def upload_model(
         "change_reason": (change_reason or "").strip() or None,
         "supersedes": None,
         "superseded_by": None,
+        # P0 — ancoră proprietate + STEP D trust/provenance readiness
+        "property_link_status": "linked" if p.get("property_id") else "unresolved",
+        "confidence": "documented",
+        "verification_status": "owner_declared",
+        "completeness": None,
     }
     # Auto-conversion path:
     #   .skp → CloudConvert (off — SKP not supported)
@@ -490,6 +570,7 @@ async def upload_model(
     await db.digital_twin_models.insert_one(model_doc)
     # ST-001: fișierul e deja durabil în Object Storage (store_dt_bytes la upload).
     await storage_service.add_usage(p["owner_id"], total, "digital_twin")
+    await _kg_link_twin(p.get("property_id"), "twin_model", model_doc["id"])
     # Only set as the active model_url if it's actually viewable (.glb/.gltf)
     is_viewable = not is_archive and not needs_blender
     update_set = {"updated_at": _now_iso()}
@@ -857,6 +938,10 @@ class _LayerUpdateIn(BaseModel):
     source: Optional[str] = Field(None, max_length=40)
     change_reason: Optional[str] = Field(None, max_length=300)
     supersedes: Optional[str] = Field(None, max_length=40)
+    # P0/STEP D — trust & provenance (readiness, non-breaking)
+    confidence: Optional[str] = Field(None, max_length=20)
+    verification_status: Optional[str] = Field(None, max_length=30)
+    completeness: Optional[int] = Field(None, ge=0, le=100)
 
 
 @router.patch("/models/{model_id}")
@@ -883,6 +968,12 @@ async def update_model_layer(
         raise HTTPException(400, f"status invalid. Permis: {', '.join(sorted(_MODEL_STATUSES))}")
     if "visibility" in update and update["visibility"] not in _MODEL_VISIBILITIES:
         raise HTTPException(400, f"visibility invalid. Permis: {', '.join(sorted(_MODEL_VISIBILITIES))}")
+    if "confidence" in update and update["confidence"] not in _MODEL_CONFIDENCE:
+        raise HTTPException(400, f"confidence invalid. Permis: {', '.join(sorted(_MODEL_CONFIDENCE))}")
+    if "verification_status" in update and update["verification_status"] not in _MODEL_VERIFICATION:
+        raise HTTPException(400, f"verification_status invalid. Permis: {', '.join(sorted(_MODEL_VERIFICATION))}")
+    if "source" in update and update["source"] not in _MODEL_SOURCES:
+        raise HTTPException(400, f"source invalid. Permis: {', '.join(sorted(_MODEL_SOURCES))}")
     supersedes = update.get("supersedes")
     if supersedes:
         if supersedes == model_id:
@@ -2310,6 +2401,7 @@ async def operator_clients_queue(
 class OperatorProjectCreate(BaseModel):
     client_id: str
     name: str = Field(..., min_length=2, max_length=200)
+    property_id: Optional[str] = None
     description: Optional[str] = Field(None, max_length=2000)
     trimble_embed_url: Optional[str] = Field(None, max_length=2000)
 
@@ -2363,6 +2455,7 @@ async def operator_create_project_for_client(
         raise HTTPException(400, "Doar clientii pot avea proiecte Digital Twin.")
     if not client.get("digital_twin_pro"):
         raise HTTPException(400, "Clientul nu are acces Digital Twin Pro. Acordă mai întâi accesul.")
+    prop_anchor, link_status = await _resolve_property_anchor(payload.property_id, user, owner_id=client_id)
     pid = _new_id()
     now = _now_iso()
     doc = {
@@ -2373,6 +2466,8 @@ async def operator_create_project_for_client(
         "trimble_embed_url": (payload.trimble_embed_url or "").strip() or None,
         "owner_id": client_id,
         "owner_name": client.get("name") or client.get("email"),
+        "property_id": prop_anchor,
+        "property_link_status": link_status,
         "members": [],
         "model_count": 0,
         "plan_count": 0,
@@ -2383,6 +2478,7 @@ async def operator_create_project_for_client(
         "created_by_operator_name": user.get("name") or user.get("email"),
     }
     await db.digital_twin_projects.insert_one(doc)
+    await _kg_link_twin(prop_anchor, "twin_project", pid)
     await db.audit_log.insert_one({
         "actor": user["id"],
         "actor_role": user.get("role"),
@@ -2404,6 +2500,45 @@ async def operator_create_project_for_client(
 # ----------------- admin: subscription grant -----------------
 
 admin_router = APIRouter(prefix="/api/admin/digital-twin", tags=["digital-twin-admin"])
+
+
+@admin_router.post("/backfill-property-links")
+async def backfill_property_links(user: dict = Depends(require_role("admin"))):  # noqa: ARG001
+    """P0 — backfill SAFE, determinist, auditabil. ZERO auto-assignment: proiectele fără
+    property_id NU sunt atribuite arbitrar, ci marcate `unresolved` (regula Fondator).
+    Idempotent. Scrie muchiile KG pentru cele deja legate."""
+    projects_total = already_linked = marked_unresolved = 0
+    async for p in db.digital_twin_projects.find({}):
+        projects_total += 1
+        if p.get("property_id"):
+            already_linked += 1
+            if p.get("property_link_status") != "linked":
+                await db.digital_twin_projects.update_one({"id": p["id"]}, {"$set": {"property_link_status": "linked"}})
+            await _kg_link_twin(p.get("property_id"), "twin_project", p["id"])
+        elif p.get("property_link_status") != "unresolved":
+            await db.digital_twin_projects.update_one({"id": p["id"]}, {"$set": {"property_link_status": "unresolved"}})
+            marked_unresolved += 1
+        else:
+            marked_unresolved += 1
+    models_total = models_linked = 0
+    async for m in db.digital_twin_models.find({}):
+        models_total += 1
+        st = "linked" if m.get("property_id") else "unresolved"
+        if m.get("property_link_status") != st:
+            await db.digital_twin_models.update_one({"id": m["id"]}, {"$set": {"property_link_status": st}})
+        if m.get("property_id"):
+            models_linked += 1
+            await _kg_link_twin(m.get("property_id"), "twin_model", m["id"])
+    return {
+        "projects_total": projects_total,
+        "projects_already_linked": already_linked,
+        "projects_marked_unresolved": marked_unresolved,
+        "projects_auto_assigned": 0,
+        "models_total": models_total,
+        "models_linked": models_linked,
+        "models_unresolved": models_total - models_linked,
+        "note": "Zero auto-assignment. Proiectele fără property_id rămân 'unresolved' și se ancorează manual via PATCH /projects/{id}/property.",
+    }
 
 
 @admin_router.post("/subscription/grant")
