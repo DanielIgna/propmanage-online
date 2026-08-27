@@ -31,6 +31,19 @@
 
 ---
 
+## 🏗️ PROPERTY TWIN — CANONIC (2D+3D · Property Anchor) · DELIVERED IN PREVIEW (28 Aug 2026)
+
+**Doc canonic**: `audits/PROPERTY_TWIN_CANONICAL_v1.0.md` (taxonomie + stare + direcție viitoare).
+
+- **Property Twin = umbrelă** cu 2 straturi complementare ale ACELEIAȘI proprietăți: **2D** (`twins`) + **3D** (`digital_twin_projects/models/plans/pins`). NU duplicate, NU legacy, NU se migrează/șterg/consolidează (corectează D5 §11 + M5 §13/§17 din acest audit).
+- **P0 — Property Anchor** (DELIVERED/PREVIEW): 3D legat de `property_id` (anti-misassignment + KG + moștenire modele); backfill SAFE zero auto-assign; trust readiness (confidence/verification_status/completeness). Teste iter201 4/4.
+- **P1 — Experiența unificată** (DELIVERED/PREVIEW): `GET /api/properties/{id}/digital-twin` + `PropertyTwinModal` taburi 2D/3D + `ViewerErrorBoundary`. Teste iter202 6/6.
+- **P0.1 — Operator Property Anchor** (DELIVERED/PREVIEW): `property_id` OBLIGATORIU pe create operator + `GET /api/operator/digital-twin/clients/{id}/properties` + selector FE. Teste iter203 5/5. Regresie totală P0+P1+P0.1 = **15/15 PASS**.
+- **Producție**: PENDING_FOUNDER_DEPLOYMENT — necesită redeploy + LIVE VALIDATION. NU marcat production-complete.
+- **NU s-a atins**: House Health/PVI/Maturity engine, Property DNA, Auth, Stripe, entitlements, Demo/Beta.
+
+---
+
 ## ✅ Task 7 + 7.1 — PropManage Configuration Layer (24 Aug 2026)
 
 **Canonical flags** (sync via Task 7.2 → Task 7.3):
@@ -201,7 +214,7 @@ Auditul Forensic de Duplicare a dat 🔴 DO NOT PUBLISH pe Task 8 inițial. Reme
 | Orchestration | 4 (engine, playbooks, governance, playbooks_sprint3) + retry_queue | ✅ COMPLET |
 | Executive Dashboards | 9 pagini (CEO, ControlTower, CommandCenter, Ops, CEOBriefing, MorningBriefing, EnterpriseExplorer, FinancialCockpit, FirstRevenueWarRoom) | ✅ IMPLEMENTAT · 🔴 DUPLICAT major |
 | Knowledge & Memory | 5 (knowledge_center, kg, ai_memories, agent_journal, learning_engine) | ✅ IMPLEMENTAT · 🟡 DRIFT graph |
-| Digital Twin | 5 collections (`digital_twin_projects/models/plans/pins/twins`) + `twin_schedule` | ✅ IMPLEMENTAT · 🟡 storage fragmentat |
+| Property Twin (2D+3D) | `twins` (2D) + `digital_twin_projects/models/plans/pins` (3D) + `twin_schedule` | ✅ IMPLEMENTAT · property-anchored (P0/P0.1) · unified UX (P1) · vezi `PROPERTY_TWIN_CANONICAL_v1.0.md` |
 | Marketplace | 6 (requests, offers, partners, leads, gaps, reviews) | ✅ COMPLET |
 | Property & Estate | 8 (properties, buildings, portfolio, documents, intelligence, verified_estate_*, house_health_*) | ✅ COMPLET |
 | Payments & Finance | 5 (transactions, payment_transactions, pb_ledger, wallet, escrow, stripe_*) | ✅ COMPLET |
@@ -355,9 +368,9 @@ Documente `/app/memory/*.md` — **33 fișiere root + subfoldere structurate**:
 | `admin_ai_findings` | 43 | AI findings |
 | `transactions` | 42 | Raw Stripe |
 | `disputes` | 40 | Support |
-| `digital_twin_projects` | 40 | Twin SSOT |
+| `digital_twin_projects` | 40 | Property Twin 3D — proiecte (property-anchored P0/P0.1) |
 | `projects` | 38 | General projects |
-| `twins` | 34 | 🟠 LEGACY |
+| `twins` | 34 | Property Twin — stratul 2D (CANONIC, NU legacy) |
 | `digital_twin_pins` | 34 | Twin annotations |
 | `verified_estate_listings` | 33 | Verified estate |
 | `reviews` | 33 | Ratings SSOT |
@@ -366,7 +379,7 @@ Documente `/app/memory/*.md` — **33 fișiere root + subfoldere structurate**:
 | `verified_estate_orders` | 29 | Order flow |
 | `revenue_opportunities` | 28 | Revenue Hunter |
 | `qa_sessions` | 28 | QA runs |
-| `digital_twin_models` | 28 | 🟡 candidat merge |
+| `digital_twin_models` | 28 | Property Twin 3D — modele (property-anchored P0) |
 | `payment_transactions` | 27 | Payment state machine |
 | `notifications` | 27 | Notifications |
 | `marketplace_partners` | 27 | Specialists |
@@ -377,7 +390,7 @@ Documente `/app/memory/*.md` — **33 fișiere root + subfoldere structurate**:
 | `hh_evaluations` | 23 | House Health |
 | `concierge_messages` | 23 | AI chat |
 | `city_partners` | 23 | City-level partners |
-| `digital_twin_plans` | 21 | 🟡 candidat merge |
+| `digital_twin_plans` | 21 | Property Twin 3D — planuri 2D atașate |
 | `city_partner_leads` | 21 | City leads |
 | `orchestrator_ledger` | 20 | Orchestrator SSOT |
 | `hh_subscriptions` | 19 | HH subscriptions |
@@ -580,7 +593,7 @@ Confirmate din Sprint 1:
 | D2 | **6+ executive dashboards** (CEO, ControlTower, CommandCenter, CEOBriefing, MorningBriefing, EnterpriseExplorer) | HIGH — cognitive load |
 | D3 | **3 decision ledgers** (`ai_decision_ledger`, `orchestrator_ledger`, `admin_audit_log`) | HIGH — audit fragmentation |
 | D4 | **10 AI modules** fără registry unificat | MEDIUM |
-| D5 | **5 twin collections** (`digital_twin_projects/models/plans/pins/twins`) | MEDIUM |
+| D5 | ~~5 twin collections~~ → REÎNCADRAT: `twins`(2D) + `digital_twin_projects/models/plans/pins`(3D) = straturile Property Twin, NU duplicate (canonic — `PROPERTY_TWIN_CANONICAL_v1.0.md`) | N/A |
 | D6 | **2 knowledge graphs** (`kg` + `ai_brain/graph`) | MEDIUM |
 | D7 | **3 memory stores** (`ai_memories`, `knowledge_center`, `agent_journal`) | MEDIUM |
 | D8 | **9 growth/marketing/intelligence modules** cu overlap major | HIGH — un metric are 3 surse |
@@ -592,7 +605,7 @@ Confirmate din Sprint 1:
 
 Suspecte candidate (necesită confirmare cu logs de acces):
 
-- Collection `twins` (LEGACY) — datele ar putea fi migrate în `digital_twin_projects` și collection dropped.
+- Collection `twins` = stratul 2D CANONIC al Property Twin (NU legacy, NU se migrează/dropează — decizie Fondator, `PROPERTY_TWIN_CANONICAL_v1.0.md`).
 - `enable_twin_orchestrator` field — deja marcat în `test_iter154_client_v2_regression.py` ca stale.
 - Pagini admin cu <10 accesuri în 30 zile — nu există audit acces per admin page (TD6).
 - Route-uri cu 0 consumers frontend — nu există audit endpoint-vs-frontend-imports (candidat sprint viitor).
@@ -611,7 +624,7 @@ Componente arhitecturale absente sau incomplete:
 | **AI Agent Registry consolidat** | Ai_brain, ai_pm, ai_dev_team nu se auto-înregistrează | P1 (M4 Sprint 2) |
 | **Event Bus catalog de consumers** | Nu știi cine ascultă ce → refactor orb | P1 |
 | **Executive Layer unificat** (`ExecutiveHub`) | 6+ dashboards fragmentate | P2 (M2 Sprint 4) |
-| **Twin storage consolidat** | 5 collections legacy overlap | P2 (M5) |
+| ~~Twin storage consolidat~~ (ANULAT) | `twins`(2D) + 3D = straturi canonice, NU se consolidează (Fondator) | — |
 | **Growth/Marketing/Intel consolidat** | 9 modules fragmentate | P2 (M6) |
 | **Knowledge Layer consolidat** | knowledge_center + kg + ai_brain/graph = 3 grafuri paralele | P2 (M7) |
 | **Truth Engine oficial** | Distribuit, fără endpoint dedicat | P1 |
@@ -705,7 +718,7 @@ Ordonate după **impact asupra lansării + monetizare**:
 | **P2-13** | **Twin Viewer 3D UI testing** | User confidence | Medium | — |
 | **P2-14** | **Admin bundle perf audit** — lazy routes 79 | Perf | Low-Medium | — |
 | **P2-15** | **Event Bus consumer catalog** | Prevent blind refactors | Low | — |
-| **P3-16** | **M5** — Twin storage consolidation | Data hygiene | High (data migration) | — |
+| **P3-16** | ~~M5 Twin storage consolidation~~ ANULAT — straturi 2D/3D canonice (nu se migrează) | — | — | — |
 | **P3-17** | **M6** — Growth/Marketing/Intelligence merge | Cognitive load | High | — |
 | **P3-18** | **M7** — Knowledge Layer consolidation | Long-term coherence | High | — |
 | **P3-19** | **Retention Policy MongoDB** | Data hygiene | Low | — |

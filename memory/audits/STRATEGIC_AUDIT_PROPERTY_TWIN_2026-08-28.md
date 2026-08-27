@@ -3,6 +3,8 @@
 **Data:** 28 Aug 2026 · **Mod:** READ-ONLY (zero cod modificat) · **Metodă:** evidence din cod + date LIVE (preview)
 **Legendă:** 🟢 EVIDENCE FROM CODE · 🟡 ARCHITECTURAL INFERENCE · 🔵 FUTURE PRODUCT IDEA
 
+> **UPDATE 28 Aug 2026 — STATUS**: Recomandările P0/P1 din acest audit au fost EXECUTATE + P0.1 (Operator Anchor). Verdictul „3D orfan (0/40)" din §1/§4 este REZOLVAT prin P0 (property anchor + backfill SAFE). Statutul LIVE + taxonomia canonică: `PROPERTY_TWIN_CANONICAL_v1.0.md`. Acest audit rămâne referința de EVIDENCE/FEASIBILITY (datat, read-only).
+
 ---
 
 ## 1. EXECUTIVE VERDICT

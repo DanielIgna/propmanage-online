@@ -1,3 +1,23 @@
+## 🧭 DIGITAL TWIN P0.1 — OPERATOR PROPERTY ANCHOR (BUILD) · LIVRAT ÎN PREVIEW (28 Aug 2026)
+
+**Doc canonic Property Twin (taxonomie + stare + direcție)**: `audits/PROPERTY_TWIN_CANONICAL_v1.0.md`.
+
+Ultima sursă de orfanare eliminată: fluxul OPERATOR de creare Digital Twin nu avea selector de proprietate în UI (backend-ul P0 accepta deja `property_id`).
+
+**Ce s-a construit (non-breaking, reutilizează integral P0):**
+- **Backend** (`digital_twin.py`): `property_id` devine **OBLIGATORIU** pe endpoint-ul operator `POST /api/operator/digital-twin/clients/{id}/projects` → 400 dacă lipsește (Property Anchor). Ancorarea folosește `_resolve_property_anchor(owner_id=client_id)` (anti-misassignment owner-verified) + KG `has_twin_project` + moștenire `property_id` pe modele la upload. Fluxul CLIENT (`create_project`) rămâne neschimbat (standalone permis).
+- **Backend NOU (read-only)**: `GET /api/operator/digital-twin/clients/{id}/properties` — listează proprietățile clientului pentru selector (reutilizează `db.properties` SSOT; NU creează sistem nou de identitate/linking).
+- **FE** (`OperatorDigitalTwin.jsx` · `CreateProjectModal`): selector `[Proprietate ▼]` (Property Anchor) sus în modal; submit dezactivat până la selecție; mesaj când clientul nu are proprietăți (`create-project-property`, `create-project-no-properties`).
+
+**Testare**: `tests/test_dt_p01_operator_anchor_iter203.py` — **5/5 PASS** (selector endpoint; create fără property → 400; create cu property → linked + moștenire model; property neautorizat → 403/404; regresie client standalone → unresolved). Regresie totală **P0+P1+P0.1 = 15/15 PASS** (iter201 + iter202 + iter203).
+
+**NU s-a construit**: sistem de roluri operator/specialist = FUTURE PROFESSIONAL WORKFLOW (documentat în doc canonic §5.8). **Necesită redeploy Fondator + LIVE VALIDATION pentru producție** (nu marcat production-complete).
+
+**Reconciliere documentară (28 Aug 2026)**: `PROPERTY_TWIN_CANONICAL_v1.0.md` devine sursa unică pentru taxonomia Property Twin (umbrelă 2D `twins` + 3D `digital_twin_projects`). Corectate contradicțiile din `MASTER_PLATFORM_STATE.md` (`twins` NU e „legacy"; D5/M5 „consolidare twin storage" = ANULAT). `CANONICAL_SYSTEM_REGISTRY` + `SSOT_REGISTRY` + `INDEX` sincronizate.
+
+---
+
+
 ## 🧭 DIGITAL TWIN P0 — PROPERTY ANCHOR (BUILD) · LIVRAT ÎN PREVIEW (28 Aug 2026)
 
 Gate HIGH/MEDIUM → **NO HIGH-RISK BLOCKER** → BUILD P0. Doc: `memory/audits/STRATEGIC_AUDIT_PROPERTY_TWIN_2026-08-28.md`. **Necesită redeploy Fondator pentru producție.**

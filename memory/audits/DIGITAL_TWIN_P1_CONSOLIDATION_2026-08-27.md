@@ -1,6 +1,8 @@
 # PropManage — DIGITAL TWIN · P1 CONSOLIDARE (BUILD) · 27 Aug 2026
 Decizii Fondator confirmate → implementare non-breaking. Supersedează secțiunea „OWNER DECISIONS" din auditul v2.
 
+> **UPDATE 28 Aug 2026**: după P1 au urmat **P0 (Property Anchor)** + **P0.1 (Operator Anchor)**. Statutul canonic curent + taxonomia unificată (2D+3D): `PROPERTY_TWIN_CANONICAL_v1.0.md`.
+
 ## DECIZII APLICATE
 - **Property Twin = umbrelă cu 2 straturi complementare**: `twins` (2D structurat, client) + `digital_twin_projects` (3D profesional). NU migrate, NU șterse, NU redenumite.
 - **Vizibilitate model** (#2): default `internal` (owner + operator + specialist asignat). `public` = opt-in explicit (pașaportul public NU expune modelul implicit).

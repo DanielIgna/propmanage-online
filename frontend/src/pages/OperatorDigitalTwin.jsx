@@ -118,14 +118,38 @@ const CreateProjectModal = ({ client, onClose, onCreated }) => {
   const [name, setName] = useState(`Digital Twin — ${client.client_name || "Client"}`);
   const [desc, setDesc] = useState("");
   const [trimbleUrl, setTrimbleUrl] = useState("");
+  const [properties, setProperties] = useState([]);
+  const [propertyId, setPropertyId] = useState("");
+  const [loadingProps, setLoadingProps] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+
+  // P0.1 — Property Anchor: încarcă proprietățile clientului pentru selector.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      setLoadingProps(true);
+      try {
+        const { data } = await axios.get(`${API}/operator/digital-twin/clients/${client.client_id}/properties`);
+        if (!active) return;
+        const items = data.items || [];
+        setProperties(items);
+        if (items.length === 1) setPropertyId(items[0].id);
+      } catch (_) {
+        if (active) setProperties([]);
+      } finally {
+        if (active) setLoadingProps(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [client.client_id]);
 
   const create = async () => {
     setBusy(true); setErr(null);
     try {
       const { data } = await axios.post(`${API}/operator/digital-twin/clients/${client.client_id}/projects`, {
         client_id: client.client_id, name, description: desc,
+        property_id: propertyId || null,
         trimble_embed_url: trimbleUrl.trim() || null,
       });
       onCreated?.(data);
@@ -146,6 +170,36 @@ const CreateProjectModal = ({ client, onClose, onCreated }) => {
             <p className="text-xs text-stone-400 mt-0.5">Pentru <strong>{client.client_name}</strong>. Proiectul va apărea în contul clientului instant.</p>
           </div>
           <button onClick={onClose}><X className="w-5 h-5 text-stone-500" /></button>
+        </div>
+
+        <div>
+          <label className="text-[10px] uppercase text-emerald-300 font-semibold flex items-center gap-1.5">
+            <MapPin className="w-3 h-3" /> Proprietate (Property Anchor) *
+          </label>
+          {loadingProps ? (
+            <div className="mt-1 text-xs text-stone-500 flex items-center gap-1.5" data-testid="create-project-property-loading">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Se încarcă proprietățile clientului…
+            </div>
+          ) : properties.length === 0 ? (
+            <div className="mt-1 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2" data-testid="create-project-no-properties">
+              Clientul nu are nicio proprietate. Clientul trebuie să adauge o proprietate înainte de a ancora un Digital Twin.
+            </div>
+          ) : (
+            <select
+              value={propertyId}
+              onChange={(e) => setPropertyId(e.target.value)}
+              className="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+              data-testid="create-project-property"
+            >
+              <option value="" className="bg-stone-900">Selectează proprietatea…</option>
+              {properties.map(p => (
+                <option key={p.id} value={p.id} className="bg-stone-900">
+                  {p.name}{p.address ? ` · ${p.address}` : ""}
+                </option>
+              ))}
+            </select>
+          )}
+          <p className="text-[10px] text-stone-500 mt-1">Twin-ul și modelele 3D vor fi ancorate de această proprietate.</p>
         </div>
 
         <div>
@@ -193,7 +247,7 @@ const CreateProjectModal = ({ client, onClose, onCreated }) => {
           <button onClick={onClose} className="flex-1 px-3 py-2 text-sm rounded-lg bg-white/5 hover:bg-white/10 text-stone-300">Anulează</button>
           <button
             onClick={create}
-            disabled={busy || name.trim().length < 2}
+            disabled={busy || name.trim().length < 2 || !propertyId}
             className="flex-1 px-3 py-2 text-sm rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-medium flex items-center justify-center gap-1.5"
             data-testid="create-project-submit"
           >

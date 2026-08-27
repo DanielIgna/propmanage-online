@@ -2445,6 +2445,28 @@ async def operator_set_trimble_embed(
     return {"ok": True, "trimble_embed_url": new_value}
 
 
+@operator_router.get("/clients/{client_id}/properties")
+async def operator_list_client_properties(
+    client_id: str,
+    user: dict = Depends(require_role("operator", "admin")),  # noqa: ARG001
+):
+    """P0.1 — proprietățile clientului pentru selectorul de ancorare (Property Anchor) la
+    crearea unui Digital Twin din zona Operator. Read-only, reutilizează db.properties (SSOT),
+    NU creează un nou sistem de identitate/linking."""
+    client = await db.users.find_one(_user_filter(client_id))
+    if not client:
+        raise HTTPException(404, "Client inexistent.")
+    items = []
+    async for p in db.properties.find({"owner_id": client_id}).sort("created_at", -1):
+        items.append({
+            "id": str(p["_id"]),
+            "name": p.get("name") or "Proprietate",
+            "address": p.get("address"),
+            "type": p.get("type"),
+        })
+    return {"items": items}
+
+
 @operator_router.post("/clients/{client_id}/projects")
 async def operator_create_project_for_client(
     client_id: str,
@@ -2452,7 +2474,12 @@ async def operator_create_project_for_client(
     user: dict = Depends(require_role("operator", "admin")),
 ):
     """Creates a Digital Twin project owned by the client (not the operator).
-    The operator is recorded as `created_by_operator_id` for audit / project routing."""
+    The operator is recorded as `created_by_operator_id` for audit / project routing.
+
+    P0.1 — Operator Property Anchor: `property_id` este OBLIGATORIU pe fluxul operator (spre
+    deosebire de fluxul client, unde standalone rămâne permis). Elimină sursa de orfanare a
+    modelelor create de operator. Ancorarea reutilizează integral infrastructura P0
+    (`_resolve_property_anchor` anti-misassignment + KG + moștenire pe modele)."""
     if payload.client_id != client_id:
         raise HTTPException(400, "client_id mismatch.")
     client = await db.users.find_one(_user_filter(client_id))
@@ -2462,6 +2489,8 @@ async def operator_create_project_for_client(
         raise HTTPException(400, "Doar clientii pot avea proiecte Digital Twin.")
     if not client.get("digital_twin_pro"):
         raise HTTPException(400, "Clientul nu are acces Digital Twin Pro. Acordă mai întâi accesul.")
+    if not payload.property_id:
+        raise HTTPException(400, "Selectează proprietatea clientului pentru a ancora Digital Twin-ul (Property Anchor).")
     prop_anchor, link_status = await _resolve_property_anchor(payload.property_id, user, owner_id=client_id)
     pid = _new_id()
     now = _now_iso()
