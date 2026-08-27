@@ -5,6 +5,7 @@ import { API } from "../DashShared";
 import { formatApiError } from "../../auth";
 import { trackPassport } from "../../lib/passportTracker";
 import { GREEN } from "./ui";
+import { HouseHealthAxisSnapshot } from "../../components/HouseHealthAxisCard";
 
 export const PassportCard = ({ prop }) => {
   const [data, setData] = useState(null);
@@ -88,6 +89,12 @@ export const PassportCard = ({ prop }) => {
               </div>
             </div>
           </div>
+
+          {data.preview?.scores?.completeness?.items && (
+            <div className="mt-4" data-testid="passport-axis-owner">
+              <HouseHealthAxisSnapshot completeness={data.preview.scores.completeness} theme="light" />
+            </div>
+          )}
 
           <button onClick={() => setShowPrivacy(!showPrivacy)} data-testid="passport-privacy-toggle"
             className="mt-3 flex items-center gap-1 text-xs font-bold text-slate-500">

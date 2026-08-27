@@ -185,7 +185,7 @@ async def _public_payload(prop: dict, request: Request) -> dict:
         "photo_url": f"/api/public/passport/{slug}/photo" if has_photo else None,
         "scores": {
             "trust": trust,
-            "completeness": {"score": compl["score"], "next_step": compl["next_step"], "docs_count": compl["docs_count"]} if privacy["show_scores"] else None,
+            "completeness": {"score": compl["score"], "next_step": compl["next_step"], "docs_count": compl["docs_count"], "items": compl["items"]} if privacy["show_scores"] else None,
             "maintenance": _maintenance_score(prop) if privacy["show_scores"] else None,
         },
         "badges": badges,

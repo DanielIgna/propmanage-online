@@ -8,6 +8,7 @@ import {
   Sparkles, ChevronRight, ChevronDown, Check, Clock, Gift, Users, HardDrive,
   HeartPulse, History, BadgeCheck, Trophy, Box, BookOpen, CircleHelp, Flag, Star,
 } from "lucide-react";
+import { chapterForNextStep } from "../../lib/houseHealthAxis";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 const GREEN = "#166534";
@@ -39,13 +40,21 @@ const ExplainRow = ({ label, value }) => (
   </div>
 );
 
-const NextAction = ({ a, run }) => {
+const NextAction = ({ a, run, axisChapter }) => {
   const [open, setOpen] = useState(false);
   if (!a) return null;
   const ex = a.explain || {};
   return (
     <div className="mt-3 rounded-2xl border border-[#166534]/15 bg-[#F0FBF4] p-3.5" data-testid="copilot-next-action">
-      <div className="text-[9px] font-black uppercase tracking-[0.14em] text-[#166534]">Pasul cu cel mai mare impact</div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[9px] font-black uppercase tracking-[0.14em] text-[#166534]">Pasul cu cel mai mare impact</span>
+        {axisChapter && (
+          <span data-testid="copilot-axis-chapter" title={axisChapter.title}
+            className="text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full bg-slate-900 text-[#d4ff3a]">
+            A→G · Cap. {axisChapter.code}
+          </span>
+        )}
+      </div>
       <div className="mt-1 text-sm font-black text-slate-900 leading-snug" data-testid="copilot-next-title">{a.title}</div>
       <p className="mt-1 text-xs text-slate-600 leading-relaxed">{a.value}</p>
       <div className="mt-2 flex items-center gap-2 flex-wrap text-[10px] font-bold text-slate-500">
@@ -146,7 +155,7 @@ const Timeline = ({ tl }) => {
   );
 };
 
-export const HouseCopilot = ({ go }) => {
+export const HouseCopilot = ({ go, completeness }) => {
   const [d, setD] = useState(null);
   const navigate = useNavigate();
 
@@ -171,6 +180,7 @@ export const HouseCopilot = ({ go }) => {
   const sub = d.subscription;
   const amb = d.community?.ambassador;
   const topDeal = d.community?.deals_needing_support?.[0];
+  const axisCh = completeness ? chapterForNextStep(completeness) : null;
 
   return (
     <div className="mx-5 mt-5 lg:mx-0 lg:mt-0 cv2-fade" data-testid="copilot-widget">
@@ -194,7 +204,7 @@ export const HouseCopilot = ({ go }) => {
           </p>
         )}
 
-        <NextAction a={d.next_action} run={run} />
+        <NextAction a={d.next_action} run={run} axisChapter={axisCh} />
         <Checklist cl={d.checklist} run={run} />
 
         {/* Progres casă */}

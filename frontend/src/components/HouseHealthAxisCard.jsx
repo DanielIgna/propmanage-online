@@ -112,4 +112,93 @@ export const HouseHealthAxisCard = ({ prop, actions, goSection }) => {
   );
 };
 
+// ── „Ești aici" — chip de orientare pentru Home / Copilot (folosește completeness.next_step) ──
+export const AxisHereBadge = ({ completeness, onOpen }) => {
+  if (!completeness) return null;
+  const ch = chapterForNextStep(completeness);
+  if (!ch) return null;
+  return (
+    <button onClick={onOpen} data-testid="hh-axis-here-badge"
+      className="w-full flex items-center gap-2.5 rounded-2xl border border-[#166534]/15 bg-[#F0FBF4] p-3 text-left active:scale-[0.99] transition-transform">
+      <span className="w-8 h-8 rounded-xl bg-slate-900 text-[#d4ff3a] flex items-center justify-center shrink-0 text-[11px] font-black">{ch.code}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-[#166534]">Harta casei · ești la capitolul {ch.code}</span>
+        <span className="block text-xs font-bold text-slate-700 truncate">Următorul pas: {completeness?.next_step?.label || ch.nextHint}</span>
+      </span>
+      <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+    </button>
+  );
+};
+
+// ── Preview onboarding: harta A→G înainte de a adăuga proprietatea (static, non-interactiv) ──
+export const HouseHealthAxisPreview = ({ onCta }) => (
+  <div className="mx-5 lg:mx-0 mt-5 rounded-3xl border border-slate-100 bg-white shadow-sm p-4 lg:p-5" data-testid="hh-axis-preview">
+    <div className="flex items-center gap-3">
+      <span className="w-9 h-9 rounded-2xl bg-slate-900 text-[#d4ff3a] flex items-center justify-center shrink-0 text-[11px] font-black">A→G</span>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-black text-slate-900 leading-none">Drumul casei tale, de la A la G</div>
+        <div className="text-[10px] text-slate-400 mt-0.5">iată ce vei construi, pas cu pas</div>
+      </div>
+    </div>
+    <div className="mt-3 space-y-1.5">
+      {HOUSE_HEALTH_AXIS.map((c) => (
+        <div key={c.code} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-3" data-testid={`hh-axis-preview-${c.code}`}>
+          <span className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center shrink-0 text-sm font-black text-slate-300">{c.code}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-black text-slate-700 truncate">{c.title}</span>
+            <span className="block text-[10px] text-slate-400 truncate">{c.homepageVerb}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+    {onCta && (
+      <button onClick={onCta} data-testid="hh-axis-preview-cta"
+        className="mt-3 w-full py-3 rounded-full text-sm font-black text-black active:scale-[0.98] transition-transform" style={{ background: "#d4ff3a" }}>
+        Adaugă proprietatea și pornește harta
+      </button>
+    )}
+    <p className="mt-2 text-[10px] leading-relaxed text-slate-400">{AXIS_DISCLAIMER}</p>
+  </div>
+);
+
+// ── Snapshot partajabil pentru Pașaport (read-only, temă light/dark) ──
+const SNAP_DARK = {
+  verificat: "bg-[#d4ff3a]/10 text-[#d4ff3a] border-[#d4ff3a]/25",
+  documentat: "bg-[#d4ff3a]/5 text-lime-300 border-[#d4ff3a]/15",
+  lipsa: "bg-white/5 text-stone-500 border-white/5",
+  lipsa_date: "bg-amber-400/10 text-amber-300 border-amber-400/20",
+};
+export const HouseHealthAxisSnapshot = ({ completeness, theme = "light" }) => {
+  if (!completeness || !Array.isArray(completeness.items)) return null;
+  const dark = theme === "dark";
+  return (
+    <div data-testid="hh-axis-snapshot"
+      className={dark ? "glass rounded-3xl p-5" : "mt-4 rounded-3xl border border-slate-100 bg-white shadow-sm p-4"}>
+      <div className="flex items-center gap-2.5">
+        <span className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-[10px] font-black ${dark ? "bg-[#d4ff3a]/10 text-[#d4ff3a] border border-[#d4ff3a]/20" : "bg-slate-900 text-[#d4ff3a]"}`}>A→G</span>
+        <div className="flex-1 min-w-0">
+          <div className={`text-sm font-medium ${dark ? "text-stone-100" : "text-slate-900 font-black"}`}>Sănătatea casei · A→G</div>
+          <div className={`text-[10px] ${dark ? "text-stone-500" : "text-slate-400"}`}>progresul celor 7 capitole ale locuinței</div>
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {HOUSE_HEALTH_AXIS.map((c) => {
+          const state = deriveChapterState(c, completeness);
+          const meta = STATE_META[state];
+          const badge = dark ? SNAP_DARK[state] : TONE[meta.tone].chip;
+          return (
+            <div key={c.code} data-testid={`hh-axis-snapshot-${c.code}`}
+              className={`flex items-center gap-2.5 rounded-2xl border p-2.5 ${dark ? "border-white/5 bg-white/[0.02]" : "border-slate-100 bg-white"}`}>
+              <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-black ${dark ? "bg-white/5 text-stone-300" : "bg-slate-100 text-slate-500"}`}>{c.code}</span>
+              <span className={`min-w-0 flex-1 text-[11px] font-bold truncate ${dark ? "text-stone-300" : "text-slate-700"}`}>{c.title}</span>
+              <span className={`shrink-0 text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full border ${badge}`} title={meta.hint}>{meta.label}</span>
+            </div>
+          );
+        })}
+      </div>
+      <p className={`mt-2.5 text-[10px] leading-relaxed ${dark ? "text-stone-600" : "text-slate-400"}`}>{AXIS_DISCLAIMER}</p>
+    </div>
+  );
+};
+
 export default HouseHealthAxisCard;

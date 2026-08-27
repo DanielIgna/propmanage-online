@@ -6,6 +6,7 @@ import {
   Sparkles, Lock, Ruler, DoorOpen, Flame, Layers, ArrowRight, CircleHelp,
 } from "lucide-react";
 import { initPassportTracking, trackPassport } from "../lib/passportTracker";
+import { HouseHealthAxisSnapshot } from "../components/HouseHealthAxisCard";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -140,6 +141,13 @@ export default function PublicPassportPage() {
             {data.scores.maintenance
               ? <ScoreRing value={data.scores.maintenance.score} label={data.scores.maintenance.label} sub={data.scores.maintenance.source} testid="passport-maintenance" />
               : <div className="glass rounded-3xl p-5 text-center hidden sm:block"><Sparkles className="w-6 h-6 mx-auto text-[#d4ff3a]" /><div className="mt-2 text-xs text-stone-400">Istoria acestei case se scrie pe PropManage</div></div>}
+          </section>
+        )}
+
+        {/* House Health A→G — rezumat partajabil (progresul celor 7 capitole) */}
+        {data.scores.completeness?.items && (
+          <section className="mt-4" data-testid="passport-axis-public">
+            <HouseHealthAxisSnapshot completeness={data.scores.completeness} theme="dark" />
           </section>
         )}
 

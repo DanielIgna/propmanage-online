@@ -1,3 +1,24 @@
+## 🔗 A→G EXTENSIONS (Copilot · Onboarding · Pașaport) + CLIENT.JUNIOR SELF-HEAL · LIVRAT (27 Aug 2026)
+
+Extinderea A→G în restul călătoriei + fix-ul auto-vindecător pentru drift-ul de rol (opțiunea 2, aprobată de Fondator). Toate reutilizează SSOT `lib/houseHealthAxis.js` — zero scoring nou, zero endpoint nou.
+
+**Componente partajate adăugate** (în `components/HouseHealthAxisCard.jsx`):
+- `AxisHereBadge` — chip „ești la capitolul X · Următorul pas" din `completeness.next_step`.
+- `HouseHealthAxisPreview` — harta A→G statică pentru onboarding (fără proprietate).
+- `HouseHealthAxisSnapshot` — rezumat read-only al celor 7 capitole cu stări (temă light/dark).
+
+**Task 2 — Copilot A→G** (`HomeV2.jsx`, `HouseCopilot.jsx`): fetch unic `completeness` în HomeV2 (înlocuiește fetch-ul de docsCount); `AxisHereBadge` pe ecranul Acasă (workspace + onboarding); chip „A→G · Cap. X" pe „Pasul cu cel mai mare impact" în Copilotul Casei. Verificat: badge „Cap. E" + chip „A→G · CAP. E" ✅.
+
+**Task 3 — Onboarding A→G** (`HomeV2.jsx`): în starea fără proprietate, sub Hero A apare `HouseHealthAxisPreview` (7 capitole A-G + CTA „Adaugă proprietatea și pornește harta" + disclaimer). Verificat cu client.junior (fără proprietate) ✅.
+
+**Task 4 — Pașaport A→G** (`PassportCard.jsx` owner light + `PublicPassportPage.jsx` public dark): rezumat A→G partajabil. Backend: `property_passport.py::_public_payload` include acum `completeness.items` (gated de `show_scores`) — reutilizează `_completeness`, fără endpoint/colecție nouă. Verificat pe `/p/{slug}` public: snapshot dark cu 7 capitole + stări reale + disclaimer ✅.
+
+**Task 1 — client.junior self-heal (opțiunea 2)** (`tier_demo_seed.py`): `role` devine AUTORITAR pentru cele 14 emailuri demo canonice; pentru clienți se curăță atributele de specialist rămase (specialty/service_categories/coverage/availability). Hashing-ul parolei NEatins. Verificat pe preview: simulat drift (client.junior→specialist+hvac) → seed → reparat automat la client/JUNIOR, specialty=None; specialiștii neafectați; `ensure-demo-target` → `ok:true` (role client) ✅. **PROD se corectează automat la următorul redeploy** (nicio acțiune manuală pe prod).
+
+**Testare**: self-test țintit (Regula 12) — screenshots + curl + simulare seed. Fără forensic/security audit. `webpack compiled` fără erori.
+
+---
+
 ## 🧭 HOUSE HEALTH A→G — „O singură poveste PropManage" (Homepage ↔ Client Beta) · LIVRAT (27 Aug 2026)
 
 **Cerere Fondator (APPROVED cu guardrails stricte)**: Alinierea narativă homepage → Client Beta printr-un cadru **House Health A→G** = „harta casei" (7 capitole/dimensiuni), STRICT ca strat narativ/de orientare peste sistemele existente. **ZERO scoring nou, ZERO backend/DB/endpoint, ZERO features noi.** A→G ≠ echivalent legal DPE.
@@ -30,7 +51,7 @@
 
 **Cauză**: drift de date DOAR pe PROD — `client.junior@propmanage.io` are `role="specialist"`. Preview e corect (`role="client"`). `tier_demo_seed.py` NU rescrie `role` la restart, deci redeploy simplu nu repară.
 
-**Decizie Fondator (Regula 13)**: NU se face nicio migrare/repair pe prod ACUM. Se folosește întâi raportul real de production safety check. **Opțiunea aleasă = 2** (fix auto-vindecător: `tier_demo_seed.py` autoritar pe `role`/`specialty` pentru cele 14 emailuri demo canonice → redeploy corectează automat). Rămâne în așteptare până la datele reale din PROD. NU implementat în acest task.
+**Decizie Fondator (Regula 13)**: **Opțiunea 2 aleasă și IMPLEMENTATĂ în cod** (27 Aug 2026) — `tier_demo_seed.py` autoritar pe `role`/`specialty` pentru cele 14 emailuri demo canonice. Testat pe preview (self-heal + `ensure-demo-target` ok). NU s-a rulat nicio migrare manuală pe prod; drift-ul se corectează automat la următorul redeploy. Vezi secțiunea „A→G EXTENSIONS" de mai sus.
 
 ---
 

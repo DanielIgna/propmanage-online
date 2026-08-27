@@ -11,6 +11,7 @@ import { BenefitsPulse } from "../../components/pb/PbEverywhere";
 import { HouseCopilot } from "../../components/copilot/HouseCopilot";
 import { HouseJourneyCard } from "../../components/copilot/HouseJourneyCard";
 import { AchievementsCard } from "../../components/copilot/AchievementsCard";
+import { AxisHereBadge, HouseHealthAxisPreview } from "../../components/HouseHealthAxisCard";
 
 const IMG_TWIN = "https://images.unsplash.com/photo-1721244654394-36a7bc2da288?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzh8MHwxfHNlYXJjaHwyfHxhcmNoaXRlY3R1cmFsJTIwYmx1ZXByaW50JTIwYnVpbGRpbmd8ZW58MHx8fHwxNzg0OTkwMDEyfDA&ixlib=rb-4.1.0&q=85&w=800";
 const IMG_HEALTH = "https://images.pexels.com/photos/36035073/pexels-photo-36035073.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
@@ -272,10 +273,11 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
   const unread = notifs.filter(n => !n.read);
 
   // CX-2: câte documente are proprietatea (Pasul 2 din onboarding = primul document)
-  const [docsCount, setDocsCount] = useState(null);
+  const [compl, setCompl] = useState(null);
+  const docsCount = compl?.docs_count ?? null;
   useEffect(() => {
     if (!prop?.id) return;
-    const load = () => axios.get(`${API}/properties/${prop.id}/completeness`).then(r => setDocsCount(r.data.docs_count)).catch(() => {});
+    const load = () => axios.get(`${API}/properties/${prop.id}/completeness`).then(r => setCompl(r.data)).catch(() => {});
     load();
     window.addEventListener("propmanage:doc-uploaded", load);
     return () => window.removeEventListener("propmanage:doc-uploaded", load);
@@ -319,7 +321,11 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
     return (
       <div className="lg:px-5 lg:max-w-3xl" data-testid="v2-home-onboarding">
         {hero}
-        {show("house_copilot") && <HouseCopilot key="house_copilot" go={go} />}
+        {properties.length === 0 && <HouseHealthAxisPreview onCta={actions.openPropManager} />}
+        {show("house_copilot") && <HouseCopilot key="house_copilot" go={go} completeness={compl} />}
+        {properties.length > 0 && (
+          <div className="mx-5 lg:mx-0 mt-5" data-testid="v2-axis-here-onboarding"><AxisHereBadge completeness={compl} onOpen={() => go("property")} /></div>
+        )}
         {show("achievements") && <AchievementsCard key="achievements" />}
         {show("house_journey") && <HouseJourneyCard key="house_journey" go={go} />}
       </div>
@@ -369,8 +375,10 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
   return (
     <div className="lg:px-5 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start pb-24 lg:pb-0" data-testid="v2-home-workspace">
       <div className="lg:col-span-8 lg:space-y-6 min-w-0">
+        {/* A→G: „ești aici" — leagă ecranul Acasă de harta casei */}
+        <div className="mx-5 mt-5 lg:mx-0 lg:mt-0" data-testid="v2-axis-here"><AxisHereBadge completeness={compl} onOpen={() => go("property")} /></div>
         {/* ASM-001: Copilotul Casei — primul widget din Home */}
-        {show("house_copilot") && <HouseCopilot key="house_copilot" go={go} />}
+        {show("house_copilot") && <HouseCopilot key="house_copilot" go={go} completeness={compl} />}
         {/* UX-001: Realizările casei — între Copilot și Drumul Casei */}
         {show("achievements") && <AchievementsCard key="achievements" />}
         {/* SH-001: Drumul Casei Tale — imediat sub Copilot */}
