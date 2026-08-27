@@ -1,3 +1,24 @@
+## 🏗️ DIGITAL TWIN P1 — CONSOLIDARE (Property Twin 2D+3D) · LIVRAT (27 Aug 2026)
+
+Decizii Fondator confirmate (GO explicit) → implementare non-breaking, ZERO migrare/ștergere. Doc canonic: `memory/audits/DIGITAL_TWIN_P1_CONSOLIDATION_2026-08-27.md`. Property Twin = 2 straturi complementare ale aceleiași proprietăți: `twins` (2D) + `digital_twin_projects` (3D). PropManage = strat digital care RECEIVES→ORGANIZES→CONNECTS→VERSIONS→EXPOSES→PRESERVES modelul profesional (NU software de arhitectură).
+
+**A · ProfessionalModel metadata/versionare** (`digital_twin_models`, aditiv): la upload → `property_id, source, version, version_label, status, visibility(internal), change_reason, supersedes, superseded_by, object_path`. `PATCH /api/digital-twin/models/{id}` acceptă metadata + `supersedes=<id>` (marchează vechiul model `superseded_by`+`status=superseded`, NON-DESTRUCTIV). Validare `status`/`visibility`.
+**B · Room/Space cross-system**: NOU `GET /api/properties/{id}/spaces` expune `twins.rooms[]` (uuid stabil) ca ancoră canonică — fără colecție nouă, fără duplicare.
+**C · Asset identity**: `models.py TwinAsset.asset_ref` (opțional) leagă poziționarea 2D de `property_assets` (SSOT identitate). ONE ASSET IDENTITY + MULTIPLE CONTEXTS. Fără migrare.
+**D · Docs↔Model/Room**: `property_documents` + `related_model_id`, `related_room_id` (opționale, în upload + EDITABLE).
+**E · Visibility minimă**: default `internal` (owner+operator+specialist asignat); `public` = opt-in (pașaportul public NU expune modelul implicit).
+**F · Health↔Twin**: eliminat DOAR override-ul sintetic `structure_health=95` la aprobarea twin (`operator_twins.py`). Default `90` la creare RĂMÂNE (baseline motor House Health — neatins). `twin_unlocked` rămâne True.
+**G · Gating upload (decizia #4 — schimbare de comportament aprobată)**: NOU `_ensure_dt_ingest_access` — orice user autentificat poate ADUCE/STOCA/VERSIONA modelul propriu (create/list/get/update/delete project, upload model+plan, list/serve/delete/patch own). Funcțiile AVANSATE (pins, comentarii, issue-reports, colaboratori, retry conversii, AI Q&A) RĂMÂN PREMIUM (`_ensure_dt_access`). `/subscription` +`can_ingest:true`.
+**Operator UI (#11)**: `OperatorTwin.jsx` (2D) vs `OperatorDigitalTwin.jsx` (3D) NU sunt duplicate — cele două suprafețe operator ale aceluiași Property Twin. Adăugate comentarii de clarificare (ZERO schimbare comportament).
+
+**Deploy-readiness (forțat de gate, non-breaking)**: upload model+plan scriu DIRECT în Emergent Object Storage (`storage_service.store_dt_bytes` + retry bounded 3×); disc = cache; `serve_model_file`/conversii fac restore la cerere (`ensure_dt_local`); GLB convertit persistat durabil. Rezolvă riscul „fișiere pierdute la redeploy" (audit §17).
+
+**Testare**: `testing_agent` iter200 (13/13 PASS, 100% backend) + suite actualizate iter185/iter186 (asserturile vechi „upload gated" → noul model: ingest permis / advanced 402) + phase53 DT + st001 storage → **65/65 PASS**. Smoke FE: `/digital-twin` PREMIUM randează corect (proiecte + „Model încărcat" + viewer). Self-test e2e curl: FREE poate crea/upload/list/serve, pin→402; PREMIUM versionare/supersedes/visibility; `/spaces` 5 camere; document links persistă.
+
+**NU în P1**: UX client „adu modelul" pentru FREE (backend gata, UI = P2), IFC viewer (P4), Property Knowledge Layer populare (P2). **Necesită redeploy Fondator pentru producție.**
+
+---
+
 ## 💳 CLIENT PRO/PREMIUM (/pricing dinamic) + SPECIALIST ENTITLEMENTS + PAȘAPORT PDF A→G · LIVRAT (27 Aug 2026)
 
 Trei task-uri P1 aprobate de Fondator (GO explicit: 1a, 2a, 3b), construite peste sistemele existente.

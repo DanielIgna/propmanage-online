@@ -176,6 +176,9 @@ class TwinAsset(BaseModel):
     type: Literal["hvac", "boiler", "electric_panel", "water_meter", "gas_meter", "appliance", "lighting", "plumbing", "other"]
     name: str
     room_id: Optional[str] = None
+    # P1 — identitate canonică unică: leagă poziționarea 2D de activul din `property_assets` (SSOT).
+    # Optional & non-destructiv: ONE ASSET IDENTITY + MULTIPLE CONTEXTS.
+    asset_ref: Optional[str] = None
     x: float = 0
     y: float = 0
     condition: Literal["good", "fair", "needs_service", "critical"] = "good"

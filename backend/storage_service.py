@@ -455,6 +455,40 @@ async def mirror_dt_file(kind: str, doc_id: str) -> None:
         logger.warning(f"[storage] DT mirror failed for {kind} {doc_id}: {e}")
 
 
+def dt_object_path(kind: str, project_id: str, stored_as: str) -> str:
+    sub = "plans/" if kind == "plan" else ""
+    return f"propmanage/digital_twin/{project_id}/{sub}{stored_as}"
+
+
+async def store_dt_bytes(kind: str, project_id: str, stored_as: str, data: bytes, content_type: str) -> str:
+    """Persistă un fișier Digital Twin DIRECT în Emergent Object Storage (durabil la redeploy).
+
+    Discul pod-local e folosit doar drept cache la cerere (vezi ensure_dt_local / restore_dt_file).
+    Retry bounded (3 încercări) pentru 5xx tranzitorii din upstream — upload-ul e user-facing.
+    """
+    from storage_client import put_object
+    path = dt_object_path(kind, project_id, stored_as)
+    last_err = None
+    for attempt in range(3):
+        try:
+            await asyncio.to_thread(put_object, path, data, content_type)
+            return path
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            logger.warning(f"[storage] store_dt_bytes attempt {attempt + 1}/3 failed for {path}: {e}")
+            await asyncio.sleep(0.6 * (attempt + 1))
+    raise last_err
+
+
+async def ensure_dt_local(kind: str, project_id: str, stored_as: str):
+    """Întoarce calea locală (cache) a unui fișier DT; îl readuce din Object Storage dacă lipsește."""
+    dirp = (DT_DIR / project_id / "plans") if kind == "plan" else (DT_DIR / project_id)
+    fp = dirp / stored_as
+    if fp.exists():
+        return fp
+    return await restore_dt_file(kind, project_id, stored_as)
+
+
 async def restore_dt_file(kind: str, project_id: str, filename: str):
     """Fallback la servire: readuce fișierul de pe object storage pe disc (cache)."""
     from storage_client import get_object

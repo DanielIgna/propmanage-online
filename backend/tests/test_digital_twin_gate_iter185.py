@@ -189,33 +189,31 @@ def test_dt_subscription_free(free_user):
 
 
 # ============================================================================
-# 7. FREE user POST /digital-twin/projects → 402 with correct detail
+# 7. FREE user CAN ingest (bring/store own model) — decizia Fondator #4 (upload NU e blocat)
 # ============================================================================
-def test_free_user_create_project_402(free_user):
+def test_free_user_can_create_project_ingest(free_user):
     r = free_user["session"].post(
         f"{BASE_URL}/api/digital-twin/projects",
-        json={"name": "TEST_free_should_fail_iter185"},
+        json={"name": "TEST_free_ingest_iter185"},
         timeout=15,
     )
-    assert r.status_code == 402, f"{r.status_code} {r.text}"
-    body = r.json()
-    detail = body.get("detail") or {}
-    assert detail.get("error") == "entitlement_required", detail
-    assert detail.get("feature") == "digital_twin_advanced", detail
+    assert r.status_code in (200, 201), f"ingest should be allowed (decizia #4): {r.status_code} {r.text}"
+    pid = r.json().get("id")
+    if pid:
+        free_user["session"].delete(f"{BASE_URL}/api/digital-twin/projects/{pid}", timeout=10)
 
 
 # ============================================================================
-# 8. FREE user other mutations → 402
+# 8. FREE user: INGEST allowed (project patch/delete), ADVANCED (pins) still 402
 # ============================================================================
-def test_free_user_other_mutations_402(free_user):
+def test_free_user_advanced_gated_ingest_allowed(free_user):
     s = free_user["session"]
-    # PATCH project
+    # INGEST: patch/delete nonexistent project → NOT 402 (entitlement not required; 404 not-found)
     r = s.patch(f"{BASE_URL}/api/digital-twin/projects/nonexistent-id", json={"name": "XX"}, timeout=10)
-    assert r.status_code == 402, r.status_code
-    # DELETE project
+    assert r.status_code != 402, r.status_code
     r = s.delete(f"{BASE_URL}/api/digital-twin/projects/nonexistent-id", timeout=10)
-    assert r.status_code == 402, r.status_code
-    # POST pin
+    assert r.status_code != 402, r.status_code
+    # ADVANCED: pins still require PREMIUM → 402
     r = s.post(
         f"{BASE_URL}/api/digital-twin/projects/nonexistent-id/pins",
         json={"position": {"x": 0, "y": 0, "z": 0}, "title": "abc"},
@@ -244,13 +242,23 @@ def test_pro_user_gets_digital_twin_advanced(free_user, mongo):
         assert "digital_twin_advanced" not in body["features"], body
         assert "house_health_advanced" in body["features"], body
 
-        # POST project — trebuie să fie 402 (Digital Twin necesită PREMIUM)
+        # INGEST: create project allowed pentru orice user autentificat (decizia #4)
         r2 = s.post(
             f"{BASE_URL}/api/digital-twin/projects",
             json={"name": "TEST_pro_iter185"},
             timeout=15,
         )
-        assert r2.status_code == 402, r2.text
+        assert r2.status_code != 402, r2.text
+        pid = r2.json().get("id") if r2.status_code in (200, 201) else None
+        # ADVANCED: Digital Twin necesită PREMIUM — PRO NU are pins → 402
+        rp = s.post(
+            f"{BASE_URL}/api/digital-twin/projects/{pid or 'nonexistent-id'}/pins",
+            json={"position": {"x": 0, "y": 0, "z": 0}, "title": "abc"},
+            timeout=10,
+        )
+        assert rp.status_code == 402, rp.text
+        if pid:
+            s.delete(f"{BASE_URL}/api/digital-twin/projects/{pid}", timeout=10)
     finally:
         _clear_subscription(mongo, uid)
 
@@ -271,8 +279,18 @@ def test_basic_user_no_digital_twin(free_user, mongo):
         assert "house_health_basic" in body["features"], body
         assert "digital_twin_advanced" not in body["features"], body
 
+        # INGEST allowed; ADVANCED (pins) gated 402
         r2 = s.post(f"{BASE_URL}/api/digital-twin/projects", json={"name": "TEST_basic_iter185"}, timeout=15)
-        assert r2.status_code == 402, r2.text
+        assert r2.status_code != 402, r2.text
+        pid = r2.json().get("id") if r2.status_code in (200, 201) else None
+        rp = s.post(
+            f"{BASE_URL}/api/digital-twin/projects/{pid or 'nonexistent-id'}/pins",
+            json={"position": {"x": 0, "y": 0, "z": 0}, "title": "abc"},
+            timeout=10,
+        )
+        assert rp.status_code == 402, rp.text
+        if pid:
+            s.delete(f"{BASE_URL}/api/digital-twin/projects/{pid}", timeout=10)
     finally:
         _clear_subscription(mongo, uid)
 

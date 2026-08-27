@@ -1,4 +1,10 @@
 // Operator Digital Twin onboarding & file uploads for clients.
+//
+// PROPERTY TWIN · STRATUL 3D (decizie Fondator, 27 Aug 2026): această suprafață operează pe
+// `digital_twin_projects` + `digital_twin_models` (model arhitectural/BIM/SketchUp + layere + Trimble)
+// = stratul 3D profesional. NU e duplicat cu OperatorTwin.jsx — acela e stratul 2D (`twins`).
+// Ambele = suprafețe operator ale ACELUIAȘI Property Twin (2D + 3D), tab-uri în OperatorDashboard.
+// Consolidare = clarificare non-breaking, FĂRĂ ștergere.
 // User flow:
 // 1. Operator sees list of clients with digital_twin_pro flag (grouped by status: needs_setup / in_progress / delivered)
 // 2. For clients without flag → "Acordă acces" button (uses operator grant endpoint)

@@ -257,20 +257,32 @@ def test_expired_user_402_on_house_health_documents(fresh_user, mongo):
 
 
 # ============================================================================
-# 8. REGRESSION — expired user 402 on digital-twin/projects
+# 8. REGRESSION — expired user: INGEST allowed (bring/store model), ADVANCED (pins) 402
+#    (P1 decizia Fondator #4 — upload/stocare NU e blocat; exploatarea avansată rămâne PREMIUM)
 # ============================================================================
-def test_expired_user_402_on_digital_twin_projects(fresh_user, mongo):
+def test_expired_user_ingest_ok_advanced_402_digital_twin(fresh_user, mongo):
     uid = fresh_user["user_id"]
     s = fresh_user["session"]
     _upsert_sub(mongo, uid, plan="pro", status="active", days=15)
     _age_sub_to_expired(mongo, uid, status="cancelled")
 
+    # INGEST: create own project still allowed after downgrade
     r = s.post(
         f"{BASE_URL}/api/digital-twin/projects",
         json={"name": "TEST_expired_dt_iter186"},
         timeout=15,
     )
-    assert r.status_code == 402, f"expected 402, got {r.status_code}: {r.text}"
+    assert r.status_code in (200, 201), f"ingest should be allowed: {r.status_code}: {r.text}"
+    pid = r.json().get("id")
+    # ADVANCED: pins still gated 402 for downgraded (FREE) user
+    rp = s.post(
+        f"{BASE_URL}/api/digital-twin/projects/{pid or 'nonexistent-id'}/pins",
+        json={"position": {"x": 0, "y": 0, "z": 0}, "title": "abc"},
+        timeout=10,
+    )
+    assert rp.status_code == 402, rp.text
+    if pid:
+        s.delete(f"{BASE_URL}/api/digital-twin/projects/{pid}", timeout=10)
 
 
 # ============================================================================

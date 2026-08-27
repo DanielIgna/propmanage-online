@@ -48,7 +48,7 @@ DOC_FIELDS = [
     "id", "property_id", "title", "category", "category_label", "filename", "content_type", "size",
     "building_system", "room", "doc_date", "uploaded_at", "author_name", "company", "specialist_id",
     "source", "provenance", "warranty_start", "warranty_end", "supplier", "tags", "notes",
-    "related_request_id", "related_asset_id", "verification_status", "version", "prev_version_id", "history",
+    "related_request_id", "related_asset_id", "related_model_id", "related_room_id", "verification_status", "version", "prev_version_id", "history",
 ]
 
 
@@ -141,6 +141,8 @@ async def upload_document(
     notes: str = Form(""),
     related_request_id: str = Form(""),
     related_asset_id: str = Form(""),
+    related_model_id: str = Form(""),
+    related_room_id: str = Form(""),
     user: dict = Depends(get_current_user),
 ):
     prop = await _load_property_for(user, prop_id)
@@ -197,6 +199,8 @@ async def upload_document(
         "notes": (notes or "").strip() or None,
         "related_request_id": (related_request_id or "").strip() or None,
         "related_asset_id": (related_asset_id or "").strip() or None,
+        "related_model_id": (related_model_id or "").strip() or None,
+        "related_room_id": (related_room_id or "").strip() or None,
         "verification_status": "verified" if role in ("admin", "operator") else "unverified",
         "version": 1,
         "prev_version_id": None,
@@ -297,7 +301,7 @@ async def document_file(doc_id: str, download: int = Query(0), user: dict = Depe
 
 
 EDITABLE = ["title", "category", "building_system", "room", "doc_date", "company", "supplier",
-            "warranty_start", "warranty_end", "tags", "notes"]
+            "warranty_start", "warranty_end", "tags", "notes", "related_model_id", "related_room_id"]
 
 
 @router.patch("/documents/{doc_id}")

@@ -95,6 +95,41 @@ async def get_my_property_twin(prop_id: str, user: dict = Depends(get_current_us
     }
 
 
+@router.get("/properties/{prop_id}/spaces")
+async def get_property_spaces(prop_id: str, user: dict = Depends(get_current_user)):
+    """P1 — Room/Space ca ancoră canonică cross-system.
+
+    Camerele NU se dublează: sursa e `twins.rooms[]` (uuid stabil + geometrie). Acest endpoint
+    doar EXPUNE camerele existente ca „spaces" referențiabile de documente / modele / active / pini,
+    fără colecție nouă și fără migrare. Autorizare identică cu vizualizarea twin-ului.
+    """
+    prop = await db.properties.find_one({"_id": ObjectId(prop_id)})
+    if not prop:
+        raise HTTPException(404, "Property not found")
+    is_authorized = (
+        prop.get("owner_id") == user["id"]
+        or user.get("role") in ("admin", "operator")
+    )
+    if not is_authorized and user.get("role") == "specialist":
+        spec_request = await db.requests.find_one({"property_id": prop_id, "specialist_id": user["id"]})
+        is_authorized = bool(spec_request)
+    if not is_authorized:
+        raise HTTPException(403, "Not allowed")
+    twin = await db.twins.find_one({"property_id": prop_id})
+    rooms = (twin.get("rooms") or []) if twin else []
+    spaces = [
+        {
+            "space_id": r.get("id"),
+            "name": r.get("name"),
+            "type": r.get("type"),
+            "area": r.get("area"),
+            "source": "twin_2d",
+        }
+        for r in rooms if r.get("id")
+    ]
+    return {"property_id": prop_id, "count": len(spaces), "spaces": spaces}
+
+
 # ---------------------------------------------------------------------------
 # CLIENT — Digital Twin summary across all owned properties
 # Used by Settings → Digital Twin 3D section.
@@ -323,7 +358,7 @@ async def operator_validate_twin(prop_id: str, data: TwinValidateIn, user: dict 
     if data.action == "approve":
         await db.properties.update_one(
             {"_id": ObjectId(prop_id)},
-            {"$set": {"twin_unlocked": True, "structure_health": 95}}
+            {"$set": {"twin_unlocked": True}}
         )
     # Notify property owner
     prop = await db.properties.find_one({"_id": ObjectId(prop_id)})

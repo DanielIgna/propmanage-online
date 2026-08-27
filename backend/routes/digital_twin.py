@@ -116,6 +116,24 @@ async def _ensure_dt_access(user: dict) -> None:
         )
 
 
+async def _ensure_dt_ingest_access(user: dict) -> None:
+    """Decizia Fondator #4: aducerea/stocarea/versionarea modelului profesional PROPRIU NU e blocată
+    de PREMIUM. Orice utilizator autentificat își poate crea containerul de proiect și încărca/gestiona
+    modelul; proprietatea e verificată separat (_ensure_project_access). Funcțiile AVANSATE de
+    vizualizare/exploatare (pins, comentarii, issue-reports, colaboratori, AI Q&A, retry conversii)
+    rămân gated PREMIUM prin _ensure_dt_access.
+    """
+    if not user or not user.get("id"):
+        raise HTTPException(status_code=401, detail="Autentificare necesară.")
+
+
+# P1 — ProfessionalModel metadata: valori deterministe permise
+_MODEL_STATUSES = {"processing", "ready", "stored", "superseded", "archived"}
+# Vizibilitate minimă & deterministă (decizia #2): implicit intern (owner + operator + specialist asignat);
+# `public` = opt-in explicit al proprietarului (expunere pe pașaportul public — nu implicit).
+_MODEL_VISIBILITIES = {"internal", "public"}
+
+
 async def _ensure_project_access(project_id: str, user: dict) -> dict:
     """Returns project doc if user is owner, member, or admin/operator."""
     p = await db.digital_twin_projects.find_one({"id": project_id})
@@ -180,6 +198,7 @@ async def my_subscription(user: dict = Depends(get_current_user)):
         "tier": tier,
         "tier_label": tier_label,
         "required_feature": "digital_twin_advanced",
+        "can_ingest": True,
         "cta_href": "/pricing",
     }
 
@@ -203,7 +222,7 @@ class ProjectUpdate(BaseModel):
 
 @router.post("/projects")
 async def create_project(payload: ProjectCreate, user: dict = Depends(get_current_user)):
-    await _ensure_dt_access(user)
+    await _ensure_dt_ingest_access(user)
     pid = _new_id()
     now = _now_iso()
     doc = {
@@ -228,7 +247,7 @@ async def create_project(payload: ProjectCreate, user: dict = Depends(get_curren
 
 @router.get("/projects")
 async def list_projects(user: dict = Depends(get_current_user)):
-    await _ensure_dt_access(user)
+    await _ensure_dt_ingest_access(user)
     # Admin/operator see all; others see owned + member-of.
     if user.get("role") in ("admin", "operator"):
         q = {}
@@ -242,7 +261,7 @@ async def list_projects(user: dict = Depends(get_current_user)):
 
 @router.get("/projects/{project_id}")
 async def get_project(project_id: str, user: dict = Depends(get_current_user)):
-    await _ensure_dt_access(user)
+    await _ensure_dt_ingest_access(user)
     p = await _ensure_project_access(project_id, user)
     # Attach lightweight counts.
     p["pin_count"] = await db.digital_twin_pins.count_documents({"project_id": project_id})
@@ -296,7 +315,7 @@ async def remove_member(project_id: str, user_id: str, user: dict = Depends(get_
 
 @router.patch("/projects/{project_id}")
 async def update_project(project_id: str, payload: ProjectUpdate, user: dict = Depends(get_current_user)):
-    await _ensure_dt_access(user)
+    await _ensure_dt_ingest_access(user)
     p = await _ensure_project_access(project_id, user)
     if user.get("role") not in ("admin", "operator") and p.get("owner_id") != user["id"]:
         raise HTTPException(403, "Only owner can update.")
@@ -311,7 +330,7 @@ async def update_project(project_id: str, payload: ProjectUpdate, user: dict = D
 
 @router.delete("/projects/{project_id}")
 async def delete_project(project_id: str, user: dict = Depends(get_current_user)):
-    await _ensure_dt_access(user)
+    await _ensure_dt_ingest_access(user)
     p = await _ensure_project_access(project_id, user)
     if user.get("role") not in ("admin", "operator") and p.get("owner_id") != user["id"]:
         raise HTTPException(403, "Only owner can delete.")
@@ -337,6 +356,7 @@ async def upload_model(
     project_id: str,
     file: UploadFile = File(...),
     layer_type: Optional[str] = Query(None, description="structure | electric | plumbing | hvac | decor | other"),
+    change_reason: Optional[str] = Query(None, max_length=300),
     user: dict = Depends(get_current_user),
 ):
     """Upload a .glb/.gltf model for the project. Stored locally and served via /files/.
@@ -345,7 +365,7 @@ async def upload_model(
     electric, plumbing, hvac, ...). Multiple layers per project let the viewer
     render the X-Ray "glass walls" overlay business case.
     """
-    await _ensure_dt_access(user)
+    await _ensure_dt_ingest_access(user)
     p = await _ensure_project_access(project_id, user)
     if user.get("role") not in ("admin", "operator") and p.get("owner_id") != user["id"]:
         raise HTTPException(403, "Only owner can upload models.")
@@ -361,34 +381,28 @@ async def upload_model(
 
     max_bytes = await storage_service.file_limit_bytes("digital_twin_model")
     dt_remaining = await storage_service.dt_remaining_bytes(p["owner_id"])
-    # Persist to disk with streaming (chunks of 1 MB) to avoid loading 200MB in RAM
-    project_dir = UPLOAD_ROOT / project_id
-    project_dir.mkdir(parents=True, exist_ok=True)
     safe_stem = uuid.uuid4().hex[:12]
     safe_name = f"{safe_stem}{ext}"
-    dest = project_dir / safe_name
 
-    total = 0
+    # Stream into memory (chunked, with guards) then persist DURABLY to Object Storage.
+    # Pod-local disk survives only as an on-demand cache (serve/convert restore it).
+    buf = bytearray()
+    while True:
+        chunk = await file.read(1024 * 1024)  # 1 MB
+        if not chunk:
+            break
+        buf.extend(chunk)
+        if len(buf) > max_bytes:
+            raise HTTPException(413, f"Fișier prea mare (max {max_bytes // (1024*1024)} MB).")
+        if len(buf) > dt_remaining:
+            raise HTTPException(413, "Cota de stocare Digital Twin este plină. Șterge modele vechi sau contactează echipa.")
+    total = len(buf)
+    if total == 0:
+        raise HTTPException(400, "Fișierul este gol.")
+    model_ct = {".glb": "model/gltf-binary", ".gltf": "model/gltf+json"}.get(ext, "application/octet-stream")
     try:
-        with dest.open("wb") as out:
-            while True:
-                chunk = await file.read(1024 * 1024)  # 1 MB
-                if not chunk:
-                    break
-                total += len(chunk)
-                if total > max_bytes:
-                    out.close()
-                    dest.unlink(missing_ok=True)
-                    raise HTTPException(413, f"Fișier prea mare (max {max_bytes // (1024*1024)} MB).")
-                if total > dt_remaining:
-                    out.close()
-                    dest.unlink(missing_ok=True)
-                    raise HTTPException(413, "Cota de stocare Digital Twin este plină. Șterge modele vechi sau contactează echipa.")
-                out.write(chunk)
-    except HTTPException:
-        raise
+        object_path = await storage_service.store_dt_bytes("model", project_id, safe_name, bytes(buf), model_ct)
     except Exception as e:  # noqa: BLE001
-        dest.unlink(missing_ok=True)
         raise HTTPException(500, f"Upload failed: {e}") from e
 
     # Build the public URL. Use APP_PUBLIC_URL when set, else relative path the frontend will resolve.
@@ -426,6 +440,10 @@ async def upload_model(
     # Save model metadata + set as current model on project
     is_archive = ext in DOWNLOAD_ONLY_EXTS
     needs_blender = ext in BLENDER_CONVERT_EXTS  # DAE/OBJ/FBX/STL/PLY → GLB
+    _will_convert = (needs_blender and _blender.is_enabled()) or (is_archive and ext == ".skp" and _ccv.is_enabled())
+    model_status = "processing" if _will_convert else ("ready" if (not is_archive and not needs_blender) else "stored")
+    _role = user.get("active_view") or user.get("role")
+    model_source = "specialist" if _role == "specialist" else ("platform" if _role in ("admin", "operator") else "owner_upload")
     model_doc = {
         "id": _new_id(),
         "project_id": project_id,
@@ -444,6 +462,17 @@ async def upload_model(
         "uploaded_by_name": user.get("name") or user.get("email"),
         "uploaded_by_role": user.get("role"),
         "uploaded_at": _now_iso(),
+        "object_path": object_path,
+        # P1 — ProfessionalModel metadata (proveniență / versionare / vizibilitate / status)
+        "property_id": p.get("property_id"),
+        "source": model_source,
+        "version": 1,
+        "version_label": None,
+        "status": model_status,
+        "visibility": "internal",
+        "change_reason": (change_reason or "").strip() or None,
+        "supersedes": None,
+        "superseded_by": None,
     }
     # Auto-conversion path:
     #   .skp → CloudConvert (off — SKP not supported)
@@ -459,9 +488,8 @@ async def upload_model(
         model_doc["conversion_started_at"] = _now_iso()
         model_doc["conversion_engine"] = "cloudconvert"
     await db.digital_twin_models.insert_one(model_doc)
-    # ST-001: bucket separat DT + copie durabilă în Object Storage (discul se pierde la redeploy)
+    # ST-001: fișierul e deja durabil în Object Storage (store_dt_bytes la upload).
     await storage_service.add_usage(p["owner_id"], total, "digital_twin")
-    asyncio.create_task(storage_service.mirror_dt_file("model", model_doc["id"]))
     # Only set as the active model_url if it's actually viewable (.glb/.gltf)
     is_viewable = not is_archive and not needs_blender
     update_set = {"updated_at": _now_iso()}
@@ -528,6 +556,10 @@ async def _run_blender_conversion(model_id: str) -> None:
     project_id = src["project_id"]
     src_path = UPLOAD_ROOT / project_id / src["stored_as"]
     if not src_path.exists():
+        restored = await storage_service.ensure_dt_local("model", project_id, src["stored_as"])
+        if restored:
+            src_path = restored
+    if not src_path.exists():
         await _update_conversion(model_id, conversion_status="failed", conversion_error="Source file missing on disk.")
         return
     await _update_conversion(model_id, conversion_status="converting", conversion_percent=10)
@@ -545,6 +577,11 @@ async def _run_blender_conversion(model_id: str) -> None:
     norm_layer = src.get("layer_type") or "structure"
     meta = LAYER_DEFAULTS_FOR_CONVERT.get(norm_layer, LAYER_DEFAULTS_FOR_CONVERT["structure"])
     glb_public_path = f"/api/digital-twin/files/{project_id}/{glb_safe}"
+    try:
+        glb_object_path = await storage_service.store_dt_bytes(
+            "model", project_id, glb_safe, glb_path.read_bytes(), "model/gltf-binary")
+    except Exception:  # noqa: BLE001
+        glb_object_path = None
     converted_doc = {
         "id": _new_id(),
         "project_id": project_id,
@@ -566,6 +603,7 @@ async def _run_blender_conversion(model_id: str) -> None:
         "converted_from_id": model_id,
         "converted_from_filename": src.get("filename"),
         "conversion_engine": "blender",
+        "object_path": glb_object_path,
     }
     await db.digital_twin_models.insert_one(converted_doc)
     await db.digital_twin_projects.update_one(
@@ -589,6 +627,10 @@ async def _run_skp_to_glb_conversion(model_id: str) -> None:
         return
     project_id = archive["project_id"]
     src_path = UPLOAD_ROOT / project_id / archive["stored_as"]
+    if not src_path.exists():
+        restored = await storage_service.ensure_dt_local("model", project_id, archive["stored_as"])
+        if restored:
+            src_path = restored
     if not src_path.exists():
         await _update_conversion(model_id, conversion_status="failed", conversion_error="Source .skp file missing on disk.")
         return
@@ -664,6 +706,11 @@ async def _run_skp_to_glb_conversion(model_id: str) -> None:
     norm_layer = archive.get("layer_type") or "structure"
     meta = LAYER_DEFAULTS_FOR_CONVERT.get(norm_layer, LAYER_DEFAULTS_FOR_CONVERT["structure"])
     glb_public_path = f"/api/digital-twin/files/{project_id}/{glb_safe}"
+    try:
+        glb_object_path = await storage_service.store_dt_bytes(
+            "model", project_id, glb_safe, glb_path.read_bytes(), "model/gltf-binary")
+    except Exception:  # noqa: BLE001
+        glb_object_path = None
     converted_doc = {
         "id": _new_id(),
         "project_id": project_id,
@@ -684,6 +731,7 @@ async def _run_skp_to_glb_conversion(model_id: str) -> None:
         "uploaded_at": _now_iso(),
         "converted_from_id": model_id,
         "converted_from_filename": archive.get("filename"),
+        "object_path": glb_object_path,
     }
     await db.digital_twin_models.insert_one(converted_doc)
     await db.digital_twin_projects.update_one(
@@ -708,7 +756,7 @@ async def get_conversion_status(model_id: str, user: dict = Depends(get_current_
     Returns:
       { status, percent, error, converted_model_id, converted_url }
     """
-    await _ensure_dt_access(user)
+    await _ensure_dt_ingest_access(user)
     doc = await db.digital_twin_models.find_one({"id": model_id})
     if not doc:
         raise HTTPException(404, "Model not found.")
@@ -775,7 +823,7 @@ async def list_project_models(project_id: str, user: dict = Depends(get_current_
       • multi-layer viewer → `models` (.glb/.gltf layers) + `archives` (.skp)
       • model versions list → `items` (everything, newest first) + `count`
     """
-    await _ensure_dt_access(user)
+    await _ensure_dt_ingest_access(user)
     await _ensure_project_access(project_id, user)
     docs = await db.digital_twin_models.find({"project_id": project_id}).sort("uploaded_at", -1).to_list(50)
     items, models, archives = [], [], []
@@ -801,6 +849,14 @@ class _LayerUpdateIn(BaseModel):
     layer_color: Optional[str] = Field(None, max_length=20)
     layer_opacity: Optional[float] = Field(None, ge=0.0, le=1.0)
     layer_visible: Optional[bool] = None
+    # P1 — ProfessionalModel metadata / versionare / vizibilitate
+    version: Optional[int] = Field(None, ge=1, le=9999)
+    version_label: Optional[str] = Field(None, max_length=60)
+    status: Optional[str] = Field(None, max_length=20)
+    visibility: Optional[str] = Field(None, max_length=30)
+    source: Optional[str] = Field(None, max_length=40)
+    change_reason: Optional[str] = Field(None, max_length=300)
+    supersedes: Optional[str] = Field(None, max_length=40)
 
 
 @router.patch("/models/{model_id}")
@@ -809,8 +865,12 @@ async def update_model_layer(
     payload: _LayerUpdateIn,
     user: dict = Depends(get_current_user),
 ):
-    """Update a model's layer metadata (color / opacity / label / visibility)."""
-    await _ensure_dt_access(user)
+    """Update a model's layer visuals AND ProfessionalModel metadata (version/status/visibility/source).
+
+    Versionare non-destructivă: setând `supersedes=<model_id>`, modelul vechi e marcat
+    `superseded_by` + `status=superseded` (rămâne în istoric, NU se șterge).
+    """
+    await _ensure_dt_ingest_access(user)
     doc = await db.digital_twin_models.find_one({"id": model_id})
     if not doc:
         raise HTTPException(404, "Model not found.")
@@ -819,6 +879,21 @@ async def update_model_layer(
     update = {k: v for k, v in payload.model_dump().items() if v is not None}
     if not update:
         raise HTTPException(400, "Nothing to update.")
+    if "status" in update and update["status"] not in _MODEL_STATUSES:
+        raise HTTPException(400, f"status invalid. Permis: {', '.join(sorted(_MODEL_STATUSES))}")
+    if "visibility" in update and update["visibility"] not in _MODEL_VISIBILITIES:
+        raise HTTPException(400, f"visibility invalid. Permis: {', '.join(sorted(_MODEL_VISIBILITIES))}")
+    supersedes = update.get("supersedes")
+    if supersedes:
+        if supersedes == model_id:
+            raise HTTPException(400, "Un model nu se poate înlocui pe sine.")
+        target = await db.digital_twin_models.find_one({"id": supersedes})
+        if not target or target.get("project_id") != doc["project_id"]:
+            raise HTTPException(400, "Modelul de înlocuit nu aparține aceluiași proiect.")
+        await db.digital_twin_models.update_one(
+            {"id": supersedes},
+            {"$set": {"superseded_by": model_id, "status": "superseded", "updated_at": _now_iso()}},
+        )
     update["updated_at"] = _now_iso()
     await db.digital_twin_models.update_one({"id": model_id}, {"$set": update})
     refreshed = await db.digital_twin_models.find_one({"id": model_id})
@@ -828,7 +903,7 @@ async def update_model_layer(
 @router.delete("/models/{model_id}")
 async def delete_model_layer(model_id: str, user: dict = Depends(get_current_user)):
     """Remove a model file from a project (owner / admin / operator only)."""
-    await _ensure_dt_access(user)
+    await _ensure_dt_ingest_access(user)
     doc = await db.digital_twin_models.find_one({"id": model_id})
     if not doc:
         raise HTTPException(404, "Model not found.")
@@ -855,14 +930,17 @@ async def delete_model_layer(model_id: str, user: dict = Depends(get_current_use
 @router.get("/files/{project_id}/{filename}")
 async def serve_model_file(project_id: str, filename: str, user: dict = Depends(get_current_user)):
     """Serve uploaded model files. Permission-checked: only project members + admin/operator."""
-    await _ensure_dt_access(user)
+    await _ensure_dt_ingest_access(user)
     await _ensure_project_access(project_id, user)
     # Sanitize: filename must be a bare name, no path traversal
     if "/" in filename or "\\" in filename or filename.startswith(".."):
         raise HTTPException(400, "Invalid filename.")
     file_path = UPLOAD_ROOT / project_id / filename
     if not file_path.exists() or not file_path.is_file():
-        raise HTTPException(404, "Model file not found.")
+        # Files live durably in Object Storage; disk is only a cache. Restore on demand.
+        file_path = await storage_service.ensure_dt_local("model", project_id, filename)
+        if not file_path or not file_path.exists():
+            raise HTTPException(404, "Model file not found.")
     fn_lower = filename.lower()
     if fn_lower.endswith(".glb"):
         media = "model/gltf-binary"
@@ -1944,7 +2022,7 @@ async def upload_plan(
     user: dict = Depends(get_current_user),
 ):
     """Upload a 2D architectural PDF (floor plan, section, elevation, detail)."""
-    await _ensure_dt_access(user)
+    await _ensure_dt_ingest_access(user)
     p = await _ensure_project_access(project_id, user)
     if user.get("role") not in ("admin", "operator") and p.get("owner_id") != user["id"]:
         # Project members can also upload plans (architects, specialists need to share schedules)
@@ -1961,33 +2039,26 @@ async def upload_plan(
 
     max_plan_bytes = await storage_service.file_limit_bytes("digital_twin_plan")
     dt_remaining = await storage_service.dt_remaining_bytes(p["owner_id"])
-    plans_dir = UPLOAD_ROOT / project_id / "plans"
-    plans_dir.mkdir(parents=True, exist_ok=True)
     safe_stem = uuid.uuid4().hex[:12]
     safe_name = f"{safe_stem}{ext}"
-    dest = plans_dir / safe_name
 
-    total = 0
+    # Stream into memory (chunked, with guards) then persist DURABLY to Object Storage.
+    buf = bytearray()
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        buf.extend(chunk)
+        if len(buf) > max_plan_bytes:
+            raise HTTPException(413, f"Fișier prea mare (max {max_plan_bytes // (1024*1024)} MB pentru PDF).")
+        if len(buf) > dt_remaining:
+            raise HTTPException(413, "Cota de stocare Digital Twin este plină. Șterge planuri/modele vechi sau contactează echipa.")
+    total = len(buf)
+    if total == 0:
+        raise HTTPException(400, "Fișierul este gol.")
     try:
-        with dest.open("wb") as out:
-            while True:
-                chunk = await file.read(1024 * 1024)
-                if not chunk:
-                    break
-                total += len(chunk)
-                if total > max_plan_bytes:
-                    out.close()
-                    dest.unlink(missing_ok=True)
-                    raise HTTPException(413, f"Fișier prea mare (max {max_plan_bytes // (1024*1024)} MB pentru PDF).")
-                if total > dt_remaining:
-                    out.close()
-                    dest.unlink(missing_ok=True)
-                    raise HTTPException(413, "Cota de stocare Digital Twin este plină. Șterge planuri/modele vechi sau contactează echipa.")
-                out.write(chunk)
-    except HTTPException:
-        raise
+        plan_object_path = await storage_service.store_dt_bytes("plan", project_id, safe_name, bytes(buf), "application/pdf")
     except Exception as e:  # noqa: BLE001
-        dest.unlink(missing_ok=True)
         raise HTTPException(500, f"Upload failed: {e}") from e
 
     public_path = f"/api/digital-twin/plans/{project_id}/{safe_name}"
@@ -1995,9 +2066,8 @@ async def upload_plan(
     page_count = 0
     try:
         from pypdf import PdfReader  # type: ignore
-        with dest.open("rb") as fr:
-            reader = PdfReader(fr)
-            page_count = len(reader.pages)
+        reader = PdfReader(io.BytesIO(bytes(buf)))
+        page_count = len(reader.pages)
     except Exception:  # noqa: BLE001
         page_count = 0
     doc = {
@@ -2014,10 +2084,10 @@ async def upload_plan(
         "uploaded_by": user["id"],
         "uploaded_by_name": user.get("name") or user.get("email"),
         "uploaded_at": _now_iso(),
+        "object_path": plan_object_path,
     }
     await db.digital_twin_plans.insert_one(doc)
     await storage_service.add_usage(p["owner_id"], total, "digital_twin")
-    asyncio.create_task(storage_service.mirror_dt_file("plan", doc["id"]))
     await db.digital_twin_projects.update_one(
         {"id": project_id},
         {"$set": {"updated_at": _now_iso()}, "$inc": {"plan_count": 1}},
@@ -2048,7 +2118,7 @@ async def list_plans(
     plan_type: Optional[str] = Query(None),
     user: dict = Depends(get_current_user),
 ):
-    await _ensure_dt_access(user)
+    await _ensure_dt_ingest_access(user)
     await _ensure_project_access(project_id, user)
     q = {"project_id": project_id}
     if plan_type and plan_type in PLAN_TYPES:
@@ -2062,7 +2132,7 @@ async def list_plans(
 @router.get("/plans/{project_id}/{filename}")
 async def serve_plan_file(project_id: str, filename: str, user: dict = Depends(get_current_user)):
     """Serve uploaded PDF plan. Permission-checked."""
-    await _ensure_dt_access(user)
+    await _ensure_dt_ingest_access(user)
     await _ensure_project_access(project_id, user)
     if "/" in filename or "\\" in filename or filename.startswith(".."):
         raise HTTPException(400, "Invalid filename.")
@@ -2087,7 +2157,7 @@ class PlanUpdate(BaseModel):
 
 @router.patch("/plans/{plan_id}")
 async def update_plan(plan_id: str, payload: PlanUpdate, user: dict = Depends(get_current_user)):
-    await _ensure_dt_access(user)
+    await _ensure_dt_ingest_access(user)
     plan = await db.digital_twin_plans.find_one({"id": plan_id})
     if not plan:
         raise HTTPException(404, "Plan not found.")
@@ -2110,7 +2180,7 @@ async def update_plan(plan_id: str, payload: PlanUpdate, user: dict = Depends(ge
 
 @router.delete("/plans/{plan_id}")
 async def delete_plan(plan_id: str, user: dict = Depends(get_current_user)):
-    await _ensure_dt_access(user)
+    await _ensure_dt_ingest_access(user)
     plan = await db.digital_twin_plans.find_one({"id": plan_id})
     if not plan:
         raise HTTPException(404, "Plan not found.")
