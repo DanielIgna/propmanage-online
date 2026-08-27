@@ -7,6 +7,7 @@ import { GREEN, GREEN_SOFT, ListItem, Sheet, CTA, AmountInput } from "./ui";
 import { DocumentVaultCard } from "./DocumentVault";
 import { PassportCard } from "./PassportCard";
 import { PropertyTechnicalRecord } from "./PropertyTechnicalRecord";
+import { HouseHealthAxisCard } from "../../components/HouseHealthAxisCard";
 
 export const WalletSheet = ({ user, onClose }) => {
   const [amount, setAmount] = useState("");
@@ -647,7 +648,10 @@ export const PropertyHubV2 = ({ user, prop, properties, setSelectedPropId, actio
         <div className="lg:col-span-7 min-w-0">
           <div className={sec("carte")}><DocumentVaultCard prop={prop} /></div>
           <div className={sec("pasaport")}><PassportCard prop={prop} /></div>
-          <div className={sec("rezumat")}><PropertyDnaCard propId={prop.id} /></div>
+          <div className={sec("rezumat")}>
+            <HouseHealthAxisCard prop={prop} actions={actions} goSection={goSection} />
+            <PropertyDnaCard propId={prop.id} />
+          </div>
           <div className={sec("dosar")}><PropertyTechnicalRecord propId={prop.id} /></div>
           <div className={sec("twin")}><TwinMaturityCard propId={prop.id} actions={actions} /></div>
           <div className={sec("istoric")}><PropertyRisksCard propId={prop.id} actions={actions} /></div>

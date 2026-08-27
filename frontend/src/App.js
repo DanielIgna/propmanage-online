@@ -164,6 +164,7 @@ const PreturiIndex = lazy(() => import("./pages/PreturiIndex"));
 const PreturiPage = lazy(() => import("./pages/PreturiPage"));
 import { trackPageView } from "@/lib/analytics";
 import { useDynamicSEO } from "@/lib/useDynamicSEO";
+import { HOUSE_HEALTH_AXIS, AXIS_DISCLAIMER } from "@/lib/houseHealthAxis";
 
 const AnalyticsRouteTracker = () => {
   const location = useLocation();
@@ -365,6 +366,65 @@ const Solution = () => {
               <p className="text-sm text-stone-400 leading-relaxed">{p.desc}</p>
             </motion.div>
           ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// ============= HOUSE HEALTH A→G (Harta casei) =============
+const HouseHealthAxisLanding = () => {
+  return (
+    <section id="house-health-axis" className="py-32 px-6 relative">
+      <div className="absolute inset-0 dotted-bg opacity-10" />
+      <div className="max-w-7xl mx-auto relative">
+        <SectionTag num="A→G" label="Harta casei" />
+        <div className="grid lg:grid-cols-2 gap-16 items-start mb-16">
+          <div>
+            <h2 className="font-serif text-5xl md:text-7xl tracking-tight" data-testid="hh-axis-landing-title">
+              Sănătatea casei tale, <span className="italic">de la A la G.</span>
+            </h2>
+          </div>
+          <div className="lg:pt-10">
+            <p className="text-lg text-stone-400 leading-relaxed">
+              PropManage organizează sănătatea și starea locuinței tale în 7 capitole, de la A la G.
+              Adaugi casa, îi înțelegi starea, vezi ce lipsește, o documentezi, o îmbunătățești prin
+              specialiști verificați și vezi progresul — pas cu pas, în aceeași poveste.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {HOUSE_HEALTH_AXIS.map((c, i) => (
+            <motion.div
+              key={c.code}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: (i % 3) * 0.08 }}
+              className="glass-strong p-7 rounded-3xl group hover:border-[#d4ff3a]/30 transition-all"
+              data-testid={`hh-axis-landing-${c.code}`}
+            >
+              <div className="flex items-center gap-3 mb-5">
+                <span className="w-12 h-12 rounded-2xl bg-[#d4ff3a]/10 border border-[#d4ff3a]/20 flex items-center justify-center text-[#d4ff3a] font-serif text-2xl group-hover:bg-[#d4ff3a]/20 transition-colors">
+                  {c.code}
+                </span>
+                <span className="text-xs uppercase tracking-[0.18em] text-stone-500">{c.homepageVerb}</span>
+              </div>
+              <h3 className="font-serif text-2xl mb-2">{c.title}</h3>
+              <p className="text-sm text-stone-400 leading-relaxed">{c.why}</p>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="mt-10 flex flex-col sm:flex-row items-start sm:items-center gap-6">
+          <a href="/register" data-testid="hh-axis-landing-cta"
+            className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-[#d4ff3a] text-black font-medium hover:scale-[1.02] transition-transform">
+            Începe cu casa ta <ChevronRight className="w-4 h-4" />
+          </a>
+          <p className="text-xs text-stone-500 leading-relaxed max-w-2xl" data-testid="hh-axis-landing-disclaimer">
+            {AXIS_DISCLAIMER}
+          </p>
         </div>
       </div>
     </section>
@@ -1556,6 +1616,7 @@ const LandingPage = () => {
       <Hero />
       <Problem />
       <Solution />
+      <HouseHealthAxisLanding />
       <UserJourney />
       <SpecialistJourney />
       <WalletEcosystem />

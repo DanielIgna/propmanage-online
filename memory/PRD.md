@@ -1,3 +1,39 @@
+## 🧭 HOUSE HEALTH A→G — „O singură poveste PropManage" (Homepage ↔ Client Beta) · LIVRAT (27 Aug 2026)
+
+**Cerere Fondator (APPROVED cu guardrails stricte)**: Alinierea narativă homepage → Client Beta printr-un cadru **House Health A→G** = „harta casei" (7 capitole/dimensiuni), STRICT ca strat narativ/de orientare peste sistemele existente. **ZERO scoring nou, ZERO backend/DB/endpoint, ZERO features noi.** A→G ≠ echivalent legal DPE.
+
+**Structura canonică A→G** (SSOT unic în cod): A Identitatea locuinței · B Documentație & Cartea Casei · C Performanță energetică · D Sănătate & siguranță (mediu interior) · E Sisteme, active & mentenanță · F Riscuri, recomandări & lucrări · G Digital Twin & Pașaport (rezultate).
+
+**Sursă unică (SSOT)**: `/app/frontend/src/lib/houseHealthAxis.js` — definiția celor 7 capitole (title, verb homepage, întrebare, why, evidence, next hint, bază legală, `items` = id-uri Completeness, `target` = secțiune Hub / acțiune), `AXIS_DISCLAIMER` legal, `deriveChapterState()`, `chapterForNextStep()`. Statusuri permise DOAR: `lipsa | documentat | verificat | lipsa_date` (fără scor). Stare derivată EXCLUSIV din `GET /api/properties/{id}/completeness` existent.
+
+**Implementare (frontend-only, non-destructiv)**:
+- NEW `lib/houseHealthAxis.js` (config partajat homepage + client).
+- NEW `components/HouseHealthAxisCard.jsx` — card de orientare în Client Beta: 7 capitole cu badge stare, „Ești la capitolul X · Următorul pas" din `completeness.next_step`, deep-link către secțiunile Hub existente (rezumat/carte/twin/istoric/pașaport) + acțiuni (openHealth/openTwin), disclaimer legal collapsible.
+- MODIFIED `pages/clientv2/PropertyHubV2.jsx` — randează cardul A→G în topul secțiunii „Rezumat" (reutilizează `goSection`+`actions`; `HouseStatusPanel` neatins).
+- MODIFIED `App.js` — secțiune homepage `HouseHealthAxisLanding` între `<Solution/>` și `<UserJourney/>` (7 capitole A-G, disclaimer legal, CTA `/register`), import SSOT.
+
+**Reutilizare (zero duplicare)**: House Health, Completeness, Maturity L0-L5, PVI, PTR, Digital Twin, Journey L1→L7 — TOATE neatinse. A→G („harta casei") e separat de Journey L1→L7 („evoluția") — roluri diferite, confirmate de Fondator.
+
+**Legal**: disclaimer afișat pe homepage + în client — „PropManage House Health A→G este un cadru de produs… nu înlocuiește certificatul de performanță energetică, documentația tehnică sau diagnosticele obligatorii prin lege. Inspirat din Legea 372/2005 (mod. Legea 238/2024) + Directiva (UE) 2024/1275 (EPBD); DPE A-G FR doar ca exemplu internațional." NU se implementează notă generală A-G; `hh_scores.classification` rămâne separat.
+
+**Verificare (self-test țintit, Regula 12 — fără forensic/security audit)**: homepage randează 7 carduri A-G + disclaimer + CTA ✅ · client property tab: card A→G cu 7 capitole, stări reale (A/E=Documentat, F/G=Verificat, B/C/D=Lipsă), highlight „Ești la capitolul E · Următorul pas" ✅ · deep-link B→Cartea casei ✅ · deep-link D→House Health sheet (87/100) ✅ · disclaimer toggle ✅. `webpack compiled` fără erori.
+
+**Scope respectat**: fără DB migration, scoring engine, API nou, entitlement/Stripe/auth/Digital Twin/House Health/PTR/marketplace changes.
+
+**Deploy**: gata pentru redeploy Fondator la propmanage.ro.
+
+---
+
+## ⏸️ PENDING FOUNDER DECISION — `client.junior` drift rol pe PROD (impersonare refuzată)
+
+**Simptom**: din Admin, „intră ca Client JUNIOR" pe prod → 409 „Contul client.junior@propmanage.io există dar are rolul 'specialist' (așteptat: client). Impersonare refuzată." Poarta P0 funcționează corect (protejează contra impersonării unui rol greșit).
+
+**Cauză**: drift de date DOAR pe PROD — `client.junior@propmanage.io` are `role="specialist"`. Preview e corect (`role="client"`). `tier_demo_seed.py` NU rescrie `role` la restart, deci redeploy simplu nu repară.
+
+**Decizie Fondator (Regula 13)**: NU se face nicio migrare/repair pe prod ACUM. Se folosește întâi raportul real de production safety check. **Opțiunea aleasă = 2** (fix auto-vindecător: `tier_demo_seed.py` autoritar pe `role`/`specialty` pentru cele 14 emailuri demo canonice → redeploy corectează automat). Rămâne în așteptare până la datele reale din PROD. NU implementat în acest task.
+
+---
+
 ## 🚨 FIX P0 — Quick-Switch „Client/Specialist Beta" intra în conturi REALE pe producție (Iun 2026)
 
 **Incident (prod, 24 Aug)**: „Schimbă profilul → Client Beta" a impersonat un CLIENT REAL (conturile demo `client.beta@` / `spec.beta@propmanage.io` nu există pe prod, iar frontend-ul avea **fallback pe PRIMUL user cu rolul respectiv**). „Specialist Beta" a intrat într-un cont E2E rămas de la teste (`lifecycle_spec_*@test.com`).
