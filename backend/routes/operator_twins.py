@@ -130,6 +130,64 @@ async def get_property_spaces(prop_id: str, user: dict = Depends(get_current_use
     return {"property_id": prop_id, "count": len(spaces), "spaces": spaces}
 
 
+@router.get("/properties/{prop_id}/digital-twin")
+async def get_property_digital_twin(prop_id: str, user: dict = Depends(get_current_user)):
+    """P1 — UNIFIED PROPERTY DIGITAL TWIN overview.
+
+    Contractul „aceeași proprietate, două straturi": 2D (`twins`: camere/active) + 3D
+    (`digital_twin_projects`/`models` ancorate de property_id în P0). Read-only, non-breaking.
+    Autorizare identică cu vizualizarea twin-ului (owner/admin/operator/specialist asignat).
+    """
+    prop = await db.properties.find_one({"_id": ObjectId(prop_id)})
+    if not prop:
+        raise HTTPException(404, "Property not found")
+    is_authorized = (
+        prop.get("owner_id") == user["id"]
+        or user.get("role") in ("admin", "operator")
+    )
+    if not is_authorized and user.get("role") == "specialist":
+        spec_request = await db.requests.find_one({"property_id": prop_id, "specialist_id": user["id"]})
+        is_authorized = bool(spec_request)
+    if not is_authorized:
+        raise HTTPException(403, "Not allowed")
+
+    twin = await db.twins.find_one({"property_id": prop_id})
+    rooms = (twin.get("rooms") or []) if twin else []
+    assets = (twin.get("assets") or []) if twin else []
+    twin_2d = {
+        "exists": bool(twin),
+        "status": (twin.get("status") if twin else "not_requested"),
+        "rooms_count": len(rooms),
+        "assets_count": len(assets),
+        "project_id": (twin.get("project_id") if twin else None),
+    }
+
+    projects = []
+    async for p in db.digital_twin_projects.find({"property_id": prop_id}).sort("updated_at", -1).limit(50):
+        models_count = await db.digital_twin_models.count_documents({"project_id": p["id"], "kind": {"$ne": "source"}})
+        projects.append({
+            "id": p["id"],
+            "name": p.get("name"),
+            "model_url": p.get("model_url"),
+            "models_count": models_count,
+            "property_link_status": p.get("property_link_status"),
+            "updated_at": p.get("updated_at"),
+        })
+    has_model = any(pr.get("model_url") or pr.get("models_count") for pr in projects)
+    twin_3d = {
+        "exists": bool(projects),
+        "has_model": has_model,
+        "projects": projects,
+    }
+
+    return {
+        "property_id": prop_id,
+        "property_name": prop.get("name") or prop.get("address"),
+        "twin_2d": twin_2d,
+        "twin_3d": twin_3d,
+    }
+
+
 # ---------------------------------------------------------------------------
 # CLIENT — Digital Twin summary across all owned properties
 # Used by Settings → Digital Twin 3D section.

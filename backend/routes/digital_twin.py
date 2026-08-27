@@ -321,13 +321,20 @@ async def link_project_property(project_id: str, payload: ProjectPropertyLink,
 
 
 @router.get("/projects")
-async def list_projects(user: dict = Depends(get_current_user)):
+async def list_projects(property_id: Optional[str] = Query(None),
+                        user: dict = Depends(get_current_user)):
     await _ensure_dt_ingest_access(user)
+    return await _list_projects_impl(user, property_id)
+
+
+async def _list_projects_impl(user: dict, property_id):
     # Admin/operator see all; others see owned + member-of.
     if user.get("role") in ("admin", "operator"):
         q = {}
     else:
         q = {"$or": [{"owner_id": user["id"]}, {"members.user_id": user["id"]}]}
+    if property_id:
+        q = {"$and": [q, {"property_id": property_id}]} if q else {"property_id": property_id}
     items = []
     async for p in db.digital_twin_projects.find(q).sort("updated_at", -1).limit(200):
         items.append(_clean(p))
