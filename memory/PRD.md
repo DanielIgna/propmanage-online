@@ -1,3 +1,21 @@
+## 💳 CLIENT PRO/PREMIUM (/pricing dinamic) + SPECIALIST ENTITLEMENTS + PAȘAPORT PDF A→G · LIVRAT (27 Aug 2026)
+
+Trei task-uri P1 aprobate de Fondator (GO explicit: 1a, 2a, 3b), construite peste sistemele existente.
+
+**Task 1 — Pașaport PDF A→G**: snapshot-ul A→G (`HouseHealthAxisSnapshot theme="dark"`) are acum stiluri `print:` → în versiunea printabilă (`/p/{slug}` → Print) apare card alb, text negru, badge-uri lizibile (DOCUMENTAT/LIPSĂ/VERIFICAT). Verificat cu `emulate_media(print)`. Bun de dus la bancă/notar.
+
+**Task 3 — `/pricing` dinamic** (`PricingPage.jsx` rescris, frontend-only): afișează 4 carduri (Gratuit + Basic/Pro/Premium) citite DINAMIC din `GET /api/house-health/plans` (admin-managed = SSOT, filtrat `active:True`). Zero prețuri/feature-uri hardcodate. Diferențiere vizuală: PRO = „Recomandat" (evidențiat), PREMIUM = stil dark/violet + badge „Property Intelligence". Checkout Stripe per slug (`POST /checkout-session`, deja existent, auto-provision). Detectare tier curent → „Ai deja acces". Verificat: 4 carduri randează cu conținut real din DB. **Prod va afișa planurile reale ale Fondatorului (Premium 249€) fiindcă citește `hh_plans` per mediu.**
+
+**Task 2 — Specialist în `entitlements.py`** (backend, role-aware, anti-duplicare): pentru `role="specialist"` rezolvă tier-ul din `experience_tier` EXISTENT (junior→SPEC_BASIC, regular→SPEC_ACTIVE, verified→SPEC_VERIFIED, pro→SPEC_PRO), CÂȘTIGAT (fără plan plătit nou, fără a 4-a scară). Feature-urile oglindesc cele 12 chei specialist din `feature_configurator` (vocabular unic). `require_entitlement` + `get_tier_catalog` extinse cu `ALL_FEATURE_LABELS`. Verificat e2e: spec.junior → `SPEC_BASIC` / lifecycle `specialist_earned` / 3 features.
+
+**Task 3b — Digital Twin relocat la PREMIUM-only** (⚠️ schimbare de comportament, conform planului admin + imaginilor Fondatorului): `F_DIGITAL_TWIN_ADVANCED` mutat din `CLIENT_PRO` → `CLIENT_PREMIUM`. PREMIUM devine distinct de PRO (adaugă `digital_twin_advanced` + `property_intelligence` + `portfolio_management`). Rezolvă plângerea „PRO și PREMIUM arată la fel". **Efect: abonații PRO nu mai au Digital Twin (îl obțin doar PREMIUM)** — intenționat, conform planului. `property_intelligence`/`portfolio_management` = feature-uri de catalog (gate real doar unde modulul e construit; Digital Twin e gate real, aplicat în `digital_twin.py`). Test `iter185 #9` actualizat (PRO → 402 pe Digital Twin). Verificat: PREMIUM `entitled`, PRO fără DT.
+
+**Testare**: self-test țintit (Rule 12) — logică entitlements (python direct), e2e curl (specialist + premium + DT subscription), screenshot `/pricing`. Fără forensic/security audit. `webpack compiled` + backend `startup complete` fără erori.
+
+**Necesită redeploy** pentru producție (inclusiv self-heal client.junior din runda anterioară).
+
+---
+
 ## 🔗 A→G EXTENSIONS (Copilot · Onboarding · Pașaport) + CLIENT.JUNIOR SELF-HEAL · LIVRAT (27 Aug 2026)
 
 Extinderea A→G în restul călătoriei + fix-ul auto-vindecător pentru drift-ul de rol (opțiunea 2, aprobată de Fondator). Toate reutilizează SSOT `lib/houseHealthAxis.js` — zero scoring nou, zero endpoint nou.

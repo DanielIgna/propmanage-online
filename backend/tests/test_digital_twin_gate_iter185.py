@@ -107,7 +107,7 @@ def _clear_subscription(mongo, uid):
 
 
 # ============================================================================
-# 1. Client Premium — features include digital_twin_advanced (inheritance from PRO)
+# 1. Client Premium — features include digital_twin_advanced (PREMIUM-only)
 # ============================================================================
 def test_premium_client_has_digital_twin_advanced_via_inheritance(client_s):
     r = client_s.get(f"{BASE_URL}/api/me/entitlements", timeout=15)
@@ -228,7 +228,7 @@ def test_free_user_other_mutations_402(free_user):
 
 
 # ============================================================================
-# 9. Simulate PRO user — digital_twin_advanced present + no 402 on POST
+# 9. Simulate PRO user — Digital Twin is PREMIUM-only → PRO must NOT have it (402)
 # ============================================================================
 def test_pro_user_gets_digital_twin_advanced(free_user, mongo):
     uid = free_user["user_id"]
@@ -240,20 +240,17 @@ def test_pro_user_gets_digital_twin_advanced(free_user, mongo):
         assert r.status_code == 200
         body = r.json()
         assert body["tier"] == "CLIENT_PRO", body
-        assert "digital_twin_advanced" in body["features"], body
+        # Digital Twin este PREMIUM-only — PRO NU îl are
+        assert "digital_twin_advanced" not in body["features"], body
         assert "house_health_advanced" in body["features"], body
 
-        # POST project — must NOT be 402
+        # POST project — trebuie să fie 402 (Digital Twin necesită PREMIUM)
         r2 = s.post(
             f"{BASE_URL}/api/digital-twin/projects",
             json={"name": "TEST_pro_iter185"},
             timeout=15,
         )
-        assert r2.status_code != 402, r2.text
-        if r2.status_code in (200, 201):
-            pid = r2.json().get("id")
-            if pid:
-                s.delete(f"{BASE_URL}/api/digital-twin/projects/{pid}", timeout=10)
+        assert r2.status_code == 402, r2.text
     finally:
         _clear_subscription(mongo, uid)
 
