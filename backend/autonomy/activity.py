@@ -275,7 +275,24 @@ async def compute_activity_metrics(days: int = 90) -> dict:
 
 
 async def get_activity() -> dict:
-    return {
-        "metrics": await compute_activity_metrics(),
-        **(await build_action_queue()),
-    }
+    """Read-model unificat: metrici + coadă. Include extinderile dispute + lifecycle
+    (aceeași coadă unică — fără al 2-lea sistem)."""
+    from autonomy import disputes as D
+    from autonomy import lifecycle as LC
+
+    base = await build_action_queue()
+    metrics = await compute_activity_metrics()
+
+    dispute_items = await D.dispute_queue_items()
+    lifecycle_items = await LC.lifecycle_queue_items()
+    # înlocuim placeholder-ul agregat de dispute (din bottleneck) cu itemii triați reali
+    queue = [it for it in base["queue"] if it.get("source") != "dispute"] + dispute_items + lifecycle_items
+
+    counts = {}
+    for it in queue:
+        counts[it["category"]] = counts.get(it["category"], 0) + 1
+
+    metrics["disputes"] = await D.dispute_metrics()
+    metrics["lifecycle"] = await LC.lifecycle_metrics()
+
+    return {"metrics": metrics, "queue": queue[:QUEUE_CAP + 40], "counts": counts, "total": len(queue)}

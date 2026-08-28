@@ -333,7 +333,21 @@ async def verify(finding: dict, act: dict) -> dict:
         ap = await db.admin_approvals.find_one({"id": a.get("approval_id")}, {"_id": 0, "status": 1})
         checks["approval_exists"] = bool(ap)
         checks["approval_status"] = (ap or {}).get("status")
-    checks["ok"] = bool(checks.get("finding_recorded") and (checks.get("todo_exists") or checks.get("approval_exists")))
+    elif a.get("type") == "lifecycle":
+        # Read-back independent: proiectul chiar a ajuns în starea țintă?
+        target = {"active_to_on_hold": "on_hold", "on_hold_to_archived": "archived"}.get(a.get("transition"))
+        actual = None
+        try:
+            from bson import ObjectId as _OID
+            p = await db.projects.find_one({"_id": _OID(a.get("project_id"))}, {"_id": 0, "status": 1})
+            actual = (p or {}).get("status")
+        except Exception:  # noqa: BLE001
+            actual = None
+        checks["lifecycle_target_state"] = target
+        checks["lifecycle_actual_state"] = actual
+        checks["lifecycle_verified"] = bool(target and actual == target)
+    checks["ok"] = bool(checks.get("finding_recorded") and (
+        checks.get("todo_exists") or checks.get("approval_exists") or checks.get("lifecycle_verified")))
     return checks
 
 
@@ -410,7 +424,7 @@ async def promote_verified_to_knowledge(steps: list[dict]) -> dict:
     # (a) fresh: acțiuni SAFE executate autonom în acest tick + verificate OK
     for st in steps:
         act = st.get("action") or {}
-        if st.get("human_gate") or act.get("type") != "todo" or st.get("actor") != "autonomous":
+        if st.get("human_gate") or act.get("type") not in ("todo", "lifecycle") or st.get("actor") != "autonomous":
             continue
         if not (st.get("verify") or {}).get("ok"):
             continue
@@ -419,26 +433,30 @@ async def promote_verified_to_knowledge(steps: list[dict]) -> dict:
             continue
         rec = st.get("recommended_action")
         if not rec:
-            f = await db.admin_ai_findings.find_one({"composite_key": key}, {"_id": 0, "recommended_action": 1})
-            rec = (f or {}).get("recommended_action") or "acțiune de remediere SAFE"
+            if act.get("type") == "lifecycle":
+                rec = f"tranziție lifecycle {act.get('transition')}"
+            else:
+                f = await db.admin_ai_findings.find_one({"composite_key": key}, {"_id": 0, "recommended_action": 1})
+                rec = (f or {}).get("recommended_action") or "acțiune de remediere SAFE"
         if await _promote_one(key, st.get("detector") or "autonomy", st.get("route") or "", rec, act.get("todo_id")):
             created.append(key)
 
-    # (b) backfill: findings reale cu acțiune autonomă (todo) deja rezolvate/triaged,
-    # al căror task încă există (artefact real), care NU sunt încă în knowledge.
+    # (b) backfill: findings reale cu acțiune autonomă (todo/lifecycle) deja rezolvate/triaged,
+    # al căror artefact încă există, care NU sunt încă în knowledge.
     try:
         cur = db.admin_ai_findings.find({
-            "autonomy_action.type": "todo",
+            "autonomy_action.type": {"$in": ["todo", "lifecycle"]},
             "status": {"$in": ["resolved", "triaged"]},
         }).limit(50)
         async for f in cur:
             key = f.get("composite_key")
             if not key or key in created or await _memory_exists(key):
                 continue
-            todo_id = (f.get("autonomy_action") or {}).get("todo_id")
-            if todo_id and not await db.admin_todos.find_one({"id": todo_id}, {"_id": 1}):
+            aa = f.get("autonomy_action") or {}
+            todo_id = aa.get("todo_id")
+            if aa.get("type") == "todo" and todo_id and not await db.admin_todos.find_one({"id": todo_id}, {"_id": 1}):
                 continue  # task-ul nu mai există → nu e un outcome verificabil acum
-            rec = f.get("recommended_action") or "acțiune de remediere SAFE"
+            rec = f.get("recommended_action") or (f"tranziție lifecycle {aa.get('transition')}" if aa.get("type") == "lifecycle" else "acțiune de remediere SAFE")
             detector = f.get("pattern") or "autonomy"
             route = f.get("affected_route") or f"{f.get('entity_type')}:{f.get('entity_id')}"
             if await _promote_one(key, detector, route, rec, todo_id):
@@ -506,6 +524,29 @@ async def act_on_existing_finding(obs: dict, autoexec_allowed: bool) -> dict:
             return {"action_class": action_class, "actor": "autonomous(blocat)",
                     "action": {"type": "blocked_governance", "reason": "low_risk_autopilot OFF"},
                     "rollback": {"how": "n/a"}, "human_gate": False, "blocked": True}
+        # stale_project → tranziție REALĂ de business (active→on_hold), reversibilă, validată.
+        pattern = (obs.get("raw_observation") or {}).get("pattern")
+        entity_id = (obs.get("raw_observation") or {}).get("entity_id")
+        if pattern == "stale_project" and entity_id:
+            try:
+                from autonomy.lifecycle import transition_project
+                lc = await transition_project(entity_id, "active_to_on_hold", actor=_autonomy_actor(),
+                                              autoexec_allowed=True,
+                                              reason="autonomy_loop: proiect stale >30z → on_hold (reversibil)")
+                if lc.get("ok") and lc.get("status") in ("executed", "idempotent"):
+                    await db.admin_ai_findings.update_one({"composite_key": key},
+                        {"$set": {"status": "triaged", "autonomy_action": {"type": "lifecycle",
+                                  "transition": "active_to_on_hold", "project_id": entity_id,
+                                  "verified": lc.get("verified"), "class": action_class,
+                                  "by": "autonomy_loop", "at": _now()}}})
+                    return {"action_class": action_class, "actor": "autonomous",
+                            "action": {"type": "lifecycle", "transition": "active_to_on_hold",
+                                       "project_id": entity_id, "verified": lc.get("verified"), "reused": False},
+                            "rollback": {"how": "on_hold→active (reversibil)", "project_id": entity_id},
+                            "human_gate": False, "lifecycle": lc}
+                # not eligible / blockers / not stale → fall back to TODO (vizibilitate)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[loop] lifecycle transition failed for {entity_id}: {e}")
         res = await _create_todo(finding)
         await db.admin_ai_findings.update_one({"composite_key": key},
             {"$set": {"status": "triaged", "autonomy_action": {"type": "todo", "todo_id": res["todo_id"],
@@ -570,7 +611,7 @@ async def run_loop_tick(triggered_by: str = "manual") -> dict:
     observations = await observe()
     current_keys = {_composite_key(o) for o in observations}
     findings_created = 0
-    actions_taken = {"todo": 0, "approval": 0, "blocked_governance": 0}
+    actions_taken = {"todo": 0, "approval": 0, "blocked_governance": 0, "lifecycle": 0, "dispute_triage": 0}
     for obs in observations:
         try:
             finding, created = await get_or_create_finding(obs)
@@ -617,6 +658,12 @@ async def run_loop_tick(triggered_by: str = "manual") -> dict:
                 await _emit_analytics("autonomy_action_executed", {"finding_key": kobs["composite_key"],
                     "detector": kobs["detector"], "action": "todo", "todo_id": act["action"]["todo_id"],
                     "class": act["action_class"], "affected_function": kobs["affected_function"]})
+            elif a_type == "lifecycle":
+                actions_taken["lifecycle"] += 1
+                await _emit_analytics("autonomy_action_executed", {"finding_key": kobs["composite_key"],
+                    "detector": kobs["detector"], "action": "lifecycle",
+                    "transition": act["action"].get("transition"), "project_id": act["action"].get("project_id"),
+                    "class": act["action_class"], "affected_function": kobs["affected_function"]})
             elif a_type == "approval" and not act["action"].get("reused"):
                 actions_taken["approval"] += 1
             elif a_type == "blocked_governance":
@@ -637,6 +684,25 @@ async def run_loop_tick(triggered_by: str = "manual") -> dict:
             steps.append({"detector": kobs.get("detector"), "route": kobs.get("affected_route"),
                           "source": "knowledge_center", "error": str(e)[:200], "verify": {"ok": False}})
 
+    # OBSERVE #3 — Dispute pre-triage (bounded, non-destructiv, kill-switch gated).
+    # Clasifică + prioritizează + propune; NU rezolvă (rezolvarea mișcă bani → 100% umană).
+    if gov["low_risk_autopilot"]:
+        try:
+            from autonomy.disputes import triage_open_disputes
+            dt = await triage_open_disputes(limit=3, use_llm=True)
+            actions_taken["dispute_triage"] = dt.get("triaged", 0)
+            if dt.get("triaged"):
+                steps.append({
+                    "detector": "dispute_triage", "route": "disputes", "source": "dispute_triage",
+                    "severity": "medium", "created": False,
+                    "decision": f"SAFE → triaj {dt['triaged']} dispute (propunere, fără rezolvare)",
+                    "action": {"type": "triage", "count": dt["triaged"], "by_priority": dt.get("by_priority")},
+                    "actor": "autonomous", "human_gate": False, "verify": {"ok": True},
+                    "recommended_action": "Triaj dispute — clasificare + propunere; decizia rămâne umană.",
+                })
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[loop] dispute triage failed: {e}")
+
     learned = await learn(current_keys)
     knowledge = await promote_verified_to_knowledge(steps)
     op_after = await _operational_score()
@@ -656,11 +722,12 @@ async def run_loop_tick(triggered_by: str = "manual") -> dict:
         "scores_before": scores_before,
         "scores_after": scores_after,
         "steps": steps,
-        "outcome": "applied" if (findings_created or actions_taken["todo"] or actions_taken["approval"] or learned["auto_resolved"] or knowledge["knowledge_records_created"]) else ("blocked_by_governance" if actions_taken["blocked_governance"] else "no_change"),
+        "outcome": "applied" if (findings_created or actions_taken["todo"] or actions_taken["approval"] or actions_taken["lifecycle"] or actions_taken["dispute_triage"] or learned["auto_resolved"] or knowledge["knowledge_records_created"]) else ("blocked_by_governance" if actions_taken["blocked_governance"] else "no_change"),
     }
     await db.autonomy_loop_runs.insert_one(dict(run))
     run.pop("_id", None)
     logger.info(f"[loop] tick {run['outcome']} — obs={run['observations']} findings={findings_created} "
-                f"todos={actions_taken['todo']} approvals={actions_taken['approval']} learned={learned['auto_resolved']} "
+                f"todos={actions_taken['todo']} approvals={actions_taken['approval']} lifecycle={actions_taken['lifecycle']} "
+                f"disputes={actions_taken['dispute_triage']} learned={learned['auto_resolved']} "
                 f"knowledge={knowledge['knowledge_records_created']}")
     return run

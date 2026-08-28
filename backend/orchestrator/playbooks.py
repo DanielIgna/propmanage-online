@@ -307,6 +307,52 @@ async def handle_category_visibility(payload: dict) -> dict:
 # ============================================================================
 # 5. DISPUTE AI TRIAGE (Sprint 2)
 # ============================================================================
+DISPUTE_TRIAGE_SYSTEM = (
+    "Ești arbitrul AI al platformei PropManage (marketplace servicii construcții România). "
+    "Primești o dispută client-specialist și răspunzi DOAR cu JSON strict:\n"
+    '{"category": "no_show|quality|price|communication|damage|other", '
+    '"severity": "low|medium|high", "summary": "<1 frază în română>", '
+    '"proposed_resolution": "<propunere concretă în română, 1-2 fraze>", '
+    '"arguments": ["<arg1>", "<arg2>", "<arg3>"], '
+    '"suggested_split": {"client_pct": <0-100>, "specialist_pct": <0-100>}}\n'
+    "suggested_split = cum propui împărțirea sumei din escrow (client_pct = cât se returnează clientului). "
+    "Fii echilibrat și bazează-te STRICT pe faptele furnizate. Nu inventa fapte."
+)
+
+
+async def compute_dispute_triage(dispute: dict, req: dict, test: bool = False) -> dict:
+    """Reusable AI triage (Claude) → triage_doc. NU rezolvă disputa, doar clasifică + propune.
+    Folosit atât de playbook-ul la deschidere, cât și de backfill-ul autonomiei (fără duplicare)."""
+    if test:
+        triage = {
+            "category": "quality", "severity": "medium",
+            "summary": "SIMULARE — clientul reclamă calitatea finisajului.",
+            "proposed_resolution": "SIMULARE — refacere parțială de către specialist, escrow eliberat 70/30.",
+            "arguments": ["Simulare argument 1", "Simulare argument 2", "Simulare argument 3"],
+            "suggested_split": {"client_pct": 30, "specialist_pct": 70},
+        }
+    else:
+        from orchestrator.llm import claude_json
+        prompt = (
+            f"Lucrare: {(req or {}).get('title', 'necunoscută')} · categoria {(req or {}).get('category', '?')} · "
+            f"buget {(req or {}).get('budget_estimate', '?')} RON · escrow {(req or {}).get('escrow_amount', 0)} RON · "
+            f"status {(req or {}).get('status', '?')}\n"
+            f"Dispută deschisă de: {dispute.get('opened_by_role')}\n"
+            f"Motiv invocat: {dispute.get('reason', '')[:1500]}"
+        )
+        triage = await claude_json(DISPUTE_TRIAGE_SYSTEM, prompt, "dispute_triage")
+    return {
+        "category": str(triage.get("category", "other"))[:30],
+        "severity": str(triage.get("severity", "medium"))[:10],
+        "summary": str(triage.get("summary", ""))[:400],
+        "proposed_resolution": str(triage.get("proposed_resolution", ""))[:600],
+        "arguments": [str(a)[:250] for a in (triage.get("arguments") or [])][:3],
+        "suggested_split": triage.get("suggested_split") or {},
+        "model": "claude-sonnet-4-5",
+        "ran_at": _now(),
+    }
+
+
 async def handle_dispute_opened(payload: dict) -> dict:
     from bson import ObjectId
     from orchestrator.engine import notify_admins
@@ -318,56 +364,17 @@ async def handle_dispute_opened(payload: dict) -> dict:
                 "outcome": "error", "minutes_saved": 0, "escalate": False}
     req = await db.requests.find_one({"_id": ObjectId(dispute["request_id"])}) if dispute and dispute.get("request_id") else None
 
-    if payload.get("test"):
-        triage = {
-            "category": "quality", "severity": "medium",
-            "summary": "SIMULARE — clientul reclamă calitatea finisajului.",
-            "proposed_resolution": "SIMULARE — refacere parțială de către specialist, escrow eliberat 70/30.",
-            "arguments": ["Simulare argument 1", "Simulare argument 2", "Simulare argument 3"],
-            "suggested_split": {"client_pct": 30, "specialist_pct": 70},
-        }
-        steps_log.append({"action": "ai_classify", "ok": True, "detail": "SIMULARE — clasificare fără apel LLM"})
-    else:
-        try:
-            from orchestrator.llm import claude_json
-            system = (
-                "Ești arbitrul AI al platformei PropManage (marketplace servicii construcții România). "
-                "Primești o dispută client-specialist și răspunzi DOAR cu JSON strict:\n"
-                '{"category": "no_show|quality|price|communication|damage|other", '
-                '"severity": "low|medium|high", "summary": "<1 frază în română>", '
-                '"proposed_resolution": "<propunere concretă în română, 1-2 fraze>", '
-                '"arguments": ["<arg1>", "<arg2>", "<arg3>"], '
-                '"suggested_split": {"client_pct": <0-100>, "specialist_pct": <0-100>}}\n'
-                "suggested_split = cum propui împărțirea sumei din escrow (client_pct = cât se returnează clientului). "
-                "Fii echilibrat și bazează-te strict pe faptele furnizate."
-            )
-            prompt = (
-                f"Lucrare: {(req or {}).get('title', 'necunoscută')} · categoria {(req or {}).get('category', '?')} · "
-                f"buget {(req or {}).get('budget_estimate', '?')} RON · escrow {(req or {}).get('escrow_amount', 0)} RON · "
-                f"status {(req or {}).get('status', '?')}\n"
-                f"Dispută deschisă de: {dispute.get('opened_by_role')}\n"
-                f"Motiv invocat: {dispute.get('reason', '')[:1500]}"
-            )
-            triage = await claude_json(system, prompt, "dispute_triage")
-            steps_log.append({
-                "action": "ai_classify", "ok": True,
-                "detail": f"Categorie: {triage.get('category')} · severitate: {triage.get('severity')} · {str(triage.get('summary', ''))[:120]}",
-            })
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"[orchestrator] dispute triage LLM failed: {e}")
-            return {"steps": [{"action": "ai_classify", "ok": False, "detail": str(e)[:200]}],
-                    "outcome": "error", "minutes_saved": 0, "escalate": False}
+    try:
+        triage_doc = await compute_dispute_triage(dispute, req, test=bool(payload.get("test")))
+        steps_log.append({
+            "action": "ai_classify", "ok": True,
+            "detail": f"Categorie: {triage_doc.get('category')} · severitate: {triage_doc.get('severity')} · {str(triage_doc.get('summary', ''))[:120]}",
+        })
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[orchestrator] dispute triage LLM failed: {e}")
+        return {"steps": [{"action": "ai_classify", "ok": False, "detail": str(e)[:200]}],
+                "outcome": "error", "minutes_saved": 0, "escalate": False}
 
-    triage_doc = {
-        "category": str(triage.get("category", "other"))[:30],
-        "severity": str(triage.get("severity", "medium"))[:10],
-        "summary": str(triage.get("summary", ""))[:400],
-        "proposed_resolution": str(triage.get("proposed_resolution", ""))[:600],
-        "arguments": [str(a)[:250] for a in (triage.get("arguments") or [])][:3],
-        "suggested_split": triage.get("suggested_split") or {},
-        "model": "claude-sonnet-4-5",
-        "ran_at": _now(),
-    }
     if dispute:
         await db.disputes.update_one({"_id": dispute["_id"]}, {"$set": {"ai_triage": triage_doc}})
         steps_log.append({"action": "persist_triage", "ok": True, "detail": "Triage salvat pe dispută — vizibil în panoul admin"})

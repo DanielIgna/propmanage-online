@@ -1,3 +1,18 @@
+## ⚖️🔁 AUTONOMY EXPANSION — Dispute pre-triage + Safe Project Lifecycle (PREVIEW · Iun 2026)
+
+Extindere controlată a Autonomy Core (fără redesign/duplicare). Confirmat: **1a (on_hold auto, archive human-gated) + 2a (demo real în preview) + 3a (Claude pentru triaj)**.
+
+**A. Dispute pre-triage** (`autonomy/disputes.py`, reutilizează triajul Claude existent): clasifică + prioritizează DETERMINIST + propune rezoluție → coada `Autonomy Activity`. NICIO auto-rezoluție (bani/escrow = 100% uman). **28/28 dispute triate**: 20 HIGH · 8 MEDIUM · 21 ready-for-human · 7 waiting-info.
+
+**B. Safe Project Lifecycle** (`autonomy/lifecycle.py`, API îngust `POST /api/admin/autonomy/projects/{id}/lifecycle`): `active→on_hold` SAFE-auto (reversibil, stale>30z, fără blocante, kill-switch); `on_hold→archived` MEDIUM (aprobare umană + blocker-checks escrow/garanție/task-uri). READ-BACK + audit `project_lifecycle_actions`. Status `archived` adăugat. **Demonstrat real în preview: 2 proiecte → on_hold autonom (verificat), 1 blocat → escaladat.**
+
+**Integrare**: în bucla existentă (OBSERVE→...→LEARN); `stale_project`→lifecycle real (nu doar TODO); outcome verificat→knowledge. UI: panou extins cu strip-uri dispute + lifecycle. Aceeași coadă unică, același ledger, aceleași gate-uri.
+
+**Testare**: `tests/test_autonomy_expansion_p3.py` 26/26 PASS (+ P2 17/17 + P1 12/12). Scor NEMANIPULAT (recommendation ≠ verified ≠ resolved). PRODUCȚIE: necesită redeploy + rularea backfill-ului de triaj.
+
+---
+
+
 ## 🔁 AUTONOMY CORE — bucla operațională închisă (vizibil → măsurabil → verificabil → învață) (PREVIEW · Iun 2026)
 
 Cerință Fondator: transformă stratul de autonomie din „dashboard de observare/scoring" într-un sistem închis controlat OBSERVE→DECIDE→ACT→VERIFY→LEARN, care rezolvă autonom munca sigură/deterministă și escaladează doar ce necesită judecată umană. REUTILIZARE strictă, fără sistem paralel, fără puteri noi de execuție. Alegere confirmată: **a1 (verified→knowledge) + b1 (păstrează toate gate-urile umane)**.

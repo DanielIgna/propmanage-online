@@ -11,8 +11,10 @@ import logging
 import re
 import uuid
 from datetime import datetime, timezone, timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Body, HTTPException, BackgroundTasks
+from pydantic import BaseModel
 
 from db import db
 from deps import require_role
@@ -729,3 +731,53 @@ async def get_autonomy_activity(user=Depends(require_role("admin"))):
     ai_memories + semnale bottleneck) — CE A FĂCUT / AȘTEAPTĂ / A EȘUAT / NECESITĂ OM / A ÎNVĂȚAT."""
     from autonomy import activity
     return await activity.get_activity()
+
+
+@router.post("/disputes/triage")
+async def trigger_dispute_triage(
+    limit: int = Query(30, ge=1, le=50),
+    use_llm: bool = Query(True),
+    force: bool = Query(False),
+    user=Depends(require_role("admin")),
+):
+    """Backfill bounded de triaj pe disputele deschise (reutilizează triajul Claude existent).
+    Non-destructiv: adaugă analiză, NU rezolvă disputele. Idempotent."""
+    from autonomy import disputes
+    result = await disputes.triage_open_disputes(limit=limit, use_llm=use_llm, force=force)
+    return {"ok": True, **result, "metrics": await disputes.dispute_metrics()}
+
+
+class LifecycleTransitionIn(BaseModel):
+    transition: str  # active_to_on_hold | on_hold_to_archived
+    reason: Optional[str] = None
+
+
+@router.post("/projects/{project_id}/lifecycle")
+async def admin_project_lifecycle(project_id: str, body: LifecycleTransitionIn, user=Depends(require_role("admin"))):
+    """API ÎNGUST de lifecycle (nu update generic). Tranziții explicite validate.
+    SAFE (active→on_hold) se poate executa direct; MEDIUM (on_hold→archived) întoarce
+    `requires_human_approval` → creează o aprobare în admin_approvals (gate uman)."""
+    from autonomy.lifecycle import transition_project, ALLOWED_TRANSITIONS
+    if body.transition not in ALLOWED_TRANSITIONS:
+        raise HTTPException(400, f"Tranziție nepermisă. Permise: {list(ALLOWED_TRANSITIONS)}")
+    res = await transition_project(project_id, body.transition, actor=user,
+                                   autoexec_allowed=True, reason=body.reason or f"Admin {user.get('email','')}")
+    # MEDIUM → creează aprobare umană (reutilizează admin_approvals)
+    if res.get("status") == "requires_human_approval":
+        approval_id = str(uuid.uuid4())
+        await db.admin_approvals.insert_one({
+            "id": approval_id, "action": "project_lifecycle_transition",
+            "payload": {"project_id": project_id, "transition": body.transition, "reason": body.reason or "archivare"},
+            "scope": "general", "requested_by": "admin", "requested_by_email": user.get("email"),
+            "requested_by_seniority": "junior", "reason": f"Arhivare proiect {project_id} (necesită aprobare senior).",
+            "status": "pending", "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        return {**res, "approval_created": approval_id}
+    return res
+
+
+@router.get("/projects/lifecycle/audit")
+async def get_lifecycle_audit(limit: int = Query(20, ge=1, le=100), user=Depends(require_role("admin"))):
+    """Ledger de audit al tranzițiilor de lifecycle."""
+    items = await db.project_lifecycle_actions.find({}, {"_id": 0}).sort("requested_at", -1).to_list(limit)
+    return {"items": items}

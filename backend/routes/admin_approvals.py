@@ -288,8 +288,6 @@ async def _exec_update_autonomy_targets(payload: dict, decider: dict) -> dict:
     from routes.autonomy import update_targets
     return await update_targets(payload=payload, user=decider)
 
-
-
 @register_action("analytics_loop_remediation")
 async def _exec_analytics_loop_remediation(payload: dict, decider: dict) -> dict:
     """Executor pentru propunerile MEDIUM ale Operational Autonomy Loop.
@@ -314,3 +312,23 @@ async def _exec_analytics_loop_remediation(payload: dict, decider: dict) -> dict
                       "resolution_note": "analytics_loop: propunere aprobată de om → task de remediere creat."}},
         )
     return {"ok": True, "todo_id": todo_id, "finding_key": key}
+
+
+
+@register_action("project_lifecycle_transition")
+async def _exec_project_lifecycle_transition(payload: dict, decider: dict) -> dict:
+    """Executor pentru tranziții de lifecycle MEDIUM (ex: on_hold→archived) aprobate de om.
+    Deleagă către API-ul îngust `transition_project` cu `human_approved=True`. NU ocolește
+    validările (stare/blocante/read-back/audit)."""
+    from autonomy.lifecycle import transition_project
+    res = await transition_project(
+        payload.get("project_id"),
+        payload.get("transition"),
+        actor=decider,
+        autoexec_allowed=True,
+        reason=payload.get("reason", "Aprobat de admin"),
+        human_approved=True,
+    )
+    if not res.get("ok"):
+        raise Exception(f"Lifecycle transition failed: {res.get('status')} — {res.get('reason') or res.get('error')}")
+    return res

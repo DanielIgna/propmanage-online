@@ -3,7 +3,7 @@ import axios from "axios";
 import { Link } from "react-router-dom";
 import {
   Activity, RefreshCw, Loader2, CheckCircle2, Clock, XCircle,
-  UserCheck, GraduationCap, ShieldAlert, ArrowRight,
+  UserCheck, GraduationCap, ShieldAlert, ArrowRight, Scale, GitBranch,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -85,6 +85,39 @@ export default function AutonomyActivityPanel() {
         <Stat label="Rulări loop" value={m.loop_runs} hint={`ultimele ${m.window_days ?? 90}z`} />
       </div>
 
+      {/* Dispute triage summary */}
+      {m.disputes && m.disputes.disputes_total_open > 0 && (
+        <div className="mt-4 rounded-2xl border border-amber-500/25 bg-amber-500/[0.05] p-4" data-testid="activity-disputes-summary">
+          <div className="flex items-center gap-2 text-xs font-semibold text-amber-200">
+            <Scale className="w-4 h-4" /> Triaj dispute — {m.disputes.disputes_triaged}/{m.disputes.disputes_total_open} triate
+            <span className="ml-auto text-[10px] text-stone-500">rezolvarea rămâne 100% umană</span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+            <span className="px-2 py-1 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-200" data-testid="disputes-high">{m.disputes.disputes_high_priority} HIGH</span>
+            <span className="px-2 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-200">{m.disputes.disputes_medium_priority} MEDIUM</span>
+            <span className="px-2 py-1 rounded-lg bg-stone-500/15 border border-stone-500/30 text-stone-300">{m.disputes.disputes_low_priority} LOW</span>
+            <span className="px-2 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-200" data-testid="disputes-ready">{m.disputes.disputes_ready_for_human_decision} gata de decizie</span>
+            <span className="px-2 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-200" data-testid="disputes-waiting">{m.disputes.disputes_waiting_information} așteaptă info</span>
+            <span className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-stone-400">confidence mediu {m.disputes.dispute_triage_avg_confidence ?? "—"}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Lifecycle summary */}
+      {m.lifecycle && m.lifecycle.lifecycle_actions_total > 0 && (
+        <div className="mt-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.05] p-4" data-testid="activity-lifecycle-summary">
+          <div className="flex items-center gap-2 text-xs font-semibold text-emerald-200">
+            <GitBranch className="w-4 h-4" /> Lifecycle proiecte (active→on_hold autonom · on_hold→archived cu aprobare)
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+            <span className="px-2 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-200" data-testid="lifecycle-onhold">{m.lifecycle.lifecycle_on_hold_autonomous} on_hold autonom (verificat)</span>
+            <span className="px-2 py-1 rounded-lg bg-violet-500/15 border border-violet-500/30 text-violet-200">{m.lifecycle.lifecycle_archived_after_approval} archived (după aprobare)</span>
+            <span className="px-2 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-200">{m.lifecycle.lifecycle_awaiting_human_approval} așteaptă aprobare</span>
+            <span className="px-2 py-1 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-200" data-testid="lifecycle-blocked">{m.lifecycle.lifecycle_blocked} blocate</span>
+          </div>
+        </div>
+      )}
+
       {/* Coada de acțiuni grupată */}
       <div className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-3" data-testid="activity-queue">
         {CATEGORIES.map(({ key, label, icon: Icon, cls }) => {
@@ -101,6 +134,9 @@ export default function AutonomyActivityPanel() {
                   <div key={i} className="rounded-lg bg-black/20 border border-white/5 px-2.5 py-2" data-testid={`activity-item-${key}-${i}`}>
                     <div className="flex items-center gap-1.5 text-[10px] text-stone-400">
                       <span className="font-mono">{it.source}</span>
+                      {it.priority && ["high", "critical"].includes(it.priority) && <span className="px-1 rounded bg-rose-500/20 text-rose-300 font-semibold">{it.priority}</span>}
+                      {it.dispute_category && <span className="px-1 rounded bg-white/10 text-stone-300">{it.dispute_category}</span>}
+                      {it.confidence != null && <span className="text-stone-500">conf {it.confidence}</span>}
                       {it.count > 1 && <span className="px-1 rounded bg-white/10 text-stone-300">×{it.count}</span>}
                       <span className="ml-auto uppercase tracking-wide">{it.status}</span>
                     </div>
@@ -112,6 +148,8 @@ export default function AutonomyActivityPanel() {
                       {it.approval_id && <Link to={`/admin?tab=approvals&focus=${it.approval_id}`} className="text-amber-300 hover:underline inline-flex items-center gap-0.5" data-testid={`activity-item-${key}-${i}-approval`}>Aprobare <ArrowRight className="w-2.5 h-2.5" /></Link>}
                       {it.source === "automation_rule" && <Link to="/admin/automation" className="text-sky-300 hover:underline">Reguli</Link>}
                       {it.source === "audit_anomaly" && <Link to="/admin/audit" className="text-rose-300 hover:underline">Audit</Link>}
+                      {it.source === "dispute" && <Link to="/admin?tab=disputes" className="text-amber-300 hover:underline">Vezi disputa</Link>}
+                      {it.source === "project_lifecycle" && it.project_id && <Link to={`/projects/${it.project_id}`} className="text-emerald-300 hover:underline">Proiect</Link>}
                     </div>
                   </div>
                 ))}
