@@ -6,7 +6,7 @@ import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import axios from "axios";
 import {
-  Eye, EyeOff, Layers, RotateCcw, Box as BoxIcon, Sparkles, Wand2, Loader2, Palette, ShieldCheck,
+  Eye, EyeOff, Layers, RotateCcw, Box as BoxIcon, Sparkles, Wand2, Loader2, Palette, ShieldCheck, GitCompare,
 } from "lucide-react";
 import { API } from "../pages/DashShared";
 import { FACE_STYLES, TOOLS, SECTION_AXES } from "./viewer/constants";
@@ -16,6 +16,7 @@ import { PinMarker, PinDraftModal, PinThreadModal } from "./viewer/PinSystem";
 import DigitalTwinQAPanel from "./DigitalTwinQAPanel";
 import DesignConceptStudio from "./DesignConceptStudio";
 import ModelValidationPanel from "./ModelValidationPanel";
+import ConceptComparison from "./ConceptComparison";
 import ViewerErrorBoundary from "./ViewerErrorBoundary";
 
 // Captures the WebGL canvas to a PNG data URL on demand.
@@ -75,6 +76,7 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
   const [qaOpen, setQaOpen] = useState(false);
   const [designOpen, setDesignOpen] = useState(false);
   const [validationOpen, setValidationOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
   const [isPro, setIsPro] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMsg, setAiMsg] = useState(null);
@@ -497,6 +499,13 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
               <Palette className="w-3.5 h-3.5" /> Concept AI Design
             </button>
             <button
+              onClick={() => setCompareOpen(true)}
+              className="w-full px-3 py-2 text-xs rounded-lg bg-white/5 hover:bg-white/10 text-stone-200 flex items-center justify-center gap-1.5"
+              data-testid="dt-open-compare"
+            >
+              <GitCompare className="w-3.5 h-3.5" /> Compară concepte
+            </button>
+            <button
               onClick={() => setValidationOpen(true)}
               className="w-full px-3 py-2 text-xs rounded-lg bg-white/5 hover:bg-white/10 text-stone-200 flex items-center justify-center gap-1.5"
               data-testid="dt-open-validation"
@@ -690,6 +699,16 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
             projectName={projectName}
             onClose={() => setDesignOpen(false)}
             onModelChanged={reloadLayers}
+            onOpenCompare={() => { setDesignOpen(false); setCompareOpen(true); }}
+          />
+        )}
+
+        {compareOpen && projectId && (
+          <ConceptComparison
+            projectId={projectId}
+            projectName={projectName}
+            onClose={() => setCompareOpen(false)}
+            onChanged={reloadLayers}
           />
         )}
 

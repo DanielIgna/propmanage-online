@@ -4,9 +4,10 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import {
   Sparkles, Wand2, X, Loader2, Palette, Coins, ShieldCheck, Image as ImageIcon,
-  ChevronRight, AlertTriangle,
+  ChevronRight, AlertTriangle, GitCompare,
 } from "lucide-react";
 import { API } from "../pages/DashShared";
+import { ConceptMaterials, RequestOfferButton } from "./ConceptComparison";
 
 const TrustBadge = () => (
   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 text-[10px] font-semibold border border-amber-500/25" data-testid="design-inferred-badge">
@@ -101,6 +102,10 @@ const ConceptResult = ({ c, onRequestReview, reviewBusy }) => {
         </div>
       )}
 
+      {c.id && <ConceptMaterials conceptId={c.id} />}
+
+      {c.id && <RequestOfferButton concept={c} />}
+
       {c.model_id && status === "inferred" && (
         <button
           onClick={() => onRequestReview(c.model_id)}
@@ -116,7 +121,7 @@ const ConceptResult = ({ c, onRequestReview, reviewBusy }) => {
   );
 };
 
-export const DesignConceptStudio = ({ projectId, projectName, onClose, onModelChanged }) => {
+export const DesignConceptStudio = ({ projectId, projectName, onClose, onModelChanged, onOpenCompare }) => {
   const [options, setOptions] = useState({ styles: [], materials: [], default_currency: "RON" });
   const [concepts, setConcepts] = useState([]);
   const [view, setView] = useState("wizard"); // wizard | result
@@ -210,6 +215,13 @@ export const DesignConceptStudio = ({ projectId, projectName, onClose, onModelCh
           className={`px-3 py-1.5 rounded-full text-[11px] ${view === "history" ? "bg-violet-500 text-white" : "bg-white/5 text-stone-400"}`}
           data-testid="design-tab-history"
         >Concepte ({concepts.length})</button>
+        {onOpenCompare && concepts.length >= 2 && (
+          <button
+            onClick={onOpenCompare}
+            className="ml-auto px-3 py-1.5 rounded-full text-[11px] bg-white/5 text-stone-300 hover:bg-white/10 inline-flex items-center gap-1"
+            data-testid="design-open-compare"
+          ><GitCompare className="w-3 h-3" /> Compară</button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">

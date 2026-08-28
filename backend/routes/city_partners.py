@@ -52,6 +52,7 @@ logger = logging.getLogger("propmanage.city_partners")
 
 admin_router = APIRouter(prefix="/api/admin/city-partners", tags=["admin-city-partners"])
 partner_router = APIRouter(prefix="/api/partner", tags=["city-partner-portal"])
+products_admin_router = APIRouter(prefix="/api/admin/city-partner-products", tags=["admin-city-partner-products"])
 
 ALLOWED_STATUS = {"lead", "onboarding", "active", "paused", "terminated"}
 ALLOWED_LEAD_STAGES = {"introduced", "contacted", "onboarded", "converted", "lost"}
@@ -655,3 +656,147 @@ async def partner_copilot_nudges(user=Depends(get_current_user)):
     except Exception as e:  # noqa: BLE001
         logger.exception(f"[city_partner_copilot] failed: {e}")
         raise HTTPException(500, f"Eroare AI: {str(e)[:200]}")
+
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# CITY PARTNER PRODUCTS — real material catalog (admin-managed, EMPTY by default)
+# Consumed by Digital Twin design concepts for REAL indicative material prices.
+# Never seeded with fake data: stays empty until a super-admin adds real products.
+# ═════════════════════════════════════════════════════════════════════════════
+class ProductIn(BaseModel):
+    name: str = Field(min_length=2, max_length=200)
+    brand: Optional[str] = None
+    category: Optional[str] = None
+    unit: str = "buc"
+    price_min: float = Field(ge=0)
+    price_max: Optional[float] = Field(default=None, ge=0)
+    currency: str = "RON"
+    partner_id: Optional[str] = None
+    url: Optional[str] = None
+    tags: list = Field(default_factory=list)
+    active: bool = True
+
+
+class ProductPatch(BaseModel):
+    name: Optional[str] = None
+    brand: Optional[str] = None
+    category: Optional[str] = None
+    unit: Optional[str] = None
+    price_min: Optional[float] = None
+    price_max: Optional[float] = None
+    currency: Optional[str] = None
+    partner_id: Optional[str] = None
+    url: Optional[str] = None
+    tags: Optional[list] = None
+    active: Optional[bool] = None
+
+
+def _serialize_product(d: dict) -> dict:
+    if not d:
+        return d
+    return {
+        "id": str(d.get("_id")),
+        "name": d.get("name"),
+        "brand": d.get("brand"),
+        "category": d.get("category"),
+        "unit": d.get("unit") or "buc",
+        "price_min": d.get("price_min"),
+        "price_max": d.get("price_max"),
+        "currency": d.get("currency") or "RON",
+        "partner_id": str(d["partner_id"]) if d.get("partner_id") else None,
+        "partner_name": d.get("partner_name"),
+        "url": d.get("url"),
+        "tags": d.get("tags") or [],
+        "active": bool(d.get("active", True)),
+        "created_at": d.get("created_at"),
+        "updated_at": d.get("updated_at"),
+    }
+
+
+async def _resolve_partner(partner_id):
+    if not partner_id:
+        return None, None
+    try:
+        pdoc = await db.city_partners.find_one({"_id": ObjectId(partner_id)})
+    except Exception:
+        return None, None
+    if not pdoc:
+        return None, None
+    return pdoc["_id"], pdoc.get("company")
+
+
+@products_admin_router.get("")
+async def list_products(q: Optional[str] = None, user=Depends(get_current_user)):
+    _require_super(user)
+    query = {}
+    if q:
+        query["$or"] = [
+            {"name": {"$regex": q, "$options": "i"}},
+            {"brand": {"$regex": q, "$options": "i"}},
+            {"tags": {"$in": [q.lower()]}},
+        ]
+    cur = db.city_partner_products.find(query).sort("created_at", -1)
+    items = [_serialize_product(d) async for d in cur]
+    return {"items": items, "count": len(items)}
+
+
+@products_admin_router.post("")
+async def create_product(payload: ProductIn, user=Depends(get_current_user)):
+    _require_super(user)
+    now = datetime.now(timezone.utc).isoformat()
+    partner_ref, partner_name = await _resolve_partner(payload.partner_id)
+    doc = {
+        "name": payload.name,
+        "brand": payload.brand,
+        "category": payload.category,
+        "unit": payload.unit or "buc",
+        "price_min": payload.price_min,
+        "price_max": payload.price_max if payload.price_max is not None else payload.price_min,
+        "currency": payload.currency or "RON",
+        "partner_id": partner_ref,
+        "partner_name": partner_name,
+        "url": payload.url,
+        "tags": [str(t).lower().strip() for t in (payload.tags or []) if str(t).strip()],
+        "active": payload.active,
+        "created_at": now,
+        "updated_at": now,
+        "created_by": user.get("email"),
+    }
+    res = await db.city_partner_products.insert_one(doc)
+    doc["_id"] = res.inserted_id
+    return _serialize_product(doc)
+
+
+@products_admin_router.patch("/{product_id}")
+async def patch_product(product_id: str, payload: ProductPatch, user=Depends(get_current_user)):
+    _require_super(user)
+    try:
+        oid = ObjectId(product_id)
+    except Exception:
+        raise HTTPException(400, "ID invalid.")
+    update = {k: v for k, v in payload.dict(exclude_unset=True).items() if v is not None}
+    if "tags" in update:
+        update["tags"] = [str(t).lower().strip() for t in update["tags"] if str(t).strip()]
+    if "partner_id" in update:
+        partner_ref, partner_name = await _resolve_partner(update["partner_id"])
+        update["partner_id"] = partner_ref
+        update["partner_name"] = partner_name
+    update["updated_at"] = datetime.now(timezone.utc).isoformat()
+    res = await db.city_partner_products.find_one_and_update({"_id": oid}, {"$set": update}, return_document=True)
+    if not res:
+        raise HTTPException(404, "Produs inexistent.")
+    return _serialize_product(res)
+
+
+@products_admin_router.delete("/{product_id}")
+async def delete_product(product_id: str, user=Depends(get_current_user)):
+    _require_super(user)
+    try:
+        oid = ObjectId(product_id)
+    except Exception:
+        raise HTTPException(400, "ID invalid.")
+    res = await db.city_partner_products.delete_one({"_id": oid})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Produs inexistent.")
+    return {"ok": True, "deleted": True}

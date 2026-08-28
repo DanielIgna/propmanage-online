@@ -44,7 +44,7 @@ from email_service import (
     tpl_dt_issue_report,
     send_email_with_attachments,
 )
-from services import notify
+from services import notify, log_event
 
 router = APIRouter(prefix="/api/digital-twin", tags=["digital-twin"])
 
@@ -1145,6 +1145,234 @@ async def get_design_concept_render(concept_id: str, user: dict = Depends(get_cu
     )
 
 
+# ============= REAL MATERIALS + INDICATIVE PRICING (City Partners + market fallback) =============
+# Concept materials are AI-inferred. We enrich them with REAL indicative prices:
+#   1) City Partners product catalog (`city_partner_products`, admin-managed) — empty by default.
+#   2) Fallback: real market observations (`price_observations`, PropManage price data).
+# Nothing is invented: when no match exists we honestly return "preț orientativ indisponibil".
+
+_MATERIAL_PRICE_CATEGORY = [
+    (("parchet", "stejar", "laminat", "dușumea", "dusumea", "lemn"), "parchet"),
+    (("marmur", "granit"), "faianta"),
+    (("piatr", "piatră"), "faianta"),
+    (("faian", "gresie", "ceramic", "plac"), "faianta"),
+    (("gips", "rigips", "tavan"), "gips_carton"),
+    (("vops", "zugrav", "lavabil", "glet"), "zugravit"),
+    (("cărămid", "caramid", "zid", "beton", "bca"), "constructii"),
+    (("fereas", "geam", "tâmpl", "tampl", "ușă", "usa", "pvc"), "tamplarie"),
+    (("fațad", "fatad", "termo", "polistiren"), "fatade_termoizolatii"),
+]
+
+
+def _material_to_category(text: str) -> str:
+    t = (text or "").lower()
+    for kws, cat in _MATERIAL_PRICE_CATEGORY:
+        if any(k in t for k in kws):
+            return cat
+    return "interior_design"
+
+
+async def _match_partner_product(material: str, surface: str):
+    """Match a concept material to a REAL City Partners product. Catalog empty by default → None."""
+    material = (material or "").strip()
+    if not material:
+        return None
+    if await db.city_partner_products.count_documents({}, limit=1) == 0:
+        return None
+    base = {"active": {"$ne": False}}
+    prod = await db.city_partner_products.find_one({
+        **base,
+        "$or": [
+            {"name": {"$regex": material, "$options": "i"}},
+            {"tags": {"$in": [material.lower()]}},
+        ],
+    })
+    if not prod:
+        terms = [t.lower() for t in material.split() if len(t) > 2]
+        if terms:
+            prod = await db.city_partner_products.find_one({**base, "tags": {"$in": terms}})
+    return prod
+
+
+@router.get("/design-concepts/{concept_id}/materials")
+async def concept_materials(concept_id: str, city: Optional[str] = Query(None),
+                            user: dict = Depends(get_current_user)):
+    """Feature D — map concept materials to REAL indicative prices (partner product or market fallback)."""
+    await _ensure_dt_ingest_access(user)
+    c = await db.digital_twin_design_concepts.find_one({"id": concept_id})
+    if not c:
+        raise HTTPException(404, "Concept not found.")
+    await _ensure_project_access(c["project_id"], user)
+    concept = c.get("concept") or {}
+    plan = concept.get("materials_plan") or []
+    currency = (concept.get("budget") or {}).get("currency") or "RON"
+    from construction.prices import aggregate_prices
+    out = []
+    for m in plan:
+        material = (m.get("material") or "").strip()
+        surface = (m.get("surface") or "").strip()
+        pricing = None
+        source = None
+        prod = await _match_partner_product(material, surface)
+        if prod:
+            pricing = {
+                "label": prod.get("name"),
+                "partner": prod.get("partner_name"),
+                "brand": prod.get("brand"),
+                "unit": prod.get("unit") or "buc",
+                "price_low": prod.get("price_min"),
+                "price_high": prod.get("price_max") if prod.get("price_max") is not None else prod.get("price_min"),
+                "url": prod.get("url"),
+            }
+            source = "city_partner"
+        else:
+            cat = _material_to_category(f"{material} {surface}")
+            try:
+                rows = await aggregate_prices(cat, city or "București")
+            except Exception:  # noqa: BLE001
+                rows = []
+            row = next((r for r in rows if r.get("experience_level") == "mid"), (rows[0] if rows else None))
+            if row:
+                pricing = {
+                    "label": row.get("service"),
+                    "unit": row.get("unit"),
+                    "price_low": row.get("price_min"),
+                    "price_high": row.get("price_max"),
+                    "city": row.get("city"),
+                    "preliminary": row.get("preliminary"),
+                }
+                source = "market_price"
+        out.append({
+            "surface": surface,
+            "material": material,
+            "note": m.get("note"),
+            "pricing": pricing,
+            "pricing_source": source,  # city_partner | market_price | None
+        })
+    return {
+        "items": out,
+        "count": len(out),
+        "currency": currency,
+        "disclaimer": (
+            "Prețuri ORIENTATIVE (produse partener sau manoperă de piață PropManage). "
+            "Nu reprezintă o ofertă fermă — pentru preț exact cere o ofertă unui specialist verificat."
+        ),
+    }
+
+
+# ============= OFFER FROM VERIFIED CONCEPT (Feature B) =============
+# Transformă un concept VALIDAT PROFESIONAL într-o cerere reală de ofertă (db.requests),
+# folosind fluxul de marketplace existent. Necesită confirmarea explicită a clientului.
+
+class RequestOfferIn(BaseModel):
+    confirm: bool = False
+    note: Optional[str] = Field(None, max_length=600)
+    category: str = Field("interior_design", max_length=60)
+
+
+@router.post("/design-concepts/{concept_id}/request-offer")
+async def request_offer_from_concept(concept_id: str, payload: RequestOfferIn,
+                                     user: dict = Depends(get_current_user)):
+    await _ensure_dt_ingest_access(user)
+    c = await db.digital_twin_design_concepts.find_one({"id": concept_id})
+    if not c:
+        raise HTTPException(404, "Concept not found.")
+    proj = await _ensure_project_access(c["project_id"], user)
+    owner_id = proj.get("owner_id")
+    if user.get("role") not in ("admin", "operator") and owner_id != user["id"]:
+        raise HTTPException(403, "Doar proprietarul poate cere o ofertă din acest concept.")
+    # STRICT: doar concept validat profesional.
+    verified = c.get("status") == "verified" or c.get("confidence") == "verified"
+    if not verified and c.get("model_id"):
+        m = await db.digital_twin_models.find_one({"id": c["model_id"]}, {"confidence": 1})
+        verified = bool(m and m.get("confidence") == "verified")
+    if not verified:
+        raise HTTPException(400, "Oferta se poate cere DOAR dintr-un concept validat profesional (verificat).")
+    prop_id = c.get("property_id") or proj.get("property_id")
+    if not prop_id:
+        raise HTTPException(400, "Conceptul nu este ancorat la o proprietate.")
+    try:
+        prop = await db.properties.find_one({"_id": ObjectId(prop_id)})
+    except Exception:
+        prop = None
+    if not prop:
+        raise HTTPException(404, "Proprietatea nu există.")
+    if str(prop.get("owner_id")) != str(owner_id):
+        raise HTTPException(403, "Proprietatea nu aparține proprietarului conceptului.")
+    if not payload.confirm:
+        raise HTTPException(400, "Confirmarea explicită a clientului este necesară (confirm=true).")
+    # Idempotență: nu dubla o cerere activă din același concept.
+    existing = await db.requests.find_one({"concept_id": concept_id, "status": {"$in": ["open", "assigned", "in_progress"]}})
+    if existing:
+        return {"ok": True, "already_exists": True, "request_id": str(existing["_id"]),
+                "offers_link": f"/client/requests/{str(existing['_id'])}/offers",
+                "message": "Există deja o cerere de ofertă activă pentru acest concept."}
+    concept = c.get("concept") or {}
+    budget = concept.get("budget") or {}
+    est = None
+    if budget.get("total_low") is not None and budget.get("total_high") is not None:
+        est = round((float(budget["total_low"]) + float(budget["total_high"])) / 2.0)
+    elif budget.get("total_high"):
+        est = float(budget["total_high"])
+    mats = ", ".join([f"{m.get('surface')}: {m.get('material')}" for m in (concept.get("materials_plan") or [])][:8])
+    title = f"Execuție concept: {concept.get('title') or c.get('inputs', {}).get('style') or 'Design interior'}"
+    lines = [concept.get("summary") or "Cerere generată dintr-un concept de design validat profesional."]
+    if mats:
+        lines.append(f"Materiale (orientativ): {mats}.")
+    if budget.get("total_low") or budget.get("total_high"):
+        lines.append(f"Buget estimativ concept: {budget.get('total_low') or '—'}–{budget.get('total_high') or '—'} {budget.get('currency') or 'RON'} (orientativ).")
+    if payload.note:
+        lines.append(f"Notă client: {payload.note}")
+    lines.append("Sursă: Digital Twin — concept validat profesional.")
+    owner = await db.users.find_one(_user_filter(owner_id), {"name": 1, "email": 1})
+    doc = {
+        "property_id": prop_id,
+        "category": payload.category or "interior_design",
+        "title": title[:200],
+        "description": "\n".join(lines)[:4000],
+        "priority": "normal",
+        "budget_estimate": est,
+        "county": prop.get("county") or prop.get("zone") or prop.get("city"),
+        "photos": None,
+        "taxonomy_node_id": None,
+        "subcategory": None,
+        "client_id": owner_id,
+        "client_name": (owner or {}).get("name") or proj.get("owner_name") or "Client",
+        "property_name": prop.get("name"),
+        "property_address": prop.get("address"),
+        "status": "open",
+        "specialist_id": None,
+        "specialist_name": None,
+        "escrow_amount": None,
+        "created_at": _now_iso(),
+        "source": "digital_twin_concept",
+        "concept_id": concept_id,
+        "dt_model_id": c.get("model_id"),
+        "dt_project_id": c["project_id"],
+    }
+    res = await db.requests.insert_one(doc)
+    req_id = str(res.inserted_id)
+    await db.digital_twin_design_concepts.update_one({"id": concept_id}, {"$set": {
+        "offer_request_id": req_id, "offer_requested_at": _now_iso(), "offer_requested_by": user["id"],
+    }})
+    try:
+        await log_event(req_id, "request.created", actor=user, property_id=prop_id,
+                        payload={"title": title, "category": doc["category"], "source": "digital_twin_concept"})
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[dt-offer] log_event failed: {e}")
+    spec_query = {"role": "specialist", "$or": [{"specialty": doc["category"]}, {"specialty": None}]}
+    specs = await db.users.find(spec_query).to_list(50)
+    for s in specs:
+        await notify(
+            str(s["_id"]),
+            f"Lead nou (concept validat): {title}",
+            f"Cerere de ofertă dintr-un concept Digital Twin validat profesional. Buget estimativ: {est or '—'} RON.",
+            type_="lead", link="/specialist",
+        )
+    return {"ok": True, "request_id": req_id, "offers_link": f"/client/requests/{req_id}/offers",
+            "message": "Cererea de ofertă a fost trimisă către specialiștii verificați."}
+
+
 # ============= PROFESSIONAL VALIDATION — inferred → review → verified =============
 # Un profesionist (admin/operator sau membru architect/specialist) confirmă EXPLICIT un model inferat.
 # NU convertim automat inferred → verified. Istoricul validării e păstrat (cine/când/ce/rezultat).
@@ -1258,6 +1486,31 @@ async def validate_model(model_id: str, payload: ValidateIn, user: dict = Depend
             cset.update({"confidence": "verified", "verification_status": "professional_audit",
                          "validated_by_name": user.get("name") or user.get("email"), "validated_at": now})
         await db.digital_twin_design_concepts.update_one({"id": doc["design_concept_id"]}, {"$set": cset})
+    # Feature C — notify the property owner + review requester about the validation outcome.
+    try:
+        owner_id = proj.get("owner_id")
+        actor = user.get("name") or user.get("email") or "Un profesionist"
+        fname = doc.get("filename") or "Modelul 3D"
+        if owner_id and owner_id != user["id"]:
+            if payload.action == "confirm":
+                await notify(owner_id, "✅ Model validat profesional",
+                             f"{actor} a verificat „{fname}”. Modelul este acum marcat ca verificat profesional.",
+                             type_="dt_validation", link="/digital-twin")
+            else:
+                reason = (payload.note or "").strip()
+                msg = f"{actor} a respins „{fname}” la validare. Modelul rămâne orientativ (AI)."
+                if reason:
+                    msg += f" Motiv: {reason}"
+                await notify(owner_id, "⚠️ Model respins la validare", msg,
+                             type_="dt_validation", link="/digital-twin")
+        rr = doc.get("review_requested_by")
+        if rr and rr not in (user["id"], owner_id):
+            verdict = "validat" if payload.action == "confirm" else "respins"
+            await notify(rr, f"Validare finalizată: {verdict}",
+                         f"Modelul „{fname}” trimis de tine a fost {verdict} de {actor}.",
+                         type_="dt_validation", link="/digital-twin")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[dt-validation] notify failed: {e}")
     refreshed = await db.digital_twin_models.find_one({"id": model_id})
     return _clean(refreshed)
 

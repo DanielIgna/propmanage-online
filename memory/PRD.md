@@ -1,3 +1,19 @@
+## 🚀 DIGITAL TWIN — NEXT STAGE II (4 funcționalități, ONE BUILD) · LIVRAT ÎN PREVIEW (Iun 2026)
+
+Extensie non-breaking peste conceptele AI + fluxul de validare existente. Testare `testing_agent` iter207 (95%, 24/25) → un singur fix MEDIUM → iter208 **100% (3/3)**. Backend verificat integral prin curl E2E. Toată copia UI în ROMÂNĂ. Regresia Twin-ului existent intactă.
+
+**A · Comparație Concepte AI** — nou `ConceptComparison.jsx` (overlay `concept-comparison`). Selectori pentru 2 concepte (`compare-select-a/b`), 2 coloane side-by-side (render, titlu, status validare, paletă, buget, materiale). Responsive: conținut `grid-cols-1 md:grid-cols-2` (stivuit pe mobil). Buton intrare din viewer (`dt-open-compare`) + din studio (`design-open-compare`). Reutilizează `GET /projects/{id}/design-concepts` (fără endpoint nou).
+
+**B · Ofertă din Concept Validat** — nou `POST /api/digital-twin/design-concepts/{id}/request-offer`. STRICT: doar concept `verified` (validat profesional); necesită `confirm=true` (confirmare explicită client, `offer-confirm` → `offer-confirm-yes`). Creează o cerere REALĂ în `db.requests` (fluxul de marketplace existent), pre-completată cu proprietatea + buget mediu estimativ + materiale, `source:"digital_twin_concept"`. Idempotent (nu dublează cererea activă). Notifică specialiștii eligibili. UI: `RequestOfferButton` (stări: `offer-locked` neverificat / `request-offer-btn` verificat / `offer-requested` după trimitere) — montat în `ConceptResult` (studio) + coloana de comparație.
+
+**C · Notificare Validare** — în `validate_model` (POST `/models/{id}/validate`): la `confirm` → proprietarul primește „✅ Model validat profesional"; la `reject` → „⚠️ Model respins la validare" + motiv (nota profesionistului). Se notifică și cel care a cerut validarea (dacă diferă). Prin `notify()` existent (in-app + email + web push). Nimic auto-verificat.
+
+**D · Materiale reale + preț orientativ** (varianta c aleasă de Fondator) — nou `GET /api/digital-twin/design-concepts/{id}/materials`. Mapează fiecare material al conceptului la: (1) catalog produse City Partners (`city_partner_products`, admin-managed, GOL implicit) sau (2) fallback pe prețuri REALE de piață (`price_observations` via `aggregate_prices`, etichetat „Preț orientativ piață"). Fără date inventate: fără potrivire → „preț orientativ indisponibil". Disclaimer clar. Nou `products_admin_router` (`/api/admin/city-partner-products`, super-admin CRUD) pentru popularea reală a catalogului. UI: `ConceptMaterials` (în studio + coloane comparație).
+
+**Fișiere**: BE `routes/digital_twin.py` (+materials, +request-offer, +notify în validate), `routes/city_partners.py` (+products CRUD), `routes/register.py` (înregistrare router). FE nou: `ConceptComparison.jsx`; editate: `DesignConceptStudio.jsx` (materiale+ofertă+compară), `DigitalTwinViewer.jsx` (buton+mount comparație). Colecție nouă: `city_partner_products` (goală). Fields concept noi: `offer_request_id`, `offer_requested_at`. **Necesită redeploy Fondator pentru producție.**
+
+---
+
 ## 🔧 REPARAȚIE — Upload/Conversie SKP (SketchUp) · 28 Aug 2026
 
 **Cauza exactă**: `.skp` era trimis către o conversie CloudConvert imposibilă. Verificat pe API-ul live CloudConvert: `.skp` NU e format de intrare acceptat (tokenul `sk` = Sketch/vector via Inkscape, nu SketchUp) și CloudConvert **nu produce deloc GLB** (0 conversii `→ glb`). Blender nici nu e instalat pe pod și oricum nu are importer SketchUp pe Linux. Deci NU există conversie server-side `.skp`→3D în infra actuală → jobul eșua cu „This conversion type is not supported" + buton „Reîncearcă" inutil.
