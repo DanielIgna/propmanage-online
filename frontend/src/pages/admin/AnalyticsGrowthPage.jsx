@@ -3,7 +3,7 @@ import axios from "axios";
 import {
   BarChart3, Users, MousePointerClick, UserPlus, Building2, Wallet, Plus, QrCode, Trash2,
   Link2, Megaphone, Settings2, CheckCircle2, Flame, FlaskConical, Repeat, TrendingDown, MessageCircle,
-  GitCompareArrows, X,
+  GitCompareArrows, X, Workflow, TrendingUp,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -43,10 +43,68 @@ const formatBucket = (day, granularity) => {
   return day.slice(5); // MM-DD (day/week)
 };
 
+// ── Funnel comercial (VISITOR→CLIENT→CERERE→SPECIALIST→FINALIZAT) ──────────────
+// Reutilizează trackerul first-party (semnale intent_*) + verificare încrucișată cu db.requests.
+const CommercialFunnelTab = ({ data }) => {
+  if (!data) return <DSSkeleton kpis={4} blocks={2} />;
+  const kpi = data.kpi || {};
+  const bc = data.backend_check || {};
+  const stages = data.stages || [];
+  return (
+    <div className="space-y-6" data-testid="ag-commercial-funnel">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <KpiCard icon={Users} label="Client pe /client" value={kpi.client_visitors ?? 0} accent="info" testid="ag-cf-opened" />
+        <KpiCard icon={Workflow} label="Au început o cerere" value={kpi.started ?? 0} accent="warning" testid="ag-cf-started" />
+        <KpiCard icon={CheckCircle2} label="Au creat o cerere reală" value={kpi.created ?? 0} accent="success" testid="ag-cf-created" />
+        <KpiCard icon={TrendingUp} label="Conversie /client → cerere" value={`${kpi.opened_to_created_pct ?? 0}%`} accent="ai" testid="ag-cf-conversion" />
+      </div>
+
+      {/* Strip conversii intermediare — răspunsul direct la întrebarea Fondatorului */}
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <DSBadge variant="info">Intrat → început: {kpi.opened_to_started_pct ?? 0}%</DSBadge>
+        <DSBadge variant="success">Început → cerere: {kpi.started_to_created_pct ?? 0}%</DSBadge>
+        <DSBadge variant="ai">Intrat → cerere reală: {kpi.opened_to_created_pct ?? 0}%</DSBadge>
+      </div>
+
+      <ChartCard title="Funnel comercial: /client → cerere → specialist → finalizat" testid="ag-cf-chart">
+        {stages.every(s => (s.count || 0) === 0) ? (
+          <EmptyState title="Fără evenimente încă." hint="Trackerul colectează etapele pe măsură ce clienții și specialiștii folosesc fluxul." />
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={stages} layout="vertical" margin={{ left: 60 }}>
+              <XAxis type="number" hide />
+              <YAxis type="category" dataKey="label" width={175} tick={{ fontSize: 11 }} />
+              <Tooltip />
+              <Bar dataKey="count" fill={CHART_COLORS[0]} radius={[0, 8, 8, 0]} barSize={22}>
+                <LabelList dataKey="count" position="right" style={{ fontSize: 12, fontWeight: 700 }} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </ChartCard>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4" data-testid="ag-cf-backend-check">
+        <div className="text-sm font-bold text-slate-900 mb-3">Verificare încrucișată cu backend-ul (db.requests · SSOT)</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div><div className="text-slate-500 text-xs">Cereri reale create</div><div className="font-black text-slate-900" data-testid="ag-cf-real-created">{bc.requests_created_real ?? 0}</div></div>
+          <div><div className="text-slate-500 text-xs">Semnal request_created</div><div className="font-black text-slate-900">{bc.signal_request_created ?? 0}</div></div>
+          <div><div className="text-slate-500 text-xs">Cereri confirmate</div><div className="font-black text-slate-900">{bc.requests_confirmed_real ?? 0}</div></div>
+          <div><div className="text-slate-500 text-xs">Diferență semnal − real</div><div className="font-black text-slate-900">{bc.created_delta ?? 0}</div></div>
+        </div>
+        <p className="text-[11px] text-slate-400 mt-3">
+          „Cereri reale create" e sursa de adevăr (db.requests). Semnalul „request_created" vine din trackerul first-party
+          (doar vizitatori cu tracking activ), deci poate diferi de realitate (conturi demo/seed sau tracker blocat de browser).
+        </p>
+      </div>
+    </div>
+  );
+};
+
 export default function AnalyticsGrowthPage() {
   const [tab, setTab] = useState("overview");
   const [period, setPeriod] = useState("week");
   const [overview, setOverview] = useState(null);
+  const [commercialFunnel, setCommercialFunnel] = useState(null);
   const [insights, setInsights] = useState(null);
   const [pages, setPages] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
@@ -65,16 +123,18 @@ export default function AnalyticsGrowthPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const [o, p, c, i, ins, m] = await Promise.all([
+      const [o, p, c, i, ins, m, cf] = await Promise.all([
         axios.get(`${API}/admin/analytics/overview?period=${period}`),
         axios.get(`${API}/admin/analytics/pages?period=${period}`),
         axios.get(`${API}/admin/growth/campaigns`),
         axios.get(`${API}/admin/analytics/integrations`),
         axios.get(`${API}/admin/analytics/insights?period=${period}`),
         axios.get(`${API}/admin/analytics/campaign-markers?period=${period}`),
+        axios.get(`${API}/admin/analytics/commercial-funnel?period=${period}`),
       ]);
       setOverview(o.data); setPages(p.data.items); setCampaigns(c.data.items); setIntegrations(i.data); setInsights(ins.data);
       setCampaignMarkers(m.data.markers || []);
+      setCommercialFunnel(cf.data);
     } catch (e) { toast.error("Eroare la încărcarea datelor analytics"); }
     setLoading(false);
   };
@@ -138,7 +198,7 @@ export default function AnalyticsGrowthPage() {
         {/* 1. Navigare secundară (TabBar standard) */}
         <div className="flex flex-wrap items-center gap-2">
           <TabBar
-            tabs={[["overview", "Dashboard", BarChart3], ["heatmap", "Heatmap", Flame], ["bounce", "Bounce", TrendingDown], ["retention", "Retenție", Repeat], ["abtest", "A/B Testing", FlaskConical], ["whatsapp", "WhatsApp", MessageCircle], ["pages", "Pagini", MousePointerClick], ["campaigns", "Campanii", Megaphone], ["integrations", "Integrări", Settings2]]}
+            tabs={[["overview", "Dashboard", BarChart3], ["commercial", "Funnel comercial", Workflow], ["heatmap", "Heatmap", Flame], ["bounce", "Bounce", TrendingDown], ["retention", "Retenție", Repeat], ["abtest", "A/B Testing", FlaskConical], ["whatsapp", "WhatsApp", MessageCircle], ["pages", "Pagini", MousePointerClick], ["campaigns", "Campanii", Megaphone], ["integrations", "Integrări", Settings2]]}
             active={tab} onChange={setTab} testidPrefix="ag-tab"
           />
           {/* 2. Action Bar standard: perioadă · CSV · PDF · refresh */}
@@ -270,6 +330,8 @@ export default function AnalyticsGrowthPage() {
               </ResponsiveContainer>
             </ChartCard>
           </>
+        ) : tab === "commercial" ? (
+          <CommercialFunnelTab data={commercialFunnel} />
         ) : tab === "heatmap" ? (
           <HeatmapTab period={period} clarityId={integrations?.clarity_id} />
         ) : tab === "bounce" ? (

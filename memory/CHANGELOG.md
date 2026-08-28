@@ -4,6 +4,13 @@ Rol: jurnal cronologic al schimbărilor semnificative + sincronizărilor de cuno
 
 ---
 
+## 2026-06 · COMMERCIAL FLOW — Funnel comercial instrumentat + vizibil (PREVIEW, necesită redeploy)
+- Instrumentat fluxul comercial REAL existent (VISITOR→CLIENT→PROPRIETATE→CERERE→SPECIALIST→CONTINUARE) cu 7 evenimente, prin trackerul first-party EXISTENT (`analytics.js` `trackIntent` → `POST /api/track`, flag `intent_{signal}` pe `analytics_sessions`). ZERO sistem nou de analytics. Evenimente: `client_flow_opened`, `client_property_selected`, `request_started` (exista), `request_created`, `specialist_flow_opened`, `specialist_action_taken`, `flow_completed`.
+- Backend NOU (read-only): `GET /api/admin/analytics/commercial-funnel` (analytics_growth.py) — agregă etapele per vizitator unic + verificare ÎNCRUCIȘATĂ cu `db.requests` real (SSOT): `requests_created_real`, `requests_confirmed_real`, `created_delta`. Răspunde direct la „din cei care intră pe /client, câți încep și câți creează o cerere reală".
+- Frontend: tab NOU „Funnel comercial" în `AnalyticsGrowthPage.jsx` (KPI + bar chart 7 etape + card cross-check db.requests). Instrumentare în `ClientDashboardV2.jsx`, `RequestWizard.jsx`, `SpecialistDashboard.jsx`.
+- Verificat E2E (iter213, 100% frontend): client creează cerere reală (POST /api/requests → db.requests) → specialist vede/acceptă (POST /accept) → funnel admin reflectă activitatea; cross-check real=1/semnal=1/diff=0. Zero regresii Client/Specialist Beta. NU s-a atins Orphan Twins / entitlements / abonament 9€ / Digital Twin CTA.
+
+
 ## 2026-06 · DATA INTEGRITY — Safe repair pentru Twins orfane (PREVIEW, necesită redeploy)
 - Extins scannerul read-only `admin_data_integrity.py` cu remediere sigură pentru „Twins orfane": `GET /api/admin/data-integrity/orphan-twins` (listă+clasificare) și `POST .../orphan-twins/resolve` (arhivează în `twins_orphan_archive` + șterge din `db.twins` + audit în `data_integrity_actions` + re-scan). Re-atașarea deterministă e imposibilă (twins fără `owner_id`/legătură) → acțiune sigură = DELETE arhivat (recuperabil). UI: buton „Șterge toate Twin-urile orfane" + confirmare cu mesaj de protecție în `DataIntegrityCard.jsx`.
 - Verificat E2E: 28 orfane reale → arhivate+șterse, orphan=0; protecție confirmată (properties/users/requests/disputes/transactions neatinse); audit 28 SUCCESS; idempotent; confirm=false→400; UI E2E 100% (iter212). Reality Check (read-only) livrat separat.

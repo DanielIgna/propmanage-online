@@ -1,3 +1,24 @@
+## 📊 FUNNEL COMERCIAL — Instrumentare flow real + vizibilitate în Analytics (PREVIEW · Iun 2026)
+
+Cerere Fondator (BUILD→DEPLOY→USE→OBSERVE→FIX, buget limitat): legarea infrastructurii EXISTENTE într-un singur flow comercial real, măsurabil și vizibil — fără audit, fără refactor, fără UI nou inutil, fără mock data. Scope aprobat exact: instrumentare + „Funnel comercial" în Analytics & Growth, folosind trackerul existent (`trackIntent`). NU s-a atins Orphan Twins, entitlements, abonamentul 9€, Digital Twin CTA.
+
+**Ce s-a construit (non-breaking, reutilizează integral infra existentă):**
+- **7 evenimente comerciale** prin trackerul first-party EXISTENT (`frontend/src/lib/analytics.js::trackIntent` → `POST /api/track` → flag `intent_{signal}` pe `analytics_sessions`). ZERO al doilea sistem de analytics:
+  `client_flow_opened` (mount `/client`) · `client_property_selected` (deschidere wizard cu proprietate) · `request_started` (mount wizard, exista) · `request_created` (succes POST /requests) · `specialist_flow_opened` (mount `/specialist`) · `specialist_action_taken` (accept lead) · `flow_completed` (client confirmă).
+- **Backend read-only NOU**: `GET /api/admin/analytics/commercial-funnel?period=…` (`routes/analytics_growth.py`) — agregă etapele per vizitator unic + **verificare încrucișată cu `db.requests` real (SSOT)**: `requests_created_real`, `requests_confirmed_real`, `signal_request_created`, `created_delta`. KPI: `client_visitors`, `opened_to_started_pct`, `opened_to_created_pct`, `started_to_created_pct` → răspunde direct la întrebarea Fondatorului.
+- **Frontend**: tab NOU „Funnel comercial" (icon Workflow) în `AnalyticsGrowthPage.jsx` — 4 KPI carduri (`ag-cf-opened/started/created/conversion`), strip conversii, bar chart orizontal cu 7 etape (`ag-cf-chart`), card cross-check `db.requests` (`ag-cf-backend-check`, `ag-cf-real-created`).
+
+**Ce date REALE se scriu în DB**: nimic nou ca schemă — se scriu evenimentele în `analytics_events` + flags pe `analytics_sessions` (colecții existente); cererea reală se scrie în `db.requests` (flux existent).
+
+**Fișiere**: BE `routes/analytics_growth.py` (+`commercial-funnel`). FE `pages/admin/AnalyticsGrowthPage.jsx` (+tab/component), `pages/clientv2/ClientDashboardV2.jsx`, `pages/clientv2/RequestWizard.jsx`, `pages/SpecialistDashboard.jsx` (instrumentare `trackIntent`).
+
+**Testare**: pipeline dovedit prin `POST /api/track` real (toate 7 etape) + curl pe endpoint (real=130 cereri în 90z). E2E UI `testing_agent` iter213 **100% frontend**: client creează cerere reală → specialist acceptă → funnel admin reflectă (real=1/semnal=1/diff=0). Zero regresii Client/Specialist Beta.
+
+**Producție**: gata în PREVIEW. Deploy pe `propmanage.ro` = **redeploy Fondator** (arhitectura platformei; codul nu se propagă automat). Rută de testat după deploy: `/admin/analytics-growth` → tab „Funnel comercial".
+
+---
+
+
 ## 🎯 DIGITAL TWIN — NEXT STAGE III (4 îmbunătățiri, ONE BUILD) · LIVRAT ÎN PREVIEW (Iun 2026)
 
 Non-breaking, în ROMÂNĂ. Backend verificat E2E prin curl (inclusiv poarta de siguranță a pașaportului). Frontend verificat de `testing_agent`: iter209 (Feature 1/2/3 = 100%) + iter210 (Feature 4 vizual = 100%). Regresia Next Stage I/II intactă.

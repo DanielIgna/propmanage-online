@@ -624,6 +624,92 @@ async def analytics_insights(
     return {"bullets": bullets, "alerts": alerts, "recommendations": recs}
 
 
+# ═══════════════════════ FUNNEL COMERCIAL (VISITOR→CLIENT→CERERE→SPECIALIST) ═══════════════════════
+# Instrumentat prin trackerul first-party existent (trackIntent). Fiecare etapă = flag
+# `intent_{signal}` pe sesiune. request_created e verificat ÎNCRUCIȘAT cu db.requests real,
+# ca să nu ne bazăm doar pe semnalul client-side. ZERO sistem nou de analytics.
+COMMERCIAL_FUNNEL_STAGES = [
+    ("client_flow_opened", "Client pe /client"),
+    ("client_property_selected", "Proprietate aleasă"),
+    ("request_started", "Cerere începută"),
+    ("request_created", "Cerere creată"),
+    ("specialist_flow_opened", "Specialist deschide leads"),
+    ("specialist_action_taken", "Specialist acceptă"),
+    ("flow_completed", "Flux finalizat (confirmat)"),
+]
+
+
+@admin_router.get("/analytics/commercial-funnel")
+async def analytics_commercial_funnel(
+    period: str = Query("90d", pattern="^(day|week|month|60d|90d|6m|12m|ytd|custom)$"),
+    date_from: str = "", date_to: str = "",
+    user: dict = Depends(require_role("admin")),
+):
+    """Funnel comercial real: din cei care intră pe /client, câți încep fluxul și câți
+    creează o cerere reală → apoi specialistul o vede/acceptă → flux finalizat.
+    Etapele vin din semnalele `intent_*` (trackIntent), agregate per vizitator unic.
+    `request_created` e verificat încrucișat cu numărul real de cereri din db.requests."""
+    d_from, d_to = _period_range(period, date_from, date_to)
+    q = {"day": {"$gte": d_from, "$lte": d_to}}
+
+    # Agregare per vizitator unic: o etapă e „atinsă" dacă apare pe oricare sesiune din perioadă
+    stage_keys = [k for k, _ in COMMERCIAL_FUNNEL_STAGES]
+    proj = {"visitor_id": 1, **{f"intent_{k}": 1 for k in stage_keys}}
+    visitor_stages = defaultdict(set)
+    async for s in db.analytics_sessions.find(q, proj):
+        vid = s.get("visitor_id")
+        if not vid:
+            continue
+        for k in stage_keys:
+            if s.get(f"intent_{k}"):
+                visitor_stages[vid].add(k)
+
+    stage_counts = {k: 0 for k in stage_keys}
+    for stages in visitor_stages.values():
+        for k in stages:
+            stage_counts[k] += 1
+
+    stages = [{"key": k, "label": label, "count": stage_counts[k]} for k, label in COMMERCIAL_FUNNEL_STAGES]
+
+    # Verificare încrucișată cu backend-ul real (SSOT = db.requests)
+    iso_from, iso_to = d_from, d_to + "T23:59:59"
+    requests_created_real = await db.requests.count_documents({"created_at": {"$gte": iso_from, "$lte": iso_to}})
+    requests_confirmed_real = await db.requests.count_documents(
+        {"status": "confirmed", "created_at": {"$gte": iso_from, "$lte": iso_to}}
+    )
+    signal_request_created = stage_counts["request_created"]
+
+    def _pct(num, den):
+        return round(num / den * 100, 1) if den else 0.0
+
+    opened = stage_counts["client_flow_opened"]
+    started = stage_counts["request_started"]
+    created = stage_counts["request_created"]
+
+    return {
+        "period": {"from": d_from, "to": d_to},
+        "stages": stages,
+        "backend_check": {
+            "requests_created_real": requests_created_real,
+            "requests_confirmed_real": requests_confirmed_real,
+            "signal_request_created": signal_request_created,
+            "signal_flow_completed": stage_counts["flow_completed"],
+            # diferența semnal vs realitate (vizitatori fără cont / tracker blocat / conturi seed)
+            "created_delta": signal_request_created - requests_created_real,
+        },
+        "kpi": {
+            "client_visitors": opened,
+            "started": started,
+            "created": created,
+            # KPI-ul cheie al Fondatorului: din cei intrați pe /client → câți creează o cerere
+            "opened_to_started_pct": _pct(started, opened),
+            "opened_to_created_pct": _pct(created, opened),
+            "started_to_created_pct": _pct(created, started),
+        },
+    }
+
+
+
 @admin_router.get("/analytics/pages")
 async def analytics_pages(
     period: str = Query("week", pattern="^(day|week|month|60d|90d|6m|12m|ytd|custom)$"),

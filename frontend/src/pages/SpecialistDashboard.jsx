@@ -1,6 +1,6 @@
 // PropManage - Specialist Dashboard with 4-zone bottom navigation
 // Tabs: Oportunități | Lucrările mele | Notificări | Setări
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
 import {
@@ -67,11 +67,17 @@ export const SpecialistDashboard = () => {
     axios.get(`${API}/ui-rules/my`).then(r => setXosHidden(r.data.hidden || [])).catch(() => {});
   }, []);
 
+  const specOpenedRef = useRef(false);
   const load = () => axios.get(`${API}/requests`).then(r => setRequests(r.data)).catch(() => {});
   const loadNotifs = () => axios.get(`${API}/notifications`).then(r => setNotifs(r.data)).catch(() => {});
   useEffect(() => {
     if (user) {
       claimPendingInvite();
+      // Funnel comercial (etapa 5): specialistul a deschis zona de leads
+      if (!specOpenedRef.current) {
+        specOpenedRef.current = true;
+        import("../lib/analytics").then(({ trackIntent }) => trackIntent("specialist_flow_opened")).catch(() => {});
+      }
       load();
       loadNotifs();
       const interval = setInterval(loadNotifs, 30000);
@@ -466,7 +472,7 @@ export const SpecialistDashboard = () => {
       {disputeFor && <OpenDisputeModal requestId={disputeFor.id} requestTitle={disputeFor.title} onClose={() => setDisputeFor(null)} onOpened={() => load()} />}
       {proposePhaseFor && <ProposePhaseModal requestId={proposePhaseFor} onClose={() => setProposePhaseFor(null)} onProposed={() => load()} />}
       {showPortfolio && <PortfolioManagerModal onClose={() => setShowPortfolio(false)} />}
-      {acceptingReq && <ScheduleProposalModal requestId={acceptingReq.id} requestTitle={acceptingReq.title} feeWaived={acceptingReq.feeWaived} onClose={() => setAcceptingReq(null)} onAccepted={async () => { await refreshUser(); load(); }} />}
+      {acceptingReq && <ScheduleProposalModal requestId={acceptingReq.id} requestTitle={acceptingReq.title} feeWaived={acceptingReq.feeWaived} onClose={() => setAcceptingReq(null)} onAccepted={async () => { import("../lib/analytics").then(({ trackIntent }) => trackIntent("specialist_action_taken")).catch(() => {}); await refreshUser(); load(); }} />}
       {timelineRequestId && <RequestTimelineModal requestId={timelineRequestId} onClose={() => setTimelineRequestId(null)} />}
       {showNewProject && <NewProjectModal onClose={() => setShowNewProject(false)} />}
     </DashLayout>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { Home, Plus, Wrench, Building2, Settings, Bell, ChevronDown, Shield, ChevronRight, Gift } from "lucide-react";
 import { useAuth, formatApiError } from "../../auth";
@@ -35,6 +35,7 @@ const TITLES = { home: null, jobs: "Lucrările mele", property: "Proprietatea me
 export default function ClientDashboardV2() {
   useMobileDock();
   const { user, refreshUser, logout } = useAuth();
+  const flowOpenedRef = useRef(false);
   const [loaded, setLoaded] = useState(false);
   const [properties, setProperties] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -65,6 +66,11 @@ export default function ClientDashboardV2() {
   useEffect(() => {
     if (!user || user === false) return;
     claimPendingInvite();
+    // Funnel comercial (etapa 1): client a intrat pe /client — semnalul propriu (trackIntent), o dată/mount
+    if (!flowOpenedRef.current) {
+      flowOpenedRef.current = true;
+      import("../../lib/analytics").then(({ trackIntent }) => trackIntent("client_flow_opened")).catch(() => {});
+    }
     Promise.all([loadProps(), loadRequests(), loadNotifs()]).finally(() => setLoaded(true));
     const interval = setInterval(loadNotifs, 30000);
     // Deep-link taburi (onboarding checklist etc.): /client?tab=home|jobs|property|settings|request
@@ -133,6 +139,8 @@ export default function ClientDashboardV2() {
   const confirmRequest = async (id, r) => {
     try {
       await axios.post(`${API}/requests/${id}/confirm`);
+      // Funnel comercial (etapa 7): flux finalizat — clientul a confirmat lucrarea
+      import("../../lib/analytics").then(({ trackIntent }) => trackIntent("flow_completed")).catch(() => {});
       const { data } = await axios.get(`${API}/requests`);
       setRequests(data);
       await refreshUser();
@@ -145,7 +153,13 @@ export default function ClientDashboardV2() {
   const actions = {
     payEscrow, confirmRequest, setChatRequest, setReviewFor, setDisputeFor, setTimelineRequestId,
     reloadRequests: loadRequests,
-    openWizard: () => (prop ? setShowWizard(true) : setShowPropManager(true)),
+    openWizard: () => {
+      if (prop) {
+        // Funnel comercial (etapa 2): proprietate aleasă pentru o cerere reală
+        import("../../lib/analytics").then(({ trackIntent }) => trackIntent("client_property_selected")).catch(() => {});
+        setShowWizard(true);
+      } else setShowPropManager(true);
+    },
     openPropManager: () => setShowPropManager(true),
     openNotifs: () => setShowNotifs(true),
     openWallet: () => setShowWallet(true),
