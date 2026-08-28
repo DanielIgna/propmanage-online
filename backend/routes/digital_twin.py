@@ -15,6 +15,7 @@ from typing import Optional, List
 import base64
 import io
 import os
+import re
 import shutil
 import uuid
 
@@ -3340,6 +3341,31 @@ async def operator_grant_access(payload: SubGrant, user: dict = Depends(require_
             link="/digital-twin",
         )
     return {"ok": True, "user_id": payload.user_id, "active": payload.active}
+
+
+@operator_router.get("/search-clients")
+async def operator_search_clients(
+    q: str = Query(..., min_length=2, max_length=120),
+    user: dict = Depends(require_role("operator", "admin")),  # noqa: ARG001
+):
+    """Operator/admin search for CLIENTS (role=client) by name or email — for granting
+    Digital Twin Pro access. Case-insensitive, substring match on name AND email.
+    Returns `digital_twin_pro` so the UI can flag clients that already have access
+    (prevents a second grant / duplicate relation). Restricted to role=client:
+    operators never see specialists/admins/operators here."""
+    pattern = {"$regex": re.escape(q.strip()), "$options": "i"}
+    cursor = db.users.find(
+        {"role": "client", "$or": [{"name": pattern}, {"email": pattern}]}
+    ).limit(10)
+    items = []
+    async for u in cursor:
+        items.append({
+            "id": str(u["_id"]),
+            "name": u.get("name"),
+            "email": u.get("email"),
+            "digital_twin_pro": bool(u.get("digital_twin_pro")),
+        })
+    return {"items": items, "count": len(items)}
 
 
 @operator_router.get("/clients-queue")

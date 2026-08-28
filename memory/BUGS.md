@@ -54,3 +54,15 @@ Format: `BUG #NNN – Titlu` · Status: `Open` | `In Progress` | `Fixed (verific
 - **Direcție de rezolvare (viitor, ne-programat):** conversie reală `.skp`→format vizualizabil · SAU integrare validă Trimble Connect (cu validare de tip URL) · SAU altă soluție robustă.
 - **Ref canonic:** `audits/PROPERTY_TWIN_CANONICAL_v1.0.md` §9.6.
 
+## BUG #006 – „Acordă acces DT" nu găsea clienți existenți (Operator → Digital Twin Pro)
+- **Status:** Fixed ✅ (PREVIEW — necesită redeploy Fondator pentru PRODUCTION). Testat E2E iter211 (A–G = 100%).
+- **Raportat pe:** PRODUCTION (`propmanage.ro`). Reprodus și reparat în preview (același cod).
+- **Simptom:** clientul „Andrei Popescu" (client@propmanage.io) apare în lista „Clienți cu acces 3D", dar căutarea din modalul „Acordă acces DT" răspundea „Niciun client găsit" pentru orice interogare.
+- **Cauză root:** modalul apela `GET /api/admin/search` (require_role **admin**). Operatorul primea **403**, iar `search()` din FE înghițea eroarea în `catch` → `results=[]` → „Niciun client găsit". Deci operatorul NU putea găsi NICIUN client (nu doar Andrei).
+- **Fix backend:** endpoint nou operator-scoped `GET /api/operator/digital-twin/search-clients` (`require_role("operator","admin")`), filtrează `role=client`, `$regex` case-insensitive (re.escape) pe `name`+`email`, întoarce `digital_twin_pro` pentru fiecare. (`routes/digital_twin.py`)
+- **Fix frontend:** `GrantAccessModal.search()` folosește noul endpoint și citește `r.data.items`; badge „Acces deja acordat" (`already-granted-<id>`) pentru clienții care au deja DT Pro (fără a doua relație — `alreadyGranted()` doar închide+refresh); stare de eroare distinctă de „no results"; loader `grant-search-loading`. (`pages/OperatorDigitalTwin.jsx`)
+- **Securitate:** client/specialist → 403; se întorc DOAR `role=client` (specialiști/admini/operatori NU apar); ownership/authorization nemodificate; niciun endpoint public.
+- **Rezultat caz concret:** „Andrei Popescu / client@propmanage.io" e găsit după email exact, nume, case-insensitive și parțial, cu badge „Acces deja acordat".
+- **Fișiere:** `backend/routes/digital_twin.py` (+`search-clients`, `import re`), `frontend/src/pages/OperatorDigitalTwin.jsx`.
+
+

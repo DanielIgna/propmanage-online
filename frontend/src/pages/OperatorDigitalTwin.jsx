@@ -38,19 +38,23 @@ const GrantAccessModal = ({ onClose, onGranted }) => {
   const [email, setEmail] = useState("");
   const [results, setResults] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [err, setErr] = useState(null);
 
   const search = async (q) => {
     setEmail(q);
-    if (q.length < 2) { setResults([]); return; }
+    setErr(null);
+    if (q.trim().length < 2) { setResults([]); return; }
+    setSearching(true);
     try {
-      // /admin/users requires admin role — operator uses /admin/search? No, search endpoint exists
-      // Actually the operator can't list users. Use a public search? Simplest: operator already has admin/users
-      // For now use /admin/users (gives 403 to operator). Better: fall back to client lookup by email.
-      const r = await axios.get(`${API}/admin/search`, { params: { q } });
-      setResults((r.data?.users || []).filter(u => u.role === "client").slice(0, 8));
-    } catch (_) {
+      // Operator-scoped client search (role=client only). Case-insensitive, name + email.
+      const r = await axios.get(`${API}/operator/digital-twin/search-clients`, { params: { q: q.trim() } });
+      setResults(r.data?.items || []);
+    } catch (e) {
       setResults([]);
+      setErr(e?.response?.data?.detail || "Eroare la căutare. Încearcă din nou.");
+    } finally {
+      setSearching(false);
     }
   };
 
@@ -66,6 +70,9 @@ const GrantAccessModal = ({ onClose, onGranted }) => {
       setBusy(false);
     }
   };
+
+  // Client already has DT Pro → don't create a second relation, just refresh + close.
+  const alreadyGranted = () => { onGranted?.(); onClose(); };
 
   return (
     <div className="fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
@@ -92,17 +99,27 @@ const GrantAccessModal = ({ onClose, onGranted }) => {
         </div>
 
         <div className="space-y-1 max-h-72 overflow-y-auto">
-          {email.length >= 2 && results.length === 0 && <div className="text-xs text-stone-500 text-center py-3">Niciun client găsit.</div>}
+          {searching && <div className="text-xs text-stone-500 text-center py-3" data-testid="grant-search-loading">Se caută…</div>}
+          {!searching && !err && email.trim().length >= 2 && results.length === 0 && <div className="text-xs text-stone-500 text-center py-3" data-testid="grant-no-results">Niciun client găsit.</div>}
           {results.map(u => (
             <button
               key={u.id}
-              onClick={() => grant(u.id)}
+              onClick={() => (u.digital_twin_pro ? alreadyGranted() : grant(u.id))}
               disabled={busy}
               className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/5 rounded-lg p-2.5 disabled:opacity-50"
               data-testid={`grant-target-${u.id}`}
             >
-              <div className="text-sm text-white font-medium">{u.name}</div>
-              <div className="text-[11px] text-stone-400">{u.email}</div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-sm text-white font-medium truncate">{u.name}</div>
+                  <div className="text-[11px] text-stone-400 truncate">{u.email}</div>
+                </div>
+                {u.digital_twin_pro && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 shrink-0" data-testid={`already-granted-${u.id}`}>
+                    Acces deja acordat
+                  </span>
+                )}
+              </div>
             </button>
           ))}
         </div>
