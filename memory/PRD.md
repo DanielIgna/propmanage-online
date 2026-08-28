@@ -1,3 +1,23 @@
+## 🧼 DECONTAMINARE METRICĂ AUTONOMY (P1) — real vs seed/synthetic + stop auto_tune inflation (PREVIEW · Iun 2026)
+
+Cerință Fondator (P1, evidence-based, strict): separă usage REAL de seed/demo/test în calculul scorurilor Autonomous Engine și împiedică `auto_tune` să umfle artificial metricile. Folosește infra existentă, nu șterge date reale, nu recalcula artificial „în frumos", păstrează audit trail, marchează PREVIEW/PRODUCTION/UNKNOWN.
+
+**Cauza reală**: `auto_tune` (cron săptămânal + butoanele manuale Auto-Tune/Boost AI/Boost DEV) FABRICĂ date sintetice ce umflau scorurile — 17 docs seed + memorii seed (`source="autonomy_seed"`), 13 repair + 30 concierge (`synthetic_for_score_seed:True`), + mass-dismiss de findings reale. Markerii existau deja pe rânduri.
+
+**Livrat (PREVIEW, necesită redeploy)**:
+- **Calcul onest**: `engine.py::_score_ai` + `admin_ai.py::_compute_rolling_effectiveness`/`_compute_concierge_score` exclud sinteticul via markerii existenți; expun `excluded_seed_*`. → AI 69.6→49.6, general 86.5→83.9 (scădere ONESTĂ).
+- **Motorul de inflație oprit**: `run_auto_tune_orchestration` (pași seed+dismiss → `skipped`, flag `decontaminated`), `weekly_auto_tune_job` (second-pass agresiv eliminat), `/seed-ai-data` (NO-OP deprecated), `boost-dev` (doar Release Gate real). Dovadă: auto-tune dă acum `delta_general=0.0`.
+- **DB curat + audit**: `scripts/decontaminate_autonomy_synthetic.py` (dry-run/`--apply`) a șters DOAR rânduri tagged synthetic (17+13+30), logat în `autonomy_decontamination_log`.
+
+**Testare**: `tests/test_decontamination_p1.py` 12/12 PASS + e2e API + UI `/admin/autonomy`.
+
+**PRODUCTION**: contaminarea sintetică există și pe prod (cron rulat) → după redeploy rulează `scripts/decontaminate_autonomy_synthetic --apply` pe prod. Scorul de prod se corectează onest (în jos).
+
+**Risc rămas**: date DEMO/TEST în scoruri bazate pe `db.requests` (PREVIEW 204/209 = test) → aparține task-ului P0 „purge demo/test pe producție", nu unui filtru per-scor. NEMODIFICAT: snapshot-uri istorice, requests/users/Stripe/Beta/Function Map/`.skp`/db.projects.
+
+---
+
+
 ## ✅ EXECUȚIE AUTONOMĂ SAFE REALĂ — buclă închisă complet pe date reale (PREVIEW · Iun 2026)
 
 Cerință Fondator: dovada că Autonomous Engine execută SINGUR o acțiune SAFE+REVERSIBILĂ pe o problemă REALĂ (nu injectată, nu mock), buclă complet închisă. Preview real nu are un semnal SAFE de bounce peste prag (traficul e mic) → am adus în buclă a 2-a sursă REALĂ existentă (backlog findings Knowledge Center / `admin_ai_findings`), fără duplicare și fără scăderea controlului uman.

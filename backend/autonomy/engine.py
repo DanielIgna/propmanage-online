@@ -34,6 +34,18 @@ DEFAULT_TARGETS = {
 }
 
 
+# ============================================================================
+# Decontamination filters — exclude synthetic/seed rows from score inputs.
+# These rows are fabricated by the auto-tune/boost seeders purely to inflate
+# metrics; they carry explicit markers so real usage can be separated in the
+# calculation (no second demo-detection system, no data mutation here).
+# ============================================================================
+# ai_documents seeded by scripts.seed_autonomy_data → source == "autonomy_seed"
+REAL_DOC_FILTER = {"source": {"$ne": "autonomy_seed"}}
+# ai_memories seeded by scripts.seed_autonomy_data → source startswith "autonomy_seed"
+REAL_MEMORY_FILTER = {"source": {"$not": {"$regex": "^autonomy_seed"}}}
+
+
 def _clamp(v: float, lo: float = 0.0, hi: float = 100.0) -> float:
     return max(lo, min(hi, v))
 
@@ -331,23 +343,37 @@ async def _score_ai() -> dict:
         logger.warning(f"list_collection_names unavailable, falling back: {e}")
         coll_names = {"ai_memories", "ai_documents"}  # assume present; counts will be 0 if not
 
-    # Signal 2: AI memories accumulated (proxy for learning) — > 100 = mature
+    # Signal 2: AI memories accumulated (proxy for learning) — > 100 = mature.
+    # Excludes synthetic seed memories (source^="autonomy_seed") so maturity
+    # reflects REAL accumulated learning, not auto-tune padding.
     memories = 0
     if "ai_memories" in coll_names:
         try:
-            memories = await db.ai_memories.count_documents({})
+            memories = await db.ai_memories.count_documents(REAL_MEMORY_FILTER)
         except Exception:
             memories = 0
     maturity_pct = _clamp((memories / 100.0) * 100.0)
 
-    # Signal 3: docs RAG ingest count (proxy for knowledge base) — > 15 docs = good
+    # Signal 3: docs RAG ingest count (proxy for knowledge base) — > 15 docs = good.
+    # Excludes synthetic seed docs (source=="autonomy_seed") so knowledge base
+    # reflects REAL ingested documents, not the 17 fabricated internal docs.
     docs_count = 0
     if "ai_documents" in coll_names:
         try:
-            docs_count = await db.ai_documents.count_documents({})
+            docs_count = await db.ai_documents.count_documents(REAL_DOC_FILTER)
         except Exception:
             docs_count = 0
     knowledge_pct = _clamp((docs_count / 15.0) * 100.0)
+
+    # Transparency: how many synthetic/seed rows were excluded from scoring.
+    seed_docs = seed_mems = 0
+    try:
+        if "ai_documents" in coll_names:
+            seed_docs = await db.ai_documents.count_documents({"source": "autonomy_seed"})
+        if "ai_memories" in coll_names:
+            seed_mems = await db.ai_memories.count_documents({"source": {"$regex": "^autonomy_seed"}})
+    except Exception:
+        pass
 
     score = closure_pct * 0.50 + maturity_pct * 0.25 + knowledge_pct * 0.25
 
@@ -363,6 +389,8 @@ async def _score_ai() -> dict:
                 "findings_dismissed": dismissed,
                 "memories_count": memories,
                 "docs_count": docs_count,
+                "excluded_seed_docs": seed_docs,
+                "excluded_seed_memories": seed_mems,
             },
         },
     }

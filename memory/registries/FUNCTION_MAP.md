@@ -196,7 +196,7 @@
 - **Description**: Modul asociație de proprietari (buildings, campaigns, announcements, maintenance tasks, votes).
 - **Frontend**: `/app/frontend/src/components/BuildingHub.jsx`, `/app/frontend/src/pages/president/*`
 - **Backend**: `/app/backend/routes/community_buildings.py`, `/app/backend/routes/building_admin.py`
-- **API**: `/api/buildings/*`, `/api/community/*`
+- **API**: `/api/buildings/*`, `/api/campaigns/*`
 - **DB**: `buildings`, `community_campaigns`, `maintenance_tasks`, `building_announcements`
 - **Engine**: None (CRUD)
 - **AI Involvement**: NONE
@@ -228,7 +228,8 @@
 - **Health**: YELLOW
 - **Risk**: MEDIUM (P0 complexity `specialist_cockpit` CC=38)
 - **Owner**: Product
-- **Next action**: E2E test full marketplace flow
+- **Test**: preview E2E 2026-06 (iteration_213): client creează cerere reală (POST /api/requests → db.requests) → specialist acceptă (POST /accept). Request→offer→accept validat în PREVIEW.
+- **Next action**: E2E complet plată/escrow/review pe PRODUCȚIE (production evidence pending)
 
 ### FN-010 · PropBenefits Copilot
 - **Category**: BUSINESS
@@ -237,7 +238,7 @@
 - **Description**: AI copilot pentru sugestii beneficii + oportunități + deal negotiation.
 - **Frontend**: `/app/frontend/src/pages/PropBenefitsPage.jsx`
 - **Backend**: `/app/backend/propbenefits/copilot.py`, `/app/backend/propbenefits/opportunities.py`, `/app/backend/propbenefits/ai_agents.py`
-- **API**: `/api/prop-benefits/*`
+- **API**: `/api/benefits/*` (user), `/api/admin/prop-benefits/*` (admin)
 - **DB**: `prop_benefits`, `benefit_opportunities`, `benefit_deals`
 - **Engine**: Emergent LLM (Claude) + cache via MD5 signature
 - **Automation**: Opportunity queue builder
@@ -293,7 +294,8 @@
 - **Health**: GREEN
 - **Risk**: LOW
 - **Owner**: Fondator
-- **Next action**: Verify formula outputs vs. business reality
+- **Test**: preview smoke 2026-06 (GET /api/admin/enterprise-health → 200 JSON)
+- **Next action**: Verify formula outputs vs. business reality (production evidence pending)
 
 ### FN-013 · Research Coverage Matrix (Founder)
 - **Category**: SHARED
@@ -323,7 +325,7 @@
 - **Description**: Daily briefing generat automat + CEO dashboard consolidat.
 - **Frontend**: `/app/frontend/src/pages/admin/CeoDashboardPage.jsx`
 - **Backend**: `/app/backend/routes/ceo_briefing.py`, `/app/backend/routes/ceo_dashboard.py`
-- **API**: `/api/admin/ceo/*`
+- **API**: `/api/admin/ceo`, `/api/admin/ceo-briefing`
 - **DB**: agregă din multiple
 - **Engine**: Multi-source aggregator + LLM briefing
 - **Automation**: Daily briefing scheduler
@@ -335,7 +337,8 @@
 - **Health**: YELLOW
 - **Risk**: MEDIUM (P0 complexity `beta_overview` CC=68, `ceo_briefing` CC=50)
 - **Owner**: Fondator
-- **Next action**: Refactor top complex funcs (Sprint T2)
+- **Test**: preview smoke 2026-06 (GET /api/admin/ceo + /api/admin/ceo-briefing → 200 JSON)
+- **Next action**: Refactor top complex funcs (Sprint T2); verify LLM briefing pe producție (production evidence pending)
 
 ### FN-015 · AI Brain (Ledger + Decisions + Graph)
 - **Category**: INFRA
@@ -355,7 +358,8 @@
 - **Health**: YELLOW
 - **Risk**: MEDIUM (P0 complexity `instance_collaboration` CC=41, `_run_ai_verification` CC=39)
 - **Owner**: Infra
-- **Next action**: E2E test decision → approval → outcome loop
+- **Test**: preview smoke 2026-06 (GET /api/admin/ai-brain/status → 200 JSON)
+- **Next action**: E2E test decision → approval → outcome loop (production evidence pending)
 
 ### FN-016 · Operations Center
 - **Category**: SHARED
@@ -364,39 +368,40 @@
 - **Description**: Consolidator ops: incidents, backups, autonomy alerts, data integrity.
 - **Frontend**: `/app/frontend/src/pages/admin/OperationsCenter.jsx`
 - **Backend**: `/app/backend/routes/admin.py`, `/app/backend/routes/admin_backups.py`, `/app/backend/routes/admin_data_integrity.py`
-- **API**: `/api/admin/ops/*`, `/api/admin/backups/*`
+- **API**: `/api/admin/operations`, `/api/admin/backups`, `/api/admin/data-integrity/*`, `/api/admin/leads/followup/*`
 - **DB**: `backups_metadata`, `data_integrity_reports`, `ops_incidents`
 - **Engine**: Backup scheduler + integrity checker
 - **Automation**: Nightly backups, integrity checks
 - **AI Involvement**: OBSERVE
 - **Human Decision**: YES (restore requires approval)
 - **Autonomy**: OBSERVE
-- **Verification**: UNKNOWN
-- **Production verified**: UNKNOWN
-- **Health**: GREY
-- **Risk**: UNKNOWN
+- **Verification**: PARTIAL (preview-verified: `/operations`, `/backups`, `/data-integrity/history` → 200 JSON, smoke 2026-06)
+- **Production verified**: UNKNOWN (fără dovadă din producție)
+- **Health**: YELLOW
+- **Risk**: MEDIUM (restore backup = acțiune sensibilă, human-gated)
 - **Owner**: Ops
-- **Next action**: Verify backup restore E2E
+- **Test**: preview smoke 2026-06 (GET /api/admin/operations, /api/admin/backups, /api/admin/data-integrity/history → 200 JSON)
+- **Next action**: Verify backup RESTORE E2E (production evidence pending — nu am acces la producție)
 
 ### FN-017 · Voice Journal + Whisper Transcription
 - **Category**: BUSINESS
 - **Subcategory**: Product
-- **Lifecycle**: IMPLEMENTED
-- **Description**: Voice journaling cu Whisper STT.
-- **Frontend**: `/app/frontend/src/components/VoiceJournal.jsx`
-- **Backend**: `/app/backend/routes/voice_journal.py`
-- **API**: `/api/voice/journal`, `/api/voice/transcribe`
-- **DB**: `voice_journal_entries`
-- **Engine**: OpenAI Whisper (via Emergent LLM key)
-- **AI Involvement**: EXECUTE (auto-transcribe)
+- **Lifecycle**: PLANNED
+- **Description**: Voice journaling cu Whisper STT. **NECONSTRUIT** (vezi Next action).
+- **Frontend**: (inexistent — fără `VoiceJournal` folosit în app)
+- **Backend**: (inexistent — `backend/routes/voice_journal.py` NU există)
+- **API**: `/api/voice/*` (inexistent)
+- **DB**: `voice_journal_entries` (necreat)
+- **Engine**: OpenAI Whisper (via Emergent LLM key) — neintegrat
+- **AI Involvement**: NONE (neimplementat)
 - **Human Decision**: NO
-- **Autonomy**: EXECUTE_LOW_RISK
-- **Verification**: UNKNOWN
-- **Production verified**: UNKNOWN
+- **Autonomy**: NONE
+- **Verification**: UNKNOWN (cod inexistent — nimic de verificat)
+- **Production verified**: NO
 - **Health**: GREY
 - **Risk**: LOW
 - **Owner**: Product
-- **Next action**: Verify transcription accuracy + usage stats
+- **Next action**: NU există implementare în codebase (inspecție 2026-06: fără backend/routes/voice_journal.py, fără frontend `VoiceJournal` folosit, zero referințe `/api/voice/*`). Feature NECONSTRUIT — nu a fost fabricat pentru scor. Necesită decizie de produs + integrare Whisper pentru a fi construit (dependență blocantă).
 
 ### FN-018 · A/B Testing Framework
 - **Category**: INFRA
@@ -405,7 +410,7 @@
 - **Description**: Experimente A/B pe UI copy, CTA, layouts.
 - **Frontend**: `/app/frontend/src/pages/admin/analytics/AbTestingTab.jsx`
 - **Backend**: parte din `/app/backend/routes/analytics_growth.py`
-- **API**: `/api/admin/ab-tests/*`
+- **API**: `/api/admin/analytics/ab` (GET/POST/PATCH/DELETE)
 - **DB**: `ab_experiments`, `ab_assignments`
 - **Engine**: Deterministic hash assignment
 - **AI Involvement**: OBSERVE
@@ -416,7 +421,8 @@
 - **Health**: YELLOW
 - **Risk**: LOW
 - **Owner**: Growth
-- **Next action**: Verify statistical significance calculation
+- **Test**: preview smoke 2026-06 (GET /api/admin/analytics/ab → 200 JSON)
+- **Next action**: Verify statistical significance calculation (production evidence pending)
 
 ### FN-019 · Heatmap Analytics
 - **Category**: INFRA
@@ -436,6 +442,7 @@
 - **Health**: YELLOW
 - **Risk**: LOW
 - **Owner**: UX
+- **Test**: preview smoke 2026-06 (GET /api/admin/analytics/heatmap → 200 JSON)
 - **Next action**: Validate coordinate density on prod
 
 ### FN-020 · WhatsApp Growth Integration
