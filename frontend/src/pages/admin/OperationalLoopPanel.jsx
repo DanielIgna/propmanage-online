@@ -119,8 +119,9 @@ export default function OperationalLoopPanel() {
                 </div>
                 {st.hypothesis && <div className="mt-1.5 text-[11px] text-stone-400"><span className="text-stone-500">Ipoteză:</span> {st.hypothesis}</div>}
                 <div className="mt-1.5 flex flex-wrap gap-3 text-[11px]">
-                  {st.action?.type === "todo" && <Link to="/admin/todos" className="text-[#d4ff3a] hover:underline" data-testid={`loop-step-${i}-todo`}>→ Vezi task-ul</Link>}
-                  {st.action?.type === "approval" && <Link to="/admin/approvals" className="text-amber-300 hover:underline" data-testid={`loop-step-${i}-approval`}>→ Aprobare (gate uman)</Link>}
+                  {st.action?.type === "todo" && st.action?.todo_id && <Link to={`/admin/todo?focus=${st.action.todo_id}`} className="text-[#d4ff3a] hover:underline" data-testid={`loop-step-${i}-todo`}>→ Vezi task-ul</Link>}
+                  {st.action?.type === "approval" && st.action?.approval_id && <Link to={`/admin?tab=approvals&focus=${st.action.approval_id}`} className="text-amber-300 hover:underline" data-testid={`loop-step-${i}-approval`}>→ Aprobare (gate uman)</Link>}
+                  {st.action?.type === "blocked_governance" && <span className="text-amber-300" data-testid={`loop-step-${i}-blocked`}>⛔ Blocat de guvernanță (autopilot OFF)</span>}
                   <span className="text-stone-600">actor: {st.actor}</span>
                 </div>
               </div>

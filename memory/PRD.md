@@ -1,3 +1,19 @@
+## 🛠️ FIX-uri validare producție — Loop Operațional (deep-links · materialize · guvernanță) + execuție autonomă reală (PREVIEW · Iun 2026)
+
+Cerință Fondator (consolidat din 3 prompturi suprapuse, prioritizat pe cel mai specific): activarea execuției autonome reale + 3 buguri concrete găsite la validarea pe `/admin/autonomy`, fără redesign, fără sinteză de date în producție, respectând guvernanța existentă.
+
+**Fix-uri (toate PREVIEW, necesită redeploy):**
+- **#1 Deep-links Loop Operațional** — „Vezi task-ul" → `/admin/todo?focus=<todo_id>` (task real evidențiat); „Aprobare" → `/admin?tab=approvals&focus=<approval_id>` (approval real evidențiat). Zero fallback homepage; lipsă artefact → „indisponibil" inline.
+- **#2 „Materializează ca TODO-uri"** — cauză: de-dup regex cu `[`/`(` → regex invalid → 500 HTML → `r.json()` crăpa. Fix: `re.escape` + endpoint JSON-safe + frontend pe axios. Idempotent.
+- **#3 Guvernanță/buget** — sursa de adevăr = `self_driving_settings.main.low_risk_autopilot` (kill-switch existent). Loop-ul îl respectă: OFF → SAFE nu se execută (fail-safe, `blocked_by_governance`, motiv în ledger). Fără buget monetar; limite per-rulare = `MAX_FINDINGS_PER_RUN`+dedup.
+
+**Execuție autonomă reală (bucla închisă):** run real preview → detectează problema reală `/client` (abandon în fluxul de cerere, MEDIUM) → decizie policy → acțiune = propunere în `admin_approvals` (gate uman) → verify → `autonomy_loop_runs`. SAFE auto-execuție (fără aprobare) dovedită E2E controlat + gate de guvernanță; pe date reale de producție va declanșa auto-execuție pe paginile cu bounce mare.
+
+**Testat:** `tests/test_loop_fixes_e2e.py` (materialize idempotent + guvernanță ON/OFF) + `test_reports/iteration_215.json` (UI deep-links 100%, fără redirect homepage). Function Map: NEMODIFICAT (per cerință; tratat în prompt separat).
+
+---
+
+
 ## 🔁 OPERATIONAL AUTONOMY LOOP (FN-021) — Analytics→Knowledge→Autonomous→Action→Verify→Learn (PREVIEW · Iun 2026)
 
 Cerere Fondator: transformarea infrastructurii existente într-un LOOP REAL (OBSERVE→UNDERSTAND→DECIDE→ACT→VERIFY→LEARN), fără duplicare, fără cosmetizarea scorurilor, cu un E2E real. Aprobat exact scope-ul; verificare finală obligatorie: idempotent + bounded + safe-on-rerun.

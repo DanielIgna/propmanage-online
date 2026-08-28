@@ -650,14 +650,13 @@ export const AutonomyEnginePage = () => {
                 onClick={async () => {
                   if (!window.confirm("Materializez recomandările ca TODO-uri în /admin/todo?")) return;
                   try {
-                    const r = await fetch(`${API}/api/admin/autonomy/generate-tasks`, {
-                      method: "POST", credentials: "include",
-                      headers: { "Content-Type": "application/json", "X-PM-Client": "propmanage-app" },
-                      body: JSON.stringify({ max_items: 6 }),
-                    });
-                    const data = await r.json();
+                    const { data } = await ax.post("/api/admin/autonomy/generate-tasks", { max_items: 6 });
+                    if (data?.ok === false) { alert("Eroare la materializare: " + (data.error || "necunoscută")); return; }
                     alert(`${data.counts?.injected || 0} TODO-uri create, ${data.counts?.skipped || 0} duplicate.`);
-                  } catch (e) { alert("Eroare: " + e.message); }
+                  } catch (e) {
+                    const msg = e?.response?.data?.detail || e?.response?.data?.error || e.message || "Eroare necunoscută";
+                    alert("Eroare la materializare: " + msg);
+                  }
                 }}
                 className="ml-auto text-[10px] inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#d4ff3a]/15 border border-[#d4ff3a]/40 text-[#d4ff3a] hover:bg-[#d4ff3a]/25"
                 data-testid="autonomy-generate-tasks"

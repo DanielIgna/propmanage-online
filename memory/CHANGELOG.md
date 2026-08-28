@@ -4,6 +4,13 @@ Rol: jurnal cronologic al schimbărilor semnificative + sincronizărilor de cuno
 
 ---
 
+## 2026-06 · FIX-uri validare producție Loop Operațional (deep-links + materialize + guvernanță) — PREVIEW
+- **#1 Deep-links Loop Operațional**: „Vezi task-ul" → `/admin/todo?focus=<todo_id>` (evidențiază task-ul real), „Aprobare (gate uman)" → `/admin?tab=approvals&focus=<approval_id>` (evidențiază approval-ul real). Fără fallback la homepage; dacă artefactul lipsește → mesaj inline „indisponibil" (`todo-focus-missing` / `approval-focus-missing`). Fișiere: `OperationalLoopPanel.jsx`, `AdminTodoBoard.jsx`, `AdminApprovals.jsx`.
+- **#2 „Materializează ca TODO-uri" (500 → JSON valid)**: cauză reală = de-dup regex `^{text[:60]}` cu `[`/`(` din textul recomandării → regex invalid → Mongo error → HTML 500 → `r.json()` crăpa în UI. Fix: `re.escape(...)` la de-dup + endpoint `generate-tasks` returnează mereu JSON (și pe eroare) + frontend pe `axios` (nu `fetch` cu `.json()` orb). Idempotent (fără duplicate). Fișiere: `routes/autonomy.py`, `AutonomyEnginePage.jsx`.
+- **#3 Guvernanță/buget**: sursa de adevăr = `self_driving_settings.main.low_risk_autopilot` (kill-switch EXISTENT). Loop-ul îl RESPECTĂ: dacă e OFF → SAFE NU se auto-execută (fail-safe, `outcome:"blocked_by_governance"`, motiv în `autonomy_loop_runs`); MEDIUM/HIGH oricum la aprobare umană. NU există buget monetar separat; limitele per-rulare = `MAX_FINDINGS_PER_RUN`+dedup. Fișiere: `autonomy/loop.py`. Bug fix bonus: finding `blocked_governance` se reîncearcă la re-run (nu mai e tratat ca „handled").
+- Testat: `tests/test_loop_fixes_e2e.py` (materialize idempotent + guvernanță ON/OFF PASS) + `test_reports/iteration_215.json` (UI deep-links 100%, fără redirect homepage). Function Map: NEMODIFICAT (per cerință).
+
+
 ## 2026-06 · OPERATIONAL AUTONOMY LOOP (FN-021) — bucla închisă Analytics→Acțiune (PREVIEW, necesită redeploy)
 - Construită veriga LIPSĂ a autonomiei: **Analytics → Finding → Decizie(policy risc) → Acțiune → Verify → Learn**. Zero sisteme paralele: findings=`admin_ai_findings`, task-uri=`admin_todos`, aprobări=`admin_approvals`, singura colecție nouă=`autonomy_loop_runs` (ledger). Modul `backend/autonomy/loop.py` + endpoints `/api/admin/autonomy/loop/{run,runs,policy}` + panou UI în `/admin/autonomy` (`OperationalLoopPanel.jsx`) + job scheduler la 3h.
 - Detectoare DETERMINISTE peste Analytics existent + funnel comercial: `high_bounce_page` (SAFE→auto todo) și `request_flow_abandonment` (MEDIUM→aprobare umană). Politică risc: SAFE/REVERSIBLE→auto-execuție; MEDIUM/HIGH→gate uman obligatoriu (admin_approvals). Idempotent, bounded, safe-on-rerun.

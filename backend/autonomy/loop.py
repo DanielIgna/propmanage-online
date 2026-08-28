@@ -204,6 +204,19 @@ def _fn_for_route(route: str) -> str:
 
 
 # ═══════════════════════ 3+4. DECIDE / POLICY / RISK + ACT ═══════════════════════
+async def _governance() -> dict:
+    """Sursa de adevăr pentru execuția autonomă = `self_driving_settings` (kill-switch EXISTENT,
+    prin `self_driving.get_settings()`). NU există buget monetar separat în platformă; limitele
+    per-rulare = `MAX_FINDINGS_PER_RUN` + fereastra de dedup. Loop-ul RESPECTĂ acest kill-switch:
+    dacă `low_risk_autopilot` e OFF, NU auto-execută (fail-safe, motiv înregistrat în ledger)."""
+    try:
+        from autonomy.self_driving import get_settings
+        s = await get_settings()
+        return {"low_risk_autopilot": bool(s.get("low_risk_autopilot", True)), "source": "self_driving_settings.main"}
+    except Exception:  # noqa: BLE001
+        return {"low_risk_autopilot": True, "source": "default"}
+
+
 async def _existing_todo_for(key: str) -> dict | None:
     return await db.admin_todos.find_one({"source": SOURCE, "finding_key": key, "done": False})
 
@@ -265,13 +278,23 @@ async def _create_approval(finding: dict) -> dict:
     return {"approval_id": approval_id, "reused": False}
 
 
-async def decide_and_act(finding: dict) -> dict:
+async def decide_and_act(finding: dict, autoexec_allowed: bool = True) -> dict:
     """Clasifică riscul și acționează. SAFE → auto todo + rezolvă finding.
     MEDIUM/HIGH → propunere aprobare (gate uman), finding rămâne open.
-    Safe-on-failure: creăm întâi artefactul, apoi marcăm finding-ul."""
+    Respectă guvernanța: dacă `autoexec_allowed` e False (kill-switch OFF), SAFE NU se execută
+    (fail-safe, finding rămâne open, motiv înregistrat). Safe-on-failure: creăm întâi artefactul."""
     action_class = finding.get("action_class") or ACTION_POLICY.get(finding.get("pattern"), "MEDIUM")
     key = finding["composite_key"]
     if action_class in ("SAFE", "REVERSIBLE"):
+        if not autoexec_allowed:
+            await db.admin_ai_findings.update_one(
+                {"composite_key": key},
+                {"$set": {"status": "open", "autonomy_action": {"type": "blocked_governance",
+                          "class": action_class, "reason": "low_risk_autopilot OFF (self_driving_settings)"}}},
+            )
+            return {"action_class": action_class, "actor": "autonomous(blocat)",
+                    "action": {"type": "blocked_governance", "reason": "low_risk_autopilot OFF (self_driving_settings)"},
+                    "rollback": {"how": "n/a — nicio execuție"}, "human_gate": False, "blocked": True}
         res = await _create_todo(finding)
         # marcăm finding-ul rezolvat DOAR după ce task-ul de remediere există (safe)
         await db.admin_ai_findings.update_one(
@@ -349,27 +372,31 @@ async def run_loop_tick(triggered_by: str = "manual") -> dict:
     run_id = str(uuid.uuid4())
     started_at = _now()
     steps = []
+    gov = await _governance()
     observations = await observe()
     current_keys = {_composite_key(o) for o in observations}
     findings_created = 0
-    actions_taken = {"todo": 0, "approval": 0}
+    actions_taken = {"todo": 0, "approval": 0, "blocked_governance": 0}
     for obs in observations:
         try:
             finding, created = await get_or_create_finding(obs)
             if created:
                 findings_created += 1
-            # dacă finding-ul e deja handled (resolved cu acțiune / approval pending) → nu re-acționăm
+            # dacă finding-ul e deja handled real (todo/approval) → nu re-acționăm.
+            # blocked_governance NU e „handled" → se reîncearcă când guvernanța permite.
             already = finding.get("autonomy_action")
-            if not created and already:
+            if not created and already and already.get("type") != "blocked_governance":
                 steps.append({"detector": obs["detector"], "route": obs["affected_route"],
                               "finding_key": finding["composite_key"], "created": False,
                               "decision": "no_change (deja procesat)", "action": already, "verify": {"ok": True}})
                 continue
-            act = await decide_and_act(finding)
+            act = await decide_and_act(finding, autoexec_allowed=gov["low_risk_autopilot"])
             if act["action"]["type"] == "todo" and not act["action"].get("reused"):
                 actions_taken["todo"] += 1
             elif act["action"]["type"] == "approval" and not act["action"].get("reused"):
                 actions_taken["approval"] += 1
+            elif act["action"]["type"] == "blocked_governance":
+                actions_taken["blocked_governance"] += 1
             ver = await verify(finding, act)
             steps.append({
                 "detector": obs["detector"], "route": obs["affected_route"],
@@ -392,13 +419,14 @@ async def run_loop_tick(triggered_by: str = "manual") -> dict:
         "triggered_by": triggered_by,
         "started_at": started_at,
         "finished_at": _now(),
+        "governance": gov,
         "observations": len(observations),
         "findings_created": findings_created,
         "actions_taken": actions_taken,
         "learned": learned,
         "operational_score_after": op_after,
         "steps": steps,
-        "outcome": "applied" if (findings_created or actions_taken["todo"] or actions_taken["approval"] or learned["auto_resolved"]) else "no_change",
+        "outcome": "applied" if (findings_created or actions_taken["todo"] or actions_taken["approval"] or learned["auto_resolved"]) else ("blocked_by_governance" if actions_taken["blocked_governance"] else "no_change"),
     }
     await db.autonomy_loop_runs.insert_one(dict(run))
     run.pop("_id", None)

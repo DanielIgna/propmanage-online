@@ -8,6 +8,7 @@ Endpoints (admin-only):
   PUT  /api/admin/autonomy/targets    — Update targets/weights
 """
 import logging
+import re
 import uuid
 from datetime import datetime, timezone, timedelta
 
@@ -344,12 +345,17 @@ async def generate_tasks(
     payload: dict = Body(default={}),
     user=Depends(require_role("admin")),
 ):
-    """Materialize current recommendations as actionable TODOs in admin_todos."""
-    return await materialize_recommendations(
-        max_items=int(payload.get("max_items", 6)),
-        min_impact=float(payload.get("min_impact", 0.0)),
-        dry_run=bool(payload.get("dry_run", False)),
-    )
+    """Materialize current recommendations as actionable TODOs in admin_todos.
+    Întoarce mereu JSON valid (și pe eroare), ca frontend-ul să nu primească HTML 500."""
+    try:
+        return await materialize_recommendations(
+            max_items=int(payload.get("max_items", 6)),
+            min_impact=float(payload.get("min_impact", 0.0)),
+            dry_run=bool(payload.get("dry_run", False)),
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.exception("[autonomy] generate-tasks failed")
+        return {"ok": False, "error": str(e)[:300], "counts": {"injected": 0, "skipped": 0, "considered": 0}}
 
 
 async def materialize_recommendations(max_items: int = 6, min_impact: float = 0.0, dry_run: bool = False) -> dict:
@@ -370,8 +376,8 @@ async def materialize_recommendations(max_items: int = 6, min_impact: float = 0.
         priority = _PRIORITY_TODO_MAP.get(r.get("priority", "medium"), "medium")
         text = f"[Autonomy · {area_label}] {r.get('action','(no action)')}"
         text = text[:500]
-        # de-dupe (case-insensitive)
-        existing = await db.admin_todos.find_one({"text": {"$regex": f"^{text[:60]}", "$options": "i"}})
+        # de-dupe (case-insensitive) — re.escape ca textul cu [ ] ( ) · să nu producă regex invalid → 500
+        existing = await db.admin_todos.find_one({"text": {"$regex": f"^{re.escape(text[:60])}", "$options": "i"}})
         if existing:
             skipped.append({"text": text, "reason": "duplicate"})
             continue
