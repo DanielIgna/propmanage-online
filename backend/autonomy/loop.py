@@ -232,7 +232,7 @@ async def _create_todo(finding: dict) -> dict:
         return {"todo_id": existing["id"], "reused": True}
     todo = {
         "id": str(uuid.uuid4()),
-        "text": f"[Autonomy·Analytics] {finding['recommended_action']}",
+        "text": f"[Autonomy] {finding['recommended_action']}",
         "priority": "medium" if finding["severity"] == "medium" else "low",
         "done": False,
         "created_at": _now(),
@@ -355,6 +355,105 @@ async def learn(current_keys: set[str]) -> dict:
     return {"auto_resolved": len(resolved), "keys": resolved}
 
 
+# ═══════════════════════ OBSERVE #2: backlog findings Knowledge Center ═══════════════════════
+# A doua sursă REALĂ (fără duplicare): findings DEJA existente în admin_ai_findings (Knowledge Center).
+# NON-destructive → SAFE (task de remediere, reversibil). Destructive (orphan_twins etc.) NU sunt
+# atinse aici — au fluxul lor cu aprobare umană (Data Integrity). Controlul uman NU scade.
+KNOWLEDGE_SAFE_PATTERNS = {"stale_project"}
+KNOWLEDGE_POLICY = {
+    "stale_project": {
+        "action_class": "SAFE",
+        "recommended_action": "Revizuiește proiectul blocat (30+ zile fără activitate): reactivează, pune pe hold sau închide.",
+        "verification_criteria": "proiectul primește activitate nouă SAU un admin îi schimbă statusul.",
+    },
+}
+
+
+async def observe_knowledge_findings(limit: int = 3) -> list[dict]:
+    """Observă findings reale deschise (whitelist non-destructiv), fără autonomy_action. Trasabil la finding."""
+    out = []
+    cur = db.admin_ai_findings.find({
+        "status": "open", "source": {"$ne": SOURCE},
+        "pattern": {"$in": list(KNOWLEDGE_SAFE_PATTERNS)},
+        "autonomy_action": {"$exists": False},
+    }).limit(limit)
+    async for f in cur:
+        pat = f.get("pattern")
+        pol = KNOWLEDGE_POLICY.get(pat, {})
+        out.append({
+            "mode": "existing_finding", "detector": f"knowledge:{pat}",
+            "composite_key": f.get("composite_key"), "finding_id": f.get("id"),
+            "affected_route": f"{f.get('entity_type')}:{f.get('entity_id')}",
+            "affected_function": "FN-009 Marketplace / Proiecte",
+            "severity": "low" if (f.get("severity") in (None, "info", "low", "warning")) else "medium",
+            "confidence": 0.9, "action_class": pol.get("action_class", "MEDIUM"),
+            "raw_observation": {"finding_id": f.get("id"), "pattern": pat, "entity_id": f.get("entity_id"),
+                                "first_seen_at": f.get("first_seen_at"), "description": f.get("description"),
+                                "source_collection": "admin_ai_findings"},
+            "hypothesis": f.get("description") or "Finding real din Knowledge Center.",
+            "recommended_action": pol.get("recommended_action", "Revizuiește finding-ul."),
+            "verification_criteria": pol.get("verification_criteria", ""),
+        })
+    return out
+
+
+async def act_on_existing_finding(obs: dict, autoexec_allowed: bool) -> dict:
+    """Acționează pe un finding REAL existent. SAFE → task de remediere (reversibil, fără aprobare);
+    altfel → aprobare umană. Respectă guvernanța (kill-switch)."""
+    key = obs["composite_key"]
+    action_class = obs["action_class"]
+    finding = {"composite_key": key, "severity": obs["severity"],
+               "recommended_action": obs["recommended_action"], "evidence": obs["raw_observation"]}
+    if action_class in ("SAFE", "REVERSIBLE"):
+        if not autoexec_allowed:
+            await db.admin_ai_findings.update_one({"composite_key": key},
+                {"$set": {"autonomy_action": {"type": "blocked_governance", "class": action_class,
+                          "reason": "low_risk_autopilot OFF (self_driving_settings)"}}})
+            return {"action_class": action_class, "actor": "autonomous(blocat)",
+                    "action": {"type": "blocked_governance", "reason": "low_risk_autopilot OFF"},
+                    "rollback": {"how": "n/a"}, "human_gate": False, "blocked": True}
+        res = await _create_todo(finding)
+        await db.admin_ai_findings.update_one({"composite_key": key},
+            {"$set": {"status": "triaged", "autonomy_action": {"type": "todo", "todo_id": res["todo_id"],
+                      "class": action_class, "by": "autonomy_loop", "at": _now()}}})
+        return {"action_class": action_class, "actor": "autonomous",
+                "action": {"type": "todo", "todo_id": res["todo_id"], "reused": res["reused"]},
+                "rollback": {"how": "close/delete todo + $unset autonomy_action", "todo_id": res["todo_id"]},
+                "human_gate": False}
+    res = await _create_approval(finding)
+    await db.admin_ai_findings.update_one({"composite_key": key},
+        {"$set": {"autonomy_action": {"type": "approval", "approval_id": res["approval_id"],
+                  "class": action_class, "awaiting": "human_approval"}}})
+    return {"action_class": action_class, "actor": "autonomous→human",
+            "action": {"type": "approval", "approval_id": res["approval_id"], "reused": res["reused"]},
+            "rollback": {"how": "reject approval"}, "human_gate": True}
+
+
+async def _emit_analytics(signal: str, meta: dict) -> None:
+    """Închide bucla înapoi în Analytics: eveniment măsurabil în analytics_events (colecție existentă).
+    Eveniment de sistem (visitor_id=system:autonomy_loop) → NU creează sesiune, NU afectează bounce/funnel."""
+    try:
+        await db.analytics_events.insert_one({
+            "type": "autonomy", "intent_signal": signal, "path": "/admin/autonomy",
+            "visitor_id": "system:autonomy_loop", "session_id": "system:autonomy_loop",
+            "ts": _now(), "day": datetime.now(timezone.utc).date().isoformat(),
+            "meta": meta, "tenant_id": "main",
+        })
+    except Exception:  # noqa: BLE001
+        pass
+
+
+async def _scores_snapshot() -> dict | None:
+    try:
+        from routes.autonomy import load_targets
+        from autonomy.engine import compute_autonomy_scores
+        cfg = await load_targets()
+        rep = await compute_autonomy_scores(weights=cfg["weights"], targets=cfg["targets"])
+        return rep.get("scores")
+    except Exception:  # noqa: BLE001
+        return None
+
+
 # ═══════════════════════ ORCHESTRATOR ═══════════════════════
 async def _operational_score() -> float | None:
     try:
@@ -373,6 +472,7 @@ async def run_loop_tick(triggered_by: str = "manual") -> dict:
     started_at = _now()
     steps = []
     gov = await _governance()
+    scores_before = await _scores_snapshot()
     observations = await observe()
     current_keys = {_composite_key(o) for o in observations}
     findings_created = 0
@@ -412,19 +512,53 @@ async def run_loop_tick(triggered_by: str = "manual") -> dict:
             logger.warning(f"[loop] step failed for {obs.get('detector')}: {e}")
             steps.append({"detector": obs.get("detector"), "route": obs.get("affected_route"),
                           "error": str(e)[:200], "verify": {"ok": False}})
+    # OBSERVE #2 — backlog findings Knowledge Center (surse REALE existente, non-destructive → SAFE)
+    knowledge_obs = await observe_knowledge_findings()
+    for kobs in knowledge_obs:
+        try:
+            act = await act_on_existing_finding(kobs, autoexec_allowed=gov["low_risk_autopilot"])
+            a_type = act["action"]["type"]
+            if a_type == "todo" and not act["action"].get("reused"):
+                actions_taken["todo"] += 1
+                await _emit_analytics("autonomy_action_executed", {"finding_key": kobs["composite_key"],
+                    "detector": kobs["detector"], "action": "todo", "todo_id": act["action"]["todo_id"],
+                    "class": act["action_class"], "affected_function": kobs["affected_function"]})
+            elif a_type == "approval" and not act["action"].get("reused"):
+                actions_taken["approval"] += 1
+            elif a_type == "blocked_governance":
+                actions_taken["blocked_governance"] += 1
+            ver = await verify({"composite_key": kobs["composite_key"]}, act)
+            steps.append({
+                "detector": kobs["detector"], "route": kobs["affected_route"], "source": "knowledge_center",
+                "severity": kobs["severity"], "confidence": kobs["confidence"],
+                "finding_key": kobs["composite_key"], "created": False,
+                "raw_observation": kobs["raw_observation"], "hypothesis": kobs["hypothesis"],
+                "recommended_action": kobs["recommended_action"],
+                "decision": f"{act['action_class']} → {a_type}" + (" (aprobare umană)" if act["human_gate"] else " (auto)"),
+                "action": act["action"], "actor": act["actor"], "human_gate": act["human_gate"],
+                "rollback": act["rollback"], "verify": ver, "affected_function": kobs["affected_function"],
+            })
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[loop] knowledge step failed {kobs.get('detector')}: {e}")
+            steps.append({"detector": kobs.get("detector"), "route": kobs.get("affected_route"),
+                          "source": "knowledge_center", "error": str(e)[:200], "verify": {"ok": False}})
+
     learned = await learn(current_keys)
     op_after = await _operational_score()
+    scores_after = await _scores_snapshot()
     run = {
         "id": run_id,
         "triggered_by": triggered_by,
         "started_at": started_at,
         "finished_at": _now(),
         "governance": gov,
-        "observations": len(observations),
+        "observations": len(observations) + len(knowledge_obs),
         "findings_created": findings_created,
         "actions_taken": actions_taken,
         "learned": learned,
         "operational_score_after": op_after,
+        "scores_before": scores_before,
+        "scores_after": scores_after,
         "steps": steps,
         "outcome": "applied" if (findings_created or actions_taken["todo"] or actions_taken["approval"] or learned["auto_resolved"]) else ("blocked_by_governance" if actions_taken["blocked_governance"] else "no_change"),
     }

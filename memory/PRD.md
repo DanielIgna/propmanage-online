@@ -1,3 +1,14 @@
+## ✅ EXECUȚIE AUTONOMĂ SAFE REALĂ — buclă închisă complet pe date reale (PREVIEW · Iun 2026)
+
+Cerință Fondator: dovada că Autonomous Engine execută SINGUR o acțiune SAFE+REVERSIBILĂ pe o problemă REALĂ (nu injectată, nu mock), buclă complet închisă. Preview real nu are un semnal SAFE de bounce peste prag (traficul e mic) → am adus în buclă a 2-a sursă REALĂ existentă (backlog findings Knowledge Center / `admin_ai_findings`), fără duplicare și fără scăderea controlului uman.
+
+**Buclă executată real (fără injecție):** detectat finding real `stale_project` (proiect blocat 30+ zile) → SAFE (low, non-destructiv) → decis fără aprobare (guvernanță `low_risk_autopilot` ON) → task real de remediere în `admin_todos` (1648b1ff…) → verify independent → audit `autonomy_loop_runs` (scores_before/after) → Knowledge Center (finding `triaged` + `autonomy_action`) → Analytics (`analytics_events: autonomy_action_executed`) → scoruri recalculate. Idempotent (re-run = 0 duplicate). Orphan_twins & alte destructive → rămân la aprobare umană.
+
+**Preview vs Production**: executat și verificat în PREVIEW. Pe producție (unde există și semnale SAFE de bounce reale), după redeploy loop-ul va executa la fel pe findings reale de producție.
+
+---
+
+
 ## 🛠️ FIX-uri validare producție — Loop Operațional (deep-links · materialize · guvernanță) + execuție autonomă reală (PREVIEW · Iun 2026)
 
 Cerință Fondator (consolidat din 3 prompturi suprapuse, prioritizat pe cel mai specific): activarea execuției autonome reale + 3 buguri concrete găsite la validarea pe `/admin/autonomy`, fără redesign, fără sinteză de date în producție, respectând guvernanța existentă.

@@ -4,6 +4,13 @@ Rol: jurnal cronologic al schimbărilor semnificative + sincronizărilor de cuno
 
 ---
 
+## 2026-06 · EXECUȚIE AUTONOMĂ SAFE REALĂ pe date reale (bucla închisă complet) — PREVIEW
+- Adăugată a 2-a sursă REALĂ de OBSERVE în loop (fără duplicare): backlog-ul de findings existent din Knowledge Center (`admin_ai_findings`). Whitelist NON-destructiv → SAFE (`stale_project`); destructive (orphan_twins etc.) NU sunt atinse — rămân la fluxul lor cu aprobare umană (control uman păstrat). Fișier: `autonomy/loop.py` (`observe_knowledge_findings`, `act_on_existing_finding`).
+- **Buclă închisă REALĂ executată pe date reale (fără injecție)**: detectat finding real `stale_project` (proiect 6a1ab71b… blocat 30+ zile) → clasificat SAFE (low, non-destructiv) → decis fără aprobare (guvernanță `low_risk_autopilot` ON) → EXECUTAT: task real de remediere în `admin_todos` (id 1648b1ff…) → verificat independent (todo există + finding triaged) → audit în `autonomy_loop_runs` (cu `scores_before`/`scores_after`) → Knowledge Center actualizat (finding `status:triaged` + `autonomy_action`) → Analytics actualizat (`analytics_events`: `autonomy_action_executed`, eveniment de sistem, nu afectează bounce/funnel) → scoruri recalculate (general 86.9→87.0).
+- Idempotent/bounded/safe verificat: re-run → 0 duplicate (finding cu `autonomy_action` e exclus din re-detectare). Guvernanță respectată (OFF → `blocked_by_governance`, motiv în ledger). Analytics feedback = capacitatea existentă introdusă în buclă fără duplicare și fără scăderea controlului uman.
+- NEMODIFICAT: mecanismul Orphan Twins, requests/users/properties/tranzacții, scoring, Function Map, abonament, Client/Specialist Beta.
+
+
 ## 2026-06 · FIX-uri validare producție Loop Operațional (deep-links + materialize + guvernanță) — PREVIEW
 - **#1 Deep-links Loop Operațional**: „Vezi task-ul" → `/admin/todo?focus=<todo_id>` (evidențiază task-ul real), „Aprobare (gate uman)" → `/admin?tab=approvals&focus=<approval_id>` (evidențiază approval-ul real). Fără fallback la homepage; dacă artefactul lipsește → mesaj inline „indisponibil" (`todo-focus-missing` / `approval-focus-missing`). Fișiere: `OperationalLoopPanel.jsx`, `AdminTodoBoard.jsx`, `AdminApprovals.jsx`.
 - **#2 „Materializează ca TODO-uri" (500 → JSON valid)**: cauză reală = de-dup regex `^{text[:60]}` cu `[`/`(` din textul recomandării → regex invalid → Mongo error → HTML 500 → `r.json()` crăpa în UI. Fix: `re.escape(...)` la de-dup + endpoint `generate-tasks` returnează mereu JSON (și pe eroare) + frontend pe `axios` (nu `fetch` cu `.json()` orb). Idempotent (fără duplicate). Fișiere: `routes/autonomy.py`, `AutonomyEnginePage.jsx`.
