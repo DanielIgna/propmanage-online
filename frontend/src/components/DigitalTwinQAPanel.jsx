@@ -18,6 +18,7 @@ export const DigitalTwinQAPanel = ({ projectId, projectName, onClose }) => {
   const [busy, setBusy] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [suggestions, setSuggestions] = useState([]); // { text, based_on }
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -32,6 +33,11 @@ export const DigitalTwinQAPanel = ({ projectId, projectName, onClose }) => {
       })
       .catch(() => {})
       .finally(() => setLoadingHistory(false));
+    // Evidence-based suggested questions (derived from the property's real data)
+    axios
+      .get(`${API}/digital-twin/qa/suggestions`, { params: { project_id: projectId } })
+      .then((r) => setSuggestions(r.data.suggestions || []))
+      .catch(() => setSuggestions([]));
   }, [projectId]);
 
   useEffect(() => {
@@ -133,17 +139,25 @@ export const DigitalTwinQAPanel = ({ projectId, projectName, onClose }) => {
         )}
 
         {!loadingHistory && turns.length === 0 && (
-          <div className="flex flex-wrap gap-1.5 justify-center pt-2">
-            {SUGGESTIONS.map((s) => (
-              <button
-                key={s}
-                onClick={() => ask(s)}
-                className="px-2.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-[11px] text-stone-300"
-                data-testid={`dt-qa-suggestion-${s.slice(0, 8)}`}
-              >
-                {s}
-              </button>
-            ))}
+          <div className="pt-2 space-y-2">
+            {(suggestions.length ? suggestions : SUGGESTIONS.map((t) => ({ text: t, based_on: null }))).length > 0 && (
+              <p className="text-[10px] uppercase tracking-[0.14em] text-stone-500 text-center">
+                {suggestions.length ? "Sugestii din dovezile proprietății" : "Întrebări utile"}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-1.5 justify-center">
+              {(suggestions.length ? suggestions : SUGGESTIONS.map((t) => ({ text: t, based_on: null }))).map((s, i) => (
+                <button
+                  key={i}
+                  onClick={() => ask(s.text)}
+                  title={s.based_on ? `pe baza: ${s.based_on}` : undefined}
+                  className="px-2.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-[11px] text-stone-300 border border-white/5"
+                  data-testid={`dt-qa-suggestion-${i}`}
+                >
+                  {s.text}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>

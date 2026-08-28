@@ -207,6 +207,70 @@ async def ask(payload: AskIn, user: dict = Depends(get_current_user)):
     return {"answer": answer, "context_size": len(context), "session_id": sid, "provider": result.get("provider"), "model": result.get("model")}
 
 
+@router.get("/suggestions")
+async def suggestions(project_id: str = Query(min_length=3), user: dict = Depends(get_current_user)):
+    """Întrebări sugerate DERIVATE din dovezile REALE ale proprietății (nu generice, nu decorative).
+
+    Fiecare sugestie apare DOAR dacă evidența corespunzătoare există (camere, documente, lucrări,
+    House Health, modele AI, pin-uri). Se trimit prin același pipeline Q&A pe dovezi."""
+    project = await db.digital_twin_projects.find_one({"id": project_id})
+    if not project:
+        raise HTTPException(404, "Project not found")
+    owner_ok = str(project.get("owner_id")) == str(user.get("id"))
+    member_ok = user.get("id") in (project.get("members") or [])
+    admin_ok = user.get("role") in ("admin", "operator")
+    if not (owner_ok or member_ok or admin_ok):
+        raise HTTPException(403, "Access denied")
+
+    out = []
+
+    # Evidence: 2D plans / rooms
+    plan = await db.digital_twin_plans.find_one({"project_id": project_id, "rooms.0": {"$exists": True}})
+    has_plan_rooms = bool(plan)
+
+    # Evidence: uploaded models + AI models
+    models_n = await db.digital_twin_models.count_documents({"project_id": project_id})
+    pins_n = await db.digital_twin_pins.count_documents({"project_id": project_id})
+
+    prop_id = project.get("property_id")
+    prop = None
+    twin_rooms = 0
+    docs_n = works_n = 0
+    ai_n = 0
+    if prop_id:
+        try:
+            from bson import ObjectId as _OID
+            prop = await db.properties.find_one({"_id": _OID(prop_id)})
+        except Exception:  # noqa: BLE001
+            prop = None
+        twin = await db.twins.find_one({"property_id": prop_id}, {"rooms": 1})
+        twin_rooms = len((twin or {}).get("rooms") or [])
+        docs_n = await db.property_documents.count_documents({"property_id": prop_id})
+        works_n = await db.requests.count_documents(
+            {"property_id": prop_id, "status": {"$in": ["completed", "closed", "confirmed", "done"]}})
+        ai_n = await db.digital_twin_models.count_documents({"property_id": prop_id, "source": "ai_generated"})
+
+    if prop and (prop.get("surface") or prop.get("type")):
+        out.append({"text": "Care este suprafața și tipul proprietății?", "based_on": "identitate proprietate"})
+    if has_plan_rooms or twin_rooms:
+        out.append({"text": "Câte camere sunt și ce tip are fiecare?", "based_on": "camere (plan 2D / twin)"})
+        out.append({"text": "Ce suprafață totală însumează camerele?", "based_on": "arii camere"})
+    if docs_n:
+        out.append({"text": f"Ce documente există pentru proprietate? ({docs_n})", "based_on": "documente"})
+    if works_n:
+        out.append({"text": "Ce lucrări au fost finalizate până acum?", "based_on": "lucrări finalizate"})
+    if prop and prop.get("health_score") is not None:
+        out.append({"text": "Care este scorul House Health și ce îl influențează?", "based_on": "House Health"})
+    if pins_n:
+        out.append({"text": "Ce echipamente/anotări sunt marcate în model?", "based_on": f"{pins_n} pin-uri"})
+    if ai_n:
+        out.append({"text": "Ce modele 3D orientative (AI) există și cât sunt de complete?", "based_on": "modele AI (inferat)"})
+    if models_n and not (has_plan_rooms or twin_rooms):
+        out.append({"text": "Ce modele 3D au fost încărcate în proiect?", "based_on": "modele încărcate"})
+
+    return {"suggestions": out[:6], "count": min(len(out), 6), "grounded": True}
+
+
 @router.get("/history")
 async def history(project_id: str = Query(min_length=3), limit: int = 30, user: dict = Depends(get_current_user)):
     """Recent Q&A turns for a project (visible to project members)."""

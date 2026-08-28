@@ -1,3 +1,23 @@
+## 🎨 DIGITAL TWIN — NEXT STAGE (4 funcționalități, ONE BUILD) · LIVRAT ÎN PREVIEW (28 Aug 2026)
+
+Extensie a Digital Twin-ului existent (fără rebuild). Testare `testing_agent` iter204→iter205: toate cele 4 PASS după 2 fix-uri (un blocker critic + un URL de imagine). Regresia celor 5 anterioare intactă.
+
+**1 · AI Design Concepts (stil + buget + materiale)** — nou `DesignConceptStudio.jsx` + `POST /api/digital-twin/projects/{id}/design-concepts`. Wizard: chip-uri stil (11), cameră, interval buget, chip-uri materiale (11), note, toggle render. Rezultat: titlu + paletă + plan materiale + **buget ESTIMATIV** (nu preț garantat) + **render vizual AI (Gemini Nano Banana `gemini-3.1-flash-image-preview`)** + **strat 3D „massing" colorat în stil** (model inferred, vizibil în Twin). Marcat clar „Orientativ AI · neverificat". `GET /design-options`, `GET .../design-concepts`, `GET /design-concepts/{id}` + `/render` (servit din Object Storage, access-controlled).
+
+**2 · Validare profesională (inferred → in_review → verified)** — nou `ModelValidationPanel.jsx` + `POST /models/{id}/request-review`, `POST /models/{id}/validate {confirm|reject}`, `GET /models/{id}/validation-history`, `GET /professional/review-queue`. Un profesionist (admin/operator/architect/specialist) confirmă EXPLICIT; NIMIC nu devine „verified" automat. Istoric complet (cine/când/ce/rezultat) în `digital_twin_validations`. Operator: buton „Coadă validare" + badge.
+
+**3 · Sugestii Q&A pe dovezi** — `GET /api/digital-twin/qa/suggestions` (determinist, STRICT pe evidența reală: camere/documente/lucrări/House Health/pin-uri/modele AI). Panoul Q&A afișează sugestiile și le trimite prin același pipeline grounded. Fără întrebări generice decorative.
+
+**4 · Ancorare istorică în masă** — `POST /api/admin/digital-twin/bulk-anchor` + `GET .../properties/{id}/preview`. UnresolvedModal: multi-select DOAR în cadrul aceluiași proprietar, preview obligatoriu al proprietății (nume/adresă/tip/suprafață/sănătate/owner), confirmare explicită, ZERO auto-assign. Ancorarea individuală rămâne funcțională.
+
+**Reziliență viewer** — `ViewerErrorBoundary.jsx` în jurul `<Canvas>`: un strat 3D care eșuează afișează banner inline (`viewer-3d-error`) în loc să prăbușească toată ruta.
+
+**Fix-uri în retest**: (a) modelul concept-GLB salva fără `object_path` → 404 → crash viewer: CORECTAT + backfill 4 rânduri vechi; (b) `render_url` avea `/api/api/` dublat în `<img>`: CORECTAT să folosească `REACT_APP_BACKEND_URL` (single `/api`, curl 200 image/jpeg).
+
+**Fișiere**: BE `routes/digital_twin.py` (design+validation+bulk), `routes/digital_twin_qa.py` (suggestions). FE nou: `DesignConceptStudio.jsx`, `ModelValidationPanel.jsx`, `ViewerErrorBoundary.jsx`; editate: `DigitalTwinViewer.jsx`, `DigitalTwinQAPanel.jsx`, `OperatorDigitalTwin.jsx`. Colecții noi: `digital_twin_design_concepts`, `digital_twin_validations`. Model nou field: `review_state`, `is_design_concept`, `object_path` (pe concepte). **Necesită redeploy Fondator pentru producție.**
+
+---
+
 ## 🧩 DIGITAL TWIN — FAZA URMĂTOARE (5 funcționalități, ONE BUILD) · LIVRAT ÎN PREVIEW (28 Aug 2026)
 
 Pachet integral construit într-un singur BUILD (frontend; backend era deja gata + verificat prin curl). Testare `testing_agent` iter203: **100% (5/5 features PASS)**, zero bug-uri blocante.

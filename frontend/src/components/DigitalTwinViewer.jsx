@@ -6,7 +6,7 @@ import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import axios from "axios";
 import {
-  Eye, EyeOff, Layers, RotateCcw, Box as BoxIcon, Sparkles, Wand2, Loader2,
+  Eye, EyeOff, Layers, RotateCcw, Box as BoxIcon, Sparkles, Wand2, Loader2, Palette, ShieldCheck,
 } from "lucide-react";
 import { API } from "../pages/DashShared";
 import { FACE_STYLES, TOOLS, SECTION_AXES } from "./viewer/constants";
@@ -14,6 +14,9 @@ import { DemoHouse, ModelWithEvents, ResetCamera, MultiLayerScene } from "./view
 import { MeasureMarkers } from "./viewer/MeasureSection";
 import { PinMarker, PinDraftModal, PinThreadModal } from "./viewer/PinSystem";
 import DigitalTwinQAPanel from "./DigitalTwinQAPanel";
+import DesignConceptStudio from "./DesignConceptStudio";
+import ModelValidationPanel from "./ModelValidationPanel";
+import ViewerErrorBoundary from "./ViewerErrorBoundary";
 
 // Captures the WebGL canvas to a PNG data URL on demand.
 const CanvasCapture = ({ captureFnRef }) => {
@@ -70,8 +73,19 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
 
   // Q&A on evidence + AI-3D orientative generation
   const [qaOpen, setQaOpen] = useState(false);
+  const [designOpen, setDesignOpen] = useState(false);
+  const [validationOpen, setValidationOpen] = useState(false);
+  const [isPro, setIsPro] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMsg, setAiMsg] = useState(null);
+  const [viewerResetKey, setViewerResetKey] = useState(0);
+
+  useEffect(() => {
+    if (!projectId) return;
+    axios.get(`${API}/auth/me`).then((r) => {
+      setIsPro(["admin", "operator"].includes(r.data?.role));
+    }).catch(() => {});
+  }, [projectId]);
 
   const reloadLayers = () => {
     if (!projectId) return;
@@ -476,6 +490,20 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
               <Sparkles className="w-3.5 h-3.5" /> Întreabă AI (pe dovezi)
             </button>
             <button
+              onClick={() => setDesignOpen(true)}
+              className="w-full px-3 py-2 text-xs rounded-lg bg-violet-500/15 hover:bg-violet-500/25 text-violet-200 flex items-center justify-center gap-1.5"
+              data-testid="dt-open-design"
+            >
+              <Palette className="w-3.5 h-3.5" /> Concept AI Design
+            </button>
+            <button
+              onClick={() => setValidationOpen(true)}
+              className="w-full px-3 py-2 text-xs rounded-lg bg-white/5 hover:bg-white/10 text-stone-200 flex items-center justify-center gap-1.5"
+              data-testid="dt-open-validation"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" /> Validare modele
+            </button>
+            <button
               onClick={handleAiGenerate}
               disabled={aiBusy}
               className="w-full px-3 py-2 text-xs rounded-lg border border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/20 text-violet-200 disabled:opacity-50 flex items-center justify-center gap-1.5"
@@ -566,6 +594,10 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
             </div>
           </div>
         ) : (
+        <ViewerErrorBoundary
+          resetKey={viewerResetKey}
+          onRetry={() => { reloadLayers(); setViewerResetKey((k) => k + 1); }}
+        >
         <Canvas
           camera={{ position: [12, 9, 14], fov: 50, near: 0.1, far: 2000 }}
           gl={{ antialias: true, localClippingEnabled: true, preserveDrawingBuffer: true }}
@@ -621,6 +653,7 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
           <ResetCamera resetTrigger={resetTick} />
           <CanvasCapture captureFnRef={captureFnRef} />
         </Canvas>
+        </ViewerErrorBoundary>
         )}
         {viewMode === "three" && (
           <ViewerOverlay
@@ -648,6 +681,25 @@ export const DigitalTwinViewer = ({ projectId, modelUrl, projectName, onClose, o
             projectId={projectId}
             projectName={projectName}
             onClose={() => setQaOpen(false)}
+          />
+        )}
+
+        {designOpen && projectId && (
+          <DesignConceptStudio
+            projectId={projectId}
+            projectName={projectName}
+            onClose={() => setDesignOpen(false)}
+            onModelChanged={reloadLayers}
+          />
+        )}
+
+        {validationOpen && projectId && (
+          <ModelValidationPanel
+            projectId={projectId}
+            projectName={projectName}
+            isProfessional={isPro}
+            onClose={() => setValidationOpen(false)}
+            onChanged={reloadLayers}
           />
         )}
       </div>

@@ -794,6 +794,514 @@ async def ai_generate_model(project_id: str, user: dict = Depends(get_current_us
     return out
 
 
+# ============= AI DESIGN CONCEPTS — style + budget + materials (inferred) =============
+# Extinde AI-3D: pornind de la contextul REAL al proprietății (DNA/camere) + preferințele
+# clientului (stil, buget, materiale), produce un CONCEPT DE DESIGN orientativ:
+#   • paletă de culori + plan de materiale + buget ESTIMATIV (nu preț garantat)
+#   • un strat 3D „massing" colorat în stilul ales (model inferred, vizibil direct în Twin)
+#   • (opțional) un RENDER vizual generat cu Gemini Nano Banana
+# Trust: status=inferred, confidence=inferred, verification_status=None. Validabil ulterior de un profesionist.
+
+DT_DESIGN_STYLES = [
+    "Modern minimalist", "Scandinav", "Industrial", "Clasic elegant", "Rustic",
+    "Contemporan", "Mediteranean", "Boho", "Japandi", "Art Deco", "Mid-century",
+]
+DT_DESIGN_MATERIALS = [
+    "Lemn natural", "Marmură", "Beton aparent", "Metal negru", "Sticlă", "Ceramică",
+    "Piatră naturală", "Textile naturale", "Cărămidă aparentă", "Parchet stejar", "Alamă",
+]
+
+
+def _hex_to_rgba(h):
+    h = (h or "").strip().lstrip("#")
+    try:
+        if len(h) == 6:
+            return [int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), 255]
+    except Exception:  # noqa: BLE001
+        pass
+    return [167, 139, 250, 255]
+
+
+def _build_massing_glb_colored(layout, palette_hex) -> bytes:
+    """Ca _build_massing_glb, dar colorează camerele cu paleta conceptului de design."""
+    import trimesh
+    import numpy as np
+    pal = [_hex_to_rgba(x) for x in (palette_hex or []) if x] or [[167, 139, 250, 255]]
+    scene = trimesh.Scene()
+    for i, r in enumerate(layout):
+        w = max(0.5, float(r.get("w", 3)))
+        d = max(0.5, float(r.get("d", 3)))
+        h = max(0.5, float(r.get("h", 2.6)))
+        x = float(r.get("x", 0))
+        z = float(r.get("z", 0))
+        box = trimesh.creation.box(extents=[w, h, d])
+        box.apply_translation([x + w / 2.0, h / 2.0, z + d / 2.0])
+        box.visual.face_colors = np.array(pal[i % len(pal)], dtype=np.uint8)
+        scene.add_geometry(box, node_name=(r.get("name") or f"room{i}")[:40])
+    glb = scene.export(file_type="glb")
+    return glb if isinstance(glb, (bytes, bytearray)) else bytes(glb)
+
+
+_DESIGN_SYSTEM = (
+    "Ești designer de interior profesionist. Primești CONTEXTUL REAL al unei proprietăți (identitate, "
+    "camere, suprafețe, documente, lucrări) și PREFERINȚELE clientului (stil, buget, materiale, priorități). "
+    "Propui un CONCEPT DE DESIGN ORIENTATIV. Reguli STRICTE:\n"
+    "- NU inventa date despre proprietate care nu apar în context.\n"
+    "- Bugetul este ESTIMATIV (interval), calculat pe suprafață + materiale + stil; NU este preț garantat de execuție.\n"
+    "- Respectă intervalul de buget al clientului dacă e specificat.\n"
+    "Returnează STRICT un obiect JSON (fără text în plus) cu cheile:\n"
+    '{"title": str, "summary": str, "style_rationale": str, '
+    '"palette": [{"name": str, "hex": "#RRGGBB"}], '
+    '"materials_plan": [{"surface": str, "material": str, "note": str}], '
+    '"budget": {"currency": str, "items": [{"label": str, "low": number, "high": number}], "total_low": number, "total_high": number, "disclaimer": str}, '
+    '"render_prompt": str}\n'
+    "Textele descriptive în ROMÂNĂ. `render_prompt` în ENGLEZĂ, o descriere fotorealistă a camerei în stilul ales "
+    "(materiale, culori, lumină, unghi), 1-2 propoziții. `palette` are 4-6 culori. Buget în moneda cerută."
+)
+
+
+async def _ai_design_concept(context: str, payload, prop: dict, rooms: list):
+    """Returnează (concept_dict, engine). Fallback determinist dacă LLM eșuează."""
+    import json as _json
+    from ai_core.provider import call_llm
+    surface = prop.get("surface")
+    budget_line = "nespecificat"
+    if payload.budget_min is not None or payload.budget_max is not None:
+        budget_line = f"{payload.budget_min or 0}–{payload.budget_max or '∞'} {payload.currency}"
+    ask = {
+        "stil": payload.style,
+        "camera_tinta": payload.room_name or "întreaga locuință",
+        "buget": budget_line,
+        "moneda": payload.currency,
+        "materiale_preferate": payload.materials or [],
+        "prioritati": payload.priorities or [],
+        "note_client": payload.notes or "",
+        "suprafata_totala_m2": surface,
+        "camere": [{"nume": r.get("name"), "tip": r.get("type"), "arie_m2": r.get("area")} for r in (rooms or [])],
+    }
+    prompt = f"## CONTEXT PROPRIETATE (dovezi)\n{context}\n\n## CERINȚE CLIENT\n{_json.dumps(ask, ensure_ascii=False)}\n\nReturnează DOAR obiectul JSON."
+    try:
+        res = await call_llm(_DESIGN_SYSTEM, prompt, session_id=f"dt-design-{uuid.uuid4().hex[:8]}")
+        txt = (res.get("text") or "").strip()
+        if txt.startswith("```"):
+            txt = txt.strip("`")
+            if "\n" in txt:
+                txt = txt.split("\n", 1)[1]
+            if txt.lower().startswith("json"):
+                txt = txt[4:]
+        s = txt.find("{")
+        e = txt.rfind("}")
+        if s >= 0 and e > s:
+            obj = _json.loads(txt[s:e + 1])
+            if isinstance(obj, dict) and obj.get("palette"):
+                obj.setdefault("budget", {})
+                return obj, (res.get("model") or "ai")
+    except Exception as ex:  # noqa: BLE001
+        logger.warning(f"[design] concept inference failed: {ex}")
+    # Fallback determinist
+    fallback = {
+        "title": f"Concept {payload.style}",
+        "summary": f"Concept orientativ în stil {payload.style} pentru {payload.room_name or 'locuință'}.",
+        "style_rationale": "Generat automat (fallback) — deschide din nou pentru un concept AI complet.",
+        "palette": [{"name": "Neutru cald", "hex": "#d6cbb8"}, {"name": "Antracit", "hex": "#2f3336"},
+                    {"name": "Verde salvie", "hex": "#8a9a7b"}, {"name": "Alamă", "hex": "#b08d57"}],
+        "materials_plan": [{"surface": "Pardoseală", "material": (payload.materials or ["Parchet stejar"])[0], "note": "orientativ"}],
+        "budget": {"currency": payload.currency, "items": [], "total_low": payload.budget_min or 0,
+                   "total_high": payload.budget_max or 0, "disclaimer": "Estimare orientativă, nu preț garantat."},
+        "render_prompt": f"Photorealistic {payload.style} interior of a {payload.room_name or 'living room'}, natural light, cozy, high detail",
+    }
+    return fallback, "fallback"
+
+
+async def _gen_design_render(prompt: str, project_id: str):
+    """Generează un render vizual cu Gemini Nano Banana.
+    Returnează (object_path|None, stored_as|None, mime|None, error|None)."""
+    key = os.environ.get("EMERGENT_LLM_KEY", "").strip()
+    if not key:
+        return None, None, None, "Cheia AI pentru imagini nu este configurată."
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=key,
+            session_id=f"dt-design-img-{uuid.uuid4().hex[:8]}",
+            system_message="You generate photorealistic interior design concept renders. Output only the image.",
+        ).with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
+        full_prompt = (prompt or "Photorealistic modern interior render, natural light, high detail").strip()
+        _text, images = await chat.send_message_multimodal_response(UserMessage(text=full_prompt))
+        if not images:
+            return None, None, None, "Modelul nu a returnat nicio imagine."
+        img = images[0]
+        image_bytes = base64.b64decode(img["data"])
+        mime = img.get("mime_type") or "image/png"
+        ext = ".png" if "png" in mime else (".jpg" if "jpe" in mime else ".png")
+        safe_name = f"design_{uuid.uuid4().hex[:12]}{ext}"
+        object_path = await storage_service.store_dt_bytes("model", project_id, safe_name, image_bytes, mime)
+        return object_path, safe_name, mime, None
+    except Exception as ex:  # noqa: BLE001
+        logger.warning(f"[design] render generation failed: {ex}")
+        return None, None, None, str(ex)[:200]
+
+
+class DesignConceptIn(BaseModel):
+    room_name: Optional[str] = Field(None, max_length=120)
+    style: str = Field(..., min_length=2, max_length=80)
+    budget_min: Optional[float] = Field(None, ge=0)
+    budget_max: Optional[float] = Field(None, ge=0)
+    currency: str = Field("RON", max_length=8)
+    materials: List[str] = Field(default_factory=list)
+    priorities: List[str] = Field(default_factory=list)
+    notes: Optional[str] = Field(None, max_length=1000)
+    generate_render: bool = True
+
+
+@router.get("/design-options")
+async def design_options(user: dict = Depends(get_current_user)):  # noqa: ARG001
+    """Opțiuni selectabile pentru wizard-ul de concept (stiluri + materiale)."""
+    return {"styles": DT_DESIGN_STYLES, "materials": DT_DESIGN_MATERIALS, "default_currency": "RON"}
+
+
+@router.post("/projects/{project_id}/design-concepts")
+async def create_design_concept(project_id: str, payload: DesignConceptIn, user: dict = Depends(get_current_user)):
+    """AI Design Concept: stil + buget + materiale → concept orientativ (inferred) + strat 3D colorat + render opțional."""
+    await _ensure_dt_ingest_access(user)
+    p = await _ensure_project_access(project_id, user)
+    if user.get("role") not in ("admin", "operator") and p.get("owner_id") != user["id"]:
+        raise HTTPException(403, "Doar proprietarul proiectului poate genera concepte de design.")
+    prop_id = p.get("property_id")
+    if not prop_id:
+        raise HTTPException(400, "Ancorează proiectul la o proprietate înainte de conceptul AI (Property Anchor).")
+    try:
+        prop = await db.properties.find_one({"_id": ObjectId(prop_id)})
+    except Exception:
+        prop = None
+    if not prop:
+        raise HTTPException(404, "Proprietatea ancorată nu există.")
+    twin = await db.twins.find_one({"property_id": prop_id})
+    rooms = (twin or {}).get("rooms") or []
+    # Reuse the evidence-first context builder from Q&A (grounded, no hallucination).
+    try:
+        from routes.digital_twin_qa import _build_context
+        context = await _build_context(project_id)
+    except Exception:  # noqa: BLE001
+        context = f"Proprietate: {prop.get('name')}, {prop.get('surface')} m², {prop.get('rooms')} camere."
+
+    concept, engine = await _ai_design_concept(context, payload, prop, rooms)
+
+    # Build a colored massing GLB (inferred) tinted with the concept palette.
+    layout, _eng = await _ai_infer_layout(rooms, prop)
+    palette_hex = [c.get("hex") for c in (concept.get("palette") or []) if c.get("hex")]
+    model_id = _new_id()
+    model_public_path = None
+    try:
+        glb = _build_massing_glb_colored(layout, palette_hex)
+        total = len(glb)
+        safe_name = f"concept_{uuid.uuid4().hex[:12]}.glb"
+        object_path = await storage_service.store_dt_bytes("model", project_id, safe_name, glb, "model/gltf-binary")
+        model_public_path = f"/api/digital-twin/files/{project_id}/{safe_name}"
+        model_doc = {
+            "id": model_id,
+            "project_id": project_id,
+            "filename": f"Concept AI · {payload.style} ({len(layout)} camere).glb",
+            "stored_as": safe_name,
+            "size_bytes": total,
+            "url": model_public_path,
+            "kind": "model",
+            "ext": ".glb",
+            "layer_type": "decor",
+            "layer_label": f"Concept AI · {payload.style}",
+            "layer_color": (palette_hex[0] if palette_hex else "#a78bfa"),
+            "layer_opacity": 0.9,
+            "layer_visible": True,
+            "uploaded_by": user["id"],
+            "uploaded_by_name": user.get("name") or user.get("email"),
+            "uploaded_by_role": user.get("role"),
+            "uploaded_at": _now_iso(),
+            "object_path": object_path,
+            "property_id": prop_id,
+            "source": "ai_generated",
+            "version": 1,
+            "version_label": "Concept AI Design",
+            "status": "ready",
+            "visibility": "internal",
+            "change_reason": f"AI Design Concept ({engine})",
+            "property_link_status": "linked",
+            "confidence": "inferred",
+            "verification_status": None,
+            "completeness": 25,
+            "ai_generated": True,
+            "ai_engine": engine,
+            "review_state": "none",
+            "is_design_concept": True,
+        }
+        await db.digital_twin_models.insert_one(model_doc)
+        await storage_service.add_usage(p["owner_id"], total, "digital_twin")
+        await _kg_link_twin(prop_id, "twin_model", model_id)
+        documented = await db.digital_twin_models.count_documents({
+            "project_id": project_id, "confidence": {"$in": ["documented", "verified"]}, "kind": "model",
+        })
+        upd = {"updated_at": _now_iso()}
+        if not p.get("model_url") and documented == 0:
+            upd["model_url"] = model_public_path
+        await db.digital_twin_projects.update_one({"id": project_id}, {"$set": upd, "$inc": {"model_count": 1}})
+    except Exception as ex:  # noqa: BLE001
+        logger.warning(f"[design] colored massing failed: {ex}")
+        model_id = None
+
+    concept_doc = {
+        "id": _new_id(),
+        "project_id": project_id,
+        "property_id": prop_id,
+        "owner_id": p.get("owner_id"),
+        "created_by": user["id"],
+        "created_by_name": user.get("name") or user.get("email"),
+        "created_at": _now_iso(),
+        "inputs": {
+            "room_name": payload.room_name,
+            "style": payload.style,
+            "budget_min": payload.budget_min,
+            "budget_max": payload.budget_max,
+            "currency": payload.currency,
+            "materials": payload.materials,
+            "priorities": payload.priorities,
+            "notes": payload.notes,
+        },
+        "concept": concept,
+        "engine": engine,
+        "model_id": model_id,
+        "model_url": model_public_path,
+        "render_url": None,
+        "render_object_path": None,
+        "render_mime": None,
+        "render_error": None,
+        "status": "inferred",
+        "confidence": "inferred",
+        "verification_status": None,
+    }
+    if payload.generate_render:
+        obj_path, _stored, mime, err = await _gen_design_render(concept.get("render_prompt") or "", project_id)
+        if obj_path:
+            concept_doc["render_object_path"] = obj_path
+            concept_doc["render_mime"] = mime
+            concept_doc["render_url"] = f"/api/digital-twin/design-concepts/{concept_doc['id']}/render"
+        concept_doc["render_error"] = err
+    await db.digital_twin_design_concepts.insert_one(concept_doc)
+    if model_id:
+        await db.digital_twin_models.update_one({"id": model_id}, {"$set": {"design_concept_id": concept_doc["id"]}})
+    out = _clean(dict(concept_doc))
+    out["note"] = "Concept ORIENTATIV de design (inferred). Bugetul este estimativ, NU preț garantat de execuție. Necesită validare profesională."
+    return out
+
+
+@router.get("/projects/{project_id}/design-concepts")
+async def list_design_concepts(project_id: str, user: dict = Depends(get_current_user)):
+    await _ensure_dt_ingest_access(user)
+    await _ensure_project_access(project_id, user)
+    items = []
+    async for c in db.digital_twin_design_concepts.find({"project_id": project_id}).sort("created_at", -1).limit(50):
+        items.append(_clean(c))
+    return {"items": items, "count": len(items)}
+
+
+@router.get("/design-concepts/{concept_id}")
+async def get_design_concept(concept_id: str, user: dict = Depends(get_current_user)):
+    await _ensure_dt_ingest_access(user)
+    c = await db.digital_twin_design_concepts.find_one({"id": concept_id})
+    if not c:
+        raise HTTPException(404, "Concept not found.")
+    await _ensure_project_access(c["project_id"], user)
+    return _clean(c)
+
+
+@router.get("/design-concepts/{concept_id}/render")
+async def get_design_concept_render(concept_id: str, user: dict = Depends(get_current_user)):
+    """Servește imaginea-render a conceptului direct din Object Storage (access-controlled)."""
+    await _ensure_dt_ingest_access(user)
+    c = await db.digital_twin_design_concepts.find_one({"id": concept_id})
+    if not c:
+        raise HTTPException(404, "Concept not found.")
+    await _ensure_project_access(c["project_id"], user)
+    obj_path = c.get("render_object_path")
+    if not obj_path:
+        raise HTTPException(404, "Acest concept nu are un render vizual.")
+    from storage_client import get_object
+    try:
+        data, ct = await asyncio.to_thread(get_object, obj_path)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(404, "Render indisponibil.") from e
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type=c.get("render_mime") or ct or "image/png",
+        headers={"Cache-Control": "private, max-age=86400"},
+    )
+
+
+# ============= PROFESSIONAL VALIDATION — inferred → review → verified =============
+# Un profesionist (admin/operator sau membru architect/specialist) confirmă EXPLICIT un model inferat.
+# NU convertim automat inferred → verified. Istoricul validării e păstrat (cine/când/ce/rezultat).
+
+def _is_professional(user: dict, project: dict) -> bool:
+    if user.get("role") in ("admin", "operator"):
+        return True
+    for m in (project.get("members") or []):
+        if m.get("user_id") == user["id"] and m.get("role") in ("architect", "specialist"):
+            return True
+    return False
+
+
+async def _log_validation(model: dict, action: str, from_conf, to_conf, user: dict, note: str | None):
+    await db.digital_twin_validations.insert_one({
+        "id": _new_id(),
+        "model_id": model["id"],
+        "project_id": model["project_id"],
+        "property_id": model.get("property_id"),
+        "design_concept_id": model.get("design_concept_id"),
+        "action": action,
+        "from_confidence": from_conf,
+        "to_confidence": to_conf,
+        "actor_id": user["id"],
+        "actor_name": user.get("name") or user.get("email"),
+        "actor_role": user.get("role"),
+        "note": (note or "").strip() or None,
+        "ts": _now_iso(),
+    })
+
+
+class ReviewRequestIn(BaseModel):
+    note: Optional[str] = Field(None, max_length=600)
+
+
+class ValidateIn(BaseModel):
+    action: str = Field(..., pattern="^(confirm|reject)$")
+    note: Optional[str] = Field(None, max_length=800)
+
+
+@router.post("/models/{model_id}/request-review")
+async def request_model_review(model_id: str, payload: ReviewRequestIn, user: dict = Depends(get_current_user)):
+    """Trimite un model INFERAT la validare profesională (inferred → in_review). Nu schimbă confidence."""
+    await _ensure_dt_ingest_access(user)
+    doc = await db.digital_twin_models.find_one({"id": model_id})
+    if not doc:
+        raise HTTPException(404, "Model not found.")
+    proj = await _ensure_project_access(doc["project_id"], user)
+    if user.get("role") not in ("admin", "operator") and proj.get("owner_id") != user["id"] and not _is_professional(user, proj):
+        raise HTTPException(403, "Nu ai dreptul să trimiți acest model la validare.")
+    if doc.get("confidence") != "inferred":
+        raise HTTPException(400, "Doar modelele orientative (inferred) pot fi trimise la validare.")
+    if doc.get("review_state") == "in_review":
+        raise HTTPException(400, "Modelul este deja în curs de validare.")
+    await db.digital_twin_models.update_one({"id": model_id}, {"$set": {
+        "review_state": "in_review",
+        "review_requested_by": user["id"],
+        "review_requested_by_name": user.get("name") or user.get("email"),
+        "review_requested_at": _now_iso(),
+        "updated_at": _now_iso(),
+    }})
+    await _log_validation(doc, "request_review", doc.get("confidence"), doc.get("confidence"), user, payload.note)
+    if doc.get("design_concept_id"):
+        await db.digital_twin_design_concepts.update_one({"id": doc["design_concept_id"]}, {"$set": {"status": "in_review"}})
+    refreshed = await db.digital_twin_models.find_one({"id": model_id})
+    return _clean(refreshed)
+
+
+@router.post("/models/{model_id}/validate")
+async def validate_model(model_id: str, payload: ValidateIn, user: dict = Depends(get_current_user)):
+    """Acțiune EXPLICITĂ a profesionistului: confirm → verified (professional_audit) sau reject → rămâne inferred."""
+    await _ensure_dt_ingest_access(user)
+    doc = await db.digital_twin_models.find_one({"id": model_id})
+    if not doc:
+        raise HTTPException(404, "Model not found.")
+    proj = await _ensure_project_access(doc["project_id"], user)
+    if not _is_professional(user, proj):
+        raise HTTPException(403, "Doar un profesionist (arhitect/specialist/operator/admin) poate valida un model.")
+    from_conf = doc.get("confidence")
+    now = _now_iso()
+    if payload.action == "confirm":
+        upd = {
+            "confidence": "verified",
+            "verification_status": "professional_audit",
+            "review_state": "verified",
+            "validated_by": user["id"],
+            "validated_by_name": user.get("name") or user.get("email"),
+            "validated_by_role": user.get("role"),
+            "validated_at": now,
+            "validation_note": (payload.note or "").strip() or None,
+            "updated_at": now,
+        }
+        to_conf = "verified"
+        concept_status = "verified"
+    else:
+        upd = {
+            "review_state": "rejected",
+            "rejected_by": user["id"],
+            "rejected_by_name": user.get("name") or user.get("email"),
+            "rejected_at": now,
+            "validation_note": (payload.note or "").strip() or None,
+            "updated_at": now,
+        }
+        to_conf = from_conf
+        concept_status = "rejected"
+    await db.digital_twin_models.update_one({"id": model_id}, {"$set": upd})
+    await _log_validation(doc, payload.action, from_conf, to_conf, user, payload.note)
+    if doc.get("design_concept_id"):
+        cset = {"status": concept_status}
+        if payload.action == "confirm":
+            cset.update({"confidence": "verified", "verification_status": "professional_audit",
+                         "validated_by_name": user.get("name") or user.get("email"), "validated_at": now})
+        await db.digital_twin_design_concepts.update_one({"id": doc["design_concept_id"]}, {"$set": cset})
+    refreshed = await db.digital_twin_models.find_one({"id": model_id})
+    return _clean(refreshed)
+
+
+@router.get("/models/{model_id}/validation-history")
+async def model_validation_history(model_id: str, user: dict = Depends(get_current_user)):
+    await _ensure_dt_ingest_access(user)
+    doc = await db.digital_twin_models.find_one({"id": model_id})
+    if not doc:
+        raise HTTPException(404, "Model not found.")
+    await _ensure_project_access(doc["project_id"], user)
+    items = []
+    async for v in db.digital_twin_validations.find({"model_id": model_id}).sort("ts", -1).limit(100):
+        items.append(_clean(v))
+    return {
+        "items": items,
+        "count": len(items),
+        "current": {
+            "confidence": doc.get("confidence"),
+            "verification_status": doc.get("verification_status"),
+            "review_state": doc.get("review_state") or "none",
+            "validated_by_name": doc.get("validated_by_name"),
+            "validated_at": doc.get("validated_at"),
+        },
+    }
+
+
+@router.get("/professional/review-queue")
+async def professional_review_queue(user: dict = Depends(get_current_user)):
+    """Coada de modele trimise la validare (in_review), vizibilă profesioniștilor (admin/operator/architect/specialist)."""
+    await _ensure_dt_ingest_access(user)
+    is_priv = user.get("role") in ("admin", "operator")
+    q = {"review_state": "in_review"}
+    items = []
+    async for m in db.digital_twin_models.find(q).sort("review_requested_at", -1).limit(200):
+        proj = await db.digital_twin_projects.find_one({"id": m["project_id"]})
+        if not proj:
+            continue
+        if not is_priv and not _is_professional(user, proj):
+            continue
+        items.append({
+            "model_id": m["id"],
+            "project_id": m["project_id"],
+            "project_name": proj.get("name"),
+            "filename": m.get("filename"),
+            "confidence": m.get("confidence"),
+            "is_design_concept": bool(m.get("is_design_concept")),
+            "requested_by_name": m.get("review_requested_by_name"),
+            "requested_at": m.get("review_requested_at"),
+            "owner_name": proj.get("owner_name"),
+        })
+    return {"items": items, "count": len(items)}
+
+
 # ============= CLOUDCONVERT SKP → GLB PIPELINE =============
 
 LAYER_DEFAULTS_FOR_CONVERT = {
@@ -1225,6 +1733,12 @@ async def serve_model_file(project_id: str, filename: str, user: dict = Depends(
         media = "model/gltf+json"
     elif fn_lower.endswith(".skp"):
         media = "application/octet-stream"
+    elif fn_lower.endswith(".png"):
+        media = "image/png"
+    elif fn_lower.endswith((".jpg", ".jpeg")):
+        media = "image/jpeg"
+    elif fn_lower.endswith(".webp"):
+        media = "image/webp"
     else:
         media = "application/octet-stream"
     return FileResponse(
@@ -2773,7 +3287,15 @@ async def list_unresolved_projects(user: dict = Depends(require_role("admin", "o
         cand = []
         if owner_id:
             async for pr in db.properties.find({"owner_id": owner_id}).sort("created_at", -1):
-                cand.append({"id": str(pr["_id"]), "name": pr.get("name") or "Proprietate", "address": pr.get("address")})
+                cand.append({
+                    "id": str(pr["_id"]),
+                    "name": pr.get("name") or "Proprietate",
+                    "address": pr.get("address"),
+                    "type": pr.get("type"),
+                    "surface": pr.get("surface"),
+                    "rooms": pr.get("rooms"),
+                    "health_score": pr.get("health_score"),
+                })
         items.append({
             "id": p["id"], "name": p.get("name"), "created_at": p.get("created_at"),
             "owner_id": owner_id, "owner_name": (owner or {}).get("name") or (owner or {}).get("email") or "—",
@@ -2784,7 +3306,84 @@ async def list_unresolved_projects(user: dict = Depends(require_role("admin", "o
     return {"items": items, "count": len(items)}
 
 
-@admin_router.post("/subscription/grant")
+class BulkAnchorIn(BaseModel):
+    project_ids: List[str] = Field(..., min_length=1, max_length=100)
+    property_id: str = Field(..., min_length=3)
+
+
+@admin_router.get("/properties/{property_id}/preview")
+async def property_anchor_preview(property_id: str, user: dict = Depends(require_role("admin", "operator"))):  # noqa: ARG001
+    """Preview al proprietății țintă înainte de ancorarea în masă (nume, adresă, tip, suprafață, sănătate)."""
+    try:
+        pr = await db.properties.find_one({"_id": ObjectId(property_id)})
+    except Exception:
+        pr = None
+    if not pr:
+        raise HTTPException(404, "Proprietatea nu există.")
+    owner = await db.users.find_one(_user_filter(str(pr.get("owner_id"))), {"name": 1, "email": 1}) if pr.get("owner_id") else None
+    twin = await db.twins.find_one({"property_id": property_id}, {"rooms": 1})
+    return {
+        "id": property_id,
+        "name": pr.get("name") or "Proprietate",
+        "address": pr.get("address"),
+        "type": pr.get("type"),
+        "surface": pr.get("surface"),
+        "rooms": pr.get("rooms"),
+        "health_score": pr.get("health_score"),
+        "owner_id": str(pr.get("owner_id")) if pr.get("owner_id") else None,
+        "owner_name": (owner or {}).get("name") or (owner or {}).get("email") or "—",
+        "twin_rooms_count": len((twin or {}).get("rooms") or []),
+    }
+
+
+@admin_router.post("/bulk-anchor")
+async def bulk_anchor_projects(payload: BulkAnchorIn, user: dict = Depends(require_role("admin", "operator"))):
+    """P0.1++ — ancorează MAI MULTE proiecte neancorate la ACEEAȘI proprietate, într-o singură confirmare.
+
+    ZERO auto-assign: fiecare proiect trebuie confirmat explicit de operator (lista vine din UI).
+    Verificare ownership per proiect (proprietatea trebuie să aparțină ownerului proiectului).
+    Non-destructiv: nu se șterge nimic; proiectele deja ancorate sunt sărite (skipped)."""
+    try:
+        prop = await db.properties.find_one({"_id": ObjectId(payload.property_id)})
+    except Exception:
+        prop = None
+    if not prop:
+        raise HTTPException(404, "Proprietatea țintă nu există.")
+    prop_owner = str(prop.get("owner_id")) if prop.get("owner_id") else None
+    results = []
+    anchored = 0
+    for pid in payload.project_ids:
+        p = await db.digital_twin_projects.find_one({"id": pid})
+        if not p:
+            results.append({"project_id": pid, "ok": False, "error": "Proiect inexistent."})
+            continue
+        if p.get("property_id"):
+            results.append({"project_id": pid, "ok": False, "skipped": True, "error": "Deja ancorat."})
+            continue
+        if prop_owner is not None and str(p.get("owner_id")) != prop_owner:
+            results.append({"project_id": pid, "ok": False, "error": "Proprietatea nu aparține ownerului proiectului."})
+            continue
+        await db.digital_twin_projects.update_one(
+            {"id": pid},
+            {"$set": {"property_id": payload.property_id, "property_link_status": "linked", "updated_at": _now_iso()}},
+        )
+        await db.digital_twin_models.update_many(
+            {"project_id": pid},
+            {"$set": {"property_id": payload.property_id, "property_link_status": "linked"}},
+        )
+        await _kg_link_twin(payload.property_id, "twin_project", pid)
+        async for m in db.digital_twin_models.find({"project_id": pid}, {"id": 1}):
+            await _kg_link_twin(payload.property_id, "twin_model", m["id"])
+        anchored += 1
+        results.append({"project_id": pid, "ok": True, "property_id": payload.property_id})
+    return {
+        "ok": True,
+        "anchored_count": anchored,
+        "requested": len(payload.project_ids),
+        "property_id": payload.property_id,
+        "property_name": prop.get("name"),
+        "results": results,
+    }
 async def grant_subscription(payload: SubGrant, user: dict = Depends(require_role("admin"))):
     """Admin can manually grant/revoke Digital Twin Pro access until Stripe wiring."""
     r = await db.users.update_one(
