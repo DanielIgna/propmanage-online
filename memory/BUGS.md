@@ -44,3 +44,13 @@ Format: `BUG #NNN – Titlu` · Status: `Open` | `In Progress` | `Fixed (verific
 ## Backlog Open (pre-existing)
 - **BUG #003 – Resend Custom Domain DNS** — Status: Blocked (user action pe registrar DKIM/SPF)
 - **BUG #004 – Restore icon lipsă pentru marketplace partners terminate** — Status: Closed ✅ (buton RotateCcw `restore-{id}` în MarketplacePartnersPage → PATCH status=active; testat E2E iter86)
+
+## BUG #005 – `.skp` (SketchUp) NU e vizualizabil 3D · Trimble Connect URL validation
+- **Status:** Open (LIMITARE DE WORKFLOW — NU „fully supported"). Partial-mitigat.
+- **Simptom observat (Operator upload):** fișier `.skp` încărcat → conversie eșuează cu „This conversion type is not supported". Calea Trimble Connect respinge un link Google Drive ca invalid (cere URL Trimble Connect / SketchUp).
+- **Stare reală (mitigare aplicată în etapă anterioară):** upload-ul `.skp` **funcționează** — fișierul e stocat intact ca arhivă descărcabilă (`conversion_status="unsupported"`), fără crash / fără eroare roșie. UI: „SketchUp (doar descărcabil; exportă `.dae` pentru viewer)".
+- **Cauză root:** nu există pipeline server-side (Blender/CloudConvert) `.skp` → `.glb` în infra curentă. Un link Google Drive **NU este** link Trimble Connect și e respins CORECT (nu se confundă storage-ul GDrive cu viewer-ul Trimble/SketchUp).
+- **REGULĂ:** NU marca `.skp` drept „fully supported" până când un `.skp` real e încărcat ȘI vizualizat efectiv în Digital Twin.
+- **Direcție de rezolvare (viitor, ne-programat):** conversie reală `.skp`→format vizualizabil · SAU integrare validă Trimble Connect (cu validare de tip URL) · SAU altă soluție robustă.
+- **Ref canonic:** `audits/PROPERTY_TWIN_CANONICAL_v1.0.md` §9.6.
+

@@ -39,7 +39,13 @@
 - **P0 — Property Anchor** (DELIVERED/PREVIEW): 3D legat de `property_id` (anti-misassignment + KG + moștenire modele); backfill SAFE zero auto-assign; trust readiness (confidence/verification_status/completeness). Teste iter201 4/4.
 - **P1 — Experiența unificată** (DELIVERED/PREVIEW): `GET /api/properties/{id}/digital-twin` + `PropertyTwinModal` taburi 2D/3D + `ViewerErrorBoundary`. Teste iter202 6/6.
 - **P0.1 — Operator Property Anchor** (DELIVERED/PREVIEW): `property_id` OBLIGATORIU pe create operator + `GET /api/operator/digital-twin/clients/{id}/properties` + selector FE. Teste iter203 5/5. Regresie totală P0+P1+P0.1 = **15/15 PASS**.
-- **Producție**: **PRODUCTION-VALIDATED (28 Aug 2026)** — live 22/22 PASS pe `propmanage.ro` + KG edges confirmate. PRODUCTION-COMPLETE.
+- **Producție (P0/P1/P0.1)**: **PRODUCTION-VALIDATED (28 Aug 2026)** — live 22/22 PASS pe `propmanage.ro` + KG edges confirmate. PRODUCTION-COMPLETE.
+- **NEXT STAGE I / II / III — DELIVERED IN PREVIEW (necesită redeploy Fondator; NU e LIVE)**. Consolidat canonic în `PROPERTY_TWIN_CANONICAL_v1.0.md` §9. Sumar:
+  - **Stage I**: upload 3D multi-format (`.skp/.dae/.obj/.fbx/.stl/.ply/.glb/.gltf`) · AI-3D `inferred` · Property Q&A grounded · ancorare istorică (zero auto-assign) · mobile 390/375px.
+  - **Stage II**: AI Design Concepts (paletă+plan+buget estimativ+render) · validare profesională `inferred→în validare→verified` · Q&A suggestions · ancorare în masă (același owner, preview, confirmare, zero auto-assign) · `ViewerErrorBoundary` · Comparație concepte · Ofertă din concept `verified` (`db.requests`) · Notificare validare (in-app+email) · Materiale reale + preț orientativ (City Partners → fallback piață → „indisponibil"). Teste iter207→208 (100%).
+  - **Stage III**: Catalog Materiale admin (`/admin/city-partner-products`, super-admin, gol implicit) · Alegere câștigătoare (single-winner server-side) · Concept în Pașaport (opt-in OFF, doar `verified`, OFF→404) · Ofertă cu Poze (render atașat cererii). Teste iter209 (F1/2/3=100%) + iter210 (F4 vizual=100%). Regresie intactă.
+  - **KNOWN ISSUE `.skp`**: upload OK (stocat intact, descărcabil) dar **NU vizualizabil 3D**; Trimble Connect cere URL valid (link Google Drive respins corect). NU marca `.skp` „fully supported". Vezi `BUGS.md` #005 + canonical §9.6.
+  - **NEXT ROADMAP (NU implementat)**: Import CSV/Excel catalog · Materiale structurate în ofertă · Insignă „Amenajare planificată" în Pașaport · Comparație partajabilă. Vezi canonical §9.8.
 - **NU s-a atins**: House Health/PVI/Maturity engine, Property DNA, Auth, Stripe, entitlements, Demo/Beta.
 
 ---

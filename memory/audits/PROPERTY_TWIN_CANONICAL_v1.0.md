@@ -162,3 +162,93 @@ AI-3D generator · LiDAR pipeline · room scanning · image-to-3D · Design AI �
   - **P1**: overview unificat (`twin_2d` approved 5 camere/4 assets + `twin_3d`); filtru `?property_id`; regresie `/twin` + `/spaces` (count=5); authz bogus → 404.
   - **Property DNA** intact (dna_completeness, capabilities, pvi, timeline); **regresie**: Auth (client/operator/admin 200), entitlements (tier=FREE), House Health plans + dashboard, Stripe pricing source — toate OK.
 - **Notă LOW (data hygiene, pre-existent)**: ștergerea unui proiect NU curăță muchiile KG (append-only traversal; FK separat) → muchii KG „dangling" către proiecte șterse. Comportament pre-existent, NU regresie P0.1; de curățat eventual într-un job de mentenanță (backlog).
+
+
+---
+
+## 9. NEXT STAGE I / II / III — DELIVERED IN PREVIEW (Knowledge Sync · Iun 2026)
+
+> **CLASIFICARE STRICTĂ DE STARE.** Tot ce urmează este **BUILT & DELIVERED IN PREVIEW**, validat prin `testing_agent` + curl E2E, cu **regresie intactă** pe funcțiile anterioare. **NU este DEPLOYED în producție** — necesită **redeploy explicit de către Fondator** pentru a ajunge LIVE pe `propmanage.ro`. Doar P0/P1/P0.1 (Property Anchor, §2) sunt PRODUCTION-LIVE. NU confunda PREVIEW cu PRODUCTION. NU confunda BUILT cu DEPLOYED.
+>
+> Sursa de adevăr rămâne CODUL. Acest capitol consolidează, pentru continuitate, funcționalitățile construite incremental (non-breaking, fără rebuild) peste fundația Digital Twin 3D.
+
+### 9.1 INVENTAR FUNCȚIONALITĂȚI LIVRATE (grupate pe etape)
+
+**NEXT STAGE I — Fundația 3D + AI orientativ + Q&A + ancorare + mobil**
+1. **Upload 3D multi-format (Client)**: `.skp` · `.dae` · `.obj` · `.fbx` · `.stl` · `.ply` · `.glb` · `.gltf`, cu progres și polling conversie unde e cazul. (⚠️ vezi §9.6 limitarea `.skp`.)
+2. **AI-3D orientativ / inferred**: model AI generat, marcat clar „Orientativ AI · neverificat"; nu înlocuiește modelul profesional; viewer + flux Operator. Dacă proiectul nu e ancorat corect, endpoint-ul returnează **400** (nu inventează asocierea).
+3. **Property Q&A (grounded)**: chat în viewer; răspunsuri STRICT pe dovezile reale ale proprietății (DNA / documente / lucrări); fără halucinații; în română.
+4. **Ancorare istorică**: proiectele vechi se ancorează MANUAL; **ZERO auto-assign**; o proprietate = un singur owner; integritatea proprietății respectată.
+5. **Mobile Demo 3D**: responsive la 390/375px, fără overflow orizontal, controale touch; desktop neafectat.
+
+**NEXT STAGE II — Design AI + validare + sugestii + ancorare în masă + reziliență + comparație + ofertă + notificare + materiale**
+6. **AI Design Concepts**: wizard (stil + buget + materiale) → paletă + plan materiale + buget ESTIMATIV + render AI (infra Gemini Nano Banana / Emergent LLM) + strat 3D colorat orientativ. Rezultate marcate „Orientativ AI · neverificat".
+7. **Validare profesională**: `inferred → în validare → verified`, tranziție DOAR prin acțiune explicită a profesionistului; istoric păstrat; coadă de validare în Operator.
+8. **Q&A Suggestions**: sugestii generate STRICT din dovezile reale ale proprietății (pipeline grounded).
+9. **Ancorare în masă (bulk anchoring)**: multi-select DOAR între proiecte ale ACELUIAȘI owner; preview obligatoriu; confirmare explicită; **ZERO auto-assign**; ancorarea individuală rămâne disponibilă.
+10. **ViewerErrorBoundary**: un model 3D defect NU prăbușește ruta (fallback grațios).
+11. **Comparație Concepte AI**: două concepte side-by-side (render, stil, paletă, materiale, buget estimativ, plan, status validare); responsive mobil. Componentă `ConceptComparison.jsx`.
+12. **Ofertă din Concept Validat**: concept `verified` → cerere REALĂ în `db.requests` (fluxul marketplace existent), precompletată cu proprietate + buget + materiale; confirmare explicită client. `POST /api/digital-twin/design-concepts/{cid}/request-offer` (guard: 400 dacă neverificat / fără confirm; idempotent). Testat iter207 (95%) → fix UX → iter208 (100%).
+13. **Notificare Validare**: la `confirm`/`reject`, proprietarul e notificat automat (in-app + email prin `notify()`), cu motivul respingerii când există. Se notifică și cel care a cerut validarea (dacă diferă).
+14. **Materiale reale + preț orientativ**: materialele conceptului se mapează la produse reale din catalogul City Partners; fallback pe prețuri reale de piață (`price_observations`); dacă nu există potrivire → **„preț orientativ indisponibil"**. `GET /api/digital-twin/design-concepts/{cid}/materials`. **ZERO produse/prețuri inventate.**
+
+**NEXT STAGE III — Catalog admin + câștigător + concept public + ofertă cu poze** (build unic, testat iter209 Feature 1/2/3 = 100% + iter210 Feature 4 vizual = 100%)
+15. **Catalog Materiale (admin)**: pagină `/admin/city-partner-products` (super-admin), CRUD complet (nume, brand, categorie, unitate, preț min/max, monedă, tag-uri, link, partener City Partner, activ). Catalog **GOL implicit**. Backend `products_admin_router` (`/api/admin/city-partner-products`), colecție `city_partner_products`. Feature #14 preferă acum produsul de partener, cu fallback pe piață.
+16. **Alegere Câștigătoare**: `PreferButton` (⭐ „Alege ca preferat") în comparație/studio; **single-winner impus server-side** (`POST /api/digital-twin/projects/{pid}/design-concepts/{cid}/prefer`); pentru concept `verified`, buton combinat „Alege și cere ofertă" (prefer + ofertă, cu O confirmare — NU zero-tap, decizie de siguranță).
+17. **Concept în Pașaport**: toggle confidențialitate `show_design_concept` (**opt-in, implicit OFF**); doar conceptele `verified` apar pe pașaportul public `/p/{slug}`; poartă de siguranță verificată (OFF → `design_concept=None` + render **404**). Render public: `GET /api/public/passport/{slug}/design-concept-render`.
+18. **Ofertă cu Poze**: la „Cere ofertă", render-ul AI al conceptului se atașează automat cererii (`concept_render_url`, `dt_concept_render_path`); specialistul îl vede în lead (`SpecialistDashboard`, thumbnail 1408×768 confirmat vizual). Servit prin `GET /api/requests/{req_id}/concept-render` (auth, vizibil oricui poate vedea cererea).
+
+### 9.2 FIȘIERE & ARTEFACTE CANONICE (Next Stage II/III)
+- BE: `routes/digital_twin.py` (design concepts, materials, request-offer, prefer, notificări în `validate_model`), `routes/requests.py` (`/requests/{id}/concept-render`), `routes/property_passport.py` (`show_design_concept`, `design_concept` în payload public, render public), `routes/city_partners.py` (`products_admin_router`), `routes/register.py`.
+- FE: `components/ConceptComparison.jsx` (comparație + `PreferButton` + `RequestOfferButton` + `ConceptMaterials`), `components/DesignConceptStudio.jsx`, `components/DigitalTwinViewer.jsx`, `pages/admin/CityPartnerProductsPage.jsx`, `pages/PublicPassportPage.jsx`, `pages/clientv2/PassportCard.jsx`, `pages/SpecialistDashboard.jsx`, `App.js`, `pages/admin/AdminLayoutMetronic.jsx`.
+- Colecții noi: `city_partner_products` (goală). Câmpuri concept noi: `preferred`, `offer_request_id`. Câmpuri request noi: `source="digital_twin_concept"`, `concept_id`, `dt_project_id`, `dt_model_id`, `concept_render_url`, `dt_concept_render_path`.
+
+### 9.3 REGULI CANONICE DE INTEGRITATE (reafirmate — obligatorii)
+1. **AI ≠ verificare profesională**; `inferred ≠ verified`. Un model AI NU devine profesional prin simpla generare.
+2. Numai **profesionistul** poate face tranziția explicită la `verified`. **AI-ul NU setează niciodată `verified` automat.**
+3. **ZERO produse City Partners inventate.** **ZERO prețuri inventate.** Fără date reale → **„preț orientativ indisponibil"**.
+4. **ZERO specialiști inventați.** **ZERO oferte false.**
+5. **ZERO auto-assignment** pentru proprietăți/proiecte.
+6. Cererea de ofertă din concept e permisă **DOAR** pentru concept `verified`.
+7. O proprietate are **un singur owner**. Ancorarea în masă e limitată la proiectele **aceluiași owner**.
+8. Acțiunile care produc schimbări reale (ofertă, ancorare) necesită **confirmare explicită**.
+9. Q&A rămâne **grounded** în dovezile proprietății; indică incertitudinea; nu inventează cote/materiale/trasee.
+10. Publicarea în Pașaport este **opt-in**; conceptul public trebuie să fie `verified`.
+11. Nu transforma niciodată o estimare AI într-un fapt profesional.
+
+### 9.4 DECIZIA CITY PARTNER PRODUCTS (arhitectură canonică)
+- Catalog **administrat de super-admin**; produse **reale**, introduse manual; poate fi **gol inițial**.
+- Un produs trebuie să aparțină (opțional) unui **City Partner real**; prețurile sunt cele introduse/confirmate de admin.
+- Ordinea de rezolvare a prețului pentru un material de concept: **(a)** produs City Partner potrivit → **(b)** fallback pe benchmark-uri / prețuri reale de piață → **(c)** dacă nu există niciunul: **„preț orientativ indisponibil"**.
+- Model comercial (fee/comision/sponsored/catalog complet) — **NEDECIS, direcție viitoare** (vezi §5.6). NU s-a modificat marketplace-ul existent.
+
+### 9.5 FLUXUL STRATEGIC DE PRODUS (direcție — NU tot e implementat)
+```
+CONCEPT AI → VALIDARE PROFESIONALĂ → ALEGERE CLIENT → MATERIALE REALE → CERERE OFERTĂ
+  → SPECIALIST VERIFICAT → EXECUȚIE → DOCUMENTARE → DIGITAL TWIN / PAȘAPORT
+```
+- Implementat până la **CERERE OFERTĂ** (+ atașare render, + concept în pașaport). **EXECUȚIE / DOCUMENTARE / bucla completă înapoi în Twin** = **direcție viitoare, NU implementată**.
+
+### 9.6 KNOWN ISSUE — `.skp` / Trimble Connect (LIMITARE DE WORKFLOW, NU „fully supported")
+- **Stare reală**: upload `.skp` **funcționează** (fișier stocat intact ca arhivă descărcabilă, `conversion_status="unsupported"`, fără crash / fără eroare roșie). UI: „SketchUp (doar descărcabil; exportă `.dae` pentru viewer)".
+- **NU este vizualizabil 3D** server-side: nu există pipeline Blender/CloudConvert pentru `.skp` → `.glb` în infra curentă.
+- **Trimble Connect**: interfața cere un URL valid Trimble Connect / SketchUp. Un link **Google Drive NU este** link Trimble Connect și este respins CORECT. Nu se confundă storage-ul Google Drive cu viewer-ul Trimble Connect/SketchUp; integrarea trebuie să valideze tipul corect de URL.
+- **NU marca `.skp` ca „fully supported"** până când un fișier `.skp` real este încărcat ȘI poate fi efectiv vizualizat în Digital Twin.
+- **Direcție de rezolvare (viitor)**: conversie reală `.skp` → format vizualizabil · SAU integrare validă Trimble Connect · SAU altă soluție tehnică robustă. (Vezi și `BUGS.md` BUG #005.)
+
+### 9.7 STARE TESTARE (PREVIEW, NU PRODUCTION)
+- Next Stage II: `testing_agent` iter207 (95%) → fix UX (offer-lock în studio) → **iter208 (100%)**; backend curl E2E.
+- Next Stage III: **iter209 (Feature 1/2/3 = 100%)** + **iter210 (Feature 4 vizual = 100%)**; backend curl E2E (inclusiv poarta de siguranță pașaport OFF → 404); date de test curățate.
+- Regresia Next Stage I + P0/P1/P0.1 = intactă. Rezultatele sunt din **PREVIEW** — NU reprezintă validare de producție.
+
+### 9.8 NEXT ROADMAP — APROBAT CA DIRECȚIE, **NU IMPLEMENTAT**
+> Următoarele NU sunt livrate. Se păstrează ca roadmap; nu le marca drept implementate.
+- **A. Import Catalog** — import CSV/Excel pentru încărcarea în masă a produselor City Partners (azi doar CRUD manual).
+- **B. Materiale în Ofertă** — lista de materiale + prețurile incluse STRUCTURAT (line-items/deviz) direct în cererea de ofertă (azi doar text liber în descriere).
+- **C. Insignă Pașaport** — badge „Amenajare planificată" pentru conceptele validate (azi există secțiunea de concept, nu un badge dedicat).
+- **D. Comparație partajabilă** — link prin care clientul trimite comparația a două concepte familiei/unui specialist pentru feedback/vot.
+- **Nuanță F (un singur tap)**: „Alege și cere ofertă" e implementat cu **o confirmare** (decizie de siguranță). Varianta strict zero-tap NU e implementată.
+- **J.** Orice extindere ulterioară trebuie să păstreze separarea **AI / verified**.
+
+### 9.9 CONFLICT MARCAT PENTRU DECIZIE UMANĂ (governance)
+- În directiva de sincronizare, lista „NEXT ACTION ITEMS — NU SUNT ÎNCĂ IMPLEMENTATE" (secțiunea 10 a mesajului) a inclus itemi care, conform CODULUI + testelor, sunt **DEJA LIVRAȚI ÎN PREVIEW**: „Alegerea câștigătorului din comparație" (#16), „Concept validat în Pașaport" (#17), „Notificare client la validare/respingere" (#13), „Materiale de la parteneri cu prețuri reale" (#14), parțial „Ofertă din concept cu un singur tap" (#12/#16, cu o confirmare). Am consemnat starea REALĂ pe baza codului (sursa de adevăr). **De confirmat de Fondator** dacă lista de roadmap trebuie redusă doar la itemii genuini rămași (A/B/C/D + nuanța zero-tap). NU s-a inventat nicio rezolvare — s-a reconciliat cu codul verificat.
