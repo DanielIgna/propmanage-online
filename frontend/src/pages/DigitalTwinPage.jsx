@@ -157,10 +157,13 @@ const UploadModal = ({ project, onClose, onUploaded }) => {
         xhr.send(fd);
       });
       onUploaded(done);
-      // If the backend queued a conversion (.skp/.dae/.obj/...), keep the modal open and poll.
+      // If the backend queued a conversion (.dae/.obj/...), keep the modal open and poll.
       if (done.conversion_status && DT_CONVERTING.includes(done.conversion_status)) {
         setConv({ model_id: done.id, status: done.conversion_status, percent: done.conversion_percent || 0 });
         pollConversion(done.id);
+      } else if (done.conversion_status === "unsupported") {
+        // .skp — stored intact & downloadable; show the clear note, keep modal open.
+        setConv({ model_id: done.id, status: "unsupported", note: done.conversion_note, url: done.url });
       } else {
         onClose();
       }
@@ -223,7 +226,7 @@ const UploadModal = ({ project, onClose, onUploaded }) => {
               <p className="text-[10px] text-stone-500 mt-3 leading-relaxed">
                 <strong className="text-emerald-400">.glb / .gltf</strong> — vizualizabil instant ·{" "}
                 <strong className="text-amber-400">.dae / .obj / .fbx / .stl / .ply</strong> — auto-conversie ·{" "}
-                <strong className="text-stone-400">.skp</strong> — SketchUp · max 200 MB
+                <strong className="text-stone-400">.skp</strong> — SketchUp (stocat & descărcabil) · max 200 MB
               </p>
             </>
           )}
@@ -263,6 +266,22 @@ const UploadModal = ({ project, onClose, onUploaded }) => {
               <div className="text-xs text-emerald-300 flex items-center gap-1.5">✓ Convertit — modelul .glb e gata de vizualizare.</div>
             ) : conv.status === "failed" ? (
               <div className="text-xs text-red-300">⚠️ Conversia a eșuat: {conv.error || "eroare necunoscută"}. Fișierul rămâne descărcabil.</div>
+            ) : conv.status === "unsupported" ? (
+              <div className="space-y-2" data-testid="dt-upload-skp-note">
+                <div className="text-xs text-amber-200 leading-relaxed">
+                  📦 {conv.note || "Fișier SketchUp stocat intact și descărcabil. Nu poate fi convertit automat pe server. Exportă .glb/.gltf/.dae din SketchUp pentru randare în viewer."}
+                </div>
+                {conv.url && (
+                  <a
+                    href={`${process.env.REACT_APP_BACKEND_URL}${conv.url}`}
+                    target="_blank" rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-100"
+                    data-testid="dt-skp-download"
+                  >
+                    <FileBox className="w-3.5 h-3.5" /> Descarcă .skp
+                  </a>
+                )}
+              </div>
             ) : (
               <div className="text-xs text-stone-400">Stocat. Format nevizualizabil în browser — descărcabil din proiect.</div>
             )}
@@ -274,7 +293,7 @@ const UploadModal = ({ project, onClose, onUploaded }) => {
           <ul className="mt-1 space-y-0.5 list-disc list-inside">
             <li><strong className="text-emerald-400">.glb / .gltf</strong> — vizualizabil instant în viewer</li>
             <li><strong className="text-amber-400">.dae / .obj / .fbx / .stl / .ply</strong> — auto-conversie server-side în .glb</li>
-            <li><strong>.skp</strong> (SketchUp) — stocat & legat de proprietate; conversie automată când e disponibilă</li>
+            <li><strong>.skp</strong> (SketchUp) — stocat intact & descărcabil; exportă .glb/.gltf/.dae din SketchUp pentru randare, sau vezi nativ în Trimble Connect</li>
           </ul>
         </div>
 

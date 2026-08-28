@@ -320,7 +320,7 @@ const UploadFilesModal = ({ project, client, onClose, onUploaded }) => {
   // from "Se convertește 35%" → "Gata!" without manual refresh.
   useEffect(() => {
     const converting = (history.models || []).filter(
-      m => m.kind === "archive" && m.conversion_status && !["completed", "failed", "n/a"].includes(m.conversion_status)
+      m => m.kind === "archive" && m.conversion_status && !["completed", "failed", "unsupported", "n/a"].includes(m.conversion_status)
     );
     if (converting.length === 0) return undefined;
     const t = setInterval(() => { loadHistory(); }, 5000);
@@ -434,7 +434,7 @@ const UploadFilesModal = ({ project, client, onClose, onUploaded }) => {
                   <div className="text-[11px] text-stone-500 mt-1 leading-relaxed">
                     <strong className="text-emerald-400">.glb / .gltf</strong> — vizualizabil instant<br/>
                     <strong className="text-amber-400">.dae / .obj / .fbx / .stl / .ply</strong> — auto-conversie via Blender ⚡<br/>
-                    <strong className="text-stone-400">.skp</strong> — SketchUp (doar descărcabil; exportă .dae pentru viewer)
+                    <strong className="text-stone-400">.skp</strong> — SketchUp: stocat intact & descărcabil (exportă .glb/.gltf/.dae din SketchUp sau vezi în Trimble Connect)
                   </div>
                 </div>
               )}
@@ -485,7 +485,7 @@ const UploadFilesModal = ({ project, client, onClose, onUploaded }) => {
                   const isSource = m.kind === "source"; // DAE/OBJ/FBX/STL/PLY — auto-converts to .glb
                   const cstatus = m.conversion_status;
                   const cpct = m.conversion_percent || 0;
-                  const isConverting = (isArchive || isSource) && cstatus && !["completed", "failed", "n/a"].includes(cstatus);
+                  const isConverting = (isArchive || isSource) && cstatus && !["completed", "failed", "unsupported", "n/a"].includes(cstatus);
                   const engine = m.conversion_engine === "blender" ? "Blender ⚡" : "CloudConvert ☁️";
                   const conversionLabel = {
                     pending: `${engine} · În așteptare…`,
@@ -507,9 +507,28 @@ const UploadFilesModal = ({ project, client, onClose, onUploaded }) => {
                           </div>
                         </div>
                         {isArchive && !cstatus && <span className="text-[9px] uppercase text-amber-400">Descărcabil</span>}
+                        {cstatus === "unsupported" && <span className="text-[9px] uppercase text-amber-400">SketchUp · descărcabil</span>}
                         {isSource && !cstatus && <span className="text-[9px] uppercase text-blue-400">Sursă</span>}
                         {cstatus === "completed" && <span className="text-[9px] uppercase text-emerald-400 flex items-center gap-1"><Wand2 className="w-3 h-3"/>GLB Gata</span>}
                       </div>
+                      {cstatus === "unsupported" && (
+                        <div className="bg-amber-500/10 border border-amber-500/20 rounded p-2 space-y-1.5" data-testid={`conv-unsupported-${m.id}`}>
+                          <div className="text-[10px] text-amber-200 leading-relaxed">
+                            📦 {m.conversion_note || "Fișier SketchUp stocat intact. Nu poate fi convertit automat pe server."}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={`${process.env.REACT_APP_BACKEND_URL}${m.url}`}
+                              target="_blank" rel="noreferrer"
+                              className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 flex items-center gap-1"
+                              data-testid={`skp-download-${m.id}`}
+                            >
+                              <FileText className="w-2.5 h-2.5" /> Descarcă .skp
+                            </a>
+                            <span className="text-[9px] text-stone-500">sau folosește tab-ul „Trimble Connect” pentru viewer nativ</span>
+                          </div>
+                        </div>
+                      )}
                       {isConverting && (
                         <div className="space-y-1" data-testid={`conv-row-${m.id}`}>
                           <div className="flex items-center justify-between text-[10px]">

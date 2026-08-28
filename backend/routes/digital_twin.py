@@ -520,9 +520,15 @@ async def upload_model(
     layer_meta = LAYER_DEFAULTS[norm_layer]
 
     # Save model metadata + set as current model on project
+    # Auto-conversion capability (server-side):
+    #   .dae/.obj/.fbx/.stl/.ply → Blender headless (if Blender is installed)
+    #   .skp (SketchUp) → NOT convertible server-side. CloudConvert does not accept .skp as
+    #     input (and produces no GLB), and Blender has no SketchUp importer on Linux. We store
+    #     the .skp INTACT + downloadable and guide the user to export .glb/.gltf/.dae from
+    #     SketchUp (2025+: File → Export → glTF) or use the native Trimble Connect viewer.
     is_archive = ext in DOWNLOAD_ONLY_EXTS
     needs_blender = ext in BLENDER_CONVERT_EXTS  # DAE/OBJ/FBX/STL/PLY → GLB
-    _will_convert = (needs_blender and _blender.is_enabled()) or (is_archive and ext == ".skp" and _ccv.is_enabled())
+    _will_convert = needs_blender and _blender.is_enabled()
     model_status = "processing" if _will_convert else ("ready" if (not is_archive and not needs_blender) else "stored")
     _role = user.get("active_view") or user.get("role")
     model_source = "specialist" if _role == "specialist" else ("platform" if _role in ("admin", "operator") else "owner_upload")
@@ -562,18 +568,22 @@ async def upload_model(
         "completeness": None,
     }
     # Auto-conversion path:
-    #   .skp → CloudConvert (off — SKP not supported)
-    #   .dae / .obj / .fbx / .stl / .ply → Blender headless
+    #   .dae / .obj / .fbx / .stl / .ply → Blender headless (when installed)
+    #   .skp → NOT convertible server-side → stored intact + clear guidance (no failing job)
     if needs_blender and _blender.is_enabled():
         model_doc["conversion_status"] = "pending"
         model_doc["conversion_percent"] = 0
         model_doc["conversion_started_at"] = _now_iso()
         model_doc["conversion_engine"] = "blender"
-    elif is_archive and ext == ".skp" and _ccv.is_enabled():
-        model_doc["conversion_status"] = "pending"
-        model_doc["conversion_percent"] = 0
-        model_doc["conversion_started_at"] = _now_iso()
-        model_doc["conversion_engine"] = "cloudconvert"
+    elif is_archive and ext == ".skp":
+        # Honest terminal state: stored intact, not an error, not retryable server-side.
+        model_doc["conversion_status"] = "unsupported"
+        model_doc["conversion_note"] = (
+            "Fișier SketchUp stocat intact și descărcabil. Conversia automată în browser nu este "
+            "posibilă pe server. Pentru vizualizare 3D în viewer: exportă din SketchUp .glb/.gltf "
+            "(2025+: File → Export → glTF) sau .dae (COLLADA) și încarcă versiunea exportată. "
+            "Alternativ, folosește tab-ul „Trimble Connect” pentru vizualizare nativă SketchUp."
+        )
     await db.digital_twin_models.insert_one(model_doc)
     # ST-001: fișierul e deja durabil în Object Storage (store_dt_bytes la upload).
     await storage_service.add_usage(p["owner_id"], total, "digital_twin")
@@ -1566,13 +1576,16 @@ async def retry_conversion(model_id: str, user: dict = Depends(get_current_user)
         raise HTTPException(403, "Only the project owner can retry conversion.")
     ext = doc.get("ext")
     if ext == ".skp":
-        if not _ccv.is_enabled():
-            raise HTTPException(503, "CloudConvert is not configured.")
-        engine = "cloudconvert"
-        runner = _run_skp_to_glb_conversion
-    elif ext in BLENDER_CONVERT_EXTS:
+        raise HTTPException(
+            400,
+            "Modelele SketchUp (.skp) nu pot fi convertite pe server (SketchUp nu oferă un SDK Linux, "
+            "iar serviciile de conversie nu acceptă .skp → .glb). Fișierul e stocat intact și descărcabil. "
+            "Exportă din SketchUp .glb/.gltf (2025+: File → Export → glTF) sau .dae (COLLADA) și încarcă "
+            "versiunea exportată — sau folosește Trimble Connect pentru vizualizare nativă.",
+        )
+    if ext in BLENDER_CONVERT_EXTS:
         if not _blender.is_enabled():
-            raise HTTPException(503, "Blender is not available on this server.")
+            raise HTTPException(503, "Conversia Blender nu este disponibilă pe acest server.")
         engine = "blender"
         runner = _run_blender_conversion
     else:

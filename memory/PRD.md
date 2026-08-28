@@ -1,3 +1,21 @@
+## 🔧 REPARAȚIE — Upload/Conversie SKP (SketchUp) · 28 Aug 2026
+
+**Cauza exactă**: `.skp` era trimis către o conversie CloudConvert imposibilă. Verificat pe API-ul live CloudConvert: `.skp` NU e format de intrare acceptat (tokenul `sk` = Sketch/vector via Inkscape, nu SketchUp) și CloudConvert **nu produce deloc GLB** (0 conversii `→ glb`). Blender nici nu e instalat pe pod și oricum nu are importer SketchUp pe Linux. Deci NU există conversie server-side `.skp`→3D în infra actuală → jobul eșua cu „This conversion type is not supported" + buton „Reîncearcă" inutil.
+
+**Ce am modificat**:
+- BE `routes/digital_twin.py`: `.skp` nu mai lansează job CloudConvert; se stochează INTACT ca `kind=archive`, `status=stored`, `conversion_status="unsupported"` + `conversion_note` clar (fără eroare). `retry_conversion` pentru `.skp` întoarce mesaj clar 400 (nu re-rulează job).
+- Migrare: 12 rânduri `.skp` vechi (blocate în `failed`) → `unsupported` + notă, curățat `conversion_error`.
+- FE `OperatorDigitalTwin.jsx`: branch `conv-unsupported-{id}` (notă chihlimbar + link „Descarcă .skp"), scos retry pentru `.skp`, exclus `unsupported` din polling/isConverting, text hint onest.
+- FE `DigitalTwinPage.jsx` (client): modalul afișează `dt-upload-skp-note` (nu se închide cu eroare) + `dt-skp-download`; copy onest.
+
+**Metoda de „conversie" folosită**: NU există conversie automată reală posibilă în infra. Fallback tehnic REAL și verificat: (1) fișier stocat intact în Object Storage + descărcabil; (2) vizualizare nativă prin **Trimble Connect** (tab existent); (3) recomandare export `.glb/.gltf/.dae` din SketchUp (2025+ exportă glTF nativ) → apoi upload versiune vizualizabilă; (4) opțional „AI 3D orientativ" din camerele proprietății.
+
+**Rezultat E2E** (fișierul real 17.8MB „Casa Ionut, Tauti"): upload → `kind=archive, status=stored, conversion_status=unsupported`; download → HTTP 200, **byte-identic (17.788.271 bytes) = proiect INTACT**; retry → 400 cu mesaj clar; UI operator+client fără eroare roșie/retry, cu notă + download funcțional; viewer se deschide fără crash cu `.skp` prezent. `testing_agent` iter206: **100% frontend PASS**.
+
+**NU e posibilă conversia server-side reală** — este o limitare tehnică reală (confirmată pe CloudConvert live + Blender absent), nu un bug de mesaj.
+
+---
+
 ## 🎨 DIGITAL TWIN — NEXT STAGE (4 funcționalități, ONE BUILD) · LIVRAT ÎN PREVIEW (28 Aug 2026)
 
 Extensie a Digital Twin-ului existent (fără rebuild). Testare `testing_agent` iter204→iter205: toate cele 4 PASS după 2 fix-uri (un blocker critic + un URL de imagine). Regresia celor 5 anterioare intactă.
