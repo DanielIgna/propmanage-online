@@ -287,3 +287,30 @@ async def _exec_update_autonomy_targets(payload: dict, decider: dict) -> dict:
     """Apply autonomy targets/weights changes (mirror of PUT /api/admin/autonomy/targets)."""
     from routes.autonomy import update_targets
     return await update_targets(payload=payload, user=decider)
+
+
+
+@register_action("analytics_loop_remediation")
+async def _exec_analytics_loop_remediation(payload: dict, decider: dict) -> dict:
+    """Executor pentru propunerile MEDIUM ale Operational Autonomy Loop.
+    Aprobat de om → creează task-ul de remediere (reversibil) + rezolvă finding-ul."""
+    key = payload.get("finding_key")
+    todo_id = str(uuid.uuid4())
+    await db.admin_todos.insert_one({
+        "id": todo_id,
+        "text": f"[Autonomy·Aprobat] {payload.get('recommended_action', 'Remediere fricțiune')}",
+        "priority": "medium",
+        "done": False,
+        "created_at": _now_iso(),
+        "created_by": decider.get("email", "admin"),
+        "source": "analytics_loop",
+        "finding_key": key,
+    })
+    if key:
+        await db.admin_ai_findings.update_one(
+            {"composite_key": key},
+            {"$set": {"status": "resolved", "resolved_at": _now_iso(),
+                      "resolved_by": decider.get("email", "admin"),
+                      "resolution_note": "analytics_loop: propunere aprobată de om → task de remediere creat."}},
+        )
+    return {"ok": True, "todo_id": todo_id, "finding_key": key}

@@ -4,7 +4,7 @@
 **Owner**: Fondator (danieligna1@gmail.com)
 **Status**: LIVE
 **Version**: 1.0
-**Last update**: 2026-02-06
+**Last update**: 2026-06 (FN-021 Operational Autonomy Loop added; FN-002 PARTIAL→VERIFIED)
 **Purpose**: Source of truth pentru toate funcționalitățile PropManage. Alimentează pagina `/admin/function-map`.
 
 ## Regula fundamentală
@@ -54,9 +54,9 @@
 - **Subcategory**: AI / Governance
 - **Lifecycle**: LIVE
 - **Description**: Motor de scor autonomie L0-L5, recomandări operaționale, snapshot istoric, alerte proactive.
-- **Frontend**: `/app/frontend/src/pages/admin/AutonomyPage.jsx`
+- **Frontend**: `/app/frontend/src/pages/admin/AutonomyEnginePage.jsx`
 - **Backend**: `/app/backend/routes/autonomy.py`, `/app/backend/autonomy/*.py`
-- **API**: `/api/admin/autonomy/score`, `/history`, `/snapshot`, `/alerts/recent`, `/boost-dev`
+- **API**: `/api/admin/autonomy/score`, `/history`, `/snapshot`, `/alerts/recent`, `/boost-dev`, `/loop/run`, `/loop/runs`, `/loop/policy`
 - **DB**: `autonomy_snapshots`, `autonomy_alerts`, `autonomy_decisions`
 - **Engine**: Autonomy scoring + Rules-based recommendation engine
 - **Automation**: Snapshot scheduler (nightly)
@@ -65,13 +65,13 @@
 - **Autonomy**: RECOMMEND
 - **Metric**: autonomy_score, tier, dimensions_breakdown
 - **Enterprise Health domain**: Automation
-- **Verification**: PARTIAL (endpoint smoke pass, E2E full flow UNKNOWN)
+- **Verification**: VERIFIED (E2E loop full: observație→finding→decizie→acțiune SAFE/MEDIUM→verify→learn)
 - **Production verified**: YES (endpoints healthy)
 - **Health**: GREEN
 - **Risk**: LOW
 - **Owner**: Fondator
 - **Knowledge Center**: `memory/BOARD_DIRECTIVE_RESEARCH_DRIVEN_EVOLUTION.md`
-- **Next action**: E2E verification pentru full recommendation → approval → execution loop
+- **Next action**: None (bucla recomandare→acțiune→verify validată prin FN-021; vezi `tests/test_autonomy_loop_e2e.py` + `test_reports/iteration_214.json`)
 
 ### FN-003 · Knowledge Center
 - **Category**: SHARED
@@ -458,6 +458,32 @@
 - **Owner**: Growth
 - **Next action**: Scale to 5+ campanii pentru statistical relevance
 
+### FN-021 · Operational Autonomy Loop
+- **Category**: SHARED
+- **Subcategory**: AI / Governance / Automation
+- **Lifecycle**: LIVE
+- **Description**: Bucla operațională închisă — transformă observații Analytics în findings, decizii cu politică de risc și acțiuni reale, cu verificare și învățare. OBSERVE(Analytics)→DETECT→FINDING(admin_ai_findings)→DECIDE/POLICY/RISK→ACT(admin_todos SAFE · admin_approvals MEDIUM/HIGH)→VERIFY→RECORD(autonomy_loop_runs)→LEARN. Detectoare deterministe (bounce ridicat pe trafic mare; abandon în fluxul de cerere). Idempotent, bounded, safe-on-rerun. Zero LLM, zero sisteme paralele.
+- **Frontend**: `/app/frontend/src/pages/admin/OperationalLoopPanel.jsx` (panou în `/admin/autonomy`)
+- **Backend**: `/app/backend/autonomy/loop.py`, `/app/backend/routes/autonomy.py` (`/loop/*`), executor human-gate în `/app/backend/routes/admin_approvals.py`
+- **API**: `POST /api/admin/autonomy/loop/run`, `GET /loop/runs`, `GET /loop/policy`
+- **DB**: `analytics_sessions` (observație, read-only), `admin_ai_findings` (findings, reuse), `admin_todos` (acțiune SAFE, reuse), `admin_approvals` (gate uman, reuse), `autonomy_loop_runs` (ledger NOU)
+- **Engine**: Detectoare deterministe + politică de risc SAFE/REVERSIBLE/MEDIUM/HIGH (fără LLM)
+- **Automation**: Scheduler la 3h (`autonomy_operational_loop`) + rulare manuală din UI
+- **AI Involvement**: EXECUTE (SAFE auto) + RECOMMEND (MEDIUM/HIGH → aprobare umană)
+- **Human Decision**: PARTIAL (SAFE = auto; MEDIUM/HIGH = aprobare umană obligatorie prin admin_approvals)
+- **Autonomy**: EXECUTE_WITH_APPROVAL
+- **Metric**: observations, findings_created, actions_taken(todo/approval), learned(auto_resolved), outcome
+- **Enterprise Health domain**: Automation
+- **KPI**: findings_closure_pct, autonomous_actions_per_run, human_approvals_pending
+- **Verification**: VERIFIED (E2E controlat: SAFE→todo, MEDIUM→approval, gate uman aprobare, idempotență fără duplicate, LEARN auto-resolve)
+- **Test**: `/app/backend/tests/test_autonomy_loop_e2e.py` (toate aserțiunile PASS) + `/app/test_reports/iteration_214.json` (UI 100%)
+- **Production verified**: NO (livrat în PREVIEW — necesită redeploy Fondator)
+- **Health**: GREEN
+- **Risk**: LOW (acțiuni SAFE reversibile; MEDIUM/HIGH gated)
+- **Owner**: Fondator
+- **Knowledge Center**: `memory/PRD.md`, `memory/CHANGELOG.md`
+- **Next action**: Observare pe date de producție după redeploy; extindere detectoare doar cu dovezi
+
 ---
 
 ## MATRIX HIGH-LEVEL
@@ -486,21 +512,22 @@
 | FN-018 A/B Testing | ✓ | ✓ | ✓ | ~ | ✗ | ✓ | ~ | ✓ |
 | FN-019 Heatmap | ✓ | ✓ | ✓ | ~ | ✗ | ✓ | ~ | ✗ |
 | FN-020 WhatsApp Growth | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ |
+| FN-021 Operational Loop | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ~ |
 
 ---
 
 ## COVERAGE SUMMARY
 
-- **Total functions mapped**: 20
-- **LIVE**: 12 · **IMPLEMENTED**: 7 · **PLANNED/BLOCKED**: 1
-- **VERIFIED**: 5 · **PARTIAL**: 12 · **UNKNOWN**: 3
-- **Health GREEN**: 6 · **YELLOW**: 11 · **GREY**: 2 · **RED**: 0
-- **Risk HIGH**: 2 (FN-007, FN-011) · **MEDIUM**: 8 · **LOW**: 10 · **UNKNOWN**: 0
+- **Total functions mapped**: 21
+- **LIVE**: 15 · **IMPLEMENTED**: 6
+- **VERIFIED**: 7 (FN-001, FN-002, FN-003, FN-004, FN-013, FN-020, FN-021) · **PARTIAL**: 12 · **UNKNOWN**: 2
+- **Health GREEN**: 8 · **YELLOW**: 11 · **GREY**: 2 · **RED**: 0
+- **Risk LOW**: 11 · **MEDIUM**: 7 · **HIGH**: 2 (FN-007, FN-011) · **UNKNOWN**: 1
 
 ## KEY OBSERVATIONS
 
-1. **IMPLEMENTED ≠ VERIFIED**: Din 20 funcții, doar 5 sunt fully VERIFIED. 12 sunt PARTIAL. Aceasta este realitatea onestă a stadiului actual.
+1. **IMPLEMENTED ≠ VERIFIED**: Din 21 funcții, 7 sunt fully VERIFIED. 11 sunt PARTIAL. Realitate onestă a stadiului actual.
 2. **HIGH-risk**: Doar 2 (FN-007 Registration, FN-011 Stripe LIVE claim). Restul MEDIUM/LOW.
-3. **Human Decision explicit**: 9 din 20 funcții au Human-in-the-Loop (marketplace, votes, payments, campaigns, restore, AI approvals).
-4. **Autonomy distribution**: OBSERVE (12), RECOMMEND (4), NONE (3), EXECUTE_LOW_RISK (1). PropManage este predominant observațional + recomandativ — NU autonom.
-5. **Production verification gap**: 8 funcții au `Production verified: UNKNOWN`. Necesită verificare live-data sistematică.
+3. **Human Decision explicit**: 9 din 21 funcții au Human-in-the-Loop. FN-021 (Loop Operațional) menține gate uman pentru acțiuni MEDIUM/HIGH.
+4. **Autonomy distribution**: OBSERVE (12), RECOMMEND (4), NONE (3), EXECUTE_LOW_RISK (1), EXECUTE_WITH_APPROVAL (1). FN-021 aduce prima buclă EXECUȚIE reală (SAFE) + gate uman (MEDIUM/HIGH).
+5. **Bucla închisă**: FN-021 leagă FN-001 (Analytics) → findings (admin_ai_findings) → decizie/acțiune (admin_todos/admin_approvals) → verify → learn. Prima verigă operațională reală Analytics→Acțiune.

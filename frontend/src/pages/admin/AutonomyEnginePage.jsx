@@ -11,6 +11,7 @@ import {
 const API = process.env.REACT_APP_BACKEND_URL;
 const ax = axios.create({ baseURL: API, withCredentials: true });
 import SelfDrivingPanel from "./SelfDrivingPanel";
+import OperationalLoopPanel from "./OperationalLoopPanel";
 
 const TIER_META = {
   "self-driving": { label: "Self-Driving", color: "#a855f7", ring: "stroke-violet-500", text: "text-violet-300", bg: "bg-violet-500/15 border-violet-500/30" },
@@ -689,6 +690,9 @@ export const AutonomyEnginePage = () => {
             </div>
           )}
         </div>
+
+        {/* OPERATIONAL AUTONOMY LOOP (FN-021) */}
+        <OperationalLoopPanel />
 
         {/* TIER DOWNGRADE ALERTS PANEL */}
         <TierAlertsPanel />

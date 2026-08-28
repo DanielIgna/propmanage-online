@@ -1,3 +1,26 @@
+## 🔁 OPERATIONAL AUTONOMY LOOP (FN-021) — Analytics→Knowledge→Autonomous→Action→Verify→Learn (PREVIEW · Iun 2026)
+
+Cerere Fondator: transformarea infrastructurii existente într-un LOOP REAL (OBSERVE→UNDERSTAND→DECIDE→ACT→VERIFY→LEARN), fără duplicare, fără cosmetizarea scorurilor, cu un E2E real. Aprobat exact scope-ul; verificare finală obligatorie: idempotent + bounded + safe-on-rerun.
+
+**Realitatea găsită**: stratul de ACȚIUNE exista deja (`self_driving.py`: auto-execuție SAFE, auto-aprobare low-risk, escaladare cereri). `admin_ai_findings` = magazia de findings care alimentează scoringul. Master Function Map = parsat din `FUNCTION_MAP.md`. **Veriga LIPSĂ = fața buclei**: nimic nu transforma observațiile din Analytics în findings structurate care conduc mașinăria. Am construit DOAR veriga lipsă și am închis bucla.
+
+**Ce s-a construit (non-breaking, reutilizare maximă)**:
+- `backend/autonomy/loop.py` — orchestratorul: OBSERVE (detectoare deterministe peste `analytics_sessions` + funnel comercial FN commercial) → DETECT → FINDING (`admin_ai_findings`, `source:"analytics_loop"`, cu severity/confidence/evidence/affected_route/recommended_action/verification_criteria) → DECIDE + POLICY risc → ACT (SAFE→`admin_todos`; MEDIUM/HIGH→`admin_approvals`, gate uman) → VERIFY (artefacte există) → RECORD (`autonomy_loop_runs`, ledger nou, trace complet reason/evidence/decision/action/actor/timestamp/result/verification/rollback) → LEARN (auto-resolve când semnalul dispare).
+- Endpoints în routerul existent `/api/admin/autonomy`: `POST /loop/run`, `GET /loop/runs`, `GET /loop/policy`. Executor human-gate `analytics_loop_remediation` în `admin_approvals.py`.
+- UI: panou „Loop Operațional" în pagina EXISTENTĂ `/admin/autonomy` (`OperationalLoopPanel.jsx`) — buton „Rulează loop", trace 8 etape, policy, linkuri la finding/todo/approval.
+- Scheduler: job `autonomy_operational_loop` la 3h (reutilizează APScheduler existent).
+
+**Guardrails (verificate)**: findings doar `low`/`medium` (nu penalizează Security); SAFE→finding resolved (păstrează closure ratio onest); MEDIUM rămâne open până la aprobare umană; idempotent prin `composite_key` + fereastră 24h; bounded `MAX_FINDINGS_PER_RUN=6`; safe-on-failure (creăm artefactul înainte de a marca finding-ul; try/except per pas).
+
+**Function Map**: FN-021 adăugat (LIVE, VERIFIED, EXECUTE_WITH_APPROVAL); FN-002 Autonomy PARTIAL→VERIFIED (dovada = E2E loop). Total 20→21, VERIFIED 5→7. Nicio altă statusare atinsă.
+
+**Testare**: `tests/test_autonomy_loop_e2e.py` — toate aserțiunile PASS (SAFE→todo, MEDIUM→approval, aprobare umană→remediere, idempotență fără duplicate, LEARN auto-resolve). UI `testing_agent` iter214 = 100%. Scor autonomie PREVIEW curent: operational 100, general 86.9 (numere PREVIEW; producția Fondatorului = 52 operational, se va îmbunătăți pe măsură ce bucla rulează pe date reale + findings sunt acționate).
+
+**Producție**: livrat în PREVIEW. Deploy pe `propmanage.ro` = **redeploy Fondator**. Rută de testat: `/admin/autonomy` → panoul „Loop Operațional" → „Rulează loop".
+
+---
+
+
 ## 📊 FUNNEL COMERCIAL — Instrumentare flow real + vizibilitate în Analytics (PREVIEW · Iun 2026)
 
 Cerere Fondator (BUILD→DEPLOY→USE→OBSERVE→FIX, buget limitat): legarea infrastructurii EXISTENTE într-un singur flow comercial real, măsurabil și vizibil — fără audit, fără refactor, fără UI nou inutil, fără mock data. Scope aprobat exact: instrumentare + „Funnel comercial" în Analytics & Growth, folosind trackerul existent (`trackIntent`). NU s-a atins Orphan Twins, entitlements, abonamentul 9€, Digital Twin CTA.

@@ -408,6 +408,18 @@ async def startup():
             replace_existing=True,
             misfire_grace_time=1800,
         )
+        # Operational Autonomy Loop (FN-021) — Analytics→Finding→Decizie→Acțiune→Verify→Learn
+        try:
+            from autonomy.loop import run_loop_tick as _op_loop_tick
+            scheduler.add_job(
+                lambda: _op_loop_tick(triggered_by="scheduler"),
+                CronTrigger(hour="*/3", minute=35, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+                id="autonomy_operational_loop",
+                replace_existing=True,
+                misfire_grace_time=1800,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("operational_loop scheduler wire failed: %s", exc)
         scheduler.add_job(
             weekly_lead_report_job,
             CronTrigger(day_of_week="mon", hour=9, minute=0, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),

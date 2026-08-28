@@ -784,3 +784,42 @@ async def trigger_founder_digest(user=Depends(require_role("admin"))):
     from autonomy.founder_digest import weekly_founder_digest
     result = await weekly_founder_digest()
     return {"ok": True, "result": result}
+
+
+# ═══════════════════════ OPERATIONAL AUTONOMY LOOP (FN-021) ═══════════════════════
+# Închide bucla Analytics → Finding → Decizie → Acțiune → Verify → Learn.
+# Reutilizează admin_ai_findings + admin_todos + admin_approvals + self_driving.
+from autonomy import loop as autonomy_loop  # noqa: E402
+
+
+@router.post("/loop/run")
+async def run_operational_loop(user=Depends(require_role("admin"))):
+    """Rulează o iterație completă a buclei operaționale (OBSERVE→...→LEARN)."""
+    result = await autonomy_loop.run_loop_tick(triggered_by=f"manual:{user.get('email','admin')}")
+    return {"ok": True, "run": result}
+
+
+@router.get("/loop/runs")
+async def list_operational_loop_runs(limit: int = Query(10, ge=1, le=50), user=Depends(require_role("admin"))):
+    """Ultimele rulări ale buclei (ledger autonomy_loop_runs)."""
+    runs = await db.autonomy_loop_runs.find({}, {"_id": 0}).sort("started_at", -1).to_list(limit)
+    return {"items": runs}
+
+
+@router.get("/loop/policy")
+async def get_operational_loop_policy(user=Depends(require_role("admin"))):
+    """Politica de acțiune + pragurile deterministe + descrierea etapelor buclei."""
+    return {
+        "action_policy": autonomy_loop.ACTION_POLICY,
+        "policy_description": autonomy_loop.POLICY_DESCRIPTION,
+        "thresholds": {
+            "bounce_min_sessions": autonomy_loop.BOUNCE_MIN_SESSIONS,
+            "bounce_min_pct": autonomy_loop.BOUNCE_MIN_PCT,
+            "funnel_min_started": autonomy_loop.FUNNEL_MIN_STARTED,
+            "funnel_max_conversion_pct": autonomy_loop.FUNNEL_MAX_CONVERSION_PCT,
+            "max_findings_per_run": autonomy_loop.MAX_FINDINGS_PER_RUN,
+            "dedup_window_hours": autonomy_loop.DEDUP_WINDOW_HOURS,
+            "lookback_days": autonomy_loop.ANALYTICS_LOOKBACK_DAYS,
+        },
+        "stages": ["OBSERVE", "DETECT", "FINDING", "DECIDE/POLICY/RISK", "ACT", "VERIFY", "RECORD", "LEARN"],
+    }
