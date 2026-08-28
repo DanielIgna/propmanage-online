@@ -1,3 +1,21 @@
+## 🧩 DIGITAL TWIN — FAZA URMĂTOARE (5 funcționalități, ONE BUILD) · LIVRAT ÎN PREVIEW (28 Aug 2026)
+
+Pachet integral construit într-un singur BUILD (frontend; backend era deja gata + verificat prin curl). Testare `testing_agent` iter203: **100% (5/5 features PASS)**, zero bug-uri blocante.
+
+**1 · Upload 3D multi-format (Client)** — `DigitalTwinPage.jsx::UploadModal`: acceptă acum `.glb/.gltf/.skp/.dae/.obj/.fbx/.stl/.ply` (attribute `accept` complet, testid `dt-upload-input`), cu progres XHR + **polling conversie** (`GET /conversions/{id}/status`, testid `dt-upload-conversion`); modalul rămâne deschis cât timp rulează conversia în fundal.
+
+**2 · AI-3D „Generează model orientativ (inferred)”** — buton pe fiecare card Client (`dt-ai-generate-{id}`, DEZACTIVAT dacă proiectul nu e ancorat la o proprietate) + în viewer (`dt-viewer-ai-generate`) + în Operator (`op-ai-generate`, tab 3D). Apel `POST /projects/{id}/ai-generate` → model `source=ai_generated, confidence=inferred, completeness=30`, etichetat clar „orientativ / neverificat”. 400 corect dacă proiectul e neancorat (Property Anchor).
+
+**3 · Property Q&A pe dovezi** — component nou `DigitalTwinQAPanel.jsx` (chat drawer în `DigitalTwinViewer`, lansat din `dt-qa-launch` / `dt-open-qa`). Wired la `POST /api/digital-twin/qa/ask` + istoric `GET /qa/history`. Răspunsuri STRICT pe dovezi (DNA proprietate + documente + lucrări + modele), în română; când nu există date → „Această informație nu există în datele proprietății (necunoscut)” (fără halucinații).
+
+**4 · Ancorare istorică (unresolved)** — în dashboard Operator (tab `op-tab-dt_pro`): buton `op-unresolved-btn` + badge count (~45) → `UnresolvedModal` listează proiectele 3D neancorate cu `candidate_properties` (proprietățile ownerului). Ancorare manuală: `<select>` + `PATCH /projects/{id}/property` (ZERO auto-assign). Badge scade după ancorare (verificat 44→43).
+
+**5 · Fix responsive mobile Demo 3D** — `PublicDemoPage.jsx` + `DemoCanvas.jsx`: `overflow-x-hidden`, layout `flex-col lg:flex-row`, canvas `h-[58vh] lg:flex-1`, pastile mod + hint + reset responsive (touch), `Canvas touchAction:none` + `dpr [1,2]`. Verificat la 390 și 375 px: **zero overflow orizontal**, aside stivuit sub canvas, controale accesibile; desktop 1920 neafectat.
+
+**Fișiere**: FE `DigitalTwinPage.jsx`, `OperatorDigitalTwin.jsx`, `DigitalTwinViewer.jsx`, `PublicDemoPage.jsx`, `DemoCanvas.jsx` (edit); `DigitalTwinQAPanel.jsx` (nou). Backend neatins în această sesiune (era gata). **Necesită redeploy Fondator pentru producție.**
+
+---
+
 ## 🧭 DIGITAL TWIN P0.1 — OPERATOR PROPERTY ANCHOR (BUILD) · LIVRAT ÎN PREVIEW (28 Aug 2026)
 
 **Doc canonic Property Twin (taxonomie + stare + direcție)**: `audits/PROPERTY_TWIN_CANONICAL_v1.0.md`.
@@ -11,7 +29,7 @@ Ultima sursă de orfanare eliminată: fluxul OPERATOR de creare Digital Twin nu 
 
 **Testare**: `tests/test_dt_p01_operator_anchor_iter203.py` — **5/5 PASS** (selector endpoint; create fără property → 400; create cu property → linked + moștenire model; property neautorizat → 403/404; regresie client standalone → unresolved). Regresie totală **P0+P1+P0.1 = 15/15 PASS** (iter201 + iter202 + iter203).
 
-**NU s-a construit**: sistem de roluri operator/specialist = FUTURE PROFESSIONAL WORKFLOW (documentat în doc canonic §5.8). **Necesită redeploy Fondator + LIVE VALIDATION pentru producție** (nu marcat production-complete).
+**NU s-a construit**: sistem de roluri operator/specialist = FUTURE PROFESSIONAL WORKFLOW (documentat în doc canonic §5.8). **PRODUCTION-VALIDATED (28 Aug 2026)** — live 22/22 pe propmanage.ro (P0+P0.1+P1 + KG + Property DNA + regresie Auth/entitlements/House Health/Stripe). **PRODUCTION-COMPLETE.**
 
 **Reconciliere documentară (28 Aug 2026)**: `PROPERTY_TWIN_CANONICAL_v1.0.md` devine sursa unică pentru taxonomia Property Twin (umbrelă 2D `twins` + 3D `digital_twin_projects`). Corectate contradicțiile din `MASTER_PLATFORM_STATE.md` (`twins` NU e „legacy"; D5/M5 „consolidare twin storage" = ANULAT). `CANONICAL_SYSTEM_REGISTRY` + `SSOT_REGISTRY` + `INDEX` sincronizate.
 

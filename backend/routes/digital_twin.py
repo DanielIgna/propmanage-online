@@ -615,6 +615,185 @@ async def upload_model(
     return _clean(model_doc)
 
 
+# ============= AI-3D — ORIENTATIVE MASSING GENERATOR (inferred) =============
+# Generează un model 3D ORIENTATIV (massing) din camerele proprietății (2D twin).
+# Marcat STRICT ca inferred (Trust Model 015). NU suprascrie un model documented/verified.
+
+_AI3D_SYSTEM = (
+    "Ești un asistent care propune un layout dreptunghiular SIMPLU (massing) al unei locuințe, "
+    "pentru un model 3D ORIENTATIV. Primești o listă de camere (nume, tip, suprafață m²) și "
+    "suprafața totală. Returnează STRICT un JSON array, fără text în plus, unde fiecare element are: "
+    '{"name": str, "x": float, "z": float, "w": float, "d": float, "h": float}. '
+    "Coordonate în metri, pe un plan (x = est, z = nord), origine (0,0). Camerele NU se suprapun, "
+    "sunt aranjate compact într-un dreptunghi. w=lățime, d=adâncime, h=înălțime (2.6 dacă nu știi). "
+    "Dacă o cameră are suprafață A, atunci w*d ≈ A. Fără explicații, DOAR JSON."
+)
+
+
+def _fallback_layout(rooms, prop):
+    import math
+    total_surface = float(prop.get("surface") or 0) or None
+    n = len(rooms) or int(prop.get("rooms") or 3) or 3
+    if not rooms:
+        per = (total_surface / n) if total_surface else 16.0
+        rooms = [{"name": f"Camera {i+1}", "area": per} for i in range(n)]
+    cols = max(1, int(math.ceil(math.sqrt(len(rooms)))))
+    x = z = 0.0
+    col = 0
+    row_depth = 0.0
+    out = []
+    for i, r in enumerate(rooms):
+        area = float(r.get("area") or r.get("area_m2") or 16.0) or 16.0
+        side = max(2.0, math.sqrt(area))
+        w = side
+        d = area / side if side else side
+        out.append({"name": r.get("name") or f"Camera {i+1}", "x": round(x, 2), "z": round(z, 2),
+                    "w": round(w, 2), "d": round(d, 2), "h": 2.6})
+        x += w + 0.2
+        row_depth = max(row_depth, d)
+        col += 1
+        if col >= cols:
+            col = 0
+            x = 0.0
+            z += row_depth + 0.2
+            row_depth = 0.0
+    return out
+
+
+async def _ai_infer_layout(rooms, prop):
+    """Returns (layout, engine). Uses the canonical LLM (ai_core.call_llm); falls back to a deterministic grid."""
+    import json as _json
+    from ai_core.provider import call_llm
+    payload_rooms = [{"name": r.get("name"), "type": r.get("type"), "area": r.get("area") or r.get("area_m2")} for r in rooms]
+    user_msg = _json.dumps({"total_surface_m2": prop.get("surface"), "rooms": payload_rooms, "rooms_count": prop.get("rooms")}, ensure_ascii=False)
+    try:
+        res = await call_llm(_AI3D_SYSTEM, f"Camere:\n{user_msg}\n\nReturnează JSON array.", session_id=f"ai3d-{uuid.uuid4().hex[:8]}")
+        txt = (res.get("text") or "").strip()
+        if txt.startswith("```"):
+            txt = txt.strip("`")
+            if "\n" in txt:
+                txt = txt.split("\n", 1)[1]
+            if txt.lower().startswith("json"):
+                txt = txt[4:]
+        start = txt.find("[")
+        end = txt.rfind("]")
+        if start >= 0 and end > start:
+            arr = _json.loads(txt[start:end + 1])
+            layout = [x for x in arr if isinstance(x, dict) and all(k in x for k in ("x", "z", "w", "d"))]
+            if layout:
+                for x in layout:
+                    x.setdefault("h", 2.6)
+                    x.setdefault("name", "Camera")
+                return layout, (res.get("model") or "ai")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[ai3d] layout inference failed: {e}")
+    return _fallback_layout(rooms, prop), "fallback"
+
+
+def _build_massing_glb(layout) -> bytes:
+    import trimesh
+    import numpy as np
+    palette = [
+        [200, 184, 154, 255], [154, 138, 114, 255], [106, 176, 212, 255],
+        [212, 255, 58, 255], [167, 139, 250, 255], [16, 185, 129, 255], [148, 163, 184, 255],
+    ]
+    scene = trimesh.Scene()
+    for i, r in enumerate(layout):
+        w = max(0.5, float(r.get("w", 3)))
+        d = max(0.5, float(r.get("d", 3)))
+        h = max(0.5, float(r.get("h", 2.6)))
+        x = float(r.get("x", 0))
+        z = float(r.get("z", 0))
+        box = trimesh.creation.box(extents=[w, h, d])
+        box.apply_translation([x + w / 2.0, h / 2.0, z + d / 2.0])
+        box.visual.face_colors = np.array(palette[i % len(palette)], dtype=np.uint8)
+        scene.add_geometry(box, node_name=(r.get("name") or f"room{i}")[:40])
+    glb = scene.export(file_type="glb")
+    return glb if isinstance(glb, (bytes, bytearray)) else bytes(glb)
+
+
+@router.post("/projects/{project_id}/ai-generate")
+async def ai_generate_model(project_id: str, user: dict = Depends(get_current_user)):
+    """AI-3D — generează un model GLB ORIENTATIV (inferred) din camerele proprietății.
+    Trust Model 015: source=ai_generated, confidence=inferred, verification_status=None, completeness=30.
+    NU suprascrie un model documented/verified existent (strat suplimentar, nu înlocuiește modelul real)."""
+    await _ensure_dt_ingest_access(user)
+    p = await _ensure_project_access(project_id, user)
+    if user.get("role") not in ("admin", "operator") and p.get("owner_id") != user["id"]:
+        raise HTTPException(403, "Doar proprietarul proiectului poate genera modelul AI.")
+    prop_id = p.get("property_id")
+    if not prop_id:
+        raise HTTPException(400, "Ancorează proiectul la o proprietate înainte de generarea AI (Property Anchor).")
+    try:
+        prop = await db.properties.find_one({"_id": ObjectId(prop_id)})
+    except Exception:
+        prop = None
+    if not prop:
+        raise HTTPException(404, "Proprietatea ancorată nu există.")
+    twin = await db.twins.find_one({"property_id": prop_id})
+    rooms = (twin or {}).get("rooms") or []
+    layout, engine = await _ai_infer_layout(rooms, prop)
+    try:
+        glb = _build_massing_glb(layout)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"Generarea 3D a eșuat: {e}") from e
+    total = len(glb)
+    safe_name = f"ai_{uuid.uuid4().hex[:12]}.glb"
+    try:
+        object_path = await storage_service.store_dt_bytes("model", project_id, safe_name, glb, "model/gltf-binary")
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"Stocarea modelului AI a eșuat: {e}") from e
+    public_path = f"/api/digital-twin/files/{project_id}/{safe_name}"
+    model_doc = {
+        "id": _new_id(),
+        "project_id": project_id,
+        "filename": f"AI · model orientativ ({len(layout)} camere).glb",
+        "stored_as": safe_name,
+        "size_bytes": total,
+        "url": public_path,
+        "kind": "model",
+        "ext": ".glb",
+        "layer_type": "structure",
+        "layer_label": "Structură (AI orientativ)",
+        "layer_color": "#a78bfa",
+        "layer_opacity": 0.85,
+        "layer_visible": True,
+        "uploaded_by": user["id"],
+        "uploaded_by_name": user.get("name") or user.get("email"),
+        "uploaded_by_role": user.get("role"),
+        "uploaded_at": _now_iso(),
+        "object_path": object_path,
+        "property_id": prop_id,
+        "source": "ai_generated",
+        "version": 1,
+        "version_label": "AI orientativ",
+        "status": "ready",
+        "visibility": "internal",
+        "change_reason": f"AI-3D massing ({engine})",
+        "supersedes": None,
+        "superseded_by": None,
+        "property_link_status": "linked",
+        "confidence": "inferred",
+        "verification_status": None,
+        "completeness": 30,
+        "ai_generated": True,
+        "ai_engine": engine,
+    }
+    await db.digital_twin_models.insert_one(model_doc)
+    await storage_service.add_usage(p["owner_id"], total, "digital_twin")
+    await _kg_link_twin(prop_id, "twin_model", model_doc["id"])
+    documented = await db.digital_twin_models.count_documents({
+        "project_id": project_id, "confidence": {"$in": ["documented", "verified"]}, "kind": "model",
+    })
+    update_set = {"updated_at": _now_iso()}
+    if not p.get("model_url") and documented == 0:
+        update_set["model_url"] = public_path
+    await db.digital_twin_projects.update_one({"id": project_id}, {"$set": update_set, "$inc": {"model_count": 1}})
+    out = _clean(model_doc)
+    out["note"] = "Model ORIENTATIV generat de AI (inferred). NU este un model profesional verificat."
+    return out
+
+
 # ============= CLOUDCONVERT SKP → GLB PIPELINE =============
 
 LAYER_DEFAULTS_FOR_CONVERT = {
@@ -2575,6 +2754,34 @@ async def backfill_property_links(user: dict = Depends(require_role("admin"))): 
         "models_unresolved": models_total - models_linked,
         "note": "Zero auto-assignment. Proiectele fără property_id rămân 'unresolved' și se ancorează manual via PATCH /projects/{id}/property.",
     }
+
+
+@admin_router.get("/unresolved-projects")
+async def list_unresolved_projects(user: dict = Depends(require_role("admin", "operator"))):  # noqa: ARG001
+    """P0.1+ — proiecte 3D neancorate (istorice) + candidați de proprietate (ale ownerului),
+    pentru ancorare MANUALĂ via PATCH /projects/{id}/property. ZERO auto-assign / ZERO inferență riscantă."""
+    items = []
+    q = {"$or": [
+        {"property_id": None}, {"property_id": {"$exists": False}}, {"property_id": ""},
+        {"property_link_status": "unresolved"},
+    ]}
+    async for p in db.digital_twin_projects.find(q).sort("created_at", -1).limit(300):
+        if p.get("property_id"):
+            continue  # already anchored — never touch
+        owner_id = p.get("owner_id")
+        owner = await db.users.find_one(_user_filter(owner_id), {"name": 1, "email": 1}) if owner_id else None
+        cand = []
+        if owner_id:
+            async for pr in db.properties.find({"owner_id": owner_id}).sort("created_at", -1):
+                cand.append({"id": str(pr["_id"]), "name": pr.get("name") or "Proprietate", "address": pr.get("address")})
+        items.append({
+            "id": p["id"], "name": p.get("name"), "created_at": p.get("created_at"),
+            "owner_id": owner_id, "owner_name": (owner or {}).get("name") or (owner or {}).get("email") or "—",
+            "model_count": p.get("model_count", 0), "plan_count": p.get("plan_count", 0),
+            "property_link_status": p.get("property_link_status") or "unresolved",
+            "candidate_properties": cand,
+        })
+    return {"items": items, "count": len(items)}
 
 
 @admin_router.post("/subscription/grant")

@@ -16,7 +16,7 @@ import axios from "axios";
 import {
   Box, Upload, FileText, CheckCircle2, Clock, AlertCircle, Loader2, X,
   Plus, Search, Mail, MapPin, User as UserIcon, Layers, Eye, ShieldCheck, Edit3,
-  RefreshCw, Wand2,
+  RefreshCw, Wand2, Link2, Unlink,
 } from "lucide-react";
 import { API } from "./DashShared";
 
@@ -271,6 +271,22 @@ const UploadFilesModal = ({ project, client, onClose, onUploaded }) => {
   const [trimbleUrl, setTrimbleUrl] = useState(project.trimble_embed_url || "");
   const [savingTrimble, setSavingTrimble] = useState(false);
   const [err, setErr] = useState(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMsg, setAiMsg] = useState(null);
+
+  const aiGenerate = async () => {
+    setAiBusy(true); setAiMsg(null); setErr(null);
+    try {
+      await axios.post(`${API}/digital-twin/projects/${project.id}/ai-generate`);
+      setAiMsg("✓ Model AI orientativ generat (inferred, neverificat).");
+      await loadHistory();
+      onUploaded?.();
+    } catch (e) {
+      setErr(e?.response?.data?.detail || e.message);
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   const saveTrimble = async () => {
     setSavingTrimble(true); setErr(null);
@@ -442,6 +458,24 @@ const UploadFilesModal = ({ project, client, onClose, onUploaded }) => {
                 </button>
               </>
             )}
+
+            {/* AI-3D orientative generation (inferred) — anchored projects only */}
+            <div className="pt-2 border-t border-white/5">
+              <button
+                onClick={aiGenerate}
+                disabled={aiBusy}
+                className="w-full py-2 rounded-lg border border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/20 disabled:opacity-50 text-violet-200 text-sm font-medium flex items-center justify-center gap-2"
+                data-testid="op-ai-generate"
+                title="Generează un model 3D orientativ (AI, inferred). Necesită proiect ancorat la o proprietate. Nu suprascrie modele documentate."
+              >
+                {aiBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                {aiBusy ? "Se generează…" : "Generează AI 3D (orientativ)"}
+              </button>
+              {aiMsg && <div className="mt-2 text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-2" data-testid="op-ai-msg">{aiMsg}</div>}
+              <p className="text-[10px] text-stone-500 mt-1.5 leading-relaxed">
+                Massing orientativ din camerele proprietății. Etichetat „inferred / neverificat". Nu înlocuiește modelul profesional.
+              </p>
+            </div>
 
             {history.models.length > 0 && (
               <div className="pt-3 space-y-1.5">
@@ -716,6 +750,142 @@ const ClientCard = ({ client, onCreateProject, onUpload, onOpenDigitalTwin }) =>
   );
 };
 
+// ============= UNRESOLVED PROJECTS (Historical Anchor) MODAL =============
+// Ancorare manuală a proiectelor 3D istorice (neancorate) la o proprietate.
+// ZERO auto-assign — operatorul alege proprietatea din candidații ownerului.
+const UnresolvedRow = ({ item, onAnchored }) => {
+  const [propertyId, setPropertyId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [done, setDone] = useState(false);
+  const cands = item.candidate_properties || [];
+
+  const anchor = async () => {
+    if (!propertyId) return;
+    setBusy(true); setErr(null);
+    try {
+      await axios.patch(`${API}/digital-twin/projects/${item.id}/property`, { property_id: propertyId });
+      setDone(true);
+      onAnchored?.(item.id);
+    } catch (e) {
+      setErr(e?.response?.data?.detail || e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (done) {
+    return (
+      <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-xs text-emerald-300 flex items-center gap-2" data-testid={`unresolved-done-${item.id}`}>
+        <CheckCircle2 className="w-4 h-4" /> „{item.name}" a fost ancorat la proprietate.
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white/[0.03] border border-white/10 rounded-xl p-3 space-y-2" data-testid={`unresolved-row-${item.id}`}>
+      <div className="flex items-start gap-2">
+        <Unlink className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm text-white truncate">{item.name || "Proiect fără nume"}</div>
+          <div className="text-[10px] text-stone-500">
+            {item.owner_name} · {item.created_at ? new Date(item.created_at).toLocaleDateString("ro-RO") : "—"} · {item.model_count} model · {item.plan_count} plan
+          </div>
+        </div>
+      </div>
+
+      {cands.length === 0 ? (
+        <div className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2" data-testid={`unresolved-no-cands-${item.id}`}>
+          Proprietarul nu are nicio proprietate. Adaugă o proprietate în contul lui înainte de ancorare.
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <select
+            value={propertyId}
+            onChange={(e) => setPropertyId(e.target.value)}
+            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-xs text-white"
+            data-testid={`unresolved-select-${item.id}`}
+          >
+            <option value="" className="bg-stone-900">Alege proprietatea…</option>
+            {cands.map((c) => (
+              <option key={c.id} value={c.id} className="bg-stone-900">
+                {c.name}{c.address ? ` · ${c.address}` : ""}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={anchor}
+            disabled={!propertyId || busy}
+            className="px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5 shrink-0"
+            data-testid={`unresolved-anchor-${item.id}`}
+          >
+            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
+            Ancorează
+          </button>
+        </div>
+      )}
+      {err && <div className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-2">{err}</div>}
+    </div>
+  );
+};
+
+const UnresolvedModal = ({ onClose, onChanged }) => {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+
+  const load = async () => {
+    setLoading(true); setErr(null);
+    try {
+      const { data } = await axios.get(`${API}/admin/digital-twin/unresolved-projects`);
+      setItems(data.items || []);
+    } catch (e) {
+      setErr(e?.response?.data?.detail || e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { load(); }, []);
+
+  const handleAnchored = (id) => {
+    setTimeout(() => setItems((arr) => arr.filter((x) => x.id !== id)), 1200);
+    onChanged?.();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-stone-900 border border-white/10 rounded-2xl p-5 w-full max-w-lg max-h-[90vh] overflow-y-auto space-y-3" data-testid="unresolved-modal">
+        <div className="flex items-start justify-between sticky top-0 bg-stone-900 pb-2 z-10">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.16em] text-amber-400/90 font-semibold">Ancorare istorică</div>
+            <h3 className="font-serif text-lg text-white">Proiecte 3D neancorate</h3>
+            <p className="text-xs text-stone-400 mt-0.5">Leagă manual proiectele vechi de o proprietate. Nu se șterge nimic; ZERO atribuire automată.</p>
+          </div>
+          <button onClick={onClose} data-testid="unresolved-close"><X className="w-5 h-5 text-stone-500" /></button>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-8 text-sm text-stone-500"><Loader2 className="w-4 h-4 animate-spin inline mr-2" />Se încarcă…</div>
+        ) : err ? (
+          <div className="text-center py-6 text-red-400 text-sm">{err}</div>
+        ) : items.length === 0 ? (
+          <div className="text-center py-8" data-testid="unresolved-empty">
+            <CheckCircle2 className="w-10 h-10 text-emerald-500/60 mx-auto mb-2" />
+            <p className="text-sm text-stone-300">Toate proiectele sunt ancorate. Nimic de rezolvat.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="text-[11px] text-stone-500">{items.length} proiecte neancorate</div>
+            {items.map((it) => (
+              <UnresolvedRow key={it.id} item={it} onAnchored={handleAnchored} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ============= MAIN VIEW =============
 export const OperatorDigitalTwin = () => {
   const [items, setItems] = useState([]);
@@ -727,6 +897,15 @@ export const OperatorDigitalTwin = () => {
   const [creatingFor, setCreatingFor] = useState(null);
   const [uploadingFor, setUploadingFor] = useState(null); // { client, project }
   const [toast, setToast] = useState(null);
+  const [showUnresolved, setShowUnresolved] = useState(false);
+  const [unresolvedCount, setUnresolvedCount] = useState(0);
+
+  const loadUnresolvedCount = async () => {
+    try {
+      const { data } = await axios.get(`${API}/admin/digital-twin/unresolved-projects`);
+      setUnresolvedCount(data.count ?? (data.items || []).length);
+    } catch { /* ignore */ }
+  };
 
   const load = async () => {
     setLoading(true); setErr(null);
@@ -741,6 +920,7 @@ export const OperatorDigitalTwin = () => {
     }
   };
   useEffect(() => { load();   }, [filter]);
+  useEffect(() => { loadUnresolvedCount(); }, []);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -775,13 +955,28 @@ export const OperatorDigitalTwin = () => {
             <h2 className="font-serif text-xl text-white">Clienți cu acces 3D</h2>
             <p className="text-xs text-stone-400 mt-0.5">Acordă acces, creează proiecte, încarcă modele .glb/.gltf/.skp și planuri PDF 2D.</p>
           </div>
-          <button
-            onClick={() => setShowGrant(true)}
-            className="px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium flex items-center gap-1.5"
-            data-testid="op-grant-access-btn"
-          >
-            <ShieldCheck className="w-3.5 h-3.5" />Acordă acces DT
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowUnresolved(true)}
+              className="relative px-3 py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 text-xs font-medium flex items-center gap-1.5"
+              data-testid="op-unresolved-btn"
+              title="Ancorează proiectele 3D vechi (neancorate) la o proprietate"
+            >
+              <Unlink className="w-3.5 h-3.5" />Proiecte neancorate
+              {unresolvedCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-stone-900 text-[10px] font-bold leading-none" data-testid="op-unresolved-badge">
+                  {unresolvedCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setShowGrant(true)}
+              className="px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium flex items-center gap-1.5"
+              data-testid="op-grant-access-btn"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />Acordă acces DT
+            </button>
+          </div>
         </div>
 
         {/* Filter pills */}
@@ -837,6 +1032,12 @@ export const OperatorDigitalTwin = () => {
       )}
 
       {showGrant && <GrantAccessModal onClose={() => setShowGrant(false)} onGranted={load} />}
+      {showUnresolved && (
+        <UnresolvedModal
+          onClose={() => setShowUnresolved(false)}
+          onChanged={() => { loadUnresolvedCount(); load(); }}
+        />
+      )}
       {creatingFor && (
         <CreateProjectModal client={creatingFor} onClose={() => setCreatingFor(null)} onCreated={onProjectCreated} />
       )}

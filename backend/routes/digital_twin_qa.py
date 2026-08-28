@@ -35,16 +35,20 @@ def _now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
-_SYSTEM = """You are the Digital Twin AI assistant for PropManage — a Romanian property management platform.
-You answer in Romanian. You have access to structured data about a specific 3D Digital Twin project
-(uploaded models, 2D floor plans, room dimensions, equipment pins, finish materials, comments).
+_SYSTEM = """You are the Property & Digital Twin AI assistant for PropManage — a Romanian property platform. Answer in Romanian.
+You receive structured EVIDENCE about a property and its Digital Twin: 2D rooms, 3D models, equipment pins,
+plus property identity, House Health, documents, completed works and AI-generated (orientative) models.
 
-Rules:
-- Be concise and factual. If the answer is in the provided context, state it directly with measurements.
-- If the context does NOT contain the answer, say "Această informație nu este în Digital Twin-ul curent.
-  Adaugă un pin pe modelul 3D pentru această întrebare."
-- For room areas, sum the area_m2 fields when relevant. For equipment, mention pin label + room + type.
-- Never invent numbers, materials, or brands. Use ONLY what is in the context."""
+CRITICAL — evidence & trust rules:
+- Ground EVERY claim in the provided evidence. NEVER invent numbers, materials, brands, dimensions or routes.
+- Each evidence block is labelled with its trust type — always reflect the trust level in your answer:
+  · DECLARAT de proprietar (owner-declared) → "conform declarației proprietarului".
+  · DOCUMENTAT (documents) → "conform documentelor".
+  · REZULTAT LUCRĂRI (from works) → "rezultat din lucrări".
+  · MOTOR/DERIVAT (House Health) → "scor derivat de motorul House Health".
+  · INFERAT (AI-generated) → spune clar "estimare orientativă (AI), neverificată".
+- If the evidence does NOT contain the answer, reply EXACTLY: "Această informație nu există în datele proprietății (necunoscut)." Do not guess.
+- Be concise and factual. Sum room areas (area_m2) when relevant. For equipment mention pin label + room + type."""
 
 
 async def _build_context(project_id: str) -> str:
@@ -87,6 +91,41 @@ async def _build_context(project_id: str) -> str:
             room = p.get("room_name") or "?"
             details = p.get("description") or p.get("notes") or ""
             parts.append(f"- [{ptype}] {label} (camera: {room}) {details[:120]}")
+
+    # Property-level EVIDENCE (only when the project is anchored to a property) — Q&A pe dovezi.
+    prop_id = project.get("property_id")
+    if prop_id:
+        try:
+            from bson import ObjectId as _OID
+            prop = await db.properties.find_one({"_id": _OID(prop_id)})
+        except Exception:  # noqa: BLE001
+            prop = None
+        if prop:
+            parts.append("\n## Proprietate — identitate (DECLARAT de proprietar)")
+            parts.append(f"- Nume: {prop.get('name','?')}; adresă: {prop.get('address','?')}; tip: {prop.get('type','?')}; suprafață: {prop.get('surface','?')} m²; camere: {prop.get('rooms','?')}")
+            hs = prop.get("health_score")
+            if hs is not None:
+                parts.append(f"\n## House Health (MOTOR/DERIVAT)\n- Scor sănătate: {hs}/100")
+        docs = await db.property_documents.find({"property_id": prop_id}, {"title": 1, "category": 1, "_id": 0}).to_list(length=40)
+        if docs:
+            parts.append("\n## Documente proprietate (DOCUMENTAT)")
+            for d in docs:
+                parts.append(f"- {d.get('title','document')} · categorie={d.get('category','?')}")
+        works = await db.requests.find(
+            {"property_id": prop_id, "status": {"$in": ["completed", "closed", "confirmed", "done"]}},
+            {"title": 1, "category": 1, "status": 1, "_id": 0},
+        ).to_list(length=40)
+        if works:
+            parts.append("\n## Lucrări finalizate (REZULTAT LUCRĂRI)")
+            for w in works:
+                parts.append(f"- {w.get('title') or w.get('category','lucrare')} · status={w.get('status')}")
+        ai_models = await db.digital_twin_models.find(
+            {"property_id": prop_id, "source": "ai_generated"}, {"filename": 1, "confidence": 1, "_id": 0},
+        ).to_list(length=10)
+        if ai_models:
+            parts.append("\n## Modele 3D generate de AI (INFERAT — orientativ, neverificat)")
+            for m in ai_models:
+                parts.append(f"- {m.get('filename','model AI')} · confidence={m.get('confidence')}")
 
     return "\n".join(parts)
 

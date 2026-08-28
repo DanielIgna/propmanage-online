@@ -39,7 +39,7 @@
 - **P0 — Property Anchor** (DELIVERED/PREVIEW): 3D legat de `property_id` (anti-misassignment + KG + moștenire modele); backfill SAFE zero auto-assign; trust readiness (confidence/verification_status/completeness). Teste iter201 4/4.
 - **P1 — Experiența unificată** (DELIVERED/PREVIEW): `GET /api/properties/{id}/digital-twin` + `PropertyTwinModal` taburi 2D/3D + `ViewerErrorBoundary`. Teste iter202 6/6.
 - **P0.1 — Operator Property Anchor** (DELIVERED/PREVIEW): `property_id` OBLIGATORIU pe create operator + `GET /api/operator/digital-twin/clients/{id}/properties` + selector FE. Teste iter203 5/5. Regresie totală P0+P1+P0.1 = **15/15 PASS**.
-- **Producție**: PENDING_FOUNDER_DEPLOYMENT — necesită redeploy + LIVE VALIDATION. NU marcat production-complete.
+- **Producție**: **PRODUCTION-VALIDATED (28 Aug 2026)** — live 22/22 PASS pe `propmanage.ro` + KG edges confirmate. PRODUCTION-COMPLETE.
 - **NU s-a atins**: House Health/PVI/Maturity engine, Property DNA, Auth, Stripe, entitlements, Demo/Beta.
 
 ---

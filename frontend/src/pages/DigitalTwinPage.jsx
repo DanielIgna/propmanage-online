@@ -2,14 +2,16 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
-import { Box, Plus, Lock, Eye, Trash2, ArrowLeft, Sparkles, ExternalLink, Upload, FileBox, X, Layers, BellRing } from "lucide-react";
+import { Box, Plus, Lock, Eye, Trash2, ArrowLeft, Sparkles, ExternalLink, Upload, FileBox, X, Layers, BellRing, Wand2, Loader2 } from "lucide-react";
 import { API } from "./DashShared";
 import DigitalTwinViewer from "../components/DigitalTwinViewer";
 import { PbContextBanner } from "../components/pb/PbEverywhere";
 import DigitalTwinPlans from "../components/DigitalTwinPlans";
 import SentReportsDashboard from "../components/SentReportsDashboard";
 
-const ProjectCard = ({ p, onOpen, onDelete, onUpload, onPlans }) => (
+const ProjectCard = ({ p, onOpen, onDelete, onUpload, onPlans, onAiGenerate, aiBusy }) => {
+  const anchored = !!p.property_id;
+  return (
   <div className="group relative rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] p-5 transition-colors" data-testid={`dt-project-${p.id}`}>
     <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-t-2xl opacity-50 group-hover:opacity-100 transition-opacity" />
     <div className="flex items-start gap-3 mb-3">
@@ -27,8 +29,11 @@ const ProjectCard = ({ p, onOpen, onDelete, onUpload, onPlans }) => (
       <span>📁 {p.model_count || 0} modele</span>
       <span>📐 {p.plan_count || 0} planuri 2D</span>
       {p.model_url ? <span className="text-emerald-400">● Model încărcat</span> : <span className="text-amber-400">● Demo procedural</span>}
+      {anchored
+        ? <span className="text-cyan-400">● Ancorat la proprietate</span>
+        : <span className="text-stone-500">○ Neancorat</span>}
     </div>
-    <div className="flex gap-2">
+    <div className="flex gap-2 mb-2">
       <button
         onClick={() => onOpen(p)}
         className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-xs rounded-full bg-[#d4ff3a] text-black font-medium hover:bg-[#c5f02e] transition-colors"
@@ -47,7 +52,7 @@ const ProjectCard = ({ p, onOpen, onDelete, onUpload, onPlans }) => (
       <button
         onClick={() => onUpload(p)}
         className="px-3 py-2 text-xs rounded-full border border-white/10 text-stone-300 hover:bg-white/5"
-        title="Încarcă model .glb"
+        title="Încarcă model 3D (.glb/.gltf/.skp/.dae/.obj/.fbx/.stl/.ply)"
         data-testid={`dt-upload-${p.id}`}
       >
         <Upload className="w-3.5 h-3.5" />
@@ -60,16 +65,34 @@ const ProjectCard = ({ p, onOpen, onDelete, onUpload, onPlans }) => (
         <Trash2 className="w-3.5 h-3.5" />
       </button>
     </div>
+    <button
+      onClick={() => anchored && onAiGenerate(p)}
+      disabled={!anchored || aiBusy}
+      title={anchored ? "Generează un model 3D orientativ (AI, inferred)" : "Ancorează proiectul la o proprietate pentru a genera modelul AI"}
+      className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-xs rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-200 hover:bg-violet-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      data-testid={`dt-ai-generate-${p.id}`}
+    >
+      {aiBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+      {aiBusy ? "Se generează…" : "Generează AI 3D (orientativ)"}
+    </button>
   </div>
-);
+  );
+};
 
 // =============== UPLOAD MODAL ===============
+const DT_ALLOWED_EXTS = ["glb", "gltf", "skp", "dae", "obj", "fbx", "stl", "ply"];
+const DT_CONVERTING = ["pending", "uploading", "converting", "downloading"];
+
 const UploadModal = ({ project, onClose, onUploaded }) => {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [err, setErr] = useState(null);
+  const [conv, setConv] = useState(null); // { model_id, status, percent, error }
   const dropRef = useRef(null);
+  const pollRef = useRef(null);
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   const onDrop = (e) => {
     e.preventDefault();
@@ -78,8 +101,8 @@ const UploadModal = ({ project, onClose, onUploaded }) => {
   };
   const acceptFile = (f) => {
     const ext = f.name.toLowerCase().split(".").pop();
-    if (!["glb", "gltf"].includes(ext)) {
-      setErr(`Format invalid: .${ext}. Acceptăm doar .glb / .gltf.`);
+    if (!DT_ALLOWED_EXTS.includes(ext)) {
+      setErr(`Format invalid: .${ext}. Acceptăm .glb / .gltf / .skp / .dae / .obj / .fbx / .stl / .ply.`);
       return;
     }
     if (f.size > 200 * 1024 * 1024) {
@@ -90,11 +113,29 @@ const UploadModal = ({ project, onClose, onUploaded }) => {
     setFile(f);
   };
 
+  const pollConversion = (modelId) => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      try {
+        const { data } = await axios.get(`${API}/digital-twin/conversions/${modelId}/status`);
+        setConv({ model_id: modelId, status: data.status, percent: data.percent || 0, error: data.error });
+        if (!DT_CONVERTING.includes(data.status)) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+      } catch {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    }, 5000);
+  };
+
   const submit = async () => {
     if (!file) return;
     setUploading(true);
     setErr(null);
     setProgress(0);
+    setConv(null);
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -116,6 +157,13 @@ const UploadModal = ({ project, onClose, onUploaded }) => {
         xhr.send(fd);
       });
       onUploaded(done);
+      // If the backend queued a conversion (.skp/.dae/.obj/...), keep the modal open and poll.
+      if (done.conversion_status && DT_CONVERTING.includes(done.conversion_status)) {
+        setConv({ model_id: done.id, status: done.conversion_status, percent: done.conversion_percent || 0 });
+        pollConversion(done.id);
+      } else {
+        onClose();
+      }
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -166,13 +214,17 @@ const UploadModal = ({ project, onClose, onUploaded }) => {
                 alege un fișier
                 <input
                   type="file"
-                  accept=".glb,.gltf"
+                  accept=".glb,.gltf,.skp,.dae,.obj,.fbx,.stl,.ply"
                   className="hidden"
                   onChange={(e) => e.target.files?.[0] && acceptFile(e.target.files[0])}
                   data-testid="dt-upload-input"
                 />
               </label>
-              <p className="text-[10px] text-stone-500 mt-3">Format: .glb sau .gltf · max 200 MB</p>
+              <p className="text-[10px] text-stone-500 mt-3 leading-relaxed">
+                <strong className="text-emerald-400">.glb / .gltf</strong> — vizualizabil instant ·{" "}
+                <strong className="text-amber-400">.dae / .obj / .fbx / .stl / .ply</strong> — auto-conversie ·{" "}
+                <strong className="text-stone-400">.skp</strong> — SketchUp · max 200 MB
+              </p>
             </>
           )}
         </div>
@@ -191,17 +243,45 @@ const UploadModal = ({ project, onClose, onUploaded }) => {
 
         {err && <div className="mt-3 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-2">{err}</div>}
 
+        {conv && (
+          <div className="mt-3 rounded-xl bg-white/[0.03] border border-white/10 p-3" data-testid="dt-upload-conversion">
+            {DT_CONVERTING.includes(conv.status) ? (
+              <>
+                <div className="flex items-center justify-between text-xs mb-1.5">
+                  <span className="text-emerald-300 flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    Se convertește în .glb…
+                  </span>
+                  <span className="text-stone-400 font-mono">{conv.percent}%</span>
+                </div>
+                <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-amber-500 via-emerald-500 to-emerald-400 transition-all" style={{ width: `${conv.percent}%` }} />
+                </div>
+                <p className="text-[10px] text-stone-500 mt-1.5">Poți închide — conversia continuă în fundal.</p>
+              </>
+            ) : conv.status === "completed" ? (
+              <div className="text-xs text-emerald-300 flex items-center gap-1.5">✓ Convertit — modelul .glb e gata de vizualizare.</div>
+            ) : conv.status === "failed" ? (
+              <div className="text-xs text-red-300">⚠️ Conversia a eșuat: {conv.error || "eroare necunoscută"}. Fișierul rămâne descărcabil.</div>
+            ) : (
+              <div className="text-xs text-stone-400">Stocat. Format nevizualizabil în browser — descărcabil din proiect.</div>
+            )}
+          </div>
+        )}
+
         <div className="mt-4 rounded-xl bg-white/[0.03] border border-white/5 p-3 text-[11px] text-stone-400 leading-relaxed">
-          <strong className="text-stone-300">🛠️ Ai un fișier .skp / .ifc / .pln?</strong> Convertește-l mai întâi în .glb:
+          <strong className="text-stone-300">🛠️ Formate 3D acceptate.</strong> Încarcă direct — le gestionăm noi:
           <ul className="mt-1 space-y-0.5 list-disc list-inside">
-            <li><strong>SketchUp</strong>: File → Export → 3D Model → glTF (.glb)</li>
-            <li><strong>Blender</strong>: File → Export → glTF 2.0 (.glb)</li>
-            <li><strong>Allplan / Revit</strong>: Export IFC, apoi convertește prin <a href="https://products.aspose.app/3d/conversion/ifc-to-glb" target="_blank" rel="noreferrer" className="text-emerald-400 underline">Aspose IFC→GLB online</a></li>
+            <li><strong className="text-emerald-400">.glb / .gltf</strong> — vizualizabil instant în viewer</li>
+            <li><strong className="text-amber-400">.dae / .obj / .fbx / .stl / .ply</strong> — auto-conversie server-side în .glb</li>
+            <li><strong>.skp</strong> (SketchUp) — stocat & legat de proprietate; conversie automată când e disponibilă</li>
           </ul>
         </div>
 
         <div className="mt-4 flex gap-2">
-          <button onClick={onClose} className="flex-1 px-3 py-2 text-sm rounded-lg bg-white/5 hover:bg-white/10 text-stone-300">Anulează</button>
+          <button onClick={onClose} className="flex-1 px-3 py-2 text-sm rounded-lg bg-white/5 hover:bg-white/10 text-stone-300" data-testid="dt-upload-cancel">
+            {conv ? "Închide" : "Anulează"}
+          </button>
           <button
             onClick={submit}
             disabled={!file || uploading}
@@ -398,6 +478,8 @@ export default function DigitalTwinPage() {
   const [plansFor, setPlansFor] = useState(null);
   const [showSentReports, setShowSentReports] = useState(false);
   const [pendingReportsCount, setPendingReportsCount] = useState(0);
+  const [aiBusyId, setAiBusyId] = useState(null);
+  const [toast, setToast] = useState(null);
   useEffect(() => { import("../lib/analytics").then(({ trackIntent }) => trackIntent("twin_viewed")).catch(() => {}); }, []);
 
   const loadAll = async () => {
@@ -434,6 +516,24 @@ export default function DigitalTwinPage() {
   const requestAccess = () => {
     // Route unificată către planul PropManage (Task 2 /pricing)
     window.location.href = "/pricing";
+  };
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 4000); };
+
+  const handleAiGenerate = async (p) => {
+    if (!p.property_id) { showToast("Ancorează proiectul la o proprietate întâi."); return; }
+    setAiBusyId(p.id);
+    try {
+      const { data } = await axios.post(`${API}/digital-twin/projects/${p.id}/ai-generate`);
+      setProjects((arr) => arr.map((x) =>
+        x.id === p.id ? { ...x, model_url: data.url || x.model_url, model_count: (x.model_count || 0) + 1 } : x
+      ));
+      showToast("✓ Model AI orientativ generat (inferred, neverificat).");
+    } catch (e) {
+      showToast(e?.response?.data?.detail || e.message || "Generarea AI a eșuat.");
+    } finally {
+      setAiBusyId(null);
+    }
   };
 
   if (loading) {
@@ -532,7 +632,7 @@ export default function DigitalTwinPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="dt-projects-grid">
             {projects.map((p) => (
-              <ProjectCard key={p.id} p={p} onOpen={setViewing} onDelete={handleDelete} onUpload={setUploadingTo} onPlans={setPlansFor} />
+              <ProjectCard key={p.id} p={p} onOpen={setViewing} onDelete={handleDelete} onUpload={setUploadingTo} onPlans={setPlansFor} onAiGenerate={handleAiGenerate} aiBusy={aiBusyId === p.id} />
             ))}
           </div>
         )}
@@ -571,15 +671,21 @@ export default function DigitalTwinPage() {
           project={uploadingTo}
           onClose={() => setUploadingTo(null)}
           onUploaded={(model) => {
-            // Patch the project with the new model_url + increment count
+            // Patch the project with the new model_url + increment count.
+            // The modal stays open if a conversion is queued (it closes itself).
             setProjects((arr) => arr.map((x) =>
               x.id === uploadingTo.id
-                ? { ...x, model_url: model.url, model_count: (x.model_count || 0) + 1 }
+                ? { ...x, model_url: model.url || x.model_url, model_count: (x.model_count || 0) + 1 }
                 : x
             ));
-            setUploadingTo(null);
           }}
         />
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] px-4 py-2 rounded-full bg-stone-800 border border-white/10 text-white text-sm shadow-2xl" data-testid="dt-toast">
+          {toast}
+        </div>
       )}
     </div>
   );

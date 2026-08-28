@@ -33,9 +33,9 @@
 
 ## 2. STARE LIVRATĂ (DELIVERED / VALIDATED IN PREVIEW)
 
-> **Producția NU este marcată complete.** Toate cele de mai jos sunt implementate și validate în PREVIEW. Necesită **redeploy Fondator + LIVE VALIDATION** pe `propmanage.ro` înainte de a fi considerate production-complete.
+> **PRODUCTION-VALIDATED (28 Aug 2026).** Toate cele de mai jos sunt implementate, validate în PREVIEW (15/15 teste) ȘI validate LIVE pe `propmanage.ro` (**22/22 live checks PASS** + KG edges confirmate). **PRODUCTION-COMPLETE.**
 
-### P0 — PROPERTY ANCHOR · DELIVERED / VALIDATED IN PREVIEW (28 Aug 2026)
+### P0 — PROPERTY ANCHOR · PRODUCTION-VALIDATED (28 Aug 2026, live 22/22)
 Leagă stratul 3D (anterior orfan: 0/40 proiecte aveau `property_id`) de proprietate.
 - `create_project` (client) + `operator_create_project_for_client` acceptă/validează `property_id` cu **anti-misassignment** (`_resolve_property_anchor`, owner-verified) → `property_link_status` (linked / unresolved).
 - Modelele moștenesc `property_id` + status la upload.
@@ -47,7 +47,7 @@ Leagă stratul 3D (anterior orfan: 0/40 proiecte aveau `property_id`) de proprie
 - **Testare**: `test_dt_p0_property_anchor_iter201.py` — 4/4 PASS (ancorare, anti-misassignment 403/404, backfill zero auto-assign, moștenire + trust).
 - **NU s-a atins**: motorul House Health/PVI/Maturity, Property DNA, Auth, Stripe, entitlements, Demo/Beta.
 
-### P1 — EXPERIENȚA UNIFICATĂ PROPERTY DIGITAL TWIN · DELIVERED / VALIDATED IN PREVIEW (27–28 Aug 2026)
+### P1 — EXPERIENȚA UNIFICATĂ PROPERTY DIGITAL TWIN · PRODUCTION-VALIDATED (28 Aug 2026, live 22/22)
 Unifică straturile 2D + 3D sub o singură experiență centrată pe proprietate.
 - `GET /api/properties/{id}/digital-twin` — overview unificat: `twin_2d {exists,status,rooms_count,assets_count,project_id}` + `twin_3d {exists,has_model,projects[{id,name,model_url,models_count,property_link_status,updated_at}]}`. Authz oglindește `/twin` + `/spaces` (owner OR admin/operator OR specialist asignat).
 - `GET /api/digital-twin/projects?property_id=...` — filtru pe proprietate (răspuns cheie `items`). Fără filtru = backward-compatible.
@@ -55,7 +55,7 @@ Unifică straturile 2D + 3D sub o singură experiență centrată pe proprietate
 - P1 anterior (consolidare metadata): ProfessionalModel metadata/versionare (`supersedes` non-destructiv), `asset_ref`, docs `related_model_id/related_room_id`, `/spaces`, gate `ingest ≠ PREMIUM`, storage → Object Storage. Vezi `DIGITAL_TWIN_P1_CONSOLIDATION_2026-08-27.md`.
 - **Testare**: `test_dt_p1_unified_iter202.py` — 6/6 PASS (overview shape+values, authz 403/404, filtru property_id, backward-compat, regresie `/twin` + `/spaces`).
 
-### P0.1 — OPERATOR PROPERTY ANCHOR · DELIVERED / VALIDATED IN PREVIEW (28 Aug 2026)
+### P0.1 — OPERATOR PROPERTY ANCHOR · PRODUCTION-VALIDATED (28 Aug 2026, live 22/22)
 Elimină ultima sursă de orfanare: fluxul OPERATOR de creare Digital Twin nu avea selector de proprietate în UI.
 - **Backend** (`digital_twin.py`): `property_id` devine **OBLIGATORIU** pe endpoint-ul operator (`POST /api/operator/digital-twin/clients/{id}/projects`) → 400 dacă lipsește. Ancorarea reutilizează integral P0 (`_resolve_property_anchor(owner_id=client_id)` anti-misassignment + KG + moștenire modele). Fluxul CLIENT rămâne neschimbat (standalone permis).
 - **Backend NOU (read-only)**: `GET /api/operator/digital-twin/clients/{id}/properties` — listează proprietățile clientului pentru selector (reutilizează `db.properties` SSOT, NU creează sistem nou de identitate/linking).
@@ -154,10 +154,11 @@ AI-3D generator · LiDAR pipeline · room scanning · image-to-3D · Design AI �
 
 ---
 
-## 8. PRODUCTION READINESS
-- **P0 + P1 + P0.1**: implementate + validate în PREVIEW (15/15 teste). **NU** production-complete.
-- **Acțiune Fondator**: redeploy `propmanage.ro` → LIVE VALIDATION:
-  - P0: property anchor · `property_id` · authorization · model inheritance · KG.
-  - P0.1: operator create cu selector proprietate (fără property → blocat).
-  - P1: experiență unificată 2D/3D · viewer 2D · viewer 3D · error boundary.
-  - Regresie live: Auth · Demo · Client Beta · Specialist Beta · House Health · PVI · Stripe · entitlements · funcționalitatea Twin existentă.
+## 8. PRODUCTION READINESS — PRODUCTION-COMPLETE (28 Aug 2026)
+- **P0 + P1 + P0.1**: implementate, validate în PREVIEW (15/15) ȘI validate LIVE pe `propmanage.ro` → **PRODUCTION-COMPLETE**.
+- **LIVE VALIDATION (22/22 PASS)**, script `backend/tests/live_validate_prod_dt.py`:
+  - **P0**: create Twin ancorat → `property_id` corect + `linked`; model moștenește `property_id` + trust (confidence=documented, verification_status=owner_declared); anti-misassignment bogus → 404; **KG** `property -has_twin_project-> twin_project` + `-has_twin_model-> twin_model` confirmate live (admin `/api/admin/kg/entity/property/{id}`).
+  - **P0.1**: selector operator (`GET /clients/{id}/properties` → 10 proprietăți); create fără property → 400; cu property → `linked` + moștenire model; property neautorizat → 404.
+  - **P1**: overview unificat (`twin_2d` approved 5 camere/4 assets + `twin_3d`); filtru `?property_id`; regresie `/twin` + `/spaces` (count=5); authz bogus → 404.
+  - **Property DNA** intact (dna_completeness, capabilities, pvi, timeline); **regresie**: Auth (client/operator/admin 200), entitlements (tier=FREE), House Health plans + dashboard, Stripe pricing source — toate OK.
+- **Notă LOW (data hygiene, pre-existent)**: ștergerea unui proiect NU curăță muchiile KG (append-only traversal; FK separat) → muchii KG „dangling" către proiecte șterse. Comportament pre-existent, NU regresie P0.1; de curățat eventual într-un job de mentenanță (backlog).
