@@ -30,6 +30,7 @@ DEFAULT_PRIVACY = {
     "show_documents": True,
     "show_timeline": True,
     "show_scores": True,
+    "show_design_concept": False,
 }
 
 PRIVACY_LABELS = {
@@ -38,6 +39,7 @@ PRIVACY_LABELS = {
     "show_documents": "Rezumatul documentelor",
     "show_timeline": "Istoricul lucrărilor",
     "show_scores": "Scorurile casei",
+    "show_design_concept": "Conceptul de design (validat)",
 }
 
 
@@ -168,6 +170,24 @@ async def _public_payload(prop: dict, request: Request) -> dict:
     last_events = await db.activity_events.find({"property_id": prop_id}).sort("created_at", -1).limit(1).to_list(1)
     last_updated = (last_events[0].get("created_at") if last_events else None) or prop.get("created_at")
 
+    # Concept în Pașaport — doar concept VALIDAT profesional, opt-in explicit al proprietarului.
+    design_concept = None
+    if privacy.get("show_design_concept"):
+        vc = await db.digital_twin_design_concepts.find_one(
+            {"property_id": prop_id, "status": "verified"},
+            sort=[("validated_at", -1), ("created_at", -1)])
+        if vc:
+            cc = vc.get("concept") or {}
+            design_concept = {
+                "title": cc.get("title"),
+                "style": (vc.get("inputs") or {}).get("style"),
+                "summary": cc.get("summary"),
+                "palette": [p.get("hex") for p in (cc.get("palette") or []) if p.get("hex")][:6],
+                "render_url": f"/api/public/passport/{slug}/design-concept-render" if vc.get("render_object_path") else None,
+                "validated_by_name": vc.get("validated_by_name"),
+                "validated_at": vc.get("validated_at"),
+            }
+
     return {
         "slug": slug,
         "share_url": f"{_base_url(request)}/api/p/{slug}",
@@ -199,6 +219,7 @@ async def _public_payload(prop: dict, request: Request) -> dict:
         "privacy": privacy,
         "last_updated": str(last_updated) if last_updated else None,
         "twin_status": ((await db.twins.find_one({"property_id": prop_id}, {"status": 1})) or {}).get("status"),
+        "design_concept": design_concept,
     }
 
 
@@ -354,4 +375,21 @@ async def passport_photo(slug: str):
     import asyncio
     data, ct = await asyncio.to_thread(get_object, doc["storage_path"])
     return Response(content=data, media_type=doc.get("content_type") or ct,
+                    headers={"Cache-Control": "public, max-age=3600"})
+
+
+@public_router.get("/public/passport/{slug}/design-concept-render")
+async def passport_design_concept_render(slug: str):
+    prop = await _prop_by_slug(slug)
+    privacy = {**DEFAULT_PRIVACY, **(prop.get("passport", {}).get("privacy") or {})}
+    if not privacy.get("show_design_concept"):
+        raise HTTPException(404, "Conceptul nu este public")
+    vc = await db.digital_twin_design_concepts.find_one(
+        {"property_id": str(prop["_id"]), "status": "verified", "render_object_path": {"$ne": None}},
+        sort=[("validated_at", -1), ("created_at", -1)])
+    if not vc:
+        raise HTTPException(404, "Fără render")
+    import asyncio
+    data, ct = await asyncio.to_thread(get_object, vc["render_object_path"])
+    return Response(content=data, media_type=vc.get("render_mime") or ct or "image/png",
                     headers={"Cache-Control": "public, max-age=3600"})

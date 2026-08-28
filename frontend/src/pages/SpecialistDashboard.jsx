@@ -315,6 +315,12 @@ export const SpecialistDashboard = () => {
                   </div>
                 </div>
                 <p className="text-xs md:text-sm text-stone-400 mb-3 line-clamp-2">{r.description}</p>
+                {r.concept_render_url && (
+                  <div className="mb-3" data-testid={`lead-concept-render-${r.id}`}>
+                    <img src={`${process.env.REACT_APP_BACKEND_URL}${r.concept_render_url}`} alt="Concept validat" className="w-full h-32 object-cover rounded-xl border border-white/10" />
+                    <div className="mt-1 text-[10px] text-emerald-300 flex items-center gap-1"><ImageIcon className="w-3 h-3" /> Concept de design validat atașat</div>
+                  </div>
+                )}
                 <div className="flex justify-between items-center gap-2 flex-wrap">
                   <div className="text-xs text-stone-400">Estimat: <span className="text-white font-semibold">{r.budget_estimate} RON</span></div>
                   <PMPillButton variant="primary" size="sm" onClick={() => openAccept(r)} testid={`accept-${r.id}`}>

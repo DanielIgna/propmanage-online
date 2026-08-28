@@ -147,6 +147,7 @@ const LegalAuditPage = lazy(() => import("./pages/admin/LegalAuditPage"));
 const LegalSignPage = lazy(() => import("./pages/LegalSignPage"));
 import LegalGate from "./components/LegalGate";
 const CityPartnersPage = lazy(() => import("./pages/admin/CityPartnersPage"));
+const CityPartnerProductsPage = lazy(() => import("./pages/admin/CityPartnerProductsPage"));
 const CityPartnerDetailPage = lazy(() => import("./pages/admin/CityPartnerDetailPage"));
 const MarketplacePartnersPage = lazy(() => import("./pages/admin/MarketplacePartnersPage"));
 const StrategicPartnersDashboard = lazy(() => import("./pages/admin/StrategicPartnersDashboard"));
@@ -1775,6 +1776,7 @@ function App() {
               <Route path="/admin/it-collaborators/copilot" element={<ITCopilotPage />} />
               <Route path="/admin/legal-audit" element={<LegalAuditPage />} />
               <Route path="/admin/city-partners" element={<CityPartnersPage />} />
+              <Route path="/admin/city-partner-products" element={<CityPartnerProductsPage />} />
               <Route path="/admin/city-partners/:id" element={<CityPartnerDetailPage />} />
               <Route path="/admin/marketplace-partners" element={<MarketplacePartnersPage />} />
               <Route path="/admin/strategic-partners" element={<StrategicPartnersDashboard />} />

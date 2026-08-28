@@ -7,7 +7,7 @@ import {
   ChevronRight, AlertTriangle, GitCompare,
 } from "lucide-react";
 import { API } from "../pages/DashShared";
-import { ConceptMaterials, RequestOfferButton } from "./ConceptComparison";
+import { ConceptMaterials, RequestOfferButton, PreferButton } from "./ConceptComparison";
 
 const TrustBadge = () => (
   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 text-[10px] font-semibold border border-amber-500/25" data-testid="design-inferred-badge">
@@ -15,7 +15,7 @@ const TrustBadge = () => (
   </span>
 );
 
-const ConceptResult = ({ c, onRequestReview, reviewBusy }) => {
+const ConceptResult = ({ c, onRequestReview, reviewBusy, projectId, onChanged }) => {
   const concept = c.concept || {};
   const budget = concept.budget || {};
   const status = c.status || "inferred";
@@ -104,7 +104,8 @@ const ConceptResult = ({ c, onRequestReview, reviewBusy }) => {
 
       {c.id && <ConceptMaterials conceptId={c.id} />}
 
-      {c.id && <RequestOfferButton concept={c} />}
+      {c.id && projectId && <PreferButton concept={c} projectId={projectId} onChanged={onChanged} />}
+      {c.id && <RequestOfferButton concept={c} projectId={projectId} onDone={onChanged} />}
 
       {c.model_id && status === "inferred" && (
         <button
@@ -138,6 +139,16 @@ export const DesignConceptStudio = ({ projectId, projectName, onClose, onModelCh
   const [materials, setMaterials] = useState([]);
   const [notes, setNotes] = useState("");
   const [genRender, setGenRender] = useState(true);
+
+  const reloadConcepts = () => {
+    axios.get(`${API}/digital-twin/projects/${projectId}/design-concepts`)
+      .then((r) => {
+        const items = r.data.items || [];
+        setConcepts(items);
+        setActive((a) => (a ? (items.find((x) => x.id === a.id) || a) : a));
+      })
+      .catch(() => {});
+  };
 
   useEffect(() => {
     axios.get(`${API}/digital-twin/design-options`).then((r) => setOptions(r.data)).catch(() => {});
@@ -308,7 +319,7 @@ export const DesignConceptStudio = ({ projectId, projectName, onClose, onModelCh
         )}
 
         {!busy && view === "result" && active && (
-          <ConceptResult c={active} onRequestReview={requestReview} reviewBusy={reviewBusy} />
+          <ConceptResult c={active} onRequestReview={requestReview} reviewBusy={reviewBusy} projectId={projectId} onChanged={reloadConcepts} />
         )}
 
         {!busy && view === "history" && (

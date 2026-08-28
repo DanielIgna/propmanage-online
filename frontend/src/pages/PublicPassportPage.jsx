@@ -206,6 +206,47 @@ export default function PublicPassportPage() {
           </div>
         </section>
 
+        {/* design concept — intenție de amenajare (concept validat profesional, opt-in owner) */}
+        {data.design_concept && (
+          <section className="mt-6" data-testid="passport-design-concept">
+            <h2 className="text-base font-medium text-stone-200 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-[#d4ff3a]" /> Concept de amenajare
+            </h2>
+            <div className="mt-3 glass rounded-3xl overflow-hidden border border-white/10">
+              {data.design_concept.render_url && (
+                <img
+                  src={`${API}${data.design_concept.render_url}`}
+                  alt="Concept de design validat"
+                  className="w-full h-52 sm:h-64 object-cover"
+                  data-testid="passport-concept-render"
+                />
+              )}
+              <div className="p-5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
+                    <ShieldCheck className="w-3 h-3" /> Validat profesional
+                  </span>
+                  {data.design_concept.style && (
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/5 text-stone-300 border border-white/10">{data.design_concept.style}</span>
+                  )}
+                </div>
+                {data.design_concept.title && <div className="mt-2 font-serif text-lg text-white">{data.design_concept.title}</div>}
+                {data.design_concept.summary && <p className="mt-1 text-sm text-stone-400 leading-relaxed">{data.design_concept.summary}</p>}
+                {(data.design_concept.palette || []).length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {data.design_concept.palette.map((hex, i) => (
+                      <span key={i} className="w-6 h-6 rounded-md border border-white/20" style={{ backgroundColor: hex }} />
+                    ))}
+                  </div>
+                )}
+                {data.design_concept.validated_by_name && (
+                  <div className="mt-3 text-[11px] text-stone-500">Verificat de {data.design_concept.validated_by_name}{data.design_concept.validated_at ? ` · ${fmtDate(data.design_concept.validated_at)}` : ""}</div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* milestones */}
         {groupedMilestones.length > 0 && (
           <section className="mt-8" data-testid="passport-timeline">

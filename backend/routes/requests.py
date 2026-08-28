@@ -3,7 +3,7 @@ import logging
 from typing import Optional
 from datetime import datetime, timezone
 from bson import ObjectId
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from db import db
@@ -153,6 +153,21 @@ async def get_request(req_id: str, user: dict = Depends(get_current_user)):
     doc = await db.requests.find_one({"_id": ObjectId(req_id)})
     if not doc: raise HTTPException(404, "Request not found")
     return serialize_doc(doc)
+
+@router.get("/requests/{req_id}/concept-render")
+async def request_concept_render(req_id: str, user: dict = Depends(get_current_user)):
+    """Serve the AI design-concept render attached to a request (Ofertă cu Poze).
+    Visible to any authenticated user who can see the request (client + specialists in the lead)."""
+    if not ObjectId.is_valid(req_id):
+        raise HTTPException(404, "Request not found")
+    doc = await db.requests.find_one({"_id": ObjectId(req_id)})
+    if not doc or not doc.get("dt_concept_render_path"):
+        raise HTTPException(404, "Fără render")
+    import asyncio
+    from storage_client import get_object
+    data, ct = await asyncio.to_thread(get_object, doc["dt_concept_render_path"])
+    return Response(content=data, media_type=doc.get("dt_concept_render_mime") or ct or "image/png",
+                    headers={"Cache-Control": "private, max-age=3600"})
 
 # ============= SPECIALISTS / MARKETPLACE =============
 @router.get("/specialists")

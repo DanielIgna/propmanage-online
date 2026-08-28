@@ -1,3 +1,19 @@
+## 🎯 DIGITAL TWIN — NEXT STAGE III (4 îmbunătățiri, ONE BUILD) · LIVRAT ÎN PREVIEW (Iun 2026)
+
+Non-breaking, în ROMÂNĂ. Backend verificat E2E prin curl (inclusiv poarta de siguranță a pașaportului). Frontend verificat de `testing_agent`: iter209 (Feature 1/2/3 = 100%) + iter210 (Feature 4 vizual = 100%). Regresia Next Stage I/II intactă.
+
+**1 · Catalog Materiale (admin)** — pagină nouă `/admin/city-partner-products` (`CityPartnerProductsPage.jsx`, super-admin, în meniul „Marketplace & Parteneri") cu CRUD complet (nume, brand, categorie, unitate, preț min/max, monedă, tag-uri, link, partener din City Partners, activ). Backend: `products_admin_router` (`/api/admin/city-partner-products`). Feature D (materiale) preferă acum produsele reale de partener (`city_partner_products`, potrivire pe nume/tag-uri) și revine pe prețul de piață doar când nu există potrivire. Catalog gol implicit — zero date inventate.
+
+**2 · Alegere Câștigătoare** — nou `POST /api/digital-twin/projects/{pid}/design-concepts/{cid}/prefer` (marchează 1 câștigător, debifează restul). UI: `PreferButton` (⭐ „Alege ca preferat" / „Preferat" + badge) în comparație + studio. Pentru concept VERIFICAT, buton combinat „⭐ Alege și cere ofertă" (prefer + ofertă, o confirmare). Single-winner impus server-side.
+
+**3 · Concept în Pașaport** — nou toggle de confidențialitate `show_design_concept` (implicit **OPRIT**, opt-in). Când e pornit ȘI există un concept VALIDAT profesional, pașaportul public `/p/{slug}` afișează secțiunea `passport-design-concept` (render + „Validat profesional" + stil + paletă). Render public servit securizat: `GET /api/public/passport/{slug}/design-concept-render`. Poarta verificată: OFF → `design_concept=None` + render 404. Toggle-ul apare automat în `PassportCard` (iterează `privacy_labels`).
+
+**4 · Ofertă cu Poze** — la „Cere ofertă", render-ul AI al conceptului se atașează automat la cererea din `db.requests` (`concept_render_url`, `dt_concept_render_path`). Specialiștii îl văd în lead (`lead-concept-render-{id}` în `SpecialistDashboard`, thumbnail 1408×768 confirmat). Servit prin `GET /api/requests/{req_id}/concept-render` (auth, vizibil oricui vede cererea — client + specialiști în lead).
+
+**Fișiere**: BE `routes/digital_twin.py` (+prefer, +render pe request-offer), `routes/requests.py` (+concept-render serve), `routes/property_passport.py` (+show_design_concept, +design_concept payload, +render public), `routes/city_partners.py` (+products CRUD), `routes/register.py`. FE nou: `pages/admin/CityPartnerProductsPage.jsx`; editate: `ConceptComparison.jsx` (+PreferButton, offer combinat), `DesignConceptStudio.jsx`, `PublicPassportPage.jsx`, `SpecialistDashboard.jsx`, `App.js` (rută), `admin/AdminLayoutMetronic.jsx` (meniu). Colecție nouă: `city_partner_products`. Fields concept noi: `preferred`. Fields request noi: `concept_render_url`, `dt_concept_render_path`. **Necesită redeploy Fondator pentru producție.**
+
+---
+
 ## 🚀 DIGITAL TWIN — NEXT STAGE II (4 funcționalități, ONE BUILD) · LIVRAT ÎN PREVIEW (Iun 2026)
 
 Extensie non-breaking peste conceptele AI + fluxul de validare existente. Testare `testing_agent` iter207 (95%, 24/25) → un singur fix MEDIUM → iter208 **100% (3/3)**. Backend verificat integral prin curl E2E. Toată copia UI în ROMÂNĂ. Regresia Twin-ului existent intactă.

@@ -1260,6 +1260,34 @@ async def concept_materials(concept_id: str, city: Optional[str] = Query(None),
     }
 
 
+# ============= WINNER PICK — mark a preferred concept (Alegere câștigătoare) =============
+
+class PreferIn(BaseModel):
+    preferred: bool = True
+
+
+@router.post("/projects/{project_id}/design-concepts/{concept_id}/prefer")
+async def prefer_design_concept(project_id: str, concept_id: str, payload: PreferIn,
+                                user: dict = Depends(get_current_user)):
+    """Marchează un concept ca 'preferat' (câștigător). Debifează celelalte din proiect."""
+    await _ensure_dt_ingest_access(user)
+    proj = await _ensure_project_access(project_id, user)
+    if user.get("role") not in ("admin", "operator") and proj.get("owner_id") != user["id"]:
+        raise HTTPException(403, "Doar proprietarul poate alege conceptul preferat.")
+    c = await db.digital_twin_design_concepts.find_one({"id": concept_id, "project_id": project_id})
+    if not c:
+        raise HTTPException(404, "Concept not found.")
+    if payload.preferred:
+        await db.digital_twin_design_concepts.update_many(
+            {"project_id": project_id, "id": {"$ne": concept_id}}, {"$set": {"preferred": False}})
+        await db.digital_twin_design_concepts.update_one(
+            {"id": concept_id},
+            {"$set": {"preferred": True, "preferred_at": _now_iso(), "preferred_by": user["id"]}})
+    else:
+        await db.digital_twin_design_concepts.update_one({"id": concept_id}, {"$set": {"preferred": False}})
+    return {"ok": True, "preferred": payload.preferred, "concept_id": concept_id}
+
+
 # ============= OFFER FROM VERIFIED CONCEPT (Feature B) =============
 # Transformă un concept VALIDAT PROFESIONAL într-o cerere reală de ofertă (db.requests),
 # folosind fluxul de marketplace existent. Necesită confirmarea explicită a clientului.
@@ -1355,6 +1383,17 @@ async def request_offer_from_concept(concept_id: str, payload: RequestOfferIn,
     await db.digital_twin_design_concepts.update_one({"id": concept_id}, {"$set": {
         "offer_request_id": req_id, "offer_requested_at": _now_iso(), "offer_requested_by": user["id"],
     }})
+    # Ofertă cu Poze — attach the concept's AI render to the request so specialists see it.
+    render_url = None
+    render_path = c.get("render_object_path")
+    if render_path:
+        render_url = f"/api/requests/{req_id}/concept-render"
+        await db.requests.update_one({"_id": res.inserted_id}, {"$set": {
+            "dt_concept_render_path": render_path,
+            "dt_concept_render_mime": c.get("render_mime"),
+            "concept_render_url": render_url,
+            "photos": [render_url],
+        }})
     try:
         await log_event(req_id, "request.created", actor=user, property_id=prop_id,
                         payload={"title": title, "category": doc["category"], "source": "digital_twin_concept"})
@@ -1370,6 +1409,7 @@ async def request_offer_from_concept(concept_id: str, payload: RequestOfferIn,
             type_="lead", link="/specialist",
         )
     return {"ok": True, "request_id": req_id, "offers_link": f"/client/requests/{req_id}/offers",
+            "concept_render_url": render_url,
             "message": "Cererea de ofertă a fost trimisă către specialiștii verificați."}
 
 

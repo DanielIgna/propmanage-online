@@ -7,7 +7,7 @@ import {
   FileText, Mail, MapPin, Award, Settings, Search, Bell, Sun, Moon,
   LogOut, Menu, X, ChevronLeft, Building2, ChevronDown, ChevronRight, Sparkles, Bot, Zap, Inbox,
   UserCheck, Home, Wrench, Briefcase, Code2, Shield, Lightbulb, Bug, Compass, Layers, BookOpenCheck, GraduationCap, Gamepad2, Trophy, BarChart3, Eye, Heart,
-  Star, Clock, Command, Network, Megaphone, Brain, Rocket, Activity, KeyRound, Server, Palette, Map, Target, Download
+  Star, Clock, Command, Network, Megaphone, Brain, Rocket, Activity, KeyRound, Server, Palette, Map, Target, Download, ShoppingBag
 } from "lucide-react";
 import { useAuth } from "../../auth";
 import { useTheme as useGlobalTheme } from "../../contexts/ThemeContext";
@@ -174,6 +174,7 @@ const NAV_SECTIONS = [
       { id: "strategic_partners_dashboard", label: "Strategic Dashboard", icon: Network, badge: "AI XREF", href: "/admin/strategic-partners" },
       { id: "marketplace_intel", label: "Marketplace Intelligence", icon: Activity, badge: "DEFICIT", href: "/admin/marketplace-intel" },
       { id: "city_partners_list", label: "City Partners", icon: Building2, badge: "NEW V1", href: "/admin/city-partners" },
+      { id: "city_partner_products", label: "Catalog Materiale", icon: ShoppingBag, badge: "NEW", href: "/admin/city-partner-products" },
       { id: "marketplace_partners_list", label: "Marketplace Partners", icon: Award, badge: "AI", href: "/admin/marketplace-partners" },
     ],
   },
