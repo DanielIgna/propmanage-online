@@ -355,6 +355,100 @@ async def learn(current_keys: set[str]) -> dict:
     return {"auto_resolved": len(resolved), "keys": resolved}
 
 
+# ═══════════════════════ 6. LEARN → KNOWLEDGE (verified outcomes → ai_memories) ═══════════════════════
+# Doar rezultate REALE verificate devin memorie operațională reutilizabilă. NU sintetic:
+# se creează exclusiv din acțiuni SAFE executate autonom și VERIFICATE (verify.ok). Idempotent
+# per finding_key. Crește maturitatea memoriei ONEST (source="verified_outcome", nu "autonomy_seed").
+KNOWLEDGE_MEMORY_SOURCE = "verified_outcome"
+
+
+def _knowledge_tokens(text: str) -> list[str]:
+    try:
+        from ai_core.memory import _tokenize
+        return _tokenize(text)
+    except Exception:  # noqa: BLE001
+        return []
+
+
+async def _memory_exists(finding_key: str) -> bool:
+    return bool(await db.ai_memories.find_one(
+        {"source": KNOWLEDGE_MEMORY_SOURCE, "meta.finding_key": finding_key}, {"_id": 1}))
+
+
+async def _promote_one(key: str, detector: str, route: str, rec: str, todo_id) -> bool:
+    """Creează o memorie reutilizabilă dintr-un outcome verificat. Idempotent."""
+    if not key or await _memory_exists(key):
+        return False
+    content = (
+        f"PLAYBOOK VERIFICAT (autonomie): la detectarea «{detector}» pe «{route}», "
+        f"acțiunea SAFE executată automat a fost «{rec}», iar rezultatul a fost VERIFICAT OK "
+        f"(task de remediere creat, reversibil). Reutilizabil pentru situații similare."
+    )
+    doc = {
+        "id": uuid.uuid4().hex,
+        "user_id": "system:autonomy",
+        "scope": "admin_agent",
+        "content": content[:4000],
+        "summary": f"Verified: {detector} @ {route} → {rec[:120]}"[:280],
+        "tokens": _knowledge_tokens(content),
+        "source": KNOWLEDGE_MEMORY_SOURCE,
+        "kind": "operational_playbook",
+        "meta": {"finding_key": key, "detector": detector, "route": route,
+                 "todo_id": todo_id, "verified_at": _now()},
+        "created_at": _now(),
+        "expires_at": None,   # cunoștință operațională persistentă
+    }
+    await db.ai_memories.insert_one(doc)
+    return True
+
+
+async def promote_verified_to_knowledge(steps: list[dict]) -> dict:
+    """(a) outcomes verificate din tick-ul curent + (b) backfill bounded din findings reale
+    deja verificate (istoricul autonomy). Ambele REALE, idempotente."""
+    created: list[str] = []
+
+    # (a) fresh: acțiuni SAFE executate autonom în acest tick + verificate OK
+    for st in steps:
+        act = st.get("action") or {}
+        if st.get("human_gate") or act.get("type") != "todo" or st.get("actor") != "autonomous":
+            continue
+        if not (st.get("verify") or {}).get("ok"):
+            continue
+        key = st.get("finding_key")
+        if not key or key in created:
+            continue
+        rec = st.get("recommended_action")
+        if not rec:
+            f = await db.admin_ai_findings.find_one({"composite_key": key}, {"_id": 0, "recommended_action": 1})
+            rec = (f or {}).get("recommended_action") or "acțiune de remediere SAFE"
+        if await _promote_one(key, st.get("detector") or "autonomy", st.get("route") or "", rec, act.get("todo_id")):
+            created.append(key)
+
+    # (b) backfill: findings reale cu acțiune autonomă (todo) deja rezolvate/triaged,
+    # al căror task încă există (artefact real), care NU sunt încă în knowledge.
+    try:
+        cur = db.admin_ai_findings.find({
+            "autonomy_action.type": "todo",
+            "status": {"$in": ["resolved", "triaged"]},
+        }).limit(50)
+        async for f in cur:
+            key = f.get("composite_key")
+            if not key or key in created or await _memory_exists(key):
+                continue
+            todo_id = (f.get("autonomy_action") or {}).get("todo_id")
+            if todo_id and not await db.admin_todos.find_one({"id": todo_id}, {"_id": 1}):
+                continue  # task-ul nu mai există → nu e un outcome verificabil acum
+            rec = f.get("recommended_action") or "acțiune de remediere SAFE"
+            detector = f.get("pattern") or "autonomy"
+            route = f.get("affected_route") or f"{f.get('entity_type')}:{f.get('entity_id')}"
+            if await _promote_one(key, detector, route, rec, todo_id):
+                created.append(key)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[loop] knowledge backfill failed: {e}")
+
+    return {"knowledge_records_created": len(created), "keys": created}
+
+
 # ═══════════════════════ OBSERVE #2: backlog findings Knowledge Center ═══════════════════════
 # A doua sursă REALĂ (fără duplicare): findings DEJA existente în admin_ai_findings (Knowledge Center).
 # NON-destructive → SAFE (task de remediere, reversibil). Destructive (orphan_twins etc.) NU sunt
@@ -544,6 +638,7 @@ async def run_loop_tick(triggered_by: str = "manual") -> dict:
                           "source": "knowledge_center", "error": str(e)[:200], "verify": {"ok": False}})
 
     learned = await learn(current_keys)
+    knowledge = await promote_verified_to_knowledge(steps)
     op_after = await _operational_score()
     scores_after = await _scores_snapshot()
     run = {
@@ -556,14 +651,16 @@ async def run_loop_tick(triggered_by: str = "manual") -> dict:
         "findings_created": findings_created,
         "actions_taken": actions_taken,
         "learned": learned,
+        "knowledge": knowledge,
         "operational_score_after": op_after,
         "scores_before": scores_before,
         "scores_after": scores_after,
         "steps": steps,
-        "outcome": "applied" if (findings_created or actions_taken["todo"] or actions_taken["approval"] or learned["auto_resolved"]) else ("blocked_by_governance" if actions_taken["blocked_governance"] else "no_change"),
+        "outcome": "applied" if (findings_created or actions_taken["todo"] or actions_taken["approval"] or learned["auto_resolved"] or knowledge["knowledge_records_created"]) else ("blocked_by_governance" if actions_taken["blocked_governance"] else "no_change"),
     }
     await db.autonomy_loop_runs.insert_one(dict(run))
     run.pop("_id", None)
     logger.info(f"[loop] tick {run['outcome']} — obs={run['observations']} findings={findings_created} "
-                f"todos={actions_taken['todo']} approvals={actions_taken['approval']} learned={learned['auto_resolved']}")
+                f"todos={actions_taken['todo']} approvals={actions_taken['approval']} learned={learned['auto_resolved']} "
+                f"knowledge={knowledge['knowledge_records_created']}")
     return run

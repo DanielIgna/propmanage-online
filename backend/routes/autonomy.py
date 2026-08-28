@@ -720,3 +720,12 @@ async def get_operational_loop_policy(user=Depends(require_role("admin"))):
         },
         "stages": ["OBSERVE", "DETECT", "FINDING", "DECIDE/POLICY/RISK", "ACT", "VERIFY", "RECORD", "LEARN"],
     }
+
+
+@router.get("/activity")
+async def get_autonomy_activity(user=Depends(require_role("admin"))):
+    """Read-model UNIFICAT: coada de acțiuni + metrici REALE de autonomie.
+    Proiectează artefactele existente (findings/todos/approvals/loop_runs/playbook_executions/
+    ai_memories + semnale bottleneck) — CE A FĂCUT / AȘTEAPTĂ / A EȘUAT / NECESITĂ OM / A ÎNVĂȚAT."""
+    from autonomy import activity
+    return await activity.get_activity()

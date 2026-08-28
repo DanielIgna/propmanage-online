@@ -1,3 +1,23 @@
+## 🔁 AUTONOMY CORE — bucla operațională închisă (vizibil → măsurabil → verificabil → învață) (PREVIEW · Iun 2026)
+
+Cerință Fondator: transformă stratul de autonomie din „dashboard de observare/scoring" într-un sistem închis controlat OBSERVE→DECIDE→ACT→VERIFY→LEARN, care rezolvă autonom munca sigură/deterministă și escaladează doar ce necesită judecată umană. REUTILIZARE strictă, fără sistem paralel, fără puteri noi de execuție. Alegere confirmată: **a1 (verified→knowledge) + b1 (păstrează toate gate-urile umane)**.
+
+**Ce exista deja** (nedublicat): `loop.py` (bucla completă cu risk-gating + kill-switch + ledger), `self_driving.py` (autopilot low-risk, auto-materialize, escaladare cereri stale), executor aprobări, scoring cu semnale bottleneck.
+
+**Ce am adăugat (minim):**
+- **VERIFIED→Knowledge** (`loop.py::promote_verified_to_knowledge` + backfill): outcomes REALE verificate → `ai_memories` (`source:"verified_outcome"`), idempotent → maturitate onestă.
+- **Read-model unificat** (`autonomy/activity.py` · `GET /api/admin/autonomy/activity`): coadă unică (DID/WAITING/NEEDS_HUMAN/FAILED/BLOCKED/LEARNED) + metrici reale din ledgere.
+- **UI „Autonomy Activity"** (`AutonomyActivityPanel.jsx`): CE A FĂCUT / AȘTEAPTĂ / NECESITĂ OM / A EȘUAT / A ÎNVĂȚAT + metrici.
+
+**Gate-uri umane PĂSTRATE**: anomalii audit + reguli oprite + dispute = doar escaladate; MEDIUM/HIGH → aprobare; kill-switch OFF → SAFE blocat. Zero mutații noi pe date business/financiar.
+
+**Testare**: `tests/test_autonomy_closed_loop_p2.py` 17/17 PASS + e2e API + UI. PRODUCȚIE: necesită redeploy; metricile de prod devin reale după primul tick.
+
+**Bottleneck-uri reale rămase (human-gated by design)**: 28 dispute, 3 reguli oprite, cereri >48h — cer decizie umană sau o schimbare de produs (ex: API lifecycle `db.projects`) ca autonomia să poată face mutații de business.
+
+---
+
+
 ## 🧼 DECONTAMINARE METRICĂ AUTONOMY (P1) — real vs seed/synthetic + stop auto_tune inflation (PREVIEW · Iun 2026)
 
 Cerință Fondator (P1, evidence-based, strict): separă usage REAL de seed/demo/test în calculul scorurilor Autonomous Engine și împiedică `auto_tune` să umfle artificial metricile. Folosește infra existentă, nu șterge date reale, nu recalcula artificial „în frumos", păstrează audit trail, marchează PREVIEW/PRODUCTION/UNKNOWN.
