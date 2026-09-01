@@ -1,3 +1,19 @@
+## 🎯 GOOGLE ADS — Lead-form conversion tracking + ID nou AW-18423416296 (PREVIEW · Iun 2026)
+
+Cerere Fondator: (1) actualizare ID Google Ads la `AW-18423416296` peste tot, (2) tracking de conversie „Trimiteți un formular de client potențial" pe formularele de lead destinate CLIENȚILOR.
+
+**ID nou** `AW-18423416296` înlocuit peste tot (index.html gtag.js `<head>`, `analytics.js`, `CookieBanner.jsx`, `LegalPages.jsx`, `BusinessHealthPage.jsx`, `attribution.py`). 0 apariții rămase din vechiul `AW-857233494`.
+
+**Conversie lead-form** (label oficial case-sensitive, **O mare**: `AW-18423416296/VAOdCNyek-wcEOiL_NBE`, value 1.0, RON):
+- Helper reutilizabil `trackLeadFormConversion()` în `analytics.js` — SSR-safe (`typeof window !== 'undefined' && window.gtag`), respectă Consent Mode v2, + eveniment first-party.
+- Conectat DOAR pe succes (după 2xx) în: **Book Demo modal** (`BookDemoModal.jsx`, `/public/demo-request`) și **formularul Design Interior „Cere ofertă/Trimite cererea"** (`InteriorDesignLanding.jsx`, `/interior-design/leads`).
+- **EXCLUS** intenționat: formularul de aplicare specialist (`/devino-specialist`) — nu e lead de client.
+
+**Verificat E2E** (screenshot + stub gtag): ambele formulare → stare de succes + conversie declanșată cu label-ul corect `VAOdCNyek-wcEOiL_NBE` (value 1, RON). Lead-urile de test șterse din DB (fără contaminare). Necesită redeploy Fondator pentru producție.
+
+---
+
+
 ## 🎯 GOOGLE ADS ATRIBUIRE → UI ADMIN + GDPR Consent Mode v2 (PREVIEW · Iun 2026)
 
 Cerere Fondator: (1) `gtag.js` Google Ads `AW-857233494` în frontend, (2) GDPR via Google Consent Mode v2 (default `denied`), (3) PostHog gated de consimțământul „Statistice", (4) Privacy Policy actualizată onest, (5) atribuire server-side `gclid` → conversii (signup/first_request/purchase) vizibilă în Admin (Business Health / Autonomy).

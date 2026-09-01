@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { API } from "./DashShared";
 import { useDynamicSEO } from "../lib/useDynamicSEO";
+import { trackLeadFormConversion } from "../lib/analytics";
 import { EcosystemFlow } from "../components/ecosystem/EcosystemFlow";
 import { ServiceDetailModal } from "../components/ecosystem/ServiceDetailModal";
 import { NextStep } from "../components/ecosystem/NextStep";
@@ -101,6 +102,7 @@ const LeadForm = ({ content }) => {
     try {
       const r = await ax.post("/interior-design/leads", { ...form, surface_mp: form.surface_mp ? Number(form.surface_mp) : null });
       setSent(r.data.message);
+      trackLeadFormConversion(); // Google Ads lead-form conversion (doar pe succes)
     } catch (err) {
       setSent("A apărut o eroare — verifică emailul și reîncearcă.");
     }

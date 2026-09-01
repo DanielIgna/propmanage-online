@@ -162,6 +162,26 @@ export const trackConversion = (action, opts = {}) => {
   } catch { /* noop */ }
 };
 
+// Conversie Google Ads „Trimiteți un formular de client potențial" (lead form).
+// Label oficial (case-sensitive, litera O mare): AW-18423416296/VAOdCNyek-wcEOiL_NBE.
+// Se apelează DOAR după succes (răspuns 2xx) pe formularele de lead destinate clienților.
+// Respectă Consent Mode v2 (nu setează cookies fără consimțământul „Marketing").
+export const trackLeadFormConversion = (opts = {}) => {
+  const { value = 1.0, currency = "RON" } = opts;
+  // eveniment first-party (Business Health + Autonomy + Analytics&Growth)
+  push({ type: "conversion", conversion_action: "lead_form", conversion_value: value, conversion_currency: currency, path: currentPath });
+  flush();
+  try {
+    if (typeof window !== "undefined" && window.gtag) {
+      window.gtag("event", "conversion", {
+        send_to: "AW-18423416296/VAOdCNyek-wcEOiL_NBE",
+        value,
+        currency,
+      });
+    }
+  } catch { /* noop */ }
+};
+
 // GI-2: Intent Score — semnale de intenție dincolo de pageview-uri
 // signal: twin_viewed | audit_viewed | request_started | request_abandoned |
 //         offer_requested | whatsapp_opened | specialist_compared | guide_downloaded
