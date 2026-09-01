@@ -37,6 +37,18 @@ export const CookieBanner = () => {
     setPrefs(final);
     setOpen(false);
     setCustomize(false);
+    // GDPR — propagă alegerea către Google Consent Mode v2 (Google Ads AW-857233494).
+    // Marketing → cookies publicitare/remarketing (ad_*); Statistice → analytics_storage.
+    try {
+      if (typeof window.gtag === "function") {
+        window.gtag("consent", "update", {
+          ad_storage: final.marketing ? "granted" : "denied",
+          ad_user_data: final.marketing ? "granted" : "denied",
+          ad_personalization: final.marketing ? "granted" : "denied",
+          analytics_storage: final.analytics ? "granted" : "denied",
+        });
+      }
+    } catch (e) { /* noop */ }
     try {
       await axios.post(`${API}/api/cookies/consent`, {
         functional_cookies_accepted: true,

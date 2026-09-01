@@ -4,6 +4,14 @@ Rol: jurnal cronologic al schimbărilor semnificative + sincronizărilor de cuno
 
 ---
 
+## 2026-09 · Google Ads tag (AW-857233494) + GDPR Consent Mode v2 — PREVIEW
+- Adăugat gtag.js (Google Ads AW-857233494) în `frontend/public/index.html` cu **Google Consent Mode v2**: default `denied` pentru `ad_storage/ad_user_data/ad_personalization/analytics_storage`; citește alegerea salvată (`pm_cookie_consent_v1`) la load.
+- `CookieBanner.jsx::persist()` trimite `gtag('consent','update',...)`: Marketing→`ad_*`, Statistice→`analytics_storage`. Verificat e2e (denied la prima vizită → granted la „Accept toate" → denied la „Refuz").
+- NELEGAT de Analytics & Growth intern (acela = `/api/track` + `analytics_growth.py` + PostHog). Google Ads trimite doar în consola Google Ads (conversii/remarketing).
+- ⚠️ De rezolvat: `LegalPages.jsx` afirmă „doar cookies strict necesare, fără remarketing" — contrazice noul tag Google Ads; PostHog se încarcă încă necondiționat (înainte de consimțământ).
+- Necesită REDEPLOY pentru producție.
+
+
 ## 2026-06 · AUTONOMY EXPANSION — Dispute pre-triage + Safe Project Lifecycle — PREVIEW
 - **Reutilizat** (fără sistem paralel): triajul Claude existent (`orchestrator/playbooks.py::handle_dispute_opened` → refactorizat în `compute_dispute_triage` reutilizabil), coada `Autonomy Activity`, `admin_approvals` (registry), risk-gates + kill-switch, ledger, mecanismul `verified_outcome`→`ai_memories`.
 - **A. Dispute pre-triage** (`autonomy/disputes.py`): OBSERVE→CLASSIFY (Claude)→PRIORITIZE (DETERMINIST, explicabil: vârstă/escrow/severitate/status)→PROPOSE→HUMAN GATE. Adaugă `autonomy_triage` pe documentul disputei (non-destructiv, idempotent). Flag `insufficient_information`. **NICIO auto-rezoluție** (rezolvarea mișcă bani → 100% umană). Backfill pe cele 28 dispute: **28/28 triate — 20 HIGH · 8 MEDIUM · 21 ready-for-human · 7 waiting-info · confidence mediu 0.7 · 0 auto-rezolvate**.
