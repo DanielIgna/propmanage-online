@@ -144,7 +144,7 @@ export const trackFunnel = (step) => {
   flush();
 };
 
-// CONVERSII — leagă comportamentul clientului de Google Ads (AW-857233494) + intern.
+// CONVERSII — leagă comportamentul clientului de Google Ads (AW-18423416296) + intern.
 // action: sign_up | first_request | offer_accepted | purchase
 export const trackConversion = (action, opts = {}) => {
   const { value = 0, currency = "RON" } = opts;
@@ -155,7 +155,7 @@ export const trackConversion = (action, opts = {}) => {
   try {
     if (window.gtag) {
       const map = { sign_up: "sign_up", first_request: "generate_lead", offer_accepted: "generate_lead", purchase: "purchase" };
-      const params = { send_to: "AW-857233494", currency };
+      const params = { send_to: "AW-18423416296", currency };
       if (value) params.value = value;
       window.gtag("event", map[action] || action, params);
     }

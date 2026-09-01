@@ -226,7 +226,7 @@ export const CookiePolicyPage = () => (
       <li><strong>Stripe</strong> (<code>__stripe_mid</code>, <code>__stripe_sid</code>) — anti-fraudă pentru plățile escrow. Strict necesar. Stripe nu primește datele tale personale dincolo de ce e necesar pentru a procesa o plată.</li>
       <li><strong>Cloudflare</strong> (<code>__cf_bm</code>, <code>cf_clearance</code>) — protecție anti-bot și CDN. Strict necesar. Nu folosit pentru profilare.</li>
       <li><strong>PostHog</strong> — statistici de utilizare a produsului (first-party analytics). <strong>Opțional</strong>, se activează doar după consimțământul „Statistice".</li>
-      <li><strong>Google Ads</strong> (<code>AW-857233494</code>, via <code>googletagmanager.com</code>) — măsurarea conversiilor și remarketing. <strong>Opțional</strong>, se activează doar după consimțământul „Marketing", prin Google Consent Mode v2.</li>
+      <li><strong>Google Ads</strong> (<code>AW-18423416296</code>, via <code>googletagmanager.com</code>) — măsurarea conversiilor și remarketing. <strong>Opțional</strong>, se activează doar după consimțământul „Marketing", prin Google Consent Mode v2.</li>
     </ul>
 
     <h2>4. Consimțământ și bannerul de cookies</h2>

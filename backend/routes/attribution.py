@@ -60,7 +60,7 @@ async def compute_attribution_summary(days: int = 30) -> dict:
 
     return {
         "window_days": days,
-        "google_ads_id": "AW-857233494",
+        "google_ads_id": "AW-18423416296",
         "ad_visitors": ad_visitors,
         "google_source_visitors": utm_google,
         "conversions_total": total_conv,

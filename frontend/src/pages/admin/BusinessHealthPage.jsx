@@ -108,7 +108,7 @@ export default function BusinessHealthPage() {
           <AdminCard testid="bh-attribution" title={<span className="flex items-center gap-2">🎯 Atribuire Google Ads → conversii (30 zile)</span>}>
             {!data?.attribution || (data.attribution.conversions_total === 0 && data.attribution.ad_visitors === 0) ? (
               <div className="text-xs text-slate-400 py-3" data-testid="bh-attribution-empty">
-                Încă nu există trafic Google Ads înregistrat. Datele apar pe măsură ce vizitatorii ajung din campanii (link cu <code>gclid</code>) și convertesc (cont creat / cerere / plată). Cont Google Ads: <strong>AW-857233494</strong>.
+                Încă nu există trafic Google Ads înregistrat. Datele apar pe măsură ce vizitatorii ajung din campanii (link cu <code>gclid</code>) și convertesc (cont creat / cerere / plată). Cont Google Ads: <strong>AW-18423416296</strong>.
               </div>
             ) : (
               <div className="space-y-3" data-testid="bh-attribution-data">
@@ -146,7 +146,7 @@ export default function BusinessHealthPage() {
                     Top campanii: {data.attribution.top_campaigns.map((c) => `${c.campaign} (${c.conversions})`).join(" · ")}
                   </div>
                 )}
-                <div className="text-[10px] text-slate-400">Google Ads <strong>AW-857233494</strong> · doar cu consimțământ „Marketing" (Consent Mode v2).</div>
+                <div className="text-[10px] text-slate-400">Google Ads <strong>AW-18423416296</strong> · doar cu consimțământ „Marketing" (Consent Mode v2).</div>
               </div>
             )}
           </AdminCard>

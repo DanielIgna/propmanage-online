@@ -37,7 +37,7 @@ export const CookieBanner = () => {
     setPrefs(final);
     setOpen(false);
     setCustomize(false);
-    // GDPR — propagă alegerea către Google Consent Mode v2 (Google Ads AW-857233494).
+    // GDPR — propagă alegerea către Google Consent Mode v2 (Google Ads AW-18423416296).
     // Marketing → cookies publicitare/remarketing (ad_*); Statistice → analytics_storage.
     try {
       if (typeof window.gtag === "function") {
