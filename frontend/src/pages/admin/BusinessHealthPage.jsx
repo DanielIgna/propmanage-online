@@ -105,6 +105,53 @@ export default function BusinessHealthPage() {
             })}
           </div>
 
+          <AdminCard testid="bh-attribution" title={<span className="flex items-center gap-2">🎯 Atribuire Google Ads → conversii (30 zile)</span>}>
+            {!data?.attribution || (data.attribution.conversions_total === 0 && data.attribution.ad_visitors === 0) ? (
+              <div className="text-xs text-slate-400 py-3" data-testid="bh-attribution-empty">
+                Încă nu există trafic Google Ads înregistrat. Datele apar pe măsură ce vizitatorii ajung din campanii (link cu <code>gclid</code>) și convertesc (cont creat / cerere / plată). Cont Google Ads: <strong>AW-857233494</strong>.
+              </div>
+            ) : (
+              <div className="space-y-3" data-testid="bh-attribution-data">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+                    <div className="text-lg font-black text-slate-900 dark:text-white">{data.attribution.ad_visitors}</div>
+                    <div className="text-[10px] uppercase tracking-wide text-slate-400">Vizitatori din Google Ads</div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+                    <div className="text-lg font-black text-lime-600 dark:text-lime-300">{data.attribution.conversions_ad_attributed}</div>
+                    <div className="text-[10px] uppercase tracking-wide text-slate-400">Conversii atribuite Ads</div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+                    <div className="text-lg font-black text-slate-900 dark:text-white">{data.attribution.ad_signup_rate_pct ?? "—"}%</div>
+                    <div className="text-[10px] uppercase tracking-wide text-slate-400">Rată signup (trafic Ads)</div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+                    <div className="text-lg font-black text-emerald-600 dark:text-emerald-300">{(data.attribution.ad_attributed_value_ron ?? 0).toLocaleString()} lei</div>
+                    <div className="text-[10px] uppercase tracking-wide text-slate-400">Valoare plăți atribuite</div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 text-[11px]">
+                  {["sign_up", "first_request", "offer_accepted", "purchase"].map((a) => {
+                    const v = data.attribution.conversions_by_action?.[a] || { total: 0, ad_attributed: 0 };
+                    const lbl = { sign_up: "Cont creat", first_request: "Prima cerere", offer_accepted: "Ofertă acceptată", purchase: "Plată" }[a];
+                    return (
+                      <span key={a} className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200" data-testid={`bh-attr-${a}`}>
+                        {lbl}: <strong>{v.total}</strong> <span className="text-slate-400">({v.ad_attributed} din Ads)</span>
+                      </span>
+                    );
+                  })}
+                </div>
+                {(data.attribution.top_campaigns || []).length > 0 && (
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Top campanii: {data.attribution.top_campaigns.map((c) => `${c.campaign} (${c.conversions})`).join(" · ")}
+                  </div>
+                )}
+                <div className="text-[10px] text-slate-400">Google Ads <strong>AW-857233494</strong> · doar cu consimțământ „Marketing" (Consent Mode v2).</div>
+              </div>
+            )}
+          </AdminCard>
+
+
           <AdminCard testid="bh-menu-clicks" title="📊 Top servicii căutate din meniu (30 zile)">
             {!menuStats || menuStats.total_clicks === 0 ? (
               <div className="text-xs text-slate-400 py-3">Încă nu există click-uri înregistrate în meniu. Datele apar pe măsură ce vizitatorii navighează.</div>

@@ -1,3 +1,18 @@
+## 🎯 GOOGLE ADS ATRIBUIRE → UI ADMIN + GDPR Consent Mode v2 (PREVIEW · Iun 2026)
+
+Cerere Fondator: (1) `gtag.js` Google Ads `AW-857233494` în frontend, (2) GDPR via Google Consent Mode v2 (default `denied`), (3) PostHog gated de consimțământul „Statistice", (4) Privacy Policy actualizată onest, (5) atribuire server-side `gclid` → conversii (signup/first_request/purchase) vizibilă în Admin (Business Health / Autonomy).
+
+**Livrat (PREVIEW, necesită redeploy):**
+- `gtag.js` (AW-857233494) în `index.html` + Consent Mode v2 în `CookieBanner.jsx` (Google Ads + PostHog gated pe cookie preferences).
+- Privacy Policy actualizată în `LegalPages.jsx` (cookies marketing).
+- Atribuire server-side: `attribution.py` (`compute_attribution_summary`) + `analytics_growth.py` (ingest `marketing_attributions` first-touch + `marketing_conversions`). Hook-uri conversie în `Auth.jsx` (sign_up), `RequestWizard.jsx` (first_request), `PaymentSuccess.jsx` (purchase). Zero date sintetice.
+- UI: card „Atribuire Google Ads → conversii (30 zile)" în `BusinessHealthPage.jsx` (`bh-attribution`) — alimentat de `/api/admin/business-health` (top-level `attribution`). Stare goală onestă când 0 trafic real.
+
+**Fix critic (Iun 2026)**: `trackConversion` fusese inserat GREȘIT în interiorul `trackFunnel` în `analytics.js` → `SyntaxError: 'import'/'export' may only appear at the top level` → **întreg frontendul nu compila**. Corectat: cele 2 funcții separate corect la top-level. Verificat: pagina Admin Business Health se randează fără erori, cardul de atribuire afișează starea goală onestă. Backend curl OK (`attribution` prezent, valori 0 = fără trafic ads real).
+
+---
+
+
 ## ⚖️🔁 AUTONOMY EXPANSION — Dispute pre-triage + Safe Project Lifecycle (PREVIEW · Iun 2026)
 
 Extindere controlată a Autonomy Core (fără redesign/duplicare). Confirmat: **1a (on_hold auto, archive human-gated) + 2a (demo real în preview) + 3a (Claude pentru triaj)**.

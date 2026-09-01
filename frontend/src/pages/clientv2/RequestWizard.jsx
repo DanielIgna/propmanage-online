@@ -64,7 +64,7 @@ export const RequestWizard = ({ property, onClose, onCreated }) => {
       const { data } = await axios.post(`${API}/requests`, payload);
       if (window.__pmWizardCreated) window.__pmWizardCreated();
       // Funnel comercial (etapa 4): cerere creată real în db.requests (+ semnalul existent offer_requested)
-      import("../../lib/analytics").then(({ trackIntent }) => { trackIntent("request_created"); trackIntent("offer_requested"); }).catch(() => {});
+      import("../../lib/analytics").then(({ trackIntent, trackConversion }) => { trackIntent("request_created"); trackIntent("offer_requested"); trackConversion("first_request"); }).catch(() => {});
       onCreated(data);
       setDone(true);
     } catch (e) { alert(formatApiError(e)); }

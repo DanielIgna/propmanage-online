@@ -294,5 +294,10 @@ async def get_activity() -> dict:
 
     metrics["disputes"] = await D.dispute_metrics()
     metrics["lifecycle"] = await LC.lifecycle_metrics()
+    try:
+        from routes.attribution import compute_attribution_summary
+        metrics["attribution"] = await compute_attribution_summary(30)
+    except Exception:  # noqa: BLE001
+        metrics["attribution"] = None
 
     return {"metrics": metrics, "queue": queue[:QUEUE_CAP + 40], "counts": counts, "total": len(queue)}

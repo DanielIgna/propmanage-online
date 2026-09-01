@@ -53,9 +53,18 @@ const captureAttribution = () => {
   const utm = p.get("utm_source") || "";
   const utmMedium = p.get("utm_medium") || "";
   const utmCampaign = p.get("utm_campaign") || "";
+  const gclid = p.get("gclid") || "";
+  const gbraid = p.get("gbraid") || "";
+  const wbraid = p.get("wbraid") || "";
   const viaQr = p.get("via_qr") === "1";
-  if (c || utm) {
-    localStorage.setItem(ATTR_KEY, JSON.stringify({ c, utm_source: utm, utm_medium: utmMedium, utm_campaign: utmCampaign, via_qr: viaQr, ts: Date.now() }));
+  if (c || utm || gclid || gbraid || wbraid) {
+    // first-touch: nu suprascrie o atribuire existentă validă (păstrează prima sursă)
+    let existing = null;
+    try { existing = JSON.parse(localStorage.getItem(ATTR_KEY) || "null"); } catch { /* noop */ }
+    const fresh = existing && Date.now() - existing.ts < ATTR_TTL;
+    if (!fresh) {
+      localStorage.setItem(ATTR_KEY, JSON.stringify({ c, utm_source: utm, utm_medium: utmMedium, utm_campaign: utmCampaign, gclid, gbraid, wbraid, via_qr: viaQr, ts: Date.now() }));
+    }
   }
 };
 
@@ -64,7 +73,7 @@ const getAttribution = () => {
     const a = JSON.parse(localStorage.getItem(ATTR_KEY) || "null");
     if (a && Date.now() - a.ts < ATTR_TTL) return a;
   } catch { /* noop */ }
-  return { c: "", utm_source: "", utm_medium: "", utm_campaign: "", via_qr: false };
+  return { c: "", utm_source: "", utm_medium: "", utm_campaign: "", gclid: "", gbraid: "", wbraid: "", via_qr: false };
 };
 
 const push = (ev) => {
@@ -75,6 +84,9 @@ const push = (ev) => {
     utm_medium: attr.utm_medium || "",
     utm_campaign: attr.utm_campaign || "",
     campaign_code: attr.c,
+    gclid: attr.gclid || "",
+    gbraid: attr.gbraid || "",
+    wbraid: attr.wbraid || "",
     via_qr: !!attr.via_qr,
     ts: new Date().toISOString(),
     ...ev,
@@ -130,6 +142,24 @@ export const trackFunnel = (step) => {
   // step: signup_started | account_created | property_added | subscription | specialist_request
   push({ type: "funnel", funnel_step: step, path: currentPath });
   flush();
+};
+
+// CONVERSII — leagă comportamentul clientului de Google Ads (AW-857233494) + intern.
+// action: sign_up | first_request | offer_accepted | purchase
+export const trackConversion = (action, opts = {}) => {
+  const { value = 0, currency = "RON" } = opts;
+  // 1) eveniment first-party (alimentează Business Health + Autonomy + Analytics&Growth)
+  push({ type: "conversion", conversion_action: action, conversion_value: value, conversion_currency: currency, path: currentPath });
+  flush();
+  // 2) conversie Google Ads — respectă Consent Mode v2 (nu setează cookies fără consimțământ „Marketing")
+  try {
+    if (window.gtag) {
+      const map = { sign_up: "sign_up", first_request: "generate_lead", offer_accepted: "generate_lead", purchase: "purchase" };
+      const params = { send_to: "AW-857233494", currency };
+      if (value) params.value = value;
+      window.gtag("event", map[action] || action, params);
+    }
+  } catch { /* noop */ }
 };
 
 // GI-2: Intent Score — semnale de intenție dincolo de pageview-uri

@@ -70,7 +70,7 @@ def classify_source(referrer: str = "", utm_source: str = "", campaign_code: str
 # ═══════════════════════════ TRACKING (public) ═══════════════════════════
 
 class TrackEvent(BaseModel):
-    type: str  # pageview | heartbeat | click | funnel | intent
+    type: str  # pageview | heartbeat | click | funnel | intent | conversion
     path: str = ""
     referrer: str = ""
     utm_source: str = ""
@@ -78,11 +78,17 @@ class TrackEvent(BaseModel):
     utm_campaign: str = ""
     campaign_code: str = ""
     via_qr: bool = False
+    gclid: str = ""                # Google Ads click id (atribuire Google Ads)
+    gbraid: str = ""               # Google Ads (app/iOS)
+    wbraid: str = ""               # Google Ads (web→app)
     duration_ms: int = 0          # heartbeat: timp acumulat pe pagină
     x_pct: Optional[float] = None  # click: coordonate % (pt heatmap Faza 2)
     y_pct: Optional[float] = None
     funnel_step: str = ""          # signup_started | account_created | property_added | subscription | specialist_request
     intent_signal: str = ""        # GI-2: twin_viewed | audit_viewed | request_started | request_abandoned | offer_requested | whatsapp_opened | ...
+    conversion_action: str = ""    # sign_up | first_request | purchase | offer_accepted
+    conversion_value: float = 0.0  # valoare RON (ex: sumă escrow pt purchase)
+    conversion_currency: str = "RON"
     ab_key: str = ""               # A/B testing: cheia experimentului
     ab_variant: str = ""           # A | B
     ts: str = ""
@@ -152,6 +158,39 @@ async def ingest_events(batch: TrackBatch, request: Request):
             sess_updates[f"intent_{ev.intent_signal[:30]}"] = True
         if ev.type == "ab" and ev.ab_key and ev.ab_variant in ("A", "B"):
             sess_updates[f"ab_{ev.ab_key[:30]}"] = ev.ab_variant
+
+        # ── Google Ads attribution (first-touch per visitor) ────────────────
+        gclid = (ev.gclid or "")[:200]
+        if gclid or ev.utm_source or ev.campaign_code:
+            await db.marketing_attributions.update_one(
+                {"visitor_id": batch.visitor_id},
+                {"$setOnInsert": {
+                    "visitor_id": batch.visitor_id,
+                    "gclid": gclid, "gbraid": (ev.gbraid or "")[:200], "wbraid": (ev.wbraid or "")[:200],
+                    "utm_source": (ev.utm_source or "")[:100], "utm_medium": (ev.utm_medium or "")[:100],
+                    "utm_campaign": (ev.utm_campaign or "")[:100], "campaign_code": (ev.campaign_code or "")[:40],
+                    "landing_path": path or "/", "source": source, "first_seen_at": now, "day": _day(now),
+                }},
+                upsert=True,
+            )
+        # ── Conversion event (client-behavior → Google Ads + intern) ─────────
+        if ev.type == "conversion" and ev.conversion_action:
+            attr = await db.marketing_attributions.find_one({"visitor_id": batch.visitor_id}, {"_id": 0})
+            await db.marketing_conversions.insert_one({
+                "conversion_id": str(uuid.uuid4()),
+                "action": ev.conversion_action[:40],
+                "value": max(0.0, min(float(ev.conversion_value or 0), 10_000_000)),
+                "currency": (ev.conversion_currency or "RON")[:8],
+                "visitor_id": batch.visitor_id,
+                "user_id": (batch.user_id or "")[:40],
+                "gclid": (attr or {}).get("gclid", "") or gclid,
+                "utm_source": (attr or {}).get("utm_source", "") or (ev.utm_source or ""),
+                "utm_campaign": (attr or {}).get("utm_campaign", "") or (ev.utm_campaign or ""),
+                "source": (attr or {}).get("source") or source,
+                "ad_attributed": bool((attr or {}).get("gclid") or gclid),
+                "ts": ev.ts or now, "day": _day(now),
+            })
+            sess_updates[f"conversion_{ev.conversion_action[:30]}"] = True
     if batch.user_id:
         sess_updates["user_id"] = batch.user_id[:40]
         if batch.user_role:
@@ -161,6 +200,11 @@ async def ingest_events(batch: TrackBatch, request: Request):
             {"$set": {"user_id": batch.user_id[:40], "role": (batch.user_role or "")[:20], "last_seen_at": now},
              "$setOnInsert": {"first_seen_at": now}},
             upsert=True,
+        )
+        # leagă atribuirea (first-touch) de utilizator, dacă vizitatorul are una
+        await db.marketing_attributions.update_one(
+            {"visitor_id": batch.visitor_id, "user_id": {"$exists": False}},
+            {"$set": {"user_id": batch.user_id[:40]}},
         )
     if docs:
         await db.analytics_events.insert_many(docs)
@@ -255,6 +299,16 @@ async def update_integrations(body: IntegrationsUpdate, user: dict = Depends(req
     s = await _get_settings()
     s.pop("_id", None)
     return s
+
+
+# ═══════════════════════ MARKETING ATTRIBUTION (admin) ═══════════════════════
+@admin_router.get("/attribution/summary")
+async def attribution_summary(days: int = 30, user: dict = Depends(require_role("admin"))):
+    """Atribuire Google Ads → conversii reale (sign_up/first_request/offer_accepted/purchase).
+    Leagă comportamentul clientului măsurat de sursa de trafic Google Ads."""
+    from routes.attribution import compute_attribution_summary
+    return await compute_attribution_summary(days)
+
 
 
 # ═══════════════════════ CAMPANII GROWTH (admin) ═══════════════════════

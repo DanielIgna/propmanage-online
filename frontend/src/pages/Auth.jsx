@@ -272,6 +272,10 @@ export const RegisterPage = () => {
       if (!form.terms_accepted) throw new Error("Trebuie să accepți Termenii și Condițiile");
       if (!form.privacy_policy_accepted) throw new Error("Trebuie să accepți Politica de Confidențialitate");      const u = await register({ ...form, phone: phoneDigits });
       sendPassportConversion();
+      import("../lib/analytics").then(({ trackConversion, identify }) => {
+        identify(u.id || u._id || "", u.role || "");
+        trackConversion("sign_up");
+      }).catch(() => {});
       navigate(`/${u.role}`);
     } catch (err) {
       setError(err.message || formatApiError(err));

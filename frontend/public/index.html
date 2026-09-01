@@ -264,11 +264,18 @@
             posthog.init("phc_xAvL2Iq4tFmANRE7kzbKwaSqp1HJjN7x48s3vr0CMjs", {
                 api_host: "https://us.i.posthog.com",
                 person_profiles: "identified_only", // or 'always' to create profiles for anonymous users as well,
+                // GDPR: nu capta nimic până la consimțământul „Statistice".
+                opt_out_capturing_by_default: true,
                 session_recording: {
                     recordCrossOriginIframes: true,
                     capturePerformance: false,
                 },
             });
+            // Dacă utilizatorul a acceptat deja „Statistice" (banner), pornește capturarea.
+            try {
+                var _pmc = JSON.parse(localStorage.getItem("pm_cookie_consent_v1") || "null");
+                if (_pmc && _pmc.analytics) { posthog.opt_in_capturing(); }
+            } catch (e) {}
         </script>
     </body>
 </html>

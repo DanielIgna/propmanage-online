@@ -49,6 +49,13 @@ export const CookieBanner = () => {
         });
       }
     } catch (e) { /* noop */ }
+    // GDPR — PostHog (statistici) pornește DOAR la consimțământul „Statistice".
+    try {
+      if (window.posthog) {
+        if (final.analytics) window.posthog.opt_in_capturing();
+        else window.posthog.opt_out_capturing();
+      }
+    } catch (e) { /* noop */ }
     try {
       await axios.post(`${API}/api/cookies/consent`, {
         functional_cookies_accepted: true,

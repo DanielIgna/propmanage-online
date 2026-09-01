@@ -99,10 +99,29 @@ async def compute_health() -> dict[str, Any]:
         d["color"] = _color(d["score"])
 
     overall = round(sum(d["score"] for d in departments) / len(departments), 1)
+
+    # Atribuire Google Ads → conversii (leagă marketingul de comportamentul real al clientului)
+    attribution = None
+    try:
+        from routes.attribution import compute_attribution_summary
+        attribution = await compute_attribution_summary(30)
+        # atașează un rezumat pe departamentul Marketing (semnal REAL, fără a modifica scorul)
+        for d in departments:
+            if d["key"] == "marketing":
+                d["attribution"] = {
+                    "ad_visitors": attribution["ad_visitors"],
+                    "conversions_ad_attributed": attribution["conversions_ad_attributed"],
+                    "ad_signup_rate_pct": attribution["ad_signup_rate_pct"],
+                    "ad_attributed_value_ron": attribution["ad_attributed_value_ron"],
+                }
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[business_health] attribution attach failed: {e}")
+
     return {
         "departments": departments,
         "overall": overall,
         "overall_color": _color(overall),
+        "attribution": attribution,
         "generated_at": now.isoformat(),
     }
 
