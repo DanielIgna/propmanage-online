@@ -467,7 +467,14 @@ _SITE_URL = os.environ.get("APP_PUBLIC_URL", "https://propmanage.ro").rstrip("/"
 
 @router.get("/public/sitemap.xml")
 async def public_sitemap():
-    """Dynamic XML sitemap — included in robots.txt."""
+    """Dynamic XML sitemap — served at /api/public/sitemap.xml AND mirrored to
+    the clean root /sitemap.xml (static file in frontend/public via write_sitemap_file)."""
+    body = await build_sitemap_xml()
+    return FastResponse(content=body, media_type="application/xml")
+
+
+async def build_sitemap_xml() -> str:
+    """Construiește XML-ul sitemap (folosit de endpoint + generatorul fișierului static root)."""
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     static_pages = [
@@ -590,4 +597,24 @@ async def public_sitemap():
         + "\n".join(urls_xml)
         + "\n</urlset>\n"
     )
-    return FastResponse(content=body, media_type="application/xml")
+    return body
+
+
+# Fișierul static la rădăcina domeniului: https://propmanage.ro/sitemap.xml
+# (ingress-ul rutează /sitemap.xml către frontend, deci sitemap-ul trebuie să existe
+#  ca fișier în frontend/public). Regenerat la startup + zilnic prin scheduler.
+from pathlib import Path as _Path  # noqa: E402
+
+_SITEMAP_FILE = _Path(__file__).resolve().parents[2] / "frontend" / "public" / "sitemap.xml"
+
+
+async def write_sitemap_file() -> str:
+    """Generează sitemap-ul și îl scrie ca fișier static în frontend/public/sitemap.xml."""
+    xml = await build_sitemap_xml()
+    try:
+        _SITEMAP_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _SITEMAP_FILE.write_text(xml, encoding="utf-8")
+        logger.info(f"sitemap.xml scris ({len(xml)} bytes) → {_SITEMAP_FILE}")
+    except Exception as e:
+        logger.warning(f"Nu am putut scrie sitemap.xml static: {e}")
+    return xml

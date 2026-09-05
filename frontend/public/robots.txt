@@ -19,4 +19,4 @@ Crawl-delay: 10
 User-agent: SemrushBot
 Crawl-delay: 10
 
-Sitemap: https://propmanage.ro/api/public/sitemap.xml
+Sitemap: https://propmanage.ro/sitemap.xml

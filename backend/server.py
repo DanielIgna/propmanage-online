@@ -223,6 +223,11 @@ async def _money_flow_tick():
     await money_flow_tick()
 
 
+async def _sitemap_regen_tick():
+    from routes.public import write_sitemap_file
+    await write_sitemap_file()
+
+
 @app.on_event("startup")
 async def startup():
     await seed()
@@ -290,6 +295,12 @@ async def startup():
         await seed_default_legal_documents()
     except Exception as e:
         logger.warning(f"Legal docs seed failed: {e}")
+    # SEO — scrie sitemap.xml la rădăcina domeniului (frontend/public/sitemap.xml)
+    try:
+        from routes.public import write_sitemap_file
+        await write_sitemap_file()
+    except Exception as e:
+        logger.warning(f"Sitemap file generation failed: {e}")
     if not scheduler.running:
         scheduler.add_job(
             _lead_followup_tick,
@@ -333,6 +344,14 @@ async def startup():
             _campaign_detection_tick,
             CronTrigger(hour=8, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
             id="campaign_detection_daily",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        # SEO: regenerare sitemap.xml static (03:30) — reflectă specialiști/pagini noi
+        scheduler.add_job(
+            _sitemap_regen_tick,
+            CronTrigger(hour=3, minute=30, timezone=pytz.timezone(BUCHAREST_TZ_NAME)),
+            id="sitemap_regen_daily",
             replace_existing=True,
             misfire_grace_time=3600,
         )
