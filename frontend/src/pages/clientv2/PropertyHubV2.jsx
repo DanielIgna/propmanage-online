@@ -588,8 +588,19 @@ const HouseStatusPanel = ({ prop, onNextStep }) => {
   );
 };
 
-export const PropertyHubV2 = ({ user, prop, properties, setSelectedPropId, actions }) => {
+export const PropertyHubV2 = ({ user, prop, properties, setSelectedPropId, actions, initialSection, sectionNonce }) => {
   const [section, setSection] = useState("rezumat");
+  // Deep-link din Acasă (CTA activare document) → deschide direct „Cartea casei" + derulează la ea pe mobil
+  useEffect(() => {
+    if (!initialSection) return;
+    setSection(initialSection);
+    const t = setTimeout(() => {
+      const el = document.getElementById(`hub-section-${initialSection}`);
+      if (el && window.matchMedia("(max-width: 1023px)").matches) el.scrollIntoView({ block: "start", behavior: "smooth" });
+      else window.scrollTo({ top: 0 });
+    }, 60);
+    return () => clearTimeout(t);
+  }, [initialSection, sectionNonce]);
   if (!prop) {
     return (
       <div className="px-6 py-16 text-center" data-testid="v2-property-empty">
@@ -646,7 +657,7 @@ export const PropertyHubV2 = ({ user, prop, properties, setSelectedPropId, actio
 
         {/* Main workspace — pe mobil stiva completă, pe desktop secțiunea activă */}
         <div className="lg:col-span-7 min-w-0">
-          <div className={sec("carte")}><DocumentVaultCard prop={prop} /></div>
+          <div id="hub-section-carte" className={sec("carte")}><DocumentVaultCard prop={prop} /></div>
           <div className={sec("pasaport")}><PassportCard prop={prop} /></div>
           <div className={sec("rezumat")}>
             <HouseHealthAxisCard prop={prop} actions={actions} goSection={goSection} />

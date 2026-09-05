@@ -43,6 +43,9 @@ export default function ClientDashboardV2() {
   const [selectedPropId, setSelectedPropId] = useState(null);
   const [offersCount, setOffersCount] = useState(0);
   const [tab, setTab] = useState("home");
+  // Deep-link secțiune în Cartea casei (CTA-uri de activare document din Acasă)
+  const [propSection, setPropSection] = useState(null);
+  const [propSectionNonce, setPropSectionNonce] = useState(0);
   // modale / sheets
   const [showWizard, setShowWizard] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
@@ -62,6 +65,18 @@ export default function ClientDashboardV2() {
   const loadRequests = () => axios.get(`${API}/requests`).then(r => setRequests(r.data)).catch(() => {});
   const loadNotifs = () => axios.get(`${API}/notifications`).then(r => setNotifs(r.data)).catch(() => {});
   const loadProps = () => axios.get(`${API}/properties`).then(r => setProperties(r.data)).catch(() => {});
+
+  // CTA-uri „Adaugă primul document" (banner Acasă + Copilot „Fă pasul acum") → direct în Cartea casei
+  useEffect(() => {
+    const openBook = () => {
+      setPropSection("carte");
+      setPropSectionNonce(n => n + 1);
+      setTab("property");
+      window.scrollTo({ top: 0 });
+    };
+    window.addEventListener("propmanage:open-house-book", openBook);
+    return () => window.removeEventListener("propmanage:open-house-book", openBook);
+  }, []);
 
   useEffect(() => {
     if (!user || user === false) return;
@@ -227,7 +242,7 @@ export default function ClientDashboardV2() {
         {tab === "jobs" && <div className="lg:max-w-3xl"><JobsV2 requests={requests} actions={actions} /><TrustedSpecialists properties={properties} onRebooked={loadRequests} /></div>}
         {/* PPOS P3d: Property Hub folosește tot spațiul pe desktop (record page) */}
         {tab === "property" && (<>
-          <PropertyHubV2 user={user} prop={prop} properties={properties} setSelectedPropId={setSelectedPropId} actions={actions} />
+          <PropertyHubV2 user={user} prop={prop} properties={properties} setSelectedPropId={setSelectedPropId} actions={actions} initialSection={propSection} sectionNonce={propSectionNonce} />
           <MaintenanceCalendar properties={properties} prop={prop} onRequestCreated={loadRequests} />
           <BuildingHub properties={properties} onRequestsChanged={loadRequests} />
         </>)}

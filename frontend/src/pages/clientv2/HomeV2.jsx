@@ -314,7 +314,7 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
     <div className="cv2-fade" key="hero">
       {properties.length === 0 ? <HeroA onAddProperty={actions.openPropManager} />
         : activeReq ? <HeroC req={activeReq} offersCount={offersCount} onCta={heroCta} />
-        : docsCount === 0 ? <HeroDoc prop={prop} onOpen={() => go("property")} />
+        : docsCount === 0 ? <HeroDoc prop={prop} onOpen={() => window.dispatchEvent(new CustomEvent("propmanage:open-house-book"))} />
         : <HeroB prop={prop} confirmedCount={confirmedCount} onRequest={actions.openWizard} />}
     </div>
   );

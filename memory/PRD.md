@@ -1,3 +1,16 @@
+## 🎯 CLIENT BETA — TASK #3: CTA-uri „Adaugă primul document" duc direct în Cartea casei (Iun 2026)
+
+Problemă: bannerul „Adaugă primul document" (HeroDoc) și Copilotul → „Fă pasul acum" (acțiunea `docs_for_benefit`) duceau în pagina generală Proprietăți (secțiunea `rezumat`), deși „Adaugă document" e în Cartea casei.
+
+**Fix (doar destinația celor 2 CTA-uri, fără funcționalitate nouă):**
+- Eveniment nou `propmanage:open-house-book`. `ClientDashboardV2` îl ascultă → `setTab("property")` + `propSection="carte"` (+ nonce). Pasează `initialSection`/`sectionNonce` la `PropertyHubV2`, care setează `section="carte"` și derulează la `#hub-section-carte` pe mobil (refolosește starea `section` existentă + `DocumentVaultCard`/upload existent).
+- `HeroDoc.onOpen` (HomeV2) și `HouseCopilot.run` (când `a.id==="docs_for_benefit"`) dispatch-uiesc acel eveniment.
+- Traseu confirmat e2e (screenshot): Acasă → CTA → Cartea casei (subnav activ) → „Adaugă document" (`vault-add-btn`) → sheet upload „Adaugă în cartea casei".
+- NU s-a modificat upload-ul, UI-ul, scoring-ul, logica Copilotului sau structura Proprietăți.
+
+---
+
+
 ## ✨ CLIENT BETA HOME — TASK #2: Claritate + Activare + Valoare (Iun 2026)
 
 Peste reorganizarea Hick's Law, fără a reintroduce clutter. Testat mobil 390×844 (iteration_217, 100%) + desktop.

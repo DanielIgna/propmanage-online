@@ -171,6 +171,11 @@ export const HouseCopilot = ({ go, completeness, propName }) => {
 
   const run = (a) => {
     const p = a?.cta_path || a?.cta || "";
+    // Activare document → direct în Cartea casei (fără pasul inutil prin pagina Proprietăți)
+    if (a?.id === "docs_for_benefit") {
+      window.dispatchEvent(new CustomEvent("propmanage:open-house-book"));
+      return;
+    }
     if (p.startsWith("/client?tab=")) go?.(p.split("=")[1]);
     else if (["property", "benefits", "jobs", "request", "settings"].includes(p)) go?.(p === "request" ? "home" : p);
     else if (p) navigate(p);
