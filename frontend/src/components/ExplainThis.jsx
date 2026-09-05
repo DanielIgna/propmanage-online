@@ -35,6 +35,16 @@ export const ExplainThis = ({ role }) => {
   const [err, setErr] = useState(null);
   const [compRef, setCompRef] = useState("");
   const isDev = role === "admin" || role === "super_admin";
+  // Pe Home-ul Client (/client) AI Mentor NU mai apare ca element separat concurent cu
+  // Copilotul Casei. Funcționalitatea rămâne 100% accesibilă din Copilot (eveniment pm-open-mentor).
+  const onClientArea = location.pathname.startsWith("/client");
+
+  // Copilotul Casei deschide AI Mentor complet (recomandări, scoruri, procese, istoric).
+  useEffect(() => {
+    const h = () => { setTab("mentor"); setResult(null); setErr(null); setOpen(true); };
+    window.addEventListener("pm-open-mentor", h);
+    return () => window.removeEventListener("pm-open-mentor", h);
+  }, []);
 
   const run = useCallback(async (kind, extra = {}) => {
     setTab(kind); setBusy(true); setErr(null); setResult(null);
@@ -47,6 +57,7 @@ export const ExplainThis = ({ role }) => {
   // Onboarding inteligent: auto-deschide mentorul la primul acces într-un modul nou.
   useEffect(() => {
     if (!localStorage.getItem("pm_session_hint")) return;
+    if (location.pathname.startsWith("/client")) return; // pe Home Client, ghidul trăiește în Copilot
     const module = location.pathname.split("/")[1] || "root";
     const key = `pm_mentor_checked_${module}`;
     if (sessionStorage.getItem(key)) return;
@@ -60,11 +71,13 @@ export const ExplainThis = ({ role }) => {
   if (!localStorage.getItem("pm_session_hint")) return null;
   return (
     <>
+      {!onClientArea && (
       <button onClick={() => { setTab("mentor"); setOpen(true); }}
         className="pm-float-left-1 flex items-center gap-1.5 px-3 py-2 rounded-full bg-stone-900/90 border border-stone-700 text-[11px] font-bold text-stone-200 hover:border-[#d4ff3a]/60 hover:text-white shadow-lg backdrop-blur transition-colors"
         data-testid="explain-page-btn" title="AI Mentor — ghidul tău contextual">
         <Sparkles className="w-3.5 h-3.5 text-[#d4ff3a]" /> AI Mentor
       </button>
+      )}
       {open && (
         <div className="fixed inset-y-0 left-0 z-[75] w-full sm:w-[420px] bg-stone-950 border-r border-stone-800 shadow-2xl flex flex-col" data-testid="explain-panel">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-stone-800">

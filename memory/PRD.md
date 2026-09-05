@@ -1,3 +1,19 @@
+## 🧭 CLIENT BETA HOME — Hick's Law + Copilotul Casei ca unică suprafață AI (Iun 2026)
+
+Reorganizare UX a paginii /client (Acasă) pentru reducerea încărcării cognitive, FĂRĂ eliminarea niciunei funcții. Testat de testing_agent (iteration_216) — 100% frontend, mobil 390×844 + desktop.
+
+**Livrat:**
+- **AI Mentor nu mai apare separat pe /client** — butonul pill „✨ AI Mentor" (`explain-page-btn`) e ascuns pe rute `/client*` + auto-onboarding suprimat acolo. `ExplainThis.jsx` ascultă evenimentul `pm-open-mentor`.
+- **Copilotul Casei = unica suprafață AI.** `HouseCopilot.jsx` a devenit rezumat scurt (scor + rezumat AI + pasul cu impact maxim + „Fă pasul acum"/„De ce?"). Rând nou `copilot-summary-actions`: „Vezi alte recomandări" (`copilot-open-mentor` → deschide drawer-ul AI Mentor complet: scoruri, procese, blocaje, Knowledge Graph, istoric, feedback) + toggle „Detalii casă" (`copilot-details-toggle`). Restul (checklist, progres, beneficii, comunitate, stocare, abonament, timeline) e colapsat în `copilot-details`.
+- **Ierarhie Home nouă** (`HomeV2.jsx`): 1) hero (acțiune principală) → 2) Copilot rezumat → 3) Harta Casei (`v2-axis-here`) → 4) Noutăți reale → 5) grup progresiv `v2-more` (Realizări, Drumul Casei, beneficii, recomandări, Descoperă) colapsat pe mobil (`v2-more-toggle`/`v2-more-content`), expandat pe desktop. `CopilotCard` redundant din panoul dreapta ELIMINAT din render (funcția e acoperită de HouseCopilot).
+- Onboarding: conduce cu hero-ul, cu minim de acțiuni concurente.
+- Dock flotant `AssistantDock` (WhatsApp + Asistent AI) nemodificat: închis→buton, deschis→X (când ambele canale active). FAB nu acoperă bottom-nav (verificat: FAB y=692..748, nav y=779..844).
+
+**Observație non-blocantă (mobil):** banner-ul de cookie (bottom sheet) se poate suprapune peste `v2-more-toggle` până când userul acceptă/refuză. Tranzitoriu, o singură dată.
+
+---
+
+
 ## 🎯 GOOGLE ADS — Lead-form conversion tracking + ID nou AW-18423416296 (PREVIEW · Iun 2026)
 
 Cerere Fondator: (1) actualizare ID Google Ads la `AW-18423416296` peste tot, (2) tracking de conversie „Trimiteți un formular de client potențial" pe formularele de lead destinate CLIENȚILOR.

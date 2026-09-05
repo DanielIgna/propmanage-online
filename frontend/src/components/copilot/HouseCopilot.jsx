@@ -6,7 +6,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import {
   Sparkles, ChevronRight, ChevronDown, Check, Clock, Gift, Users, HardDrive,
-  HeartPulse, History, BadgeCheck, Trophy, Box, BookOpen, CircleHelp, Flag, Star,
+  HeartPulse, History, BadgeCheck, Trophy, Box, BookOpen, CircleHelp, Flag, Star, Brain,
 } from "lucide-react";
 import { chapterForNextStep } from "../../lib/houseHealthAxis";
 
@@ -157,6 +157,7 @@ const Timeline = ({ tl }) => {
 
 export const HouseCopilot = ({ go, completeness }) => {
   const [d, setD] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const navigate = useNavigate();
 
   const load = useCallback(() => {
@@ -205,6 +206,22 @@ export const HouseCopilot = ({ go, completeness }) => {
         )}
 
         <NextAction a={d.next_action} run={run} axisChapter={axisCh} />
+
+        {/* O singură suprafață AI: „alte recomandări" deschide Copilotul complet (AI Mentor:
+            scoruri, procese, blocaje, Knowledge Graph, istoric, feedback). Restul detaliilor
+            casei se dezvăluie progresiv la cerere (Legea lui Hick). */}
+        <div className="mt-3 flex items-center gap-2" data-testid="copilot-summary-actions">
+          <button onClick={() => window.dispatchEvent(new CustomEvent("pm-open-mentor"))} data-testid="copilot-open-mentor"
+            className="flex-1 flex items-center justify-center gap-1.5 min-h-[38px] rounded-full text-[11px] font-black text-[#166534] bg-[#166534]/5 active:scale-[0.98] transition-transform">
+            <Brain className="w-3.5 h-3.5" /> Vezi alte recomandări
+          </button>
+          <button onClick={() => setDetailsOpen(o => !o)} data-testid="copilot-details-toggle"
+            className="px-3 min-h-[38px] rounded-full text-[11px] font-bold text-slate-500 border border-slate-200 flex items-center gap-1">
+            Detalii casă <ChevronDown className={`w-3.5 h-3.5 transition-transform ${detailsOpen ? "rotate-180" : ""}`} />
+          </button>
+        </div>
+
+        {detailsOpen && (<div data-testid="copilot-details">
         <Checklist cl={d.checklist} run={run} />
 
         {/* Progres casă */}
@@ -302,6 +319,7 @@ export const HouseCopilot = ({ go, completeness }) => {
         </div>
 
         <Timeline tl={d.timeline} />
+        </div>)}
       </div>
     </div>
   );

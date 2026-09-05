@@ -2,8 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
-  Plus, Building2, Wrench, MessageCircle, Sparkles, ShieldCheck, ChevronRight,
-  CreditCard, Star, Bell, Brain, Box, Palette, Check, X,
+  Plus, Building2, Wrench, MessageCircle, Sparkles, ShieldCheck, ChevronRight, ChevronDown,
+  CreditCard, Star, Bell, Brain, Box, Palette, Check, X, Compass,
 } from "lucide-react";
 import { GREEN, CTA, Steps, stepForStatus, Skeleton } from "./ui";
 import { API } from "../DashShared";
@@ -95,6 +95,7 @@ const OpportunitiesCard = ({ actions, go }) => {
 };
 
 // Copilot — „Care e următoarea acțiune pentru casa ta?" (Blueprint Faza 4)
+// eslint-disable-next-line no-unused-vars
 const CopilotCard = ({ go, actions, hasProps }) => {
   const [data, setData] = useState(null);
   const [summary, setSummary] = useState(null);
@@ -264,6 +265,7 @@ export const HomeSkeleton = () => (
 export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, go, actions }) => {
   const navigate = useNavigate();
   const [hidden, setHidden] = useState([]);
+  const [moreOpen, setMoreOpen] = useState(false);
   useEffect(() => {
     axios.get(`${API}/ui-rules/my`).then(r => setHidden(r.data.hidden || [])).catch(() => {});
   }, []);
@@ -326,8 +328,6 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
         {properties.length > 0 && (
           <div className="mx-5 lg:mx-0 mt-5" data-testid="v2-axis-here-onboarding"><AxisHereBadge completeness={compl} onOpen={() => go("property")} /></div>
         )}
-        {show("achievements") && <AchievementsCard key="achievements" />}
-        {show("house_journey") && <HouseJourneyCard key="house_journey" go={go} />}
       </div>
     );
   }
@@ -372,27 +372,42 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
   );
 
   // Desktop: workspace 8+4 (main + Right Context Panel). Mobil: stivă în ordinea PPOS.
+  // Ierarhie Home (Legea lui Hick): 1) acțiunea principală (hero) 2) Copilotul Casei (rezumat)
+  // 3) Harta Casei 4) Noutăți reale 5) restul — dezvăluit progresiv („Explorează mai mult").
   return (
     <div className="lg:px-5 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start pb-24 lg:pb-0" data-testid="v2-home-workspace">
       <div className="lg:col-span-8 lg:space-y-6 min-w-0">
-        {/* A→G: „ești aici" — leagă ecranul Acasă de harta casei */}
-        <div className="mx-5 mt-5 lg:mx-0 lg:mt-0" data-testid="v2-axis-here"><AxisHereBadge completeness={compl} onOpen={() => go("property")} /></div>
-        {/* ASM-001: Copilotul Casei — primul widget din Home */}
-        {show("house_copilot") && <HouseCopilot key="house_copilot" go={go} completeness={compl} />}
-        {/* UX-001: Realizările casei — între Copilot și Drumul Casei */}
-        {show("achievements") && <AchievementsCard key="achievements" />}
-        {/* SH-001: Drumul Casei Tale — imediat sub Copilot */}
-        {show("house_journey") && <HouseJourneyCard key="house_journey" go={go} />}
+        {/* 1. Acțiunea principală / următorul pas */}
         {hero}
+        {/* 2. Copilotul Casei — rezumat scurt (singura suprafață AI, restul progresiv înăuntru) */}
+        {show("house_copilot") && <HouseCopilot key="house_copilot" go={go} completeness={compl} />}
+        {/* 3. Harta Casei — „ești aici" */}
+        <div className="mx-5 mt-5 lg:mx-0 lg:mt-0" data-testid="v2-axis-here"><AxisHereBadge completeness={compl} onOpen={() => go("property")} /></div>
+        {/* 4. Noutăți reale pentru tine (doar când există) */}
         {contextualEl}
-        {show("benefits_pulse") && <BenefitsPulse key="benefits_pulse" go={go} />}
-        {/* Upsell-ul nu concurează niciodată o tranzacție activă (PPOS) */}
-        {show("opportunities") && !txActive && <OpportunitiesCard key="opportunities" actions={actions} go={go} />}
-        {discoverEl}
+        {/* 5. Progressive disclosure — restul modulelor, compacte, la cerere pe mobil */}
+        <div className="mt-4 lg:mt-0 lg:space-y-6" data-testid="v2-more">
+          <button onClick={() => setMoreOpen(o => !o)} data-testid="v2-more-toggle"
+            className="lg:hidden mx-5 flex items-center gap-2.5 rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm text-left active:scale-[0.98] transition-transform w-[calc(100%-2.5rem)]">
+            <span className="w-9 h-9 rounded-xl bg-[#166534]/5 flex items-center justify-center shrink-0"><Compass className="w-4.5 h-4.5 text-[#166534]" style={{ width: 18, height: 18 }} /></span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-black text-slate-900 leading-tight">Explorează mai mult despre casa ta</span>
+              <span className="block text-[10px] text-slate-400">Realizări · Drumul Casei · beneficii · recomandări</span>
+            </span>
+            <ChevronDown className={`w-4 h-4 text-slate-300 shrink-0 transition-transform ${moreOpen ? "rotate-180" : ""}`} />
+          </button>
+          <div className={`${moreOpen ? "block" : "hidden"} lg:block lg:space-y-6`} data-testid="v2-more-content">
+            {show("achievements") && <AchievementsCard key="achievements" />}
+            {show("house_journey") && <HouseJourneyCard key="house_journey" go={go} />}
+            {show("benefits_pulse") && <BenefitsPulse key="benefits_pulse" go={go} />}
+            {/* Upsell-ul nu concurează niciodată o tranzacție activă (PPOS) */}
+            {show("opportunities") && !txActive && <OpportunitiesCard key="opportunities" actions={actions} go={go} />}
+            {discoverEl}
+          </div>
+        </div>
       </div>
       <div className="lg:col-span-4 lg:space-y-6 lg:sticky lg:top-6">
         <PropertyStatusCard prop={prop} docsCount={docsCount} go={go} />
-        {show("copilot") && <CopilotCard key="copilot" go={go} actions={actions} hasProps={properties.length > 0} />}
       </div>
     </div>
   );
