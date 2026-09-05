@@ -22,6 +22,7 @@ def _iso(dt=None):
 # ---------------------------------------------------------------------------
 async def client_pulse(user: dict) -> dict:
     from propbenefits.ai_agents import success_manager
+    ctx = await eligibility.user_context(user)
     feed = await opportunities.feed(user, limit=3)
     wallet = await ledger.wallet_summary(user["id"])
     waived = await db.requests.count_documents({"client_id": user["id"], "lead_fee_waived": True})
@@ -29,9 +30,23 @@ async def client_pulse(user: dict) -> dict:
     sm = await success_manager(user)
     deals = await list_deals(user_id=user["id"])
     negotiating = [d for d in deals if d["status"] in ("negociere", "pilot")]
+    # Plan / membership status — REUSE hh_plans (preț REAL din cod, niciodată inventat)
+    sub_active = bool(ctx.get("subscription_active"))
+    cheapest_paid = None
+    if not sub_active:
+        pp = await db.hh_plans.find_one({"active": True, "price_eur": {"$gt": 0}}, sort=[("price_eur", 1)])
+        if pp:
+            cheapest_paid = {"name": pp.get("name"), "slug": pp.get("slug"),
+                             "price_eur": pp.get("price_eur"), "billing_period": pp.get("billing_period", "monthly")}
+    level = feed["membership"]["level"]
     return {
         "slogan": SLOGAN,
         "membership": feed["membership"]["level"],
+        "plan": {
+            "subscription_active": sub_active,
+            "membership_level": level.get("name") if isinstance(level, dict) else level,
+            "cheapest_paid": cheapest_paid,
+        },
         "available": {"count": len(feed["opportunities"]) + wallet["counts"].get("available", 0),
                       "in_wallet": wallet["counts"].get("available", 0),
                       "value": round(wallet["total_value_available"]

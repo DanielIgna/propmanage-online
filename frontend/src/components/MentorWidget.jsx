@@ -1,7 +1,7 @@
 // MentorWidget — AIB-004 · AI Mentor. Widget reutilizabil în orice modul.
 // <MentorWidget path="/client" />            → recomandări + tips + ghid onboarding
 // <SmartEmptyState resource="properties" />  → empty state inteligent (de ce + pasul următor)
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Compass, Lightbulb, ArrowRight, Loader2, RotateCcw, Sparkles, Users } from "lucide-react";
 
@@ -13,9 +13,27 @@ const jpost = (url, body) => fetch(`${API}${url}`, {
   headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
 }).then(async r => { if (!r.ok) throw new Error(r.status); return r.json(); });
 
-export const MentorActions = ({ actions, onNavigate }) => {
+export const MentorActions = ({ actions, onNavigate, focus }) => {
   const navigate = useNavigate();
   const [hidden, setHidden] = useState([]);
+  const refs = useRef({});
+  // Deep-link: potrivește recomandarea relevantă contextului (Copilot → „Vezi alte recomandări").
+  const matchId = useMemo(() => {
+    if (!focus || !actions?.length) return null;
+    const fp = String(focus.focus_path || "").toLowerCase();
+    const ft = String(focus.focus_title || "").toLowerCase();
+    const fi = String(focus.focus_id || "").toLowerCase();
+    const m = actions.find(a =>
+      (fi && String(a.id || "").toLowerCase() === fi)
+      || (fp && String(a.cta_path || "").toLowerCase().includes(fp))
+      || (ft && String(a.title || "").toLowerCase().includes(ft)));
+    return m?.id || null;
+  }, [focus, actions]);
+  useEffect(() => {
+    if (matchId && refs.current[matchId]) {
+      try { refs.current[matchId].scrollIntoView({ block: "center", behavior: "smooth" }); } catch { /* noop */ }
+    }
+  }, [matchId]);
   if (!actions?.length) return null;
   const sendFeedback = (id, action) => {
     jpost("/api/ai-brain/decisions/feedback", { decision_id: id, action }).catch(() => {});
@@ -25,9 +43,9 @@ export const MentorActions = ({ actions, onNavigate }) => {
   return (
     <div className="space-y-2" data-testid="mentor-actions">
       {visible.map(a => (
-        <div key={a.id} className="flex items-stretch gap-1">
+        <div key={a.id} ref={el => { refs.current[a.id] = el; }} className="flex items-stretch gap-1">
           <button onClick={() => { sendFeedback(a.id, "accepted"); (onNavigate || navigate)(a.cta_path); }}
-            className="flex-1 text-left flex items-start gap-3 rounded-2xl border border-stone-800 bg-stone-900/40 p-3 hover:border-[#d4ff3a]/50 transition-colors group"
+            className={`flex-1 text-left flex items-start gap-3 rounded-2xl border bg-stone-900/40 p-3 transition-colors group ${a.id === matchId ? "border-[#d4ff3a] ring-1 ring-[#d4ff3a]/60 bg-[#d4ff3a]/5" : "border-stone-800 hover:border-[#d4ff3a]/50"}`}
             data-testid={`mentor-action-${a.id}`}>
             <span className="mt-0.5 w-6 h-6 rounded-lg bg-[#d4ff3a]/10 border border-[#d4ff3a]/30 flex items-center justify-center shrink-0">
               <ArrowRight className="w-3 h-3 text-[#d4ff3a] group-hover:translate-x-0.5 transition-transform" />
@@ -73,7 +91,7 @@ export const MentorTips = ({ tips }) => {
   );
 };
 
-export const MentorWidget = ({ path, onNavigate, autoGuide = false }) => {
+export const MentorWidget = ({ path, onNavigate, autoGuide = false, focus = null }) => {
   const location = useLocation();
   const p = path || location.pathname;
   const [data, setData] = useState(null);
@@ -182,7 +200,7 @@ export const MentorWidget = ({ path, onNavigate, autoGuide = false }) => {
           </button>
         </div>
         {data.actions?.length
-          ? <MentorActions actions={data.actions} onNavigate={onNavigate} />
+          ? <MentorActions actions={data.actions} onNavigate={onNavigate} focus={focus} />
           : <div className="text-xs text-stone-500" data-testid="mentor-no-actions">Ești la zi — nicio acțiune urgentă. Bravo!</div>}
       </div>
     </div>

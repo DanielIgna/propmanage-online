@@ -5,7 +5,7 @@ import { useAuth, formatApiError } from "../../auth";
 import { API } from "../DashShared";
 import { GREEN, Sheet } from "./ui";
 import { ThemeSwitcher } from "../../components/ThemeSwitcher";
-import { HomeV2, HomeSkeleton } from "./HomeV2";
+import { HomeV2, HomeSkeleton, HomeIntroTour } from "./HomeV2";
 import { JobsV2 } from "./JobsV2";
 import { PropertyHubV2, WalletSheet } from "./PropertyHubV2";
 import { RequestWizard } from "./RequestWizard";
@@ -223,6 +223,7 @@ export default function ClientDashboardV2() {
         <div className="px-5 pb-3 lg:max-w-3xl"><SubscriptionNotice /></div>
 
         {tab === "home" && (!loaded ? <HomeSkeleton /> : <HomeV2 user={user} prop={prop} properties={properties} requests={requests} notifs={notifs} offersCount={offersCount} go={setTab} actions={actions} />)}
+        {tab === "home" && loaded && <HomeIntroTour />}
         {tab === "jobs" && <div className="lg:max-w-3xl"><JobsV2 requests={requests} actions={actions} /><TrustedSpecialists properties={properties} onRebooked={loadRequests} /></div>}
         {/* PPOS P3d: Property Hub folosește tot spațiul pe desktop (record page) */}
         {tab === "property" && (<>
@@ -255,6 +256,9 @@ export default function ClientDashboardV2() {
             <p className="text-center text-[10px] text-slate-300 pt-1">PropManage · Client dashboard V2</p>
           </div>
         )}
+
+        {/* Mobile: spațiu rezervat cât timp cookie banner-ul e deschis (nu acoperă CTA-uri) */}
+        <div aria-hidden style={{ height: "var(--pm-cookie-h, 0px)" }} className="lg:hidden" data-testid="v2-cookie-spacer" />
 
         {/* Bottom nav — 5, FAB accent central (doar mobil; desktop are taburile de sus) */}
         <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 xos-dock" data-testid="v2-bottom-nav">

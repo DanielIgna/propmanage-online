@@ -31,12 +31,27 @@ export const CookieBanner = () => {
     }
   }, []);
 
+  // Mobile: rezervă spațiu sub conținut cât timp banner-ul e deschis, ca să nu acopere
+  // CTA-uri (ex. „Explorează mai mult"). Pe desktop banner-ul stă în colț, fără impact.
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const apply = () => document.documentElement.style.setProperty("--pm-cookie-h", (open && !mq.matches) ? "168px" : "0px");
+    apply();
+    mq.addEventListener("change", apply);
+    return () => {
+      mq.removeEventListener("change", apply);
+      document.documentElement.style.setProperty("--pm-cookie-h", "0px");
+    };
+  }, [open]);
+
   const persist = async (choice) => {
     const final = { functional: true, ...choice };
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...final, ts: new Date().toISOString() }));
     setPrefs(final);
     setOpen(false);
     setCustomize(false);
+    // Anunță că alegerea de cookie a fost făcută (turul de bun venit poate porni acum).
+    try { window.dispatchEvent(new CustomEvent("pm-cookie-consent")); } catch { /* noop */ }
     // GDPR — propagă alegerea către Google Consent Mode v2 (Google Ads AW-18423416296).
     // Marketing → cookies publicitare/remarketing (ad_*); Statistice → analytics_storage.
     try {

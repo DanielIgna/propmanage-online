@@ -2,6 +2,7 @@
 // Platforma ADUCE beneficiile în context; utilizatorul nu le caută.
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import { Gift, Sparkles, ChevronRight, Handshake, Lock, BadgeCheck, TrendingUp } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -11,14 +12,23 @@ const API = process.env.REACT_APP_BACKEND_URL;
 // ---------------------------------------------------------------------------
 export const BenefitsPulse = ({ go }) => {
   const [p, setP] = useState(null);
+  const navigate = useNavigate();
   useEffect(() => {
     axios.get(`${API}/api/benefits/pulse`).then(r => setP(r.data)).catch(() => {});
   }, []);
   if (!p) return null;
   const na = p.next_action;
+  const plan = p.plan || {};
+  const paid = plan.cheapest_paid;
+  const period = paid?.billing_period === "yearly" ? "an" : "lună";
   return (
     <div className="mx-5 mt-6 lg:mx-0 lg:mt-0 cv2-fade" data-testid="pb-pulse">
-      <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 px-1">Valoarea abonamentului tău azi</h3>
+      <div className="flex items-center gap-2 px-1">
+        <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 flex-1">Valoarea abonamentului tău azi</h3>
+        {plan.subscription_active
+          ? <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-[#166534]/10 text-[#166534] border border-[#166534]/20" data-testid="pb-plan-status">House Health · Activ</span>
+          : <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200" data-testid="pb-plan-status">Plan gratuit</span>}
+      </div>
       <div className="mt-2 rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
         <div className="grid grid-cols-3 divide-x divide-slate-100">
           <button onClick={() => go("benefits")} className="p-3.5 text-left" data-testid="pb-pulse-available">
@@ -34,6 +44,24 @@ export const BenefitsPulse = ({ go }) => {
             <div className="text-[10px] font-bold text-slate-400 leading-tight">negocieri ale comunității în lucru</div>
           </button>
         </div>
+        {/* Value discovery: plan/membership existent + CTA către flow-ul EXISTENT (fără billing nou) */}
+        {!plan.subscription_active && paid && (
+          <button onClick={() => navigate("/house-health/upgrade")} className="w-full flex items-center gap-3 border-t border-slate-100 bg-[#F0FBF4] px-4 py-3 text-left active:scale-[0.99] transition-transform" data-testid="pb-plan-cta">
+            <span className="w-8 h-8 rounded-xl bg-[#166534]/10 flex items-center justify-center shrink-0"><Sparkles className="w-4 h-4 text-[#166534]" style={{ width: 16, height: 16 }} /></span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-black text-slate-900 leading-snug">{paid.name} — {Number(paid.price_eur)}€/{period}</span>
+              <span className="block text-[11px] text-slate-500 leading-snug">scor de sănătate, +5 GB stocare și beneficii exclusive</span>
+            </span>
+            <ChevronRight className="w-4 h-4 shrink-0 text-[#166534]" />
+          </button>
+        )}
+        {plan.subscription_active && (
+          <button onClick={() => go("benefits")} className="w-full flex items-center gap-3 border-t border-slate-100 px-4 py-2.5 text-left" data-testid="pb-plan-cta">
+            <BadgeCheck className="w-4 h-4 shrink-0 text-[#166534]" style={{ width: 16, height: 16 }} />
+            <span className="text-[11px] text-slate-500 truncate flex-1">Abonamentul tău e activ{plan.membership_level ? ` · nivel ${plan.membership_level}` : ""} — vezi ce ai deblocat</span>
+            <ChevronRight className="w-3.5 h-3.5 shrink-0 text-slate-300" />
+          </button>
+        )}
         {na && (
           <a href={na.cta_path} className="flex items-center gap-3 border-t border-slate-100 bg-[#F0FBF4] px-4 py-3" data-testid="pb-pulse-action">
             <Sparkles className="w-4 h-4 shrink-0 text-[#166534]" style={{ width: 16, height: 16 }} />

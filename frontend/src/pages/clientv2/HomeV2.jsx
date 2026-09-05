@@ -324,7 +324,7 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
       <div className="lg:px-5 lg:max-w-3xl" data-testid="v2-home-onboarding">
         {hero}
         {properties.length === 0 && <HouseHealthAxisPreview onCta={actions.openPropManager} />}
-        {show("house_copilot") && <HouseCopilot key="house_copilot" go={go} completeness={compl} />}
+        {show("house_copilot") && <HouseCopilot key="house_copilot" go={go} completeness={compl} propName={prop?.name} />}
         {properties.length > 0 && (
           <div className="mx-5 lg:mx-0 mt-5" data-testid="v2-axis-here-onboarding"><AxisHereBadge completeness={compl} onOpen={() => go("property")} /></div>
         )}
@@ -380,7 +380,7 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
         {/* 1. Acțiunea principală / următorul pas */}
         {hero}
         {/* 2. Copilotul Casei — rezumat scurt (singura suprafață AI, restul progresiv înăuntru) */}
-        {show("house_copilot") && <HouseCopilot key="house_copilot" go={go} completeness={compl} />}
+        {show("house_copilot") && <HouseCopilot key="house_copilot" go={go} completeness={compl} propName={prop?.name} />}
         {/* 3. Harta Casei — „ești aici" */}
         <div className="mx-5 mt-5 lg:mx-0 lg:mt-0" data-testid="v2-axis-here"><AxisHereBadge completeness={compl} onOpen={() => go("property")} /></div>
         {/* 4. Noutăți reale pentru tine (doar când există) */}
@@ -408,6 +408,59 @@ export const HomeV2 = ({ user, prop, properties, requests, notifs, offersCount, 
       </div>
       <div className="lg:col-span-4 lg:space-y-6 lg:sticky lg:top-6">
         <PropertyStatusCard prop={prop} docsCount={docsCount} go={go} />
+      </div>
+    </div>
+  );
+};
+
+// Mini-tur de bun venit (3 pași) — DOAR la prima vizită pe /client (localStorage).
+// Nu blochează aplicația, nu acoperă bottom-nav (stă deasupra ei) sau FAB (z sub FAB),
+// ușor de închis. Fără elemente permanente pe Home.
+export const HomeIntroTour = () => {
+  const KEY = "pm_home_tour_v1_seen";
+  const [step, setStep] = useState(0);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    // Nu concura cu cookie banner-ul: turul apare DOAR după ce s-a făcut alegerea de cookie.
+    const check = () => {
+      try {
+        if (localStorage.getItem(KEY)) return;
+        if (!localStorage.getItem("pm_cookie_consent_v1")) return;
+        setOpen(true);
+      } catch { /* noop */ }
+    };
+    check();
+    window.addEventListener("pm-cookie-consent", check);
+    return () => window.removeEventListener("pm-cookie-consent", check);
+  }, []);
+  const finish = () => { try { localStorage.setItem(KEY, "1"); } catch { /* noop */ } setOpen(false); };
+  if (!open) return null;
+  const STEPS = [
+    { tag: "Acasă", title: "Următorul pas pentru casa ta", body: "Aici, sus, vezi mereu acțiunea principală — ce ai de făcut acum." },
+    { tag: "Copilot", title: "Copilotul îți spune ce e important", body: "Copilotul Casei rezumă totul într-un singur mesaj și o singură recomandare." },
+    { tag: "Harta Casei", title: "Vezi progresul proprietății", body: "Harta Casei arată cât de completă e casa ta și ce urmează." },
+  ];
+  const cur = STEPS[step];
+  const isLast = step === STEPS.length - 1;
+  return (
+    <div className="fixed z-[45] left-4 right-4 lg:left-auto lg:right-8 lg:w-[380px] cv2-fade"
+      style={{ bottom: "calc(var(--pm-dock-h) + var(--pm-safe-b) + 5.5rem)" }} data-testid="home-intro-tour">
+      <div className="rounded-2xl bg-slate-900 text-white shadow-2xl border border-white/10 p-4">
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] font-black uppercase tracking-[0.14em] px-2 py-0.5 rounded-full bg-[#ccff00] text-black">{cur.tag}</span>
+          <span className="text-[10px] text-white/40 flex-1">Ghid rapid · {step + 1}/{STEPS.length}</span>
+          <button onClick={finish} data-testid="home-intro-close" className="p-1 rounded-full hover:bg-white/10 text-white/60" aria-label="Închide"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="mt-2 text-sm font-black">{cur.title}</div>
+        <p className="mt-1 text-xs text-white/70 leading-relaxed">{cur.body}</p>
+        <div className="mt-3 flex items-center gap-2">
+          <div className="flex gap-1 flex-1">
+            {STEPS.map((_, i) => <span key={i} className={`h-1 w-6 rounded-full ${i <= step ? "bg-[#ccff00]" : "bg-white/15"}`} />)}
+          </div>
+          <button onClick={finish} data-testid="home-intro-skip" className="text-[11px] font-bold text-white/50 px-2">Sari peste</button>
+          <button onClick={() => (isLast ? finish() : setStep(s => s + 1))} data-testid="home-intro-next"
+            className="px-4 py-1.5 rounded-full text-[11px] font-black text-black bg-[#ccff00] active:scale-[0.97] transition-transform">{isLast ? "Am înțeles" : "Mai departe"}</button>
+        </div>
       </div>
     </div>
   );

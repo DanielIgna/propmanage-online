@@ -155,7 +155,7 @@ const Timeline = ({ tl }) => {
   );
 };
 
-export const HouseCopilot = ({ go, completeness }) => {
+export const HouseCopilot = ({ go, completeness, propName }) => {
   const [d, setD] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const navigate = useNavigate();
@@ -193,17 +193,21 @@ export const HouseCopilot = ({ go, completeness }) => {
           </span>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-black text-slate-900 leading-none">Copilotul Casei</div>
-            <div className="text-[10px] text-slate-400 mt-0.5">te ghidează spre acțiunea cu cea mai mare valoare</div>
+            <div className="text-[10px] text-slate-400 mt-0.5 truncate" data-testid="copilot-house-name">
+              {propName ? `Casa mea · ${propName}` : "te ghidează spre acțiunea cu cea mai mare valoare"}
+            </div>
           </div>
           <ScoreRing score={d.house_score?.score ?? 0} />
         </div>
 
-        {/* Rezumat AI */}
-        {d.summary?.text && (
-          <p className="mt-3 text-xs leading-relaxed text-slate-600 rounded-2xl p-3 bg-slate-50" data-testid="copilot-ai-summary">
-            {d.summary.text}
+        {/* Ce este important acum? — un singur rezumat personalizat pe datele reale ale casei */}
+        <div className="mt-3 rounded-2xl p-3 bg-slate-50" data-testid="copilot-ai-summary">
+          <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400 mb-1">Ce este important acum?</div>
+          <p className="text-xs leading-relaxed text-slate-600">
+            {d.summary?.text
+              || `Casa ta e la ${d.house_score?.score ?? 0}/100.${d.house_score?.top_gap ? ` Acum contează cel mai mult: ${d.house_score.top_gap.label}${d.house_score.top_gap.hint ? ` — ${d.house_score.top_gap.hint}` : ""}.` : ""}`}
           </p>
-        )}
+        </div>
 
         <NextAction a={d.next_action} run={run} axisChapter={axisCh} />
 
@@ -211,7 +215,7 @@ export const HouseCopilot = ({ go, completeness }) => {
             scoruri, procese, blocaje, Knowledge Graph, istoric, feedback). Restul detaliilor
             casei se dezvăluie progresiv la cerere (Legea lui Hick). */}
         <div className="mt-3 flex items-center gap-2" data-testid="copilot-summary-actions">
-          <button onClick={() => window.dispatchEvent(new CustomEvent("pm-open-mentor"))} data-testid="copilot-open-mentor"
+          <button onClick={() => window.dispatchEvent(new CustomEvent("pm-open-mentor", { detail: { focus_path: d.next_action?.cta_path || d.next_action?.cta || "", focus_title: d.next_action?.title || "", focus_id: d.next_action?.id || "" } }))} data-testid="copilot-open-mentor"
             className="flex-1 flex items-center justify-center gap-1.5 min-h-[38px] rounded-full text-[11px] font-black text-[#166534] bg-[#166534]/5 active:scale-[0.98] transition-transform">
             <Brain className="w-3.5 h-3.5" /> Vezi alte recomandări
           </button>

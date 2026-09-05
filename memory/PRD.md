@@ -1,3 +1,20 @@
+## ✨ CLIENT BETA HOME — TASK #2: Claritate + Activare + Valoare (Iun 2026)
+
+Peste reorganizarea Hick's Law, fără a reintroduce clutter. Testat mobil 390×844 (iteration_217, 100%) + desktop.
+
+**Livrat:**
+1. **Copilot — rezumat personalizat**: header „Casa mea · {nume proprietate}" (`copilot-house-name`), rezumat cu label „Ce este important acum?" (`copilot-ai-summary`) + fallback pe `house_score.top_gap` când lipsește rezumatul AI. O singură recomandare principală pe Home. `HouseCopilot` primește `propName` din HomeV2.
+2. **Deep-link „Vezi alte recomandări"**: `pm-open-mentor` trimite `detail {focus_path, focus_title, focus_id}`; `ExplainThis` pasează `focus` la `MentorWidget`; `MentorActions` potrivește recomandarea relevantă, o evidențiază (ring lime) și o aduce în vizor (scrollIntoView). Fallback = lista completă. Istoric/procese/blocaje/KG/feedback intacte.
+3. **Valoare abonament/beneficii vizibilă**: backend `client_pulse` întoarce `plan {subscription_active, membership_level, cheapest_paid}` — preț REAL din `hh_plans` (Basic 9€/lună), niciodată inventat. `BenefitsPulse` afișează badge status (`pb-plan-status`: „House Health · Activ" / „Plan gratuit") + CTA (`pb-plan-cta`) către flow-ul EXISTENT `/house-health/upgrade`. Zero billing nou.
+4. **Value discovery** prin terminologia existentă (flags marketplace + plan CTA).
+5. **Cookie banner mobil**: `--pm-cookie-h` (168px cât timp banner-ul e deschis, doar mobil) + spacer `v2-cookie-spacer` în ClientDashboardV2 → „Explorează mai mult" nu mai e acoperit. Turul apare DOAR după alegerea de cookie (`pm-cookie-consent` event) → cele două panouri nu se mai suprapun.
+6. **Mini-tur bun venit (3 pași)**: `HomeIntroTour` (HERO/COPILOT/HARTA CASEI), prima vizită (localStorage `pm_home_tour_v1_seen`), z-45 (sub FAB, peste bottom-nav), ușor de închis, fără elemente permanente.
+
+Hick's Law protejat: nicio funcție eliminată, nicio suprafață AI nouă, un singur CTA de plan (secundar, în „Explorează mai mult").
+
+---
+
+
 ## 🧭 CLIENT BETA HOME — Hick's Law + Copilotul Casei ca unică suprafață AI (Iun 2026)
 
 Reorganizare UX a paginii /client (Acasă) pentru reducerea încărcării cognitive, FĂRĂ eliminarea niciunei funcții. Testat de testing_agent (iteration_216) — 100% frontend, mobil 390×844 + desktop.

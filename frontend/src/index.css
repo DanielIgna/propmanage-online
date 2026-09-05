@@ -941,7 +941,7 @@ html:not([data-theme="light"]) .cv2-scope .xos-topbar { background: rgba(5, 5, 5
 }
 
 /* ── BUGFIX-001: Floating Manager — sloturi coordonate pentru elemente plutitoare ── */
-:root { --pm-dock-h: 0px; --pm-safe-b: env(safe-area-inset-bottom, 0px); }
+:root { --pm-dock-h: 0px; --pm-safe-b: env(safe-area-inset-bottom, 0px); --pm-cookie-h: 0px; }
 .pm-float-left-1 { position: fixed; left: 1rem; bottom: calc(var(--pm-dock-h) + var(--pm-safe-b) + 0.75rem); z-index: 40; }
 .pm-float-left-2 { position: fixed; left: 1rem; bottom: calc(var(--pm-dock-h) + var(--pm-safe-b) + 4rem); z-index: 40; }
 .pm-float-right-1 { position: fixed; right: 1.5rem; bottom: calc(var(--pm-dock-h) + var(--pm-safe-b) + 0.75rem); z-index: 40; }

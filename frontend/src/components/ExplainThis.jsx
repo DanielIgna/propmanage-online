@@ -40,8 +40,9 @@ export const ExplainThis = ({ role }) => {
   const onClientArea = location.pathname.startsWith("/client");
 
   // Copilotul Casei deschide AI Mentor complet (recomandări, scoruri, procese, istoric).
+  const [mentorFocus, setMentorFocus] = useState(null);
   useEffect(() => {
-    const h = () => { setTab("mentor"); setResult(null); setErr(null); setOpen(true); };
+    const h = (e) => { setMentorFocus(e?.detail || null); setTab("mentor"); setResult(null); setErr(null); setOpen(true); };
     window.addEventListener("pm-open-mentor", h);
     return () => window.removeEventListener("pm-open-mentor", h);
   }, []);
@@ -105,7 +106,7 @@ export const ExplainThis = ({ role }) => {
           </div>
           <div className="flex-1 overflow-auto p-4">
             {tab === "mentor" ? (
-              <MentorWidget path={location.pathname} autoGuide onNavigate={(p) => { setOpen(false); window.location.href = p; }} />
+              <MentorWidget path={location.pathname === "/client" ? "/client" : location.pathname} focus={mentorFocus} autoGuide onNavigate={(p) => { setOpen(false); window.location.href = p; }} />
             ) : (
               <>
                 {busy && (
