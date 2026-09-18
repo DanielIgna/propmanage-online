@@ -237,3 +237,11 @@ Integrare aditivă a bazei externe HartaBlocuri Cluj în entitatea `buildings` e
 - Adăugat în tile-ul „Backup DB" din Morning Briefing (`pages/admin/MorningBriefing.jsx`) o acțiune secundară „Descarcă dump BSON" lângă „Backup acum".
 - `downloadBsonDump()`: apelează `POST /api/admin/backups/dump-bson`, apoi descarcă fișierul ca blob de la `download_url` și declanșează download-ul în browser (cu toast de progres/succes).
 - `SystemTile` extins cu `secondaryAction`. Verificat: butonul se randează corect în Dashboard admin (screenshot). Backend deja testat (create+download+restore).
+
+## Cold-start / 503 fix — startup non-blocking (PREVIEW ONLY, NEPUBLICAT) — 2026-06
+**Cauză confirmată:** `@app.on_event("startup")` în `server.py` rula `await seed()` + lanț de backfill/bootstrap/seeds (scanări DB idempotente) ÎNAINTE ca Uvicorn să lege socket-ul (ASGI lifespan). Rezultat: ~4.7s în care portul 8001 nu asculta → startup/readiness probe primea connection-refused/503 la cold-start.
+**Măsurători (preview):** import-only 2.82s; total-to-listen ÎNAINTE 7.57s port / 7.88s HTTP 200. DUPĂ fix: 3.38s port / 3.93s HTTP 200 / 4.60s /api/health (−50%+).
+**Fix minim (1 fișier):** `server.py` — `startup()` acum doar face `asyncio.create_task(_run_deferred_init())` și revine imediat; corpul greu mutat identic în `_startup_impl()` (wrapper `_run_deferred_init` prinde/loghează excepții). Toate operațiile sunt idempotente + DB prod persistent → zero schimbare de comportament, doar time-to-listen redus.
+**Teste preview:** 0 task exceptions; scheduler pornit complet în background; admin login 200; /api/health = ok (db ok); fără regresii (erorile Resend sunt pre-existente, demo emails).
+**NESCHIMBAT:** memorie (rămâne 512Mi), replici (2), Health Score, HartaBlocuri, geocoding, DB.
+**Status:** DOAR în Preview. NEPUBLICAT — necesită Publish/Deploy cu confirmarea userului pentru Production.

@@ -230,6 +230,24 @@ async def _sitemap_regen_tick():
 
 @app.on_event("startup")
 async def startup():
+    # Cold-start fix: return immediately so uvicorn completes the ASGI lifespan
+    # and binds the socket right away — the startup/readiness probe then stops
+    # getting connection-refused / 503 during pod spin-up. All the heavy seeds,
+    # backfills, bootstraps and scheduler wiring run in the background instead
+    # (they are idempotent and the production DB is persistent, so a normal boot
+    # creates nothing — it was only blocking on redundant existence checks).
+    import asyncio
+    asyncio.create_task(_run_deferred_init())
+
+
+async def _run_deferred_init():
+    try:
+        await _startup_impl()
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[cold-start] deferred init failed: {e}", exc_info=True)
+
+
+async def _startup_impl():
     await seed()
     try:
         from tenancy import ensure_main_tenant, backfill_user_tenants, backfill_tier1_tenant_data
