@@ -48,6 +48,7 @@ const PublicDemoPage = lazy(() => import("./pages/PublicDemoPage").then(m => ({ 
 const AdminAuthHealthPage = lazy(() => import("./pages/admin/AdminAuthHealthPage").then(m => ({ default: m.AdminAuthHealthPage })));
 const ResearchCoveragePage = lazy(() => import("./pages/admin/ResearchCoveragePage"));
 const AcquisitionPage = lazy(() => import("./pages/AcquisitionPage"));
+const LocalHubPage = lazy(() => import("./pages/LocalHubPage"));
 const AdminSupportInboxPage = lazy(() => import("./pages/admin/AdminSupportInboxPage").then(m => ({ default: m.AdminSupportInboxPage })));
 import { PrivacyPage, TermsPage, CookiePolicyPage } from "./pages/LegalPages";
 const TrustCenterPage = lazy(() => import("./pages/TrustCenterPage").then(m => ({ default: m.TrustCenterPage })));
@@ -1578,6 +1579,15 @@ const Footer = () => {
             <Link to="/pentru-designeri" className="hover:text-[#d4ff3a] transition-colors" data-testid="footer-join-designers">Pentru designeri</Link>
           </div>
         </div>
+        <div className="border-t border-white/5 pt-6 pb-2" data-testid="footer-local-cluj">
+          <div className="text-[11px] text-stone-500 uppercase tracking-wider mb-3">Servicii pentru casă în zona Cluj</div>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-stone-400">
+            <Link to="/servicii-pentru-casa/cluj-napoca" className="hover:text-[#d4ff3a] transition-colors" data-testid="footer-local-cluj-napoca">Cluj-Napoca</Link>
+            <Link to="/servicii-pentru-casa/floresti" className="hover:text-[#d4ff3a] transition-colors" data-testid="footer-local-floresti">Florești</Link>
+            <Link to="/servicii-pentru-casa/apahida" className="hover:text-[#d4ff3a] transition-colors" data-testid="footer-local-apahida">Apahida</Link>
+            <Link to="/servicii-pentru-casa/baciu" className="hover:text-[#d4ff3a] transition-colors" data-testid="footer-local-baciu">Baciu</Link>
+          </div>
+        </div>
         <div className="border-t border-white/5 pt-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="text-[11px] text-stone-500 uppercase tracking-wider">Urmărește-ne</div>
           <div className="flex flex-wrap gap-2" data-testid="footer-socials">
@@ -1722,6 +1732,7 @@ function App() {
               <Route path="/pentru-specialisti" element={<AcquisitionPage />} />
               <Route path="/pentru-specialisti/:trade" element={<AcquisitionPage />} />
               <Route path="/pentru-designeri" element={<AcquisitionPage />} />
+              <Route path="/servicii-pentru-casa/:localitate" element={<LocalHubPage />} />
               <Route path="/franchise_admin" element={<FranchiseDashboard />} />
               <Route path="/servicii/design-interior" element={<Navigate to="/design-interior" replace />} />
               <Route path="/demo" element={<PublicDemoPage />} />

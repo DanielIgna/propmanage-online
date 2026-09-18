@@ -1,3 +1,23 @@
+## 📍📈 LOCAL SEO EXPANSION CLUJ — 4 hub-uri locale generale PropManage (18 sept 2026)
+
+**Cerere Fondator**: creștere SEO organic local în zona Cluj (Cluj-Napoca + Florești, Apahida, Baciu). Reutilizare infra existentă, fără module noi, fără modificări la HartaBlocuri/GIS/Marketplace logic/House Health/Digital Twin, FĂRĂ deploy. Prioritate: indexare + trafic organic local + conversie în cont gratuit.
+
+**Livrat (preview, cluster NOU distinct de design-interior local)**:
+- URL: `/servicii-pentru-casa/:localitate` (aprobat varianta a de Fondator). 4 hub-uri: `/servicii-pentru-casa/cluj-napoca`, `/floresti`, `/apahida`, `/baciu`.
+- `frontend/src/data/localSeo.js` (SSOT conținut, `LOCAL_HUBS` + servicii + related) + `frontend/src/pages/LocalHubPage.jsx` (renderer data-driven, rezolvat pe `:localitate`; slug necunoscut → `Navigate to="/"`).
+- Conținut DIFERENȚIAT real per localitate (NU doorway): context locativ factual, tipuri de locuințe, nevoi uzuale, secțiune specialiști, FAQ unic. Cluj-Napoca = flagship (Mănăștur/Mărăști/Gheorgheni, piață scumpă); Florești = boom apartamente noi/finisare; Apahida = case individuale/est logistic; Baciu = case suburbane NV (Suceagu/Rădaia).
+- Servicii linkate (internal linking): evaluare gratuită → /register, Scorul Casei/House Health → /scorul-casei, Cartea Casei → /cartea-casei, Digital Twin → /digital-twin, Imobile Verificate → /imobile-verificate, Probleme casă → /probleme-casa, specialiști → /pentru-specialisti + /devino-specialist. Cross-link între cele 4 hub-uri.
+- CTA principal „Evaluează-ți casa gratuit" → /register. CTA secundar „Ești specialist? Găsește clienți în {localitate}" → /devino-specialist.
+- SEO per pagină: title unic, meta description unică, H1 unic, canonical self, JSON-LD WebPage+BreadcrumbList+FAQPage, index=true (conținut real).
+- Sitemap: adăugate în `backend/routes/public.py _STATIC_PAGES` (sitemap-static + flat) — 4 URL confirmate. Clasificare în `admin_seo._classify` → type `local`, cluster `local_cluj`.
+- Footer: secțiune nouă „Servicii pentru casă în zona Cluj" (`footer-local-cluj`) cu cele 4 linkuri (internal linking sitewide).
+- NEATINS: HartaBlocuri/GIS/Marketplace logic/House Health/Digital Twin/regula marketplace NOINDEX/robots.txt/canonical global.
+
+**Verificare (PASS)**: `yarn build` 0 erori (88s); render preview cluj-napoca + floresti (title/H1/canonical/robots=index/CTA corecte, conținut distinct); slug necunoscut → redirect homepage; robots.txt nu blochează `/servicii-pentru-casa/`; 4 URL în sitemap-static + flat. **FĂRĂ deploy** (per cerință). Necesită redeploy Fondator pentru producție.
+
+---
+
+
 ## 🚀 CLIENT BETA V3 — UX aprobat mutat în LIVE `/client` · APROBAT PENTRU DEPLOY (18 septembrie 2026)
 
 **Cerere Fondator**: „ACCEPT UX — IMPLEMENTĂ ȘI PREGĂTEȘTE PENTRU DEPLOY" → apoi „APROBAT PENTRU DEPLOY. Publică versiunea nouă pe producție." Fără alte modificări UX/funcționale.

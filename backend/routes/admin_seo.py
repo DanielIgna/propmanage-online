@@ -130,6 +130,8 @@ def _classify(path: str):
         return "acquisition", "specialisti", True
     if p == "/pentru-designeri":
         return "acquisition", "designeri", True
+    if p.startswith("/servicii-pentru-casa/"):
+        return "local", "local_cluj", True
     if p == "/marketplace":
         return "marketplace", "marketplace", True
     if p == "/ghiduri":
