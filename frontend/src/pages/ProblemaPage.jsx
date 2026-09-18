@@ -199,6 +199,18 @@ export const ProblemaPage = () => {
             </section>
           )}
 
+          <section className="mt-12" data-testid="problema-score-cta">
+            <div className="rounded-2xl border border-[#d4ff3a]/30 bg-[#d4ff3a]/5 p-6 sm:p-7">
+              <h2 className="font-serif text-xl sm:text-2xl text-white mb-2">Evaluează-ți casa gratuit</h2>
+              <p className="text-sm text-stone-300 mb-5 max-w-xl leading-relaxed">
+                Vezi ce știi deja despre starea locuinței tale, ce lipsește din Cartea Casei și care e pasul următor recomandat — în contul gratuit PropManage.
+              </p>
+              <Link to="/scorul-casei" className="inline-flex items-center gap-2 bg-[#d4ff3a] text-black px-6 py-2.5 rounded-full text-sm font-semibold hover:bg-[#bfe632] transition" data-testid="problema-score-cta-btn">
+                Evaluează-ți casa gratuit <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </section>
+
           <div className="mt-12 glass-strong rounded-3xl p-8 text-center" data-testid="problema-cta">
             <h2 className="font-serif text-2xl mb-2">Ai această problemă în casă?</h2>
             <p className="text-stone-400 text-sm mb-5 max-w-md mx-auto">Postează o cerere gratuit și primești oferte de la specialiști verificați, cu plată protejată prin escrow.</p>

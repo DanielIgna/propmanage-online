@@ -623,7 +623,24 @@ _STATIC_PAGES = [
 
 
 def _static_entries(now_iso: str) -> list:
-    return [_url_xml(path, now_iso, freq, prio) for path, prio, freq in _STATIC_PAGES]
+    return [_url_xml(path, now_iso, freq, prio) for path, prio, freq in _STATIC_PAGES] + _specialist_local_entries(now_iso)
+
+
+# Specialist LOCAL recruitment pages (/devino-specialist/<trade>/<loc>) — all
+# INDEX (real, distinct content per trade×locality). Mirrors frontend data.
+_SL_TRADES = [
+    "zugrav", "finisaje-interioare", "electrician", "instalator",
+    "constructor", "montator-gresie-faianta", "tamplar", "hvac",
+]
+_SL_LOCALITIES = ["cluj-napoca", "floresti", "apahida", "baciu"]
+
+
+def _specialist_local_entries(now_iso: str) -> list:
+    entries = []
+    for trade in _SL_TRADES:
+        for loc in _SL_LOCALITIES:
+            entries.append(_url_xml(f"/devino-specialist/{trade}/{loc}", now_iso, "monthly", "0.75"))
+    return entries
 
 
 def _content_entries(now_iso: str) -> list:

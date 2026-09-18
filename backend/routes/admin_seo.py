@@ -128,6 +128,8 @@ def _classify(path: str):
         return "acquisition", "proprietari", True
     if p == "/devino-specialist" or p == "/pentru-specialisti" or p.startswith("/pentru-specialisti/"):
         return "acquisition", "specialisti", True
+    if p.startswith("/devino-specialist/"):
+        return "local", "specialisti", True
     if p == "/pentru-designeri":
         return "acquisition", "designeri", True
     if p.startswith("/servicii-pentru-casa/"):

@@ -55,9 +55,27 @@ export default function HealthScorePage() {
   const [copied, setCopied] = useState(false);
 
   useSEO({
-    title: "Scorul Casei Tale — calculator gratuit de sănătate a locuinței · PropManage",
-    description: "Află în 2 minute scorul tehnic al locuinței tale (0-100): instalații, umiditate, izolație, riscuri. Gratuit, cu recomandări personalizate.",
+    title: "Evaluează-ți casa gratuit — Scorul Casei | PropManage",
+    description: "Evaluează gratuit starea locuinței tale: verificare casă și apartament, Scorul Casei, ce lipsește din Cartea Casei și pasul următor recomandat. Cont gratuit, inclusiv în Cluj.",
     canonical: `${SITE_URL}/scorul-casei`,
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebApplication",
+          "name": "Scorul Casei — evaluare gratuită a locuinței",
+          "applicationCategory": "BusinessApplication",
+          "operatingSystem": "Web",
+          "url": `${SITE_URL}/scorul-casei`,
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "RON" },
+          "description": "Evaluează gratuit starea locuinței: instalații, umiditate, izolație, documente. Scor 0-100 cu recomandări.",
+        },
+        { "@type": "BreadcrumbList", "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "Acasă", "item": `${SITE_URL}/` },
+          { "@type": "ListItem", "position": 2, "name": "Evaluează-ți casa gratuit", "item": `${SITE_URL}/scorul-casei` },
+        ] },
+      ],
+    },
   });
 
   const answered = Object.keys(answers).length;
@@ -119,14 +137,35 @@ export default function HealthScorePage() {
       <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
         {!showResult ? (
           <>
-            <div className="mb-8">
+            <div className="mb-10">
               <div className="inline-flex items-center gap-1.5 text-xs text-[#d4ff3a] bg-[#d4ff3a]/10 border border-[#d4ff3a]/20 rounded-full px-3 py-1 mb-4">
-                <ShieldCheck className="w-3 h-3" /> Calculator gratuit · 2 minute
+                <ShieldCheck className="w-3 h-3" /> Cont gratuit · evaluare ghidată a locuinței
               </div>
               <h1 className="font-serif text-3xl sm:text-5xl tracking-tight leading-tight mb-3" data-testid="health-score-h1">
-                Scorul Casei Tale
+                Evaluează-ți casa gratuit
               </h1>
-              <p className="text-stone-400 text-lg">Răspunde la 12 întrebări și află instant starea tehnică a locuinței tale, cu riscurile principale și recomandări.</p>
+              <p className="text-stone-300 text-lg max-w-2xl">
+                Descoperă ce informații ai deja despre locuința ta, ce lipsește din Cartea Casei și care este următorul pas recomandat.
+              </p>
+              <div className="mt-6 flex flex-col sm:flex-row gap-3">
+                <Link
+                  to="/register"
+                  className="bg-[#d4ff3a] text-black px-7 py-3.5 rounded-full font-semibold hover:bg-[#bfe632] transition inline-flex items-center justify-center gap-2"
+                  data-testid="hs-register-cta"
+                >
+                  Creează cont gratuit și începe evaluarea <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+              <p className="text-xs text-stone-500 mt-4 max-w-2xl leading-relaxed" data-testid="hs-score-clarification">
+                Scorul casei indică nivelul actual de informație și completare în PropManage și nu reprezintă o certificare tehnică. Cartea Casei indică nivelul de documentare a locuinței, iar Digital Twin indică nivelul de digitalizare și documentare a locuinței.
+              </p>
+            </div>
+
+            <div className="mb-8 pt-8 border-t border-white/5">
+              <h2 className="font-serif text-2xl sm:text-3xl tracking-tight leading-tight mb-3" data-testid="hs-quick-title">
+                Sau testează rapid Scorul Casei
+              </h2>
+              <p className="text-stone-400 text-lg">Răspunde la 12 întrebări și află instant o estimare a stării tehnice a locuinței tale, cu riscurile principale și recomandări.</p>
               <div className="mt-5 h-1.5 bg-white/5 rounded-full overflow-hidden">
                 <div className="h-full bg-[#d4ff3a] transition-all" style={{ width: `${(answered / QUESTIONS.length) * 100}%` }} />
               </div>

@@ -12,6 +12,22 @@ import { LeadMagnetCTA } from "../components/LeadMagnetCTA";
 
 const SITE_URL = "https://propmanage.ro";
 
+// Contextual CTA to /scorul-casei — ONLY on relevant guides (not mechanical).
+const SCORE_CTA_SLUGS = new Set([
+  "audit-tehnic-apartament-pret",
+  "verificare-apartament-inainte-de-cumparare",
+  "ce-documente-verifici-cumparare-apartament",
+  "probleme-tehnice-apartament-inainte-cumparare",
+  "riscuri-cumparare-apartament-bloc-vechi",
+  "scorul-casei-ce-masoara",
+  "plan-mentenanta-locuinta",
+  "cartea-casei-istoric-locuinta",
+  "cum-pregatesti-apartament-renovare",
+  "ce-verifici-inainte-de-renovare-apartament",
+  "verificare-imobil-digital-twin",
+  "cum-verifici-instalator",
+]);
+
 // ---- body block renderer (supports strings, lists, callouts) ----
 const renderBodyBlock = (block, i) => {
   if (typeof block === "string") {
@@ -204,6 +220,21 @@ export const GhidPage = () => {
               <h2 className="font-serif text-2xl sm:text-3xl text-white mb-6">Întrebări frecvente</h2>
               <div>
                 {guide.faq.map((f, i) => <FaqItem key={i} q={f.q} a={f.a} index={i} />)}
+              </div>
+            </section>
+          )}
+
+          {/* Contextual CTA to free house evaluation — only on relevant guides */}
+          {SCORE_CTA_SLUGS.has(guide.slug) && (
+            <section className="mt-12 pt-10 border-t border-white/5" data-testid="ghid-score-cta">
+              <div className="rounded-2xl border border-[#d4ff3a]/30 bg-[#d4ff3a]/5 p-6 sm:p-7">
+                <h2 className="font-serif text-xl sm:text-2xl text-white mb-2">Evaluează-ți casa gratuit</h2>
+                <p className="text-sm text-stone-300 mb-5 max-w-xl leading-relaxed">
+                  Vezi ce informații ai deja despre locuința ta, ce lipsește din Cartea Casei și care e pasul următor recomandat — direct în contul gratuit PropManage.
+                </p>
+                <Link to="/scorul-casei" className="inline-flex items-center gap-2 bg-[#d4ff3a] text-black px-6 py-2.5 rounded-full text-sm font-semibold hover:bg-[#bfe632] transition" data-testid="ghid-score-cta-btn">
+                  Evaluează-ți casa gratuit <ArrowRight className="w-4 h-4" />
+                </Link>
               </div>
             </section>
           )}

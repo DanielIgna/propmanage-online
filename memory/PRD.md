@@ -1,3 +1,24 @@
+## 🧰📈 SPECIALIST LOCAL SEO CLUJ (32 pagini) + FUNNEL /scorul-casei → cont gratuit (18 sept 2026)
+
+**Cerere Fondator (2 briefuri)**: (A) pagini locale de RECRUTARE specialiști pentru zona Cluj; (B) transformarea traficului organic în conturi gratuite prin /scorul-casei + CTA contextual în ghiduri. FĂRĂ deploy, FĂRĂ modificarea regulii marketplace (≥3 verificați), fără profiluri/recenzii/date false, fără modificarea scoring engine sau a autentificării.
+
+**A · Specialist Local SEO — 32 pagini `/devino-specialist/[categorie]/[localitate]`** (INDEX, intenție = specialistul care caută clienți, NU marketplace):
+- 8 categorii (zugrav, finisaje-interioare, electrician, instalator, constructor, montator-gresie-faianta, tamplar, hvac) × 4 localități (cluj-napoca, floresti, apahida, baciu).
+- NOU `frontend/src/data/specialistLocalSeo.js` (SL_TRADES cu lucrări distincte per meserie + SL_LOCALITIES cu context de cerere real per localitate; `getSpecialistLocal` compune title/H1/desc/intro/related/faq) + NOU `frontend/src/pages/SpecialistLocalPage.jsx` (renderer; slug necunoscut → `Navigate to="/devino-specialist"`).
+- Conținut per pagină: ce lucrări primești (per meserie), de ce e cerere în {localitate} (per localitate), cum funcționează PropManage, cum primești cereri, profil verificat + documentație, beneficii, FAQ. Title „Devino {meserie} în {oraș} | Găsește clienți prin PropManage"; H1 „{Meserie} în {oraș}? Găsește clienți prin PropManage".
+- CTA înscriere → /devino-specialist (flux existent). Internal linking: categoria națională `/pentru-specialisti/[trade]` → pillar `/pentru-specialisti` → `/devino-specialist` → hub local `/servicii-pentru-casa/{loc}` → meserii-surori aceeași localitate → aceeași meserie alte localități → `/marketplace` (hub mereu indexabil). NU se linkează pagini marketplace category×city gate-uite.
+- Rutare `App.js` `/devino-specialist/:trade/:localitate`; sitemap: 32 URL generate în `public.py _specialist_local_entries` (incluse în sitemap-static + flat); clasificare `admin_seo._classify` → type `local`, cluster `specialisti`. Regula marketplace NEATINSĂ.
+
+**B · Funnel organic → cont gratuit**:
+- `/scorul-casei` (HealthScorePage): H1 nou „Evaluează-ți casa gratuit" + mesaj Cartea Casei + CTA principal „Creează cont gratuit și începe evaluarea" → /register, deasupra foldului; calculatorul de 12 întrebări păstrat ca secundar („Sau testează rapid Scorul Casei"); notă discretă de clarificare (scor + Cartea Casei + Digital Twin = niveluri de informație/documentare/digitalizare, nu certificare tehnică); JSON-LD WebApplication+BreadcrumbList; title/desc optimizate (evaluare/verificare casă/apartament, Cluj). URL neschimbat. Scoring engine & auth NEATINSE.
+- Hub-uri locale (`LocalHubPage`): CTA band actualizat la „Vrei să vezi cum este documentată propria locuință? Creează gratuit contul PropManage."
+- Ghiduri: CTA contextual „Evaluează-ți casa gratuit" → /scorul-casei DOAR pe 12 ghiduri relevante (allow-list `SCORE_CTA_SLUGS` în `GhidPage.jsx`, nu mecanic — verificat absent pe ghidurile de design) + pe toate paginile clusterului „probleme casă" (`ProblemaPage.jsx`).
+
+**Verificare (PASS)**: `yarn build` 0 erori (doar warning-uri preexistente); 32 URL specialist-local în sitemap-static + flat; render + SEO (title/H1/canonical/robots=index/CTA) pe zugrav/cluj-napoca, finisaje-interioare/floresti (conținut distinct), slug necunoscut → redirect /devino-specialist; /scorul-casei H1+CTA→/register above fold, JSON-LD, notă clarificare; CTA contextual prezent pe ghid relevant, absent pe design. Funnel: CTA→/register cablat pe fluxul EXISTENT (signup→Client Beta neatins — nu am testat crearea reală de cont). **FĂRĂ deploy** (per cerință). Necesită redeploy Fondator pentru producție.
+
+---
+
+
 ## 📍📈 LOCAL SEO EXPANSION CLUJ — 4 hub-uri locale generale PropManage (18 sept 2026)
 
 **Cerere Fondator**: creștere SEO organic local în zona Cluj (Cluj-Napoca + Florești, Apahida, Baciu). Reutilizare infra existentă, fără module noi, fără modificări la HartaBlocuri/GIS/Marketplace logic/House Health/Digital Twin, FĂRĂ deploy. Prioritate: indexare + trafic organic local + conversie în cont gratuit.

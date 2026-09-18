@@ -49,6 +49,7 @@ const AdminAuthHealthPage = lazy(() => import("./pages/admin/AdminAuthHealthPage
 const ResearchCoveragePage = lazy(() => import("./pages/admin/ResearchCoveragePage"));
 const AcquisitionPage = lazy(() => import("./pages/AcquisitionPage"));
 const LocalHubPage = lazy(() => import("./pages/LocalHubPage"));
+const SpecialistLocalPage = lazy(() => import("./pages/SpecialistLocalPage"));
 const AdminSupportInboxPage = lazy(() => import("./pages/admin/AdminSupportInboxPage").then(m => ({ default: m.AdminSupportInboxPage })));
 import { PrivacyPage, TermsPage, CookiePolicyPage } from "./pages/LegalPages";
 const TrustCenterPage = lazy(() => import("./pages/TrustCenterPage").then(m => ({ default: m.TrustCenterPage })));
@@ -1727,6 +1728,7 @@ function App() {
               <Route path="/franciza" element={<FranchiseDashboard />} />
               <Route path="/devino-francizat" element={<FranchiseApplyPage />} />
               <Route path="/devino-specialist" element={<SpecialistApplyPage />} />
+              <Route path="/devino-specialist/:trade/:localitate" element={<SpecialistLocalPage />} />
               <Route path="/pentru-proprietari" element={<AcquisitionPage />} />
               <Route path="/cartea-casei" element={<AcquisitionPage />} />
               <Route path="/pentru-specialisti" element={<AcquisitionPage />} />

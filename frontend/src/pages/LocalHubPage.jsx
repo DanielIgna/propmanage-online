@@ -142,8 +142,8 @@ export default function LocalHubPage() {
 
         {/* Primary CTA band */}
         <div className="mt-14 rounded-2xl border border-white/10 bg-white/[0.03] p-7 text-center" data-testid="local-midcta">
-          <p className="text-stone-200 text-lg mb-2">Vezi în ce stare e casa ta din {page.city}.</p>
-          <p className="text-stone-400 text-sm mb-5">Evaluarea de bază și contul de proprietar sunt gratuite.</p>
+          <p className="text-stone-200 text-lg mb-2">Vrei să vezi cum este documentată propria locuință?</p>
+          <p className="text-stone-400 text-sm mb-5">Creează gratuit contul PropManage și începe evaluarea casei tale din {page.city}.</p>
           <PrimaryCTA testid="local-cta-mid" />
         </div>
 
