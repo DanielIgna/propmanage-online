@@ -221,3 +221,14 @@ Integrare aditivă a bazei externe HartaBlocuri Cluj în entitatea `buildings` e
 - Regresie HB: 3408 total / 3406 hartablocuri_import / 2 propmanage-only / 0 conflicte — CONFIRMAT în prod.
 - Securitate: cheia Google din env (nu hardcodată); `.env` netracked; public building search doar câmpuri publice + coord. aproximate; SEED_DEMO_DATA gating activ. OK.
 - Fără deploy/publish. O singură modificare: GOOGLE_MAPS_ENABLED în preview .env.
+
+## Native BSON DB Dump (mongorestore-compatible) — 2026-06
+**Cerință user:** Dump MongoDB live — backup complet toate colecțiile, format BSON nativ restaurabil cu `mongorestore` (nu JSON, nu dump din preview).
+**Implementat (admin-only, refolosind auth existent `require_role("admin")`):**
+- `backup_service.create_bson_dump()` — scrie incremental pe disc `dump/<db>/<coll>.bson` + `<coll>.metadata.json` (indecși păstrați), tar.gz. Streaming doc-cu-doc → memorie mică (safe 512MB tier). Include TOATE colecțiile. Retention: ultimele 3 (`_prune_bson_dumps`).
+- Endpoint nou: `POST /api/admin/backups/dump-bson` → creează dump, întoarce `download_url`.
+- `GET /api/admin/backups/download/{filename}` extins să accepte prefixul `propmanage-bson-dump-`.
+- `GET /api/admin/backups` întoarce acum și `bson_dumps`.
+**Testat:** dump local 329 colecții / 138.640 docs / 8.26MB; round-trip `mongorestore` OK (27.957 docs restaurate, 0 failures — un singur EOF tranzitoriu de conexiune mongod, nu problemă de format). Endpoint HTTP verificat cu login admin (cookie) + download 8.66MB, arhivă validă (660 intrări).
+**IMPORTANT:** endpoint-ul dă dump al bazei din runtime-ul în care rulează. Pentru datele LIVE trebuie DEPLOY nou (schimbările sunt post-deploy inițiat), apoi trigger din admin-ul de producție.
+**Restore:** `tar -xzf <fisier>.tar.gz && mongorestore --uri "<MONGO_URL>" dump/`

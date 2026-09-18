@@ -17,14 +17,22 @@ import io
 import base64
 import json
 import logging
+import shutil
 import tarfile
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+import bson
 from bson import json_util
 
 from db import db
+
+# Prefix for native BSON dumps (restorable with `mongorestore`)
+BSON_DUMP_PREFIX = "propmanage-bson-dump-"
+# Keep last N native BSON dumps locally
+BSON_DUMP_RETENTION = 3
 
 logger = logging.getLogger("propmanage.backup")
 
@@ -143,6 +151,119 @@ async def create_backup() -> dict:
     except Exception as e:  # noqa: BLE001
         logger.error(f"[Backup] failed: {e}", exc_info=True)
         return {"ok": False, "error": str(e), "started_at": started.isoformat()}
+
+
+def _index_metadata(idx_info: dict) -> dict:
+    """Convert pymongo index_information() into a mongorestore metadata.json dict."""
+    indexes = []
+    for name, info in (idx_info or {}).items():
+        key = {k: v for k, v in info.get("key", [])}
+        entry = {"v": info.get("v", 2), "key": key, "name": name}
+        for opt in ("unique", "sparse", "expireAfterSeconds", "partialFilterExpression", "weights", "default_language", "2dsphereIndexVersion"):
+            if opt in info:
+                entry[opt] = info[opt]
+        indexes.append(entry)
+    return {"options": {}, "indexes": indexes, "uuid": ""}
+
+
+def _prune_bson_dumps():
+    """Keep only the newest BSON_DUMP_RETENTION native dumps."""
+    try:
+        files = sorted(BACKUP_DIR.glob(f"{BSON_DUMP_PREFIX}*.tar.gz"), key=lambda p: p.stat().st_mtime, reverse=True)
+        for old in files[BSON_DUMP_RETENTION:]:
+            try:
+                old.unlink()
+            except Exception:  # noqa: BLE001
+                pass
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[BSON Dump] prune scan failed: {e}")
+
+
+async def create_bson_dump() -> dict:
+    """Create a native BSON dump restorable with `mongorestore`.
+
+    Produces ``dump/<db>/<coll>.bson`` + ``<coll>.metadata.json`` inside a .tar.gz
+    (full backup of ALL collections). Documents are streamed to disk one-by-one
+    so peak memory stays tiny (safe for the 512MB production tier).
+
+    Restore:
+        tar -xzf <file>.tar.gz
+        mongorestore --uri "<MONGO_URL>" dump/
+    """
+    started = datetime.now(timezone.utc)
+    timestamp = started.strftime("%Y-%m-%d_%H-%M-%S")
+    filename = f"{BSON_DUMP_PREFIX}{timestamp}.tar.gz"
+    filepath = BACKUP_DIR / filename
+    tmp_root = Path(tempfile.mkdtemp(prefix="bson_dump_"))
+    try:
+        dump_dir = tmp_root / "dump" / db.name
+        dump_dir.mkdir(parents=True, exist_ok=True)
+
+        collections = await db.list_collection_names()
+        objects_count = 0
+
+        for col in collections:
+            bson_path = dump_dir / f"{col}.bson"
+            with open(bson_path, "wb") as fh:
+                async for doc in db[col].find({}):
+                    fh.write(bson.encode(doc))
+                    objects_count += 1
+            try:
+                idx_info = await db[col].index_information()
+            except Exception:  # noqa: BLE001
+                idx_info = {}
+            (dump_dir / f"{col}.metadata.json").write_bytes(
+                json.dumps(_index_metadata(idx_info), default=str).encode("utf-8")
+            )
+
+        with tarfile.open(str(filepath), mode="w:gz", compresslevel=6) as tar:
+            tar.add(str(tmp_root / "dump"), arcname="dump")
+
+        size_mb = filepath.stat().st_size / 1024 / 1024
+        _prune_bson_dumps()
+
+        duration = (datetime.now(timezone.utc) - started).total_seconds()
+        result = {
+            "ok": True,
+            "filename": filename,
+            "path": str(filepath),
+            "size_mb": round(size_mb, 2),
+            "collections_count": len(collections),
+            "objects_count": objects_count,
+            "duration_s": round(duration, 2),
+            "started_at": started.isoformat(),
+            "format": "bson (mongorestore)",
+        }
+        try:
+            await db.backup_runs.insert_one({**result, "_id": filename, "delivered_email": False})
+        except Exception:  # noqa: BLE001
+            pass
+
+        logger.info(f"[BSON Dump] created {filename} · {size_mb:.2f} MB · {len(collections)} cols · {objects_count} docs in {duration:.1f}s")
+        return result
+
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[BSON Dump] failed: {e}", exc_info=True)
+        return {"ok": False, "error": str(e), "started_at": started.isoformat()}
+    finally:
+        shutil.rmtree(tmp_root, ignore_errors=True)
+
+
+def list_bson_dumps() -> list[dict]:
+    """List current native BSON dump files (newest first)."""
+    try:
+        files = sorted(BACKUP_DIR.glob(f"{BSON_DUMP_PREFIX}*.tar.gz"), key=lambda p: p.stat().st_mtime, reverse=True)
+        return [
+            {
+                "filename": f.name,
+                "size_mb": round(f.stat().st_size / 1024 / 1024, 2),
+                "created_at": datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc).isoformat(),
+            }
+            for f in files
+        ]
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[BSON Dump] list failed: {e}")
+        return []
 
 
 def _prune_old_backups():
