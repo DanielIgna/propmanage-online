@@ -232,3 +232,8 @@ Integrare aditivă a bazei externe HartaBlocuri Cluj în entitatea `buildings` e
 **Testat:** dump local 329 colecții / 138.640 docs / 8.26MB; round-trip `mongorestore` OK (27.957 docs restaurate, 0 failures — un singur EOF tranzitoriu de conexiune mongod, nu problemă de format). Endpoint HTTP verificat cu login admin (cookie) + download 8.66MB, arhivă validă (660 intrări).
 **IMPORTANT:** endpoint-ul dă dump al bazei din runtime-ul în care rulează. Pentru datele LIVE trebuie DEPLOY nou (schimbările sunt post-deploy inițiat), apoi trigger din admin-ul de producție.
 **Restore:** `tar -xzf <fisier>.tar.gz && mongorestore --uri "<MONGO_URL>" dump/`
+
+## Buton Admin „Descarcă dump BSON" — 2026-06
+- Adăugat în tile-ul „Backup DB" din Morning Briefing (`pages/admin/MorningBriefing.jsx`) o acțiune secundară „Descarcă dump BSON" lângă „Backup acum".
+- `downloadBsonDump()`: apelează `POST /api/admin/backups/dump-bson`, apoi descarcă fișierul ca blob de la `download_url` și declanșează download-ul în browser (cu toast de progres/succes).
+- `SystemTile` extins cu `secondaryAction`. Verificat: butonul se randează corect în Dashboard admin (screenshot). Backend deja testat (create+download+restore).

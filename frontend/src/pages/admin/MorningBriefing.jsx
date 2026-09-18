@@ -6,7 +6,7 @@ import axios from "axios";
 import { Link } from "react-router-dom";
 import {
   Sunrise, CheckCircle2, AlertTriangle, XCircle, Activity, Database,
-  PlayCircle, AlertOctagon, FileSearch, RefreshCw, ArrowRight, Mail, HardDrive, BarChart3
+  PlayCircle, AlertOctagon, FileSearch, RefreshCw, ArrowRight, Mail, HardDrive, BarChart3, Download
 } from "lucide-react";
 import { AdminCard } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
@@ -20,7 +20,7 @@ const TONE = {
   idle:  { bg: "bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700",            text: "text-slate-600 dark:text-slate-300",   icon: Activity, iconColor: "text-slate-400" },
 };
 
-const SystemTile = ({ icon: Icon, title, tone, headline, sub, action, testid }) => {
+const SystemTile = ({ icon: Icon, title, tone, headline, sub, action, secondaryAction, testid }) => {
   const t = TONE[tone] || TONE.idle;
   const StatusIcon = t.icon;
   return (
@@ -37,10 +37,21 @@ const SystemTile = ({ icon: Icon, title, tone, headline, sub, action, testid }) 
           {action && (
             <button
               onClick={action.onClick}
-              className="mt-1.5 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+              disabled={action.disabled}
+              className="mt-1.5 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 disabled:opacity-50"
               data-testid={`${testid}-action`}
             >
               {action.label} <ArrowRight className="w-3 h-3" />
+            </button>
+          )}
+          {secondaryAction && (
+            <button
+              onClick={secondaryAction.onClick}
+              disabled={secondaryAction.disabled}
+              className="mt-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 disabled:opacity-50"
+              data-testid={`${testid}-secondary-action`}
+            >
+              {secondaryAction.label} <Download className="w-3 h-3" />
             </button>
           )}
         </div>
@@ -80,6 +91,38 @@ export const MorningBriefing = () => {
     }
   };
   const [runningBackup, setRunningBackup] = useState(false);
+  const [dumpingBson, setDumpingBson] = useState(false);
+
+  const downloadBsonDump = async () => {
+    setDumpingBson(true);
+    const tid = toast.loading("Se creează dump BSON nativ...");
+    try {
+      const r = await axios.post(`${API}/admin/backups/dump-bson`, {}, { timeout: 180000 });
+      const d = r.data?.dump || {};
+      if (!d.ok) {
+        toast.error(`Dump BSON eșuat: ${d.error || "necunoscut"}`, { id: tid });
+        return;
+      }
+      const fileResp = await axios.get(`${API}/admin/backups/download/${d.filename}`, {
+        responseType: "blob",
+        timeout: 180000,
+      });
+      const url = window.URL.createObjectURL(new Blob([fileResp.data], { type: "application/gzip" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = d.filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success(`Dump BSON descărcat: ${d.size_mb}MB · ${d.collections_count} colecții`, { id: tid });
+      load();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Eroare la dump BSON", { id: tid });
+    } finally {
+      setDumpingBson(false);
+    }
+  };
 
   const runManualBackup = async () => {
     setRunningBackup(true);
@@ -333,7 +376,8 @@ export const MorningBriefing = () => {
           tone={backupTile.tone}
           headline={backupTile.headline}
           sub={backupTile.sub}
-          action={{ label: runningBackup ? "Se creează..." : "Backup acum", onClick: runManualBackup }}
+          action={{ label: runningBackup ? "Se creează..." : "Backup acum", onClick: runManualBackup, disabled: runningBackup }}
+          secondaryAction={{ label: dumpingBson ? "Se pregătește..." : "Descarcă dump BSON", onClick: downloadBsonDump, disabled: dumpingBson }}
           testid="briefing-tile-backup"
         />
       </div>
