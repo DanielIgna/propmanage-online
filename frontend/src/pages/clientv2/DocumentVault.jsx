@@ -16,7 +16,7 @@ const fmtSize = (b) => (b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` :
 const SOURCE_LABEL = { owner_upload: "Declarat de proprietar", specialist: "Adăugat de specialist", platform: "Verificat de platformă" };
 
 // ── Celebrarea primului document — moment semnătură (EO CX-2) ────────────────
-const MemoryCelebration = ({ score, onClose }) => (
+export const MemoryCelebration = ({ score, onClose }) => (
   <div className="fixed inset-0 z-[90] flex items-center justify-center p-6" data-testid="memory-celebration"
     style={{ background: "rgba(6, 40, 22, 0.92)", backdropFilter: "blur(8px)" }}>
     <div className="max-w-sm w-full text-center cv2-fade">
@@ -41,7 +41,7 @@ const MemoryCelebration = ({ score, onClose }) => (
 );
 
 // ── Upload sheet: doar categoria e obligatorie (progressive disclosure) ─────
-const UploadSheet = ({ prop, presetCategory, onClose, onDone }) => {
+export const UploadSheet = ({ prop, presetCategory, onClose, onDone }) => {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState(presetCategory || "");
@@ -181,7 +181,7 @@ const UploadSheet = ({ prop, presetCategory, onClose, onDone }) => {
 };
 
 // ── Detaliu document: preview, metadate, trust, istoric, versiuni ────────────
-const DocSheet = ({ docId, onClose, onChanged }) => {
+export const DocSheet = ({ docId, onClose, onChanged }) => {
   const [data, setData] = useState(null);
   const [editing, setEditing] = useState(false);
   const [edit, setEdit] = useState({});
@@ -297,7 +297,7 @@ const DocSheet = ({ docId, onClose, onChanged }) => {
 };
 
 // ── Lista completă cu căutare + filtre pe cunoaștere (nu pe nume de fișier) ─
-const VaultSheet = ({ prop, onClose, onUpload, refreshKey }) => {
+export const VaultSheet = ({ prop, onClose, onUpload, refreshKey }) => {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
   const [data, setData] = useState(null);

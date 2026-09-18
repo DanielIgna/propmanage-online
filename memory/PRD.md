@@ -1,3 +1,21 @@
+## 🚀 CLIENT BETA V3 — UX aprobat mutat în LIVE `/client` · APROBAT PENTRU DEPLOY (18 septembrie 2026)
+
+**Cerere Fondator**: „ACCEPT UX — IMPLEMENTĂ ȘI PREGĂTEȘTE PENTRU DEPLOY" → apoi „APROBAT PENTRU DEPLOY. Publică versiunea nouă pe producție." Fără alte modificări UX/funcționale.
+
+**Livrat (preview, `frontend/src/pages/clientv2/`)**:
+- `HomeV2` → **HomeV3** · `JobsV2` → **JobsV3** · `PropertyHubV2` → **HouseV3 + HouseMapV3 + HouseSectionsV3** · **MoreV3** · strat nou `data3.js` + `ui3.jsx`. `ClientDashboardV2` rutează exclusiv către V3; fișierele V2 șterse.
+- Wiring la API-uri REALE: `/api/copilot/dashboard`, `/api/benefits/pulse` (cale corectată din `/api/client/pulse`), `/api/properties/{id}/dna-attributes`, cereri/lucrări, Cartea casei (DocumentVault+upload), Pașaport, RequestWizard, escrow, tracking funnel, evenimente `open-house-book`/`pm-open-mentor`, teme light/dark. **Backend/API/logică de business 100% neatinse.**
+- Principii: ierarhie vizuală, reducere încărcare cognitivă (Hick's Law), progressive disclosure („Explorează mai mult" colapsat).
+
+**Verificare**: smoke desktop 1920 + mobil 390 · light/dark · 4 tab-uri → PASS, 0 erori consolă; re-verificat cu `client@propmanage.io` (scor 52/100, 86 lucrări, 9 documente, House Health activ). `yarn build` → **0 erori** (2 warnings ESLint preexistente). `deployment_agent`: compilare ✅, env-only URLs ✅, CORS ✅, OAuth redirect ✅, supervisor ✅.
+
+**Notă deploy (convenție EO-026, neschimbată)**: preview păstrează `SEED_DEMO_DATA=true` în `backend/.env` (date demo + reset nocturn conturi demo). Producția trebuie să ruleze cu `SEED_DEMO_DATA` ≠ true (setat în env-ul de deploy, ca la deploy-urile anterioare) — `deployment_agent` îl semnalează ca reminder.
+
+**Status**: ✅ GATA · publicarea se face de Fondator din butonul **Deploy** al platformei (agentul nu poate publica direct).
+
+---
+
+
 ## 🐞 FIX NAVIGAȚIE — centrare meniu la derulare (18 septembrie 2026)
 
 **Problemă raportată**: pe pagini lungi, bara superioară se alinia spre stânga după derulare, în loc să rămână centrată.
