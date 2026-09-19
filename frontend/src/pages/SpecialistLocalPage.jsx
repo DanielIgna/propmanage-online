@@ -1,14 +1,25 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useParams, Navigate } from "react-router-dom";
-import { ArrowRight, Check, HelpCircle, MapPin, ShieldCheck, Wallet, FileCheck2, Users } from "lucide-react";
+import axios from "axios";
+import { ArrowRight, Check, HelpCircle, MapPin, ShieldCheck, Wallet, FileCheck2, Users, Hammer, BadgeCheck } from "lucide-react";
 import { useSEO } from "../hooks/useSEO";
 import { getSpecialistLocal } from "../data/specialistLocalSeo";
 
 const SITE_URL = "https://propmanage.ro";
+const API = process.env.REACT_APP_BACKEND_URL;
 const ACCENT = "#d4ff3a";
 
-const track = (event) => {
-  try { if (window.gtag) window.gtag("event", event); } catch (e) { /* noop */ }
+// Records the recruitment CTA with trade+locality attribution (backend funnel)
+// and stores it locally so the signup can be attributed to this page.
+const trackCta = (trade, loc) => {
+  try { if (window.gtag) window.gtag("event", "spec_local_cta"); } catch (e) { /* noop */ }
+  try {
+    localStorage.setItem("pm_spec_attr", JSON.stringify({ trade, loc, ts: Date.now() }));
+  } catch (e) { /* noop */ }
+  try {
+    let vid = localStorage.getItem("pm_visitor_id");
+    axios.post(`${API}/api/public/specialist-local-track`, { trade, loc, stage: "cta", visitor_id: vid || "" });
+  } catch (e) { /* noop */ }
 };
 
 const HOW_IT_WORKS = [
@@ -29,6 +40,16 @@ const BENEFITS = [
 export default function SpecialistLocalPage() {
   const { trade, localitate } = useParams();
   const page = getSpecialistLocal(trade, localitate);
+
+  const [stats, setStats] = useState(null);
+  useEffect(() => {
+    if (!page) return;
+    let alive = true;
+    axios.get(`${API}/api/public/specialist-local-stats?trade=${page.trade.slug}&loc=${page.loc.slug}`)
+      .then((r) => { if (alive) setStats(r.data); })
+      .catch(() => { /* honest empty state */ });
+    return () => { alive = false; };
+  }, [page && page.trade.slug, page && page.loc.slug]);
 
   const canonical = page ? `${SITE_URL}${page.path}` : `${SITE_URL}/devino-specialist`;
 
@@ -78,13 +99,41 @@ export default function SpecialistLocalPage() {
         <p className="text-stone-300 text-lg leading-relaxed mb-8">{page.intro}</p>
         <Link
           to="/devino-specialist"
-          onClick={() => track("spec_local_cta")}
+          onClick={() => trackCta(page.trade.slug, page.loc.slug)}
           data-testid="spec-local-cta-hero"
           className="inline-flex items-center gap-2 rounded-full px-7 py-3.5 font-semibold text-stone-900 transition-transform hover:scale-[1.03]"
           style={{ backgroundColor: ACCENT }}
         >
           {ctaLabel} <ArrowRight className="w-4 h-4" />
         </Link>
+
+        {/* Social proof — REAL numbers (or honest "be among the first") */}
+        {stats && (
+          <div className="mt-8 flex flex-wrap gap-3" data-testid="spec-local-proof">
+            <div className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5" data-testid="spec-local-proof-specialists">
+              <BadgeCheck className="w-4 h-4" style={{ color: ACCENT }} />
+              <span className="text-sm text-stone-200">
+                {stats.trade_verified > 0
+                  ? (stats.trade_verified === 1
+                      ? `Un ${page.trade.word} verificat activează în ${stats.zone_label}`
+                      : `${stats.trade_verified} ${page.trade.plural} verificați activează în ${stats.zone_label}`)
+                  : stats.zone_verified > 0
+                    ? `${stats.zone_verified} specialiști verificați activează deja în ${stats.zone_label}`
+                    : `Fii printre primii specialiști verificați din ${page.loc.city}`}
+              </span>
+            </div>
+            {stats.zone_jobs > 0 && (
+              <div className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5" data-testid="spec-local-proof-jobs">
+                <Hammer className="w-4 h-4" style={{ color: ACCENT }} />
+                <span className="text-sm text-stone-200">
+                  {stats.trade_jobs > 0
+                    ? `${stats.trade_jobs} lucrări din categoria ta, finalizate în ${stats.zone_label}`
+                    : `${stats.zone_jobs} lucrări finalizate prin PropManage în ${stats.zone_label}`}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Work types */}
         <section className="mt-14" data-testid="spec-local-work">
@@ -152,7 +201,7 @@ export default function SpecialistLocalPage() {
           <p className="text-stone-400 text-sm mb-5">Înregistrarea este gratuită, fără costuri de start.</p>
           <Link
             to="/devino-specialist"
-            onClick={() => track("spec_local_cta")}
+            onClick={() => trackCta(page.trade.slug, page.loc.slug)}
             data-testid="spec-local-cta-mid"
             className="inline-flex items-center gap-2 rounded-full px-7 py-3.5 font-semibold text-stone-900 transition-transform hover:scale-[1.03]"
             style={{ backgroundColor: ACCENT }}
@@ -194,7 +243,7 @@ export default function SpecialistLocalPage() {
         <div className="mt-16 text-center">
           <Link
             to="/devino-specialist"
-            onClick={() => track("spec_local_cta")}
+            onClick={() => trackCta(page.trade.slug, page.loc.slug)}
             data-testid="spec-local-cta-final"
             className="inline-flex items-center gap-2 rounded-full px-7 py-3.5 font-semibold text-stone-900 transition-transform hover:scale-[1.03]"
             style={{ backgroundColor: ACCENT }}

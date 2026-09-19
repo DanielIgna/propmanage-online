@@ -19,6 +19,7 @@ const SUB_TABS = [
   { id: "sitemap", label: "Sitemap", icon: ListChecks },
   { id: "pages", label: "Pages", icon: FileText },
   { id: "clusters", label: "Clusters", icon: Layers },
+  { id: "specialist-local", label: "Specialiști local", icon: MapPin },
   { id: "hartablocuri-clusters", label: "HartaBlocuri", icon: Building2 },
   { id: "alerts", label: "Alerts", icon: AlertTriangle },
   { id: "gsc", label: "GSC", icon: BarChart3 },
@@ -225,6 +226,48 @@ export const AdminSEO = () => {
               {c.note && <div className={`text-xs mt-3 italic ${muted}`}>{c.note}</div>}
             </AdminCard>
           ))}
+        </div>
+      )}
+
+      {/* ---------------- SPECIALIST LOCAL RECRUITMENT FUNNEL ---------------- */}
+      {tab === "specialist-local" && data && (
+        <div className="space-y-4" data-testid="seo-specialist-local">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <Stat label="CTA click-uri" value={data.totals?.cta ?? 0} testid="sl-total-cta" />
+            <Stat label="Înregistrări atribuite" value={data.totals?.signup ?? 0} tone="good" testid="sl-total-signup" />
+            <Stat label="Combinații active" value={data.totals?.combos_with_activity ?? 0} tone="muted" testid="sl-total-combos" />
+          </div>
+          <AdminCard testid="sl-funnel-table">
+            <h3 className={`font-semibold mb-3 ${txt}`}>Recrutare pe localitate × meserie</h3>
+            {(!data.rows || data.rows.length === 0) ? (
+              <div className={`text-sm ${muted}`}>Încă nu există activitate pe paginile de recrutare locale. Datele apar pe măsură ce vizitatorii dau click pe „Înregistrează-te" și creează conturi.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className={`text-left ${muted} border-b ${rowBorder}`}>
+                      <th className="py-2 pr-3">Meserie</th>
+                      <th className="py-2 pr-3">Localitate</th>
+                      <th className="py-2 pr-3">CTA</th>
+                      <th className="py-2 pr-3">Înregistrări</th>
+                      <th className="py-2 pr-3">Conversie</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.rows.map((r, i) => (
+                      <tr key={i} className={`border-b ${rowBorder}`} data-testid={`sl-row-${r.trade}-${r.loc}`}>
+                        <td className={`py-2 pr-3 ${txt}`}>{r.trade}</td>
+                        <td className={`py-2 pr-3 ${txt}`}>{r.loc}</td>
+                        <td className={`py-2 pr-3 ${txt}`}>{r.cta}</td>
+                        <td className="py-2 pr-3 font-semibold text-emerald-500">{r.signup}</td>
+                        <td className={`py-2 pr-3 ${txt}`}>{r.conversion_pct}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </AdminCard>
         </div>
       )}
 

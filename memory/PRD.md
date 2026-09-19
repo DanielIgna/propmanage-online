@@ -1,3 +1,22 @@
+## 📊 SPECIALIST LOCAL — Dovezi sociale reale + Tracking conversie (18 sept 2026)
+
+**Cerere Fondator** (2 enhancement-uri peste paginile de recrutare `/devino-specialist/[categorie]/[localitate]`): (1) dovezi sociale REALE (câți specialiști verificați + câte lucrări în zonă); (2) tracking `spec_local_cta` → funnel de înregistrare (ce localitate/meserie aduce conturi). Fără date inventate, fără atingerea regulii marketplace.
+
+**1 · Dovezi sociale reale** (`public.py`):
+- NOU `GET /api/public/specialist-local-stats?trade=&loc=` → numără REAL din `db.users` (specialiști verificați în zona Cluj: `county~Cluj` sau `coverage_zones` în zonele Cluj-Napoca) + `db.requests` (lucrări finalizate în județul Cluj). Comunele (Florești/Apahida/Baciu) mapează la zona metro Cluj. Mapare meserie→categorii (`_SL_TRADE_CATS`) pentru users (painting/electric/plumbing/faianta/carpentry/hvac) + requests (zugravit/electric/…). Preview real: zone_verified=5, zone_jobs=5; electrician trade_verified=2/trade_jobs=2.
+- `SpecialistLocalPage.jsx`: chip-uri sub hero — dacă trade_verified>0 „{n} {plural} verificați activează în zona Cluj" (plurale corecte în `plural` per meserie); altfel „{zone_verified} specialiști verificați…" ; altfel onest „Fii printre primii specialiști verificați din {oraș}". Al doilea chip pentru lucrări finalizate. Stare goală onestă (fără fabricare).
+
+**2 · Tracking conversie** (funnel de recrutare):
+- `SpecialistLocalPage`: la click pe oricare din cele 3 CTA-uri → `trackCta(trade, loc)` = gtag `spec_local_cta` + `localStorage.pm_spec_attr` + `POST /api/public/specialist-local-track {stage:'cta'}`.
+- `Auth.jsx`: la înregistrare reușită cu rol specialist, citește `pm_spec_attr` și trimite `POST … {stage:'signup'}` (apoi curăță localStorage). Auth NEATINSĂ (doar POST fire-and-forget adăugat după `register`).
+- NOU `POST /api/public/specialist-local-track` (validează trade/loc/stage, scrie în `db.specialist_local_conversions`).
+- NOU `GET /api/admin/seo/specialist-local` (admin) → agregare per meserie×localitate: CTA vs înregistrări + % conversie + totaluri. `AdminSEO.jsx`: sub-tab NOU „Specialiști local" cu 3 KPI + tabel sortat pe înregistrări.
+
+**Verificare (PASS)**: `yarn build` 0 erori; stats reale via curl (zugrav/cluj 0/5/0/5, electrician/floresti 2/5/2/5); track cta→200, invalid→400; admin funnel returnează rândurile agregate (cookie-auth admin); render chip-uri cu plurale corecte („2 electricieni verificați…"), CTA setează `pm_spec_attr` și redirecționează la /devino-specialist. Înregistrarea de test ștearsă din DB. **Neverificat E2E**: signup real de specialist cu atribuire (POST-ul e cablat, dar nu am creat cont real). **FĂRĂ deploy**.
+
+---
+
+
 ## 🧰📈 SPECIALIST LOCAL SEO CLUJ (32 pagini) + FUNNEL /scorul-casei → cont gratuit (18 sept 2026)
 
 **Cerere Fondator (2 briefuri)**: (A) pagini locale de RECRUTARE specialiști pentru zona Cluj; (B) transformarea traficului organic în conturi gratuite prin /scorul-casei + CTA contextual în ghiduri. FĂRĂ deploy, FĂRĂ modificarea regulii marketplace (≥3 verificați), fără profiluri/recenzii/date false, fără modificarea scoring engine sau a autentificării.

@@ -53,6 +53,7 @@ export const SL_TRADES = {
   "zugrav": {
     slug: "zugrav",
     word: "zugrav",
+    plural: "zugravi",
     h1Subject: "Zugrav",
     nationalPath: "/pentru-specialisti/zugrav",
     workTypes: [
@@ -68,6 +69,7 @@ export const SL_TRADES = {
   "finisaje-interioare": {
     slug: "finisaje-interioare",
     word: "specialist în finisaje interioare",
+    plural: "specialiști în finisaje",
     h1Subject: "Faci finisaje interioare",
     nationalPath: "/pentru-specialisti",
     workTypes: [
@@ -83,6 +85,7 @@ export const SL_TRADES = {
   "electrician": {
     slug: "electrician",
     word: "electrician",
+    plural: "electricieni",
     h1Subject: "Electrician",
     nationalPath: "/pentru-specialisti/electrician",
     workTypes: [
@@ -98,6 +101,7 @@ export const SL_TRADES = {
   "instalator": {
     slug: "instalator",
     word: "instalator",
+    plural: "instalatori",
     h1Subject: "Instalator",
     nationalPath: "/pentru-specialisti/instalator",
     workTypes: [
@@ -113,6 +117,7 @@ export const SL_TRADES = {
   "constructor": {
     slug: "constructor",
     word: "constructor",
+    plural: "constructori",
     h1Subject: "Constructor",
     nationalPath: "/pentru-specialisti/constructor",
     workTypes: [
@@ -128,6 +133,7 @@ export const SL_TRADES = {
   "montator-gresie-faianta": {
     slug: "montator-gresie-faianta",
     word: "montator de gresie și faianță",
+    plural: "montatori de gresie și faianță",
     h1Subject: "Montator gresie-faianță",
     nationalPath: "/pentru-specialisti/montator-gresie-faianta",
     workTypes: [
@@ -143,6 +149,7 @@ export const SL_TRADES = {
   "tamplar": {
     slug: "tamplar",
     word: "tâmplar",
+    plural: "tâmplari",
     h1Subject: "Tâmplar",
     nationalPath: "/pentru-specialisti/tamplar",
     workTypes: [
@@ -158,6 +165,7 @@ export const SL_TRADES = {
   "hvac": {
     slug: "hvac",
     word: "specialist HVAC",
+    plural: "specialiști HVAC",
     h1Subject: "Specialist HVAC",
     nationalPath: "/pentru-specialisti/hvac",
     workTypes: [

@@ -305,6 +305,39 @@ def _robots_blocks(path, disallows):
 # ---------------------------------------------------------------------------
 # 1) OVERVIEW
 # ---------------------------------------------------------------------------
+@router.get("/admin/seo/specialist-local")
+async def seo_specialist_local(user: dict = Depends(require_role("admin"))):
+    """Recruitment funnel per (trade × locality): CTA clicks vs signups, so the
+    founder sees which locality/trade brings the most specialist accounts."""
+    pipeline = [
+        {"$group": {
+            "_id": {"trade": "$trade", "loc": "$loc", "stage": "$stage"},
+            "n": {"$sum": 1},
+        }},
+    ]
+    agg = {}
+    async for row in db.specialist_local_conversions.aggregate(pipeline):
+        k = (row["_id"].get("trade"), row["_id"].get("loc"))
+        agg.setdefault(k, {"cta": 0, "signup": 0})
+        stage = row["_id"].get("stage")
+        if stage in ("cta", "signup"):
+            agg[k][stage] += row["n"]
+    rows = []
+    for (trade, loc), v in agg.items():
+        cta = v["cta"]; signup = v["signup"]
+        rows.append({
+            "trade": trade, "loc": loc, "cta": cta, "signup": signup,
+            "conversion_pct": round(100.0 * signup / cta, 1) if cta else 0.0,
+        })
+    rows.sort(key=lambda r: (r["signup"], r["cta"]), reverse=True)
+    totals = {
+        "cta": sum(r["cta"] for r in rows),
+        "signup": sum(r["signup"] for r in rows),
+        "combos_with_activity": len(rows),
+    }
+    return {"rows": rows, "totals": totals, "generated_at": datetime.now(timezone.utc).isoformat()}
+
+
 @router.get("/admin/seo/overview")
 async def seo_overview(user: dict = Depends(require_role("admin"))):
     snap = await _snapshot()

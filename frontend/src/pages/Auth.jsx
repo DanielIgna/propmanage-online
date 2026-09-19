@@ -276,6 +276,20 @@ export const RegisterPage = () => {
         identify(u.id || u._id || "", u.role || "");
         trackConversion("sign_up");
       }).catch(() => {});
+      // Specialist local SEO attribution: link the recruitment CTA to this signup.
+      try {
+        const raw = localStorage.getItem("pm_spec_attr");
+        if (raw && (u.role === "specialist" || form.role === "specialist")) {
+          const attr = JSON.parse(raw);
+          if (attr && attr.trade && attr.loc) {
+            fetch(`${process.env.REACT_APP_BACKEND_URL}/api/public/specialist-local-track`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ trade: attr.trade, loc: attr.loc, stage: "signup", visitor_id: localStorage.getItem("pm_visitor_id") || "" }),
+            }).catch(() => {});
+          }
+          localStorage.removeItem("pm_spec_attr");
+        }
+      } catch (e) { /* noop */ }
       navigate(`/${u.role}`);
     } catch (err) {
       setError(err.message || formatApiError(err));

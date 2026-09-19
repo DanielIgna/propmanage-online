@@ -871,3 +871,76 @@ async def write_sitemap_file() -> str:
     except Exception as e:  # noqa: BLE001
         logger.warning(f"Nu am putut scrie fișierele sitemap: {e}")
     return files["sitemap.xml"]
+
+
+# ---------------------------------------------------------------------------
+# Specialist LOCAL recruitment — REAL social proof + conversion tracking.
+# No invented data: counts come straight from db.users / db.requests.
+# ---------------------------------------------------------------------------
+_SL_TRADE_CATS = {
+    "zugrav":                  {"user": ["painting"],                "req": ["zugravit", "painting"]},
+    "finisaje-interioare":     {"user": ["painting"],                "req": ["zugravit", "painting", "general"]},
+    "electrician":             {"user": ["electric"],                "req": ["electric", "electrical"]},
+    "instalator":              {"user": ["plumbing"],                "req": ["plumbing"]},
+    "constructor":             {"user": ["construction", "general"], "req": ["general", "construction", "handyman"]},
+    "montator-gresie-faianta": {"user": ["faianta", "tiling"],       "req": ["faianta", "gresie"]},
+    "tamplar":                 {"user": ["carpentry"],               "req": ["carpentry"]},
+    "hvac":                    {"user": ["hvac"],                    "req": ["hvac", "HVAC", "ventilatie"]},
+}
+_SL_LOC_CITY = {
+    "cluj-napoca": "Cluj-Napoca", "floresti": "Florești",
+    "apahida": "Apahida", "baciu": "Baciu",
+}
+_SL_DONE_STATUSES = ["completed", "confirmed", "closed", "done"]
+
+
+@router.get("/public/specialist-local-stats")
+async def specialist_local_stats(trade: str, loc: str = "cluj-napoca"):
+    """REAL counts for the Cluj area: verified specialists + finished jobs.
+    Communes (Florești/Apahida/Baciu) map to the Cluj metro zone."""
+    cats = _SL_TRADE_CATS.get(trade)
+    city = _SL_LOC_CITY.get(loc)
+    if not cats or not city:
+        raise HTTPException(status_code=404, detail="combinație necunoscută")
+
+    zones = await db.regions.distinct("zone", {"city": "Cluj-Napoca"})
+    cluj_specialist = {
+        "role": "specialist", "verified": True, "deleted": {"$ne": True},
+        "$or": [{"county": {"$regex": "Cluj", "$options": "i"}}],
+    }
+    if zones:
+        cluj_specialist["$or"].append({"coverage_zones": {"$in": zones}})
+
+    zone_verified = await db.users.count_documents(cluj_specialist)
+    trade_q = dict(cluj_specialist)
+    trade_q["$and"] = [{"$or": [{"specialty": {"$in": cats["user"]}}, {"service_categories": {"$in": cats["user"]}}]}]
+    trade_verified = await db.users.count_documents(trade_q)
+
+    cluj_req = {"county": {"$regex": "Cluj", "$options": "i"}, "status": {"$in": _SL_DONE_STATUSES}}
+    zone_jobs = await db.requests.count_documents(cluj_req)
+    trade_req = dict(cluj_req)
+    trade_req["category"] = {"$in": cats["req"]}
+    trade_jobs = await db.requests.count_documents(trade_req)
+
+    return {
+        "trade": trade, "loc": loc, "city": city, "zone_label": "zona Cluj",
+        "trade_verified": trade_verified, "zone_verified": zone_verified,
+        "trade_jobs": trade_jobs, "zone_jobs": zone_jobs,
+    }
+
+
+@router.post("/public/specialist-local-track")
+async def specialist_local_track(payload: dict = Body(...)):
+    """Record a recruitment-funnel event (cta click / signup) with trade+locality
+    attribution, so the founder can see which locality/trade brings accounts."""
+    trade = str(payload.get("trade") or "")[:40]
+    loc = str(payload.get("loc") or "")[:40]
+    stage = str(payload.get("stage") or "")[:20]
+    if trade not in _SL_TRADE_CATS or loc not in _SL_LOC_CITY or stage not in ("cta", "signup"):
+        raise HTTPException(status_code=400, detail="date invalide")
+    await db.specialist_local_conversions.insert_one({
+        "trade": trade, "loc": loc, "stage": stage,
+        "visitor_id": str(payload.get("visitor_id") or "")[:64],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"ok": True}
