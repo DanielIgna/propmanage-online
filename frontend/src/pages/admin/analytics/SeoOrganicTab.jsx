@@ -22,6 +22,8 @@ const Card = ({ title, children, testid, right }) => (
 );
 
 const pct = (n) => `${(Number(n || 0) * 100).toFixed(1)}%`;
+const ron = (n) => `${Number(n || 0).toLocaleString("ro-RO")} RON`;
+const AUD_LABEL = { owner: "Proprietari", specialist: "Specialiști", designer: "Designeri", unknown: "Neatribuit" };
 
 export const SeoOrganicTab = () => {
   const [period, setPeriod] = useState("28");
@@ -123,8 +125,26 @@ export const SeoOrganicTab = () => {
         </div>
       </Card>
 
-      {/* Search queries (GSC) */}
-      <Card title="Ce caută oamenii (GSC)" testid="ag-seo-queries">
+      {/* Signups by audience (source → audience → signup) */}
+      <Card title="Signups pe audiență (sursă → audiență → cont)" testid="ag-seo-signups-audience">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {["owner", "specialist", "designer", "unknown"].map((a) => (
+            <Stat key={a} label={AUD_LABEL[a]} value={data.signups_by_audience?.[a]?.total ?? 0}
+              testid={`ag-seo-signup-aud-${a}`}
+              sub={Object.entries(data.signups_by_audience?.[a]?.by_source || {}).map(([k, v]) => `${k}: ${v}`).join(" · ") || null} />
+          ))}
+        </div>
+        <div className="text-xs mt-3" data-testid="ag-seo-signup-source-note">
+          {data.signup_source_available ? (
+            <span className="text-slate-500">Sursă per signup din atribuirea reală (marketing_attributions / conversii).</span>
+          ) : (
+            <span className="text-amber-500">Sursă indisponibilă pe Preview — <code>marketing_attributions</code> este gol. Audiența este reală (din rol); sursa apare pe Producție unde colecția e populată.</span>
+          )}
+          {" "}Total signups în perioadă: <b>{data.signups_total ?? 0}</b>.
+        </div>
+      </Card>
+
+      {/* Search queries (GSC) */}      <Card title="Ce caută oamenii (GSC)" testid="ag-seo-queries">
         {gsc.status === "connected" && (gsc.queries || []).length ? (
           <div className="overflow-x-auto max-h-80 overflow-y-auto">
             <table className="w-full text-sm">
@@ -189,6 +209,44 @@ export const SeoOrganicTab = () => {
             <div className="mt-3 grid sm:grid-cols-2 gap-4 text-xs text-slate-600 dark:text-slate-300">
               <div><span className="font-semibold">Pe meserie:</span> {Object.entries(data.prospecting.by_trade || {}).map(([k, v]) => `${k}: ${v}`).join(" · ") || "—"}</div>
               <div><span className="font-semibold">Pe oraș:</span> {Object.entries(data.prospecting.by_city || {}).map(([k, v]) => `${k}: ${v}`).join(" · ") || "—"}</div>
+            </div>
+          )}
+
+          {/* Invitations by role + leads by source/stage */}
+          <div className="mt-4 grid sm:grid-cols-3 gap-4 text-xs text-slate-600 dark:text-slate-300">
+            <div data-testid="ag-prosp-inv-by-role"><span className="font-semibold">Invitații pe rol:</span> {Object.entries(data.prospecting.invitations_by_role || {}).map(([k, v]) => `${k}: ${v}`).join(" · ") || "—"}</div>
+            <div data-testid="ag-prosp-leads-by-source"><span className="font-semibold">Leads pe sursă:</span> {Object.entries(data.prospecting.leads_by_source || {}).map(([k, v]) => `${k}: ${v}`).join(" · ") || "—"}</div>
+            <div data-testid="ag-prosp-leads-by-stage"><span className="font-semibold">Leads pe etapă:</span> {Object.entries(data.prospecting.leads_by_stage || {}).map(([k, v]) => `${k}: ${v}`).join(" · ") || "—"}</div>
+          </div>
+
+          {/* Economics — pipeline (estimat) vs revenue (realizat) — separate */}
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Stat label="Pipeline (valoare estimată)" value={ron(data.prospecting.pipeline_estimated_value)} sub="A · estimat, nu venit" testid="ag-prosp-pipeline" />
+            <Stat label="Venit efectiv generat" value={ron(data.prospecting.revenue_generated)} sub="B · realizat" testid="ag-prosp-revenue" />
+            <Stat label="Cost per invitație" value="Indisponibil" sub={data.prospecting.cost_note} testid="ag-prosp-cost" />
+          </div>
+
+          {/* C. Configured revenue model per partner (NOT realized revenue) */}
+          {(data.prospecting.revenue_model || []).length > 0 && (
+            <div className="mt-4" data-testid="ag-prosp-revenue-model">
+              <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">Model de venit configurat per partener <span className="font-normal text-slate-400">(C · valori din DB, nu venit realizat)</span></div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead><tr className="text-left text-slate-500 border-b border-slate-200 dark:border-slate-700">
+                    <th className="py-1.5 pr-3">Partener</th><th className="py-1.5 pr-3">Oraș</th><th className="py-1.5 pr-3">Pachet</th><th className="py-1.5 pr-3">Procent</th><th className="py-1.5 pr-3">Per lead</th><th className="py-1.5 pr-3">Abonament</th>
+                  </tr></thead>
+                  <tbody>
+                    {data.prospecting.revenue_model.map((m, i) => (
+                      <tr key={i} className="border-b border-slate-100 dark:border-slate-700/50">
+                        <td className="py-1.5 pr-3">{m.company}</td><td className="py-1.5 pr-3">{m.city}</td><td className="py-1.5 pr-3">{m.package}</td>
+                        <td className="py-1.5 pr-3">{m.percent != null ? `${m.percent}%` : "—"}</td>
+                        <td className="py-1.5 pr-3">{m.per_lead != null ? ron(m.per_lead) : "—"}</td>
+                        <td className="py-1.5 pr-3">{m.monthly_subscription != null ? ron(m.monthly_subscription) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
           <div className="text-[11px] text-slate-400 mt-2">Boții NU sunt numărați ca trafic organic sau utilizatori umani. Sesiuni web marcate bot: {data.prospecting.web_sessions ?? 0}.</div>

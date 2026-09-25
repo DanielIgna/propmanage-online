@@ -178,9 +178,9 @@ export const trackFunnel = (step) => {
 // CONVERSII — leagă comportamentul clientului de Google Ads (AW-18423416296) + intern.
 // action: sign_up | first_request | offer_accepted | purchase
 export const trackConversion = (action, opts = {}) => {
-  const { value = 0, currency = "RON" } = opts;
+  const { value = 0, currency = "RON", role = "" } = opts;
   // 1) eveniment first-party (alimentează Business Health + Autonomy + Analytics&Growth)
-  push({ type: "conversion", conversion_action: action, conversion_value: value, conversion_currency: currency, path: currentPath });
+  push({ type: "conversion", conversion_action: action, conversion_value: value, conversion_currency: currency, conversion_role: role, path: currentPath });
   flush();
   // 2) conversie Google Ads — respectă Consent Mode v2 (nu setează cookies fără consimțământ „Marketing")
   try {

@@ -31,6 +31,8 @@ DESIGN_PAGES: list[tuple[str, str]] = [
     ("spatii-comerciale", "2026-06-16"),
     ("cabinete-medicale", "2026-06-16"),
     ("saloane", "2026-06-16"),
+    ("vila", "2026-06-24"),
+    ("horeca", "2026-06-24"),
 ]
 
 # (slug, lastmod) — style landing pages (the REAL PropManage style system)
@@ -44,6 +46,14 @@ DESIGN_STYLES: list[tuple[str, str]] = [
     ("classic", "2026-06-11"),
     ("rustic", "2026-06-11"),
     ("boho", "2026-06-11"),
+    ("contemporary", "2026-06-24"),
+    ("mid-century", "2026-06-24"),
+    ("transitional", "2026-06-24"),
+    ("wabi-sabi", "2026-06-24"),
+    ("biophilic", "2026-06-24"),
+    ("quiet-luxury", "2026-06-24"),
+    ("coastal", "2026-06-24"),
+    ("maximalist", "2026-06-24"),
 ]
 
 # Candidate cities/zones for local Design Interior pages (valid routes).

@@ -274,7 +274,7 @@ export const RegisterPage = () => {
       sendPassportConversion();
       import("../lib/analytics").then(({ trackConversion, identify }) => {
         identify(u.id || u._id || "", u.role || "");
-        trackConversion("sign_up");
+        trackConversion("sign_up", { role: u.role || form.role || "" });
       }).catch(() => {});
       // Specialist local SEO attribution: link the recruitment CTA to this signup.
       try {

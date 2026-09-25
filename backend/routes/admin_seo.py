@@ -138,6 +138,8 @@ def _classify(path: str):
         return "marketplace", "marketplace", True
     if p == "/ghiduri":
         return "editorial-hub", "other", False
+    if p == "/blog":
+        return "editorial-hub", "blog", False
     if p == "/probleme-casa":
         return "editorial-hub", "probleme_casa", False
     if p == "/preturi":

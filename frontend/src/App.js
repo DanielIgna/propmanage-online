@@ -32,6 +32,7 @@ import { PublicMarketplace } from "./pages/Marketplace";
 import { MarketplaceLanding } from "./pages/MarketplaceLanding";
 import { GhiduriIndex } from "./pages/GhiduriIndex";
 import { GhidPage } from "./pages/GhidPage";
+const BlogIndex = lazy(() => import("./pages/BlogIndex"));
 import { ProblemeIndex } from "./pages/ProblemeIndex";
 import { ProblemaPage } from "./pages/ProblemaPage";
 import { DesignInteriorPage } from "./pages/DesignInteriorPage";
@@ -1550,6 +1551,7 @@ const Footer = () => {
             <Link to="/cookies" className="hover:text-white transition-colors" data-testid="footer-cookies">Cookies</Link>
             <Link to="/trust" className="hover:text-white transition-colors" data-testid="footer-trust">Trust Center</Link>
             <Link to="/ghiduri" className="hover:text-white transition-colors" data-testid="footer-ghiduri">Ghiduri</Link>
+            <Link to="/blog" className="hover:text-white transition-colors" data-testid="footer-blog">Blog</Link>
             <Link to="/probleme-casa" className="hover:text-white transition-colors" data-testid="footer-probleme">Probleme casă</Link>
             <Link to="/devino-francizat" className="hover:text-[#d4ff3a] transition-colors" data-testid="footer-franchise">Devino francizat</Link>
             <Link to="/devino-specialist" className="hover:text-[#d4ff3a] transition-colors" data-testid="footer-specialist-apply">Devino specialist</Link>
@@ -1863,6 +1865,7 @@ function App() {
               <Route path="/contracts/:id" element={<ContractPage />} />
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />
               <Route path="/ghiduri" element={<GhiduriIndex />} />
+              <Route path="/blog" element={<BlogIndex />} />
               <Route path="/scorul-casei" element={<HealthScorePage />} />
               <Route path="/p/:slug" element={<PublicPassportPage />} />
               <Route path="/checklist-cumparare" element={<BuyingChecklistPage />} />

@@ -1,3 +1,33 @@
+## 📊 ACQUISITION ATTRIBUTION + PROSPECTING ECONOMICS — Faza 3 (25 sept 2026)
+
+**Cerere**: completare goluri peste Faza 1+2 (fără reconstrucție, fără sistem nou de tracking, fără atingeri SEO/sitemap/robots/canonical, fără deploy). Signup attribution pe audiență; prospecting extins doar cu date reale; model de venit configurat; cost indisponibil onest.
+
+**Implementat (reutilizând `marketing_conversions`/`analytics_sessions`/`referral_invites`/`marketplace_*`)**:
+- `analytics_growth.TrackEvent` + ingest: conversia `sign_up` poartă acum `role` (owner/specialist/designer); `Auth.jsx` `trackConversion("sign_up",{role})` + `analytics.js trackConversion` acceptă `role`.
+- `seo-organic`: NOU `signups_by_audience` (owner/specialist/designer/unknown, cu `by_source`), `signup_source_available` (false pe preview — `marketing_attributions` gol; rol backfill din `visitor_identities`, sursă onest „indisponibilă pe Preview"), `signups_total`.
+- Prospecting extins: `invitations_by_role` (client 13/specialist 4), `leads_by_source` (admin/marketplace_portal), `leads_by_stage` (new/qualified), `pipeline_estimated_value` (A · 6000 RON estimat) SEPARAT de `revenue_generated` (B · realizat), `revenue_model` (C · valori reale din `commissions`: per_lead/abonament/procent), `cost_per_invitation=None` + `cost_note` „indisponibil — nu există date de cost". `invitations_claimed` include acum status `registered`.
+- UI `SeoOrganicTab`: card „Signups pe audiență" + panou prospectare extins (roluri, leads pe sursă/etapă, pipeline vs venit, model de venit per partener, cost indisponibil). Un singur dashboard, structură păstrată.
+
+**Verificare (PASS)**: pytest `test_acquisition_attribution_iter229` 15/15 (classify_source matrix, _audience_of_role, seo-organic shape, pipeline≠revenue, cost unavailable, signup role e2e, auth guard) + GSC 10/10; screenshot dashboard confirmă toate secțiunile cu date reale. Frontend build 0 erori.
+**Date reale**: prospecting complet (invitații/parteneri/leads/pipeline). **Indisponibil**: cost prospectare (nu există date); source→signup pe preview (`marketing_attributions` gol — funcționează pe producție). Fără deploy.
+
+---
+
+## 🌱 SEO GROWTH ENGINE — Faza 3 (stiluri + project types + /blog) (25 sept 2026)
+
+**Cerere**: extindere organică RO controlată (fără doorway/duplicat/volum fără valoare, fără atingeri robots/canonical/sitemap-architecture/Marketplace&specialist indexability, fără deploy). Reutilizează infra SEO existentă.
+
+**Implementat (conținut distinct, INDEX, în infra existentă)**:
+- **Style library +8** (`designInterior.js DI_STYLES` + `seo_design.DESIGN_STYLES` → 9→17): contemporary, mid-century, transitional, wabi-sabi, biophilic, quiet-luxury, coastal, maximalist — fiecare cu definiție/caracteristici/materiale/paletă/spații/avantaje-limitări/CTA distinct. Randate de `DesignInteriorPage kind=style`, în `sitemap-design.xml`, clasificate `style/design_interior`.
+- **Project types +2** (`DI_PAGES` + `DESIGN_PAGES`): `/design-interior/vila` (niveluri, exterior) + `/design-interior/horeca` (restaurante/cafenele/hoteluri, fluxuri, norme). Conținut B2B/rezidențial distinct, CTA.
+- **/blog editorial hub** NOU (`BlogIndex.jsx`, rută `/blog`, lazy): motor editorial care REUTILIZEAZĂ `GHIDURI` (26 articole) organizate în 6 clustere comerciale (Design, Renovare&Costuri, Audit&Evaluare, Imobile Verificate, Specialiști + cluster Stiluri) cu intro original per cluster, CTA real per cluster (design/renovare/evaluare/imobile/specialist) + internal linking la servicii și style pages. Distinct de `/community` (neatins), fără pagini thin noi. În `sitemap-static`, clasificat `editorial-hub/blog`, link în footer.
+
+**Verificare (PASS)**: pytest `test_seo_growth_engine_iter229` 8/8 (registry 17 stiluri, vila/horeca, clasificare, sitemap) + `test_design_interior_routing_iter219` + `test_seo_admin_iter218` 11/11 (child_count 7 neschimbat); screenshot /blog (6 clustere, 26 carduri, cluster stiluri) + style page wabi-sabi randează. Build 0 erori. Sitemap: 17 stiluri + vila/horeca în sitemap-design; /blog în sitemap-static.
+**CANDIDATE / faza următoare** (nepublicat — necesită conținut local distinct autorat, anti-doorway): expansiune Design Interior națională pe orașe (Alba Iulia, Turda, Zalău, Bistrița, Târgu Mureș, Satu Mare, Arad, Deva, Hunedoara etc.), `/servicii-pentru-casa/<oraș>` național, project types suplimentare (living/bucătărie/baie/dormitor există deja), articole blog originale noi. Fără deploy.
+
+---
+
+
 ## 🎯 SEO RANKING + CONVERSION — Faza 2 (CTA per cluster, 8 pagini) (25 sept 2026)
 
 **Cerere**: pe cele 8 pagini prioritare (impresii + poziții slabe) — title/meta/H1/prime secțiuni/internal linking/CTA. Fără pagini noi, fără deploy, fără robots/canonical/sitemap/indexability/Marketplace/tracking.

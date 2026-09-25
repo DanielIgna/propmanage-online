@@ -99,6 +99,7 @@ class TrackEvent(BaseModel):
     conversion_action: str = ""    # sign_up | first_request | purchase | offer_accepted
     conversion_value: float = 0.0  # valoare RON (ex: sumă escrow pt purchase)
     conversion_currency: str = "RON"
+    conversion_role: str = ""      # owner|specialist|designer|client — audiența la signup (fără sistem nou)
     ab_key: str = ""               # A/B testing: cheia experimentului
     ab_variant: str = ""           # A | B
     ts: str = ""
@@ -193,6 +194,7 @@ async def ingest_events(batch: TrackBatch, request: Request):
                 "currency": (ev.conversion_currency or "RON")[:8],
                 "visitor_id": batch.visitor_id,
                 "user_id": (batch.user_id or "")[:40],
+                "role": (ev.conversion_role or batch.user_role or "")[:20],
                 "gclid": (attr or {}).get("gclid", "") or gclid,
                 "utm_source": (attr or {}).get("utm_source", "") or (ev.utm_source or ""),
                 "utm_campaign": (attr or {}).get("utm_campaign", "") or (ev.utm_campaign or ""),
@@ -1411,6 +1413,18 @@ def _audience_of(intent_signal: str) -> str:
     return "unknown"
 
 
+def _audience_of_role(role: str) -> str:
+    """Map user role → acquisition audience (owner/specialist/designer/unknown)."""
+    r = (role or "").lower()
+    if r in ("specialist",):
+        return "specialist"
+    if r in ("designer",):
+        return "designer"
+    if r in ("client", "owner", "proprietar"):
+        return "owner"
+    return "unknown"
+
+
 @admin_router.get("/analytics/seo-organic")
 async def seo_organic_growth(period: str = "28", refresh: int = 0,
                              user: dict = Depends(require_role("admin"))):
@@ -1495,20 +1509,49 @@ async def seo_organic_growth(period: str = "28", refresh: int = 0,
                 page_org[_p]["cta"] += 1
             audience[_audience_of(sig)] += 1
 
-    # ── Conversions (marketing_conversions + specialist_local signups) ──
     # ── Conversions (marketing_conversions) split into signups vs leads/requests ──
+    # Also builds signups_by_audience (owner/specialist/designer/unknown) with source
+    # preserved when real attribution exists. Role backfilled from visitor_identities
+    # (real data) when the conversion predates role tagging. Never invents a source.
+    attributions_count = await db.marketing_attributions.count_documents({})
+    signups_by_audience = {a: {"total": 0, "by_source": defaultdict(int)}
+                           for a in ("owner", "specialist", "designer", "unknown")}
+    signups_total = 0
+    signups_with_source = 0
     async for cv in db.marketing_conversions.find(
-        {"day": {"$gte": cutoff}}, {"source": 1, "gclid": 1, "utm_source": 1, "action": 1, "_id": 0},
+        {"day": {"$gte": cutoff}},
+        {"source": 1, "gclid": 1, "utm_source": 1, "action": 1, "role": 1, "visitor_id": 1, "_id": 0},
     ):
         base = cv.get("source", "") or cv.get("utm_source", "")
         key, label = _refine_source(base, "", cv.get("gclid", ""))
         src_label.setdefault(key, label)
         src_tally[key]["conversions"] += 1
         act = (cv.get("action") or "").lower()
-        if "sign" in act or "signup" in act or "account" in act:
+        is_signup = "sign" in act or "signup" in act or "account" in act
+        if is_signup:
             src_tally[key]["signups"] += 1
+            role = cv.get("role") or ""
+            if not role and cv.get("visitor_id"):
+                ident = await db.visitor_identities.find_one(
+                    {"visitor_id": cv["visitor_id"]}, {"role": 1, "_id": 0})
+                role = (ident or {}).get("role", "")
+            aud = _audience_of_role(role)
+            signups_by_audience[aud]["total"] += 1
+            signups_by_audience[aud]["by_source"][key] += 1
+            signups_total += 1
+            # "has real source" = anything other than direct/other with no referrer signal
+            if key not in ("direct",):
+                signups_with_source += 1
         elif "lead" in act or "request" in act or "offer" in act or "form" in act:
             src_tally[key]["leads"] += 1
+
+    # source→signup availability: real only when marketing_attributions is populated
+    # OR at least one signup carries a non-direct source. Otherwise honest "unavailable".
+    signup_source_available = attributions_count > 0 or signups_with_source > 0
+    signups_audience_out = {
+        a: {"total": v["total"], "by_source": dict(v["by_source"])}
+        for a, v in signups_by_audience.items()
+    }
 
     # Human sources exclude bot/prospecting (reported separately below).
     traffic = sorted(
@@ -1560,7 +1603,12 @@ async def seo_organic_growth(period: str = "28", refresh: int = 0,
     # verified ; resulting leads. Real data from referral_invites / marketplace_*.
     inv_total = await db.referral_invites.count_documents({})
     inv_claimed = await db.referral_invites.count_documents(
-        {"$or": [{"status": "claimed"}, {"claimed_at": {"$nin": [None, ""]}}]})
+        {"$or": [{"status": {"$in": ["claimed", "registered"]}}, {"claimed_at": {"$nin": [None, ""]}}]})
+    # invitations by invited_role (real: client vs specialist)
+    inv_by_role = {}
+    async for r in db.referral_invites.aggregate(
+        [{"$group": {"_id": "$invited_role", "n": {"$sum": 1}}}]):
+        inv_by_role[r["_id"] or "nespecificat"] = r["n"]
     partners_total = await db.marketplace_partners.count_documents({})
     partners_signed = await db.marketplace_partners.count_documents({"linked_user_id": {"$nin": [None, ""]}})
     partners_verified = await db.marketplace_partners.count_documents(
@@ -1574,13 +1622,52 @@ async def seo_organic_growth(period: str = "28", refresh: int = 0,
     async for r in db.marketplace_partners.aggregate([{"$group": {"_id": "$city", "n": {"$sum": 1}}}]):
         if r["_id"]:
             by_city[r["_id"]] = r["n"]
+
+    # ── Leads by source / stage + pipeline vs realized revenue (kept separate) ──
+    leads_by_source, leads_by_stage = {}, {}
+    pipeline_value, revenue_generated = 0.0, 0.0
+    async for r in db.marketplace_leads.aggregate([{"$group": {"_id": "$source", "n": {"$sum": 1}}}]):
+        leads_by_source[r["_id"] or "nespecificat"] = r["n"]
+    async for r in db.marketplace_leads.aggregate([{"$group": {"_id": "$stage", "n": {"$sum": 1}}}]):
+        leads_by_stage[r["_id"] or "nespecificat"] = r["n"]
+    async for lead in db.marketplace_leads.find({}, {"estimated_value": 1, "revenue_generated": 1, "_id": 0}):
+        pipeline_value += float(lead.get("estimated_value") or 0)     # A. pipeline (estimat)
+        revenue_generated += float(lead.get("revenue_generated") or 0)  # B. venit efectiv realizat
+
+    # ── C. Configured revenue model per partner (real DB values, NOT realized revenue) ──
+    revenue_model = []
+    async for p in db.marketplace_partners.find(
+        {"commissions": {"$exists": True}},
+        {"company": 1, "city": 1, "tier": 1, "package": 1, "commissions": 1, "_id": 0}):
+        cm = p.get("commissions") or {}
+        revenue_model.append({
+            "company": p.get("company") or "—",
+            "city": p.get("city") or "—",
+            "tier": p.get("tier") or "—",
+            "package": p.get("package") or "—",
+            "type": cm.get("type") or "—",
+            "percent": cm.get("percent"),
+            "per_lead": cm.get("per_lead"),
+            "monthly_subscription": cm.get("monthly_subscription"),
+        })
+
     prospecting = {
         "invitations_sent": inv_total,
         "invitations_claimed": inv_claimed,       # invitation → signup
+        "invitations_by_role": inv_by_role,
         "partners_prospected": partners_total,
         "partners_signed": partners_signed,       # linked account created
         "partners_verified": partners_verified,
         "leads_generated": prosp_leads,
+        "leads_by_source": leads_by_source,
+        "leads_by_stage": leads_by_stage,
+        "pipeline_estimated_value": round(pipeline_value, 2),   # A. estimat (pipeline)
+        "revenue_generated": round(revenue_generated, 2),       # B. venit efectiv realizat
+        "revenue_model": revenue_model,                         # C. model configurat per partener
+        # No acquisition-cost data exists anywhere → cannot compute cost-per-invitation.
+        "cost_per_invitation": None,
+        "cost_available": False,
+        "cost_note": "indisponibil — nu există date de cost",
         "by_trade": by_trade,
         "by_city": by_city,
         "web_sessions": bot_traffic.get("sessions", 0),   # bot-tagged web hits (not human)
@@ -1607,6 +1694,9 @@ async def seo_organic_growth(period: str = "28", refresh: int = 0,
         "landing_pages": landing,
         "funnel": funnel,
         "signals": signals,
+        "signups_by_audience": signups_audience_out,
+        "signup_source_available": signup_source_available,
+        "signups_total": signups_total,
         "prospecting": prospecting,
     }
     _SEO_ORG_CACHE[ck] = (now_ts, result)
