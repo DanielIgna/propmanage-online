@@ -1,3 +1,16 @@
+## 🎯 ACQUISITION INTELLIGENCE — Faza 2 (surse separate + prospecting) (25 sept 2026)
+
+**Implementat (reutilizând infra, fără deploy, fără atingerea SEO indexability/sitemap/robots/canonical/Marketplace)**:
+- `analytics_growth.classify_source`: separare **Instagram vs Facebook** (`instagram`→instagram, `facebook.com/fb.com`→facebook) + sursă nouă **bot** (utm/campaign `bot|prospecting|outreach`); `accounts.google.com`→other; Google Search rămâne organic.
+- `_refine_source`: etichete distincte Instagram (social) / Facebook (social) / Bot–Prospecting.
+- Endpoint `seo-organic` extins: per sursă acum **signups + leads** (din `marketing_conversions.action`: sign*→signup, lead/request/offer/form→lead); **bot exclus** din traficul uman (`traffic`), raportat separat; NOU bloc **`prospecting`** din `referral_invites` (invitations_sent/claimed→signup) + `marketplace_partners` (prospected/signed=linked_user_id/verified=tier) + `marketplace_leads` (leads), cu `by_trade` și `by_city`.
+- UI `SeoOrganicTab`: coloane Signups/Leads în tabelul de surse + panou „Prospectare specialiști (bot — separat de traficul uman)".
+
+**Verificare (PASS)**: classify_source unit (instagram/facebook/bot/accounts.google/google-search corecte); endpoint real (preview): surse direct/other/whatsapp/google_organic + prospecting {inv 17, claimed 16, parteneri 7, signed 4, verified 7, leads 8, by_trade, by_city Cluj 6}; UI randează sursele + funnel onest (GSC „—" neconectat) + panou prospectare; frontend build 0 erori. **Limite reale de date**: GSC neconectat pe preview (producție îl are); signups/leads per sursă depind de `marketing_conversions` populat (preview: mai ales direct/lead_form → alte surse 0, real nu mock); rândurile Instagram/Facebook apar doar când există trafic real din ele. Fără deploy — READY FOR REVIEW.
+
+---
+
+
 ## 🔬 SEO ACQUISITION INTELLIGENCE — Faza 1 (validare attribution + fix) (25 sept 2026)
 
 **Root cause discrepanță GSC (1 click) vs analytics (28 „organic sessions")**: `classify_source` clasifica orice referrer cu „google" ca sursă „google", INCLUSIV redirect-ul OAuth login `accounts.google.com` → traficul de login apărea ca „Google organic", iar `/login`, `/auth/callback`, `/client` apăreau ca landing pages organice. Preview DB ≠ producție (preview are 1 sesiune google); cele 28 sunt din producție, dar logica e independentă de mediu și confirmată (sesiune `/login` clasificată google în preview).

@@ -50,11 +50,15 @@ def classify_source(referrer: str = "", utm_source: str = "", campaign_code: str
     if via_qr or u == "qr":
         return "qr"
     if u:
-        for s in ("whatsapp", "facebook", "google", "admin"):
+        if u in ("bot", "prospecting", "outreach"):
+            return "bot"
+        for s in ("whatsapp", "instagram", "facebook", "google", "admin"):
             if s in u:
                 return s
         return "other"
     if campaign_code:
+        if campaign_code.lower().startswith(("bot", "prospect", "outreach")):
+            return "bot"
         return "other"
     # OAuth/login return traffic from Google account pages is NOT organic search.
     # (accounts.google.com is the login provider, not google.com/search.)
@@ -62,7 +66,9 @@ def classify_source(referrer: str = "", utm_source: str = "", campaign_code: str
         return "other"
     if "wa.me" in r or "whatsapp" in r:
         return "whatsapp"
-    if "facebook" in r or "fb.com" in r or "instagram" in r:
+    if "instagram" in r:
+        return "instagram"
+    if "facebook" in r or "fb.com" in r:
         return "facebook"
     if "google" in r or "gclid" in r:
         return "google"
@@ -1380,7 +1386,11 @@ def _refine_source(source: str, utm_medium: str = "", gclid: str = "") -> tuple:
     if s == "google":
         return ("google_ads", "Google Ads (cpc)") if paid else ("google_organic", "Google / organic")
     if s == "facebook":
-        return ("social", "Facebook / Instagram (social)")
+        return ("facebook", "Facebook (social)")
+    if s == "instagram":
+        return ("instagram", "Instagram (social)")
+    if s == "bot":
+        return ("bot", "Bot / Prospecting")
     if s == "whatsapp":
         return ("whatsapp", "WhatsApp / referral")
     if s == "direct":
@@ -1446,7 +1456,7 @@ async def seo_organic_growth(period: str = "28", refresh: int = 0,
         gsc = {"status": "error", "overview": None, "queries": [], "pages": [], "error": str(exc)[:160]}
 
     # ── Traffic by refined source (analytics_sessions) ──
-    src_tally = defaultdict(lambda: {"sessions": 0, "cta": 0, "conversions": 0})
+    src_tally = defaultdict(lambda: {"sessions": 0, "cta": 0, "conversions": 0, "signups": 0, "leads": 0})
     src_label = {}
     page_org = defaultdict(lambda: {"organic_sessions": 0, "cta": 0, "conversions": 0})
     ads_sessions = 0
@@ -1486,18 +1496,26 @@ async def seo_organic_growth(period: str = "28", refresh: int = 0,
             audience[_audience_of(sig)] += 1
 
     # ── Conversions (marketing_conversions + specialist_local signups) ──
+    # ── Conversions (marketing_conversions) split into signups vs leads/requests ──
     async for cv in db.marketing_conversions.find(
-        {"day": {"$gte": cutoff}}, {"source": 1, "gclid": 1, "utm_source": 1, "_id": 0},
+        {"day": {"$gte": cutoff}}, {"source": 1, "gclid": 1, "utm_source": 1, "action": 1, "_id": 0},
     ):
         base = cv.get("source", "") or cv.get("utm_source", "")
         key, label = _refine_source(base, "", cv.get("gclid", ""))
         src_label.setdefault(key, label)
         src_tally[key]["conversions"] += 1
+        act = (cv.get("action") or "").lower()
+        if "sign" in act or "signup" in act or "account" in act:
+            src_tally[key]["signups"] += 1
+        elif "lead" in act or "request" in act or "offer" in act or "form" in act:
+            src_tally[key]["leads"] += 1
 
+    # Human sources exclude bot/prospecting (reported separately below).
     traffic = sorted(
-        [{"key": k, "label": src_label.get(k, k), **v} for k, v in src_tally.items()],
+        [{"key": k, "label": src_label.get(k, k), **v} for k, v in src_tally.items() if k != "bot"],
         key=lambda r: r["sessions"], reverse=True,
     )
+    bot_traffic = src_tally.get("bot", {"sessions": 0, "cta": 0, "conversions": 0, "signups": 0, "leads": 0})
     org = src_tally.get("google_organic", {"sessions": 0, "cta": 0, "conversions": 0})
     qualified_org = max(org["sessions"] - system_excluded, 0)
     totals = {
@@ -1537,6 +1555,37 @@ async def seo_organic_growth(period: str = "28", refresh: int = 0,
 
     signals = [_signal(r) for r in landing]
 
+    # ── Bot / Specialist PROSPECTING funnel (separate from human traffic) ──
+    # invitations sent → claimed(signup) ; partners prospected → signed(account) →
+    # verified ; resulting leads. Real data from referral_invites / marketplace_*.
+    inv_total = await db.referral_invites.count_documents({})
+    inv_claimed = await db.referral_invites.count_documents(
+        {"$or": [{"status": "claimed"}, {"claimed_at": {"$nin": [None, ""]}}]})
+    partners_total = await db.marketplace_partners.count_documents({})
+    partners_signed = await db.marketplace_partners.count_documents({"linked_user_id": {"$nin": [None, ""]}})
+    partners_verified = await db.marketplace_partners.count_documents(
+        {"$or": [{"tier": {"$in": ["verified", "premium", "strategic", "exclusive"]}}, {"status": "active"}]})
+    prosp_leads = await db.marketplace_leads.count_documents({})
+    by_trade, by_city = {}, {}
+    async for r in db.marketplace_partners.aggregate([{"$unwind": {"path": "$categories", "preserveNullAndEmptyArrays": True}},
+                                                      {"$group": {"_id": "$categories", "n": {"$sum": 1}}}]):
+        if r["_id"]:
+            by_trade[r["_id"]] = r["n"]
+    async for r in db.marketplace_partners.aggregate([{"$group": {"_id": "$city", "n": {"$sum": 1}}}]):
+        if r["_id"]:
+            by_city[r["_id"]] = r["n"]
+    prospecting = {
+        "invitations_sent": inv_total,
+        "invitations_claimed": inv_claimed,       # invitation → signup
+        "partners_prospected": partners_total,
+        "partners_signed": partners_signed,       # linked account created
+        "partners_verified": partners_verified,
+        "leads_generated": prosp_leads,
+        "by_trade": by_trade,
+        "by_city": by_city,
+        "web_sessions": bot_traffic.get("sessions", 0),   # bot-tagged web hits (not human)
+    }
+
     funnel = {
         "impressions": (gsc["overview"] or {}).get("impressions") if gsc.get("status") == "connected" else None,
         "clicks": (gsc["overview"] or {}).get("clicks") if gsc.get("status") == "connected" else None,
@@ -1558,6 +1607,7 @@ async def seo_organic_growth(period: str = "28", refresh: int = 0,
         "landing_pages": landing,
         "funnel": funnel,
         "signals": signals,
+        "prospecting": prospecting,
     }
     _SEO_ORG_CACHE[ck] = (now_ts, result)
     return result

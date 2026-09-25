@@ -86,7 +86,7 @@ export const SeoOrganicTab = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="text-left text-slate-500 border-b border-slate-200 dark:border-slate-700">
-              <th className="py-2 pr-3">Sursă</th><th className="py-2 pr-3">Sesiuni</th><th className="py-2 pr-3">CTA</th><th className="py-2 pr-3">Conversii</th>
+              <th className="py-2 pr-3">Sursă</th><th className="py-2 pr-3">Sesiuni</th><th className="py-2 pr-3">CTA</th><th className="py-2 pr-3">Signups</th><th className="py-2 pr-3">Leads</th>
             </tr></thead>
             <tbody>
               {(data.traffic || []).map((r) => (
@@ -94,7 +94,8 @@ export const SeoOrganicTab = () => {
                   <td className="py-2 pr-3 text-slate-800 dark:text-slate-200">{r.label}</td>
                   <td className="py-2 pr-3">{r.sessions}</td>
                   <td className="py-2 pr-3">{r.cta}</td>
-                  <td className="py-2 pr-3 font-semibold text-emerald-500">{r.conversions}</td>
+                  <td className="py-2 pr-3 font-semibold text-emerald-500">{r.signups ?? 0}</td>
+                  <td className="py-2 pr-3">{r.leads ?? 0}</td>
                 </tr>
               ))}
             </tbody>
@@ -172,6 +173,27 @@ export const SeoOrganicTab = () => {
           <div className="text-sm text-slate-500 flex items-center gap-2"><MousePointerClick className="w-4 h-4" /> Insufficient data — încă nu există sesiuni organice atribuite unei pagini în această perioadă.</div>
         )}
       </Card>
+
+      {/* Bot / Specialist PROSPECTING — separate from human traffic */}
+      {data.prospecting && (
+        <Card title="Prospectare specialiști (bot — separat de traficul uman)" testid="ag-seo-prospecting">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <Stat label="Invitații trimise" value={data.prospecting.invitations_sent ?? 0} testid="ag-prosp-inv" />
+            <Stat label="Invitații revendicate" value={data.prospecting.invitations_claimed ?? 0} sub="→ signup" testid="ag-prosp-claimed" />
+            <Stat label="Parteneri prospectați" value={data.prospecting.partners_prospected ?? 0} testid="ag-prosp-partners" />
+            <Stat label="Conturi create" value={data.prospecting.partners_signed ?? 0} testid="ag-prosp-signed" />
+            <Stat label="Verificați" value={data.prospecting.partners_verified ?? 0} testid="ag-prosp-verified" />
+            <Stat label="Lead-uri generate" value={data.prospecting.leads_generated ?? 0} testid="ag-prosp-leads" />
+          </div>
+          {(Object.keys(data.prospecting.by_trade || {}).length > 0 || Object.keys(data.prospecting.by_city || {}).length > 0) && (
+            <div className="mt-3 grid sm:grid-cols-2 gap-4 text-xs text-slate-600 dark:text-slate-300">
+              <div><span className="font-semibold">Pe meserie:</span> {Object.entries(data.prospecting.by_trade || {}).map(([k, v]) => `${k}: ${v}`).join(" · ") || "—"}</div>
+              <div><span className="font-semibold">Pe oraș:</span> {Object.entries(data.prospecting.by_city || {}).map(([k, v]) => `${k}: ${v}`).join(" · ") || "—"}</div>
+            </div>
+          )}
+          <div className="text-[11px] text-slate-400 mt-2">Boții NU sunt numărați ca trafic organic sau utilizatori umani. Sesiuni web marcate bot: {data.prospecting.web_sessions ?? 0}.</div>
+        </Card>
+      )}
 
       <div className="text-[11px] text-slate-400" data-testid="ag-seo-generated">
         Date reale · generat {new Date(data.generated_at).toLocaleString("ro-RO")} {data.cached ? "· din cache" : ""}
