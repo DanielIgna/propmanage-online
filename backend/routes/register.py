@@ -102,6 +102,7 @@ from routes.it_collaborators import router as it_collaborators_router
 from routes.it_digest import router as it_digest_router
 from routes.legal import router as legal_router, admin_router as legal_admin_router
 from routes.city_partners import admin_router as city_partners_admin_router, partner_router as city_partners_portal_router, products_admin_router as city_partner_products_router
+from routes.content_factory import admin_router as content_factory_admin_router, public_router as content_factory_public_router
 from routes.marketplace_partners import admin_router as marketplace_admin_router, partner_router as marketplace_portal_router
 from routes.strategic_partners import router as strategic_partners_router
 from routes.marketing_growth import router as marketing_growth_router
@@ -283,6 +284,8 @@ ALL_ROUTERS = (
     city_partners_admin_router,
     city_partners_portal_router,
     city_partner_products_router,
+    content_factory_admin_router,
+    content_factory_public_router,
     marketplace_admin_router,
     marketplace_portal_router,
     strategic_partners_router,

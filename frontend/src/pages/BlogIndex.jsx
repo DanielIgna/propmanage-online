@@ -58,6 +58,15 @@ const STYLE_LINKS = ["contemporary", "mid-century", "minimalist", "japandi", "sc
   .map((s) => ({ slug: s, label: DI_STYLES[s].h1.replace(/^Design interior stil /i, "").replace(/^Design interior /i, "") }));
 
 export const BlogIndex = () => {
+  const [freshPosts, setFreshPosts] = React.useState([]);
+  React.useEffect(() => {
+    let alive = true;
+    fetch(`${process.env.REACT_APP_BACKEND_URL}/api/content/articles`)
+      .then((r) => (r.ok ? r.json() : { articles: [] }))
+      .then((d) => { if (alive) setFreshPosts(d.articles || []); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
   const allPosts = CLUSTERS.flatMap((c) => c.slugs).map((s) => bySlug[s]).filter(Boolean);
   useSEO({
     title: "Blog PropManage · Design interior, renovare, audit și imobile verificate 2026",
@@ -132,6 +141,28 @@ export const BlogIndex = () => {
 
         {/* Content clusters */}
         <div className="space-y-16">
+          {/* Latest published articles (Content Factory) */}
+          {freshPosts.length > 0 && (
+            <section data-testid="blog-latest">
+              <div className="flex items-end justify-between gap-3 mb-5">
+                <h2 className="font-serif text-2xl sm:text-3xl">Ultimele articole</h2>
+              </div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {freshPosts.slice(0, 6).map((a) => (
+                  <Link key={a.slug} to={`/blog/${a.slug}`} data-testid={`blog-fresh-${a.slug}`}
+                    className="block glass-strong rounded-2xl p-6 hover:bg-white/[0.06] transition group h-full">
+                    <div className="text-[10px] uppercase tracking-wider font-semibold text-[#d4ff3a] mb-3">{a.cluster_label}{a.city ? ` · ${a.city}` : ""}</div>
+                    <h3 className="font-serif text-lg leading-tight mb-3 group-hover:text-[#d4ff3a] transition">{a.h1 || a.title}</h3>
+                    <p className="text-sm text-stone-400 leading-relaxed mb-4 line-clamp-3">{a.excerpt || a.meta_description}</p>
+                    <div className="flex items-center justify-between text-xs text-stone-500 pt-3 border-t border-white/5">
+                      <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" />{a.read_mins} min</span>
+                      <span className="flex items-center gap-1 text-stone-400 group-hover:text-[#d4ff3a] transition">Citește <ArrowRight className="w-3 h-3" /></span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
           {CLUSTERS.map((cluster) => {
             const posts = cluster.slugs.map((s) => bySlug[s]).filter(Boolean);
             if (!posts.length) return null;

@@ -6,11 +6,12 @@ import axios from "axios";
 import {
   Search, Globe, FileText, ListChecks, Layers, AlertTriangle, BarChart3,
   RefreshCw, CheckCircle2, XCircle, ExternalLink, Loader2, Eye, ShieldCheck,
-  MapPin, Building2, Gauge, Download, Link2, Plug,
+  MapPin, Building2, Gauge, Download, Link2, Plug, Sparkles,
 } from "lucide-react";
 import { AdminCard, AdminBtn } from "./AdminLayoutMetronic";
 import { API } from "../DashShared";
 import { useTheme as useGlobalTheme } from "../../contexts/ThemeContext";
+import { ContentFactoryTab } from "./seo/ContentFactoryTab";
 
 const SUB_TABS = [
   { id: "overview", label: "Overview", icon: Gauge },
@@ -21,6 +22,7 @@ const SUB_TABS = [
   { id: "clusters", label: "Clusters", icon: Layers },
   { id: "specialist-local", label: "Specialiști local", icon: MapPin },
   { id: "hartablocuri-clusters", label: "HartaBlocuri", icon: Building2 },
+  { id: "content-factory", label: "Content Factory", icon: Sparkles },
   { id: "alerts", label: "Alerts", icon: AlertTriangle },
   { id: "gsc", label: "GSC", icon: BarChart3 },
 ];
@@ -91,7 +93,7 @@ export const AdminSEO = () => {
   }, [cache]);
 
   React.useEffect(() => {
-    if (tab === "inspector" || tab === "gsc") return; // on-demand tabs
+    if (tab === "inspector" || tab === "gsc" || tab === "content-factory") return; // on-demand tabs
     if (!cache[tab]) load(tab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
@@ -120,7 +122,7 @@ export const AdminSEO = () => {
           );
         })}
         <div className="ml-auto">
-          <AdminBtn variant="ghost" onClick={() => load(tab === "inspector" ? "overview" : tab, true)} data-testid="seo-refresh">
+          <AdminBtn variant="ghost" onClick={() => { if (tab === "content-factory") return; load(tab === "inspector" ? "overview" : tab, true); }} data-testid="seo-refresh">
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </AdminBtn>
         </div>
@@ -199,6 +201,8 @@ export const AdminSEO = () => {
 
       {/* ---------------- URL INSPECTOR ---------------- */}
       {tab === "inspector" && <InspectorView isDark={isDark} txt={txt} muted={muted} border={border} rowBorder={rowBorder} />}
+
+      {tab === "content-factory" && <ContentFactoryTab />}
 
       {/* ---------------- SITEMAP ---------------- */}
       {tab === "sitemap" && data && <SitemapView data={data} isDark={isDark} txt={txt} muted={muted} border={border} rowBorder={rowBorder} />}

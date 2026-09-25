@@ -33,6 +33,7 @@ import { MarketplaceLanding } from "./pages/MarketplaceLanding";
 import { GhiduriIndex } from "./pages/GhiduriIndex";
 import { GhidPage } from "./pages/GhidPage";
 const BlogIndex = lazy(() => import("./pages/BlogIndex"));
+const ArticlePage = lazy(() => import("./pages/ArticlePage"));
 const IrenesWorldPage = lazy(() => import("./pages/IrenesWorldPage"));
 import { ProblemeIndex } from "./pages/ProblemeIndex";
 import { ProblemaPage } from "./pages/ProblemaPage";
@@ -1868,6 +1869,7 @@ function App() {
               <Route path="/imobile-verificate/:id" element={<EstateDetail />} />
               <Route path="/ghiduri" element={<GhiduriIndex />} />
               <Route path="/blog" element={<BlogIndex />} />
+              <Route path="/blog/:slug" element={<ArticlePage />} />
               <Route path="/scorul-casei" element={<HealthScorePage />} />
               <Route path="/p/:slug" element={<PublicPassportPage />} />
               <Route path="/checklist-cumparare" element={<BuyingChecklistPage />} />

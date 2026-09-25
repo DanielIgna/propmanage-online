@@ -1,3 +1,34 @@
+## 🏭 CONTENT GROWTH ENGINE V1 — Content Factory + SEO Opportunity Engine (25 sept 2026)
+
+**Cerere**: motor care transformă date reale search+acquisition în oportunități de conținut comercial → DRAFT-uri cu human review (V1 fără auto-publish). Reutilizează GSC/analytics/admin_seo/blog/sitemap existente; zero engine paralel, zero mock, fără deploy. LLM: **Claude Sonnet 4.6** (Emergent LLM key).
+
+**Implementat**:
+- **`backend/routes/content_factory.py`** (modul + `admin_router` + `public_router`, înregistrate în `register.py`):
+  - **Opportunity Engine** `detect_opportunities()`: categorii A–F; surse etichetate `gsc` | `analytics` | `structural-gap`; fiecare oportunitate are `data_status`. Pe Preview GSC = **UNAVAILABLE** (neconectat, onest, fără mock); analytics real (landing pages content-only, exclus login/admin/root); structural-gap din 12 topicuri comerciale reale (fără volume inventate).
+  - **Intent classifier** `classify_intent()` determinist (design/renovation/cost/problem/property/specialist/local/comparison/transactional/informational/audit/mobilier + umbrella commercial).
+  - **Content-gap** `find_content_gap()` vs registre reale (ghiduri/probleme/prețuri/design/blog) → `update` / `update_or_link` / `candidate` (anti-duplicat).
+  - **Content brief** `build_brief()` + **Article generator** `generate_article_draft()` (Claude Sonnet 4.6, one-shot JSON, parsing tolerant la ghilimele/control chars).
+  - **Workflow** `idea→research→brief→draft→review→approved→published→measured→retired`; colecție nouă `content_articles`.
+  - **Publish gate**: `POST /articles/{id}/publish` acceptă DOAR `approved` (human review obligatoriu); refresh sitemap la publish.
+  - **Public** (published only): `GET /api/content/articles` + `/articles/{slug}` (draft → 404).
+- **Frontend**: `/blog/:slug` → `ArticlePage.jsx` (DB, distinct de `/ghiduri/:slug`; useSEO+BlogPosting+FAQ+Breadcrumb JSON-LD, robots index, canonical `propmanage.ro/blog/{slug}`, CTA + internal links + tracking); `/blog` hub → secțiune „Ultimele articole" (fetch published). Sitemap `sitemap-content.xml` include `/blog/{slug}` published (endpoint + writer).
+- **Admin observability**: tab „Content Factory" în **SEO Control Center existent** (`seo/ContentFactoryTab.jsx`, fără dashboard paralel): summary pe status, tabel oportunități (sursă/cluster/gap/prio + „Generează draft"), tabel articole cu tranziții status + publish + delete.
+
+**Prima producție controlată — 5 DRAFT-uri** (Claude, status=draft, NEPUBLICATE):
+1. [design] Cât costă amenajarea unui apartament la cheie? → CTA /design-interior#formular
+2. [mobilier] Cât costă mobilierul la comandă pentru bucătărie? → CTA /servicii/mobilier
+3. [renovare] Cum eviți surprizele de buget la o renovare → CTA /scorul-casei
+4. [renovare] Greșeli frecvente la renovarea băii și cum le eviți → CTA /scorul-casei
+5. [design] Cum alegi stilul de design potrivit pentru apartament → CTA /design-interior#formular
+Fiecare cu opportunity+intent+source(structural-gap)+content-gap(candidate)+brief+CTA+internal links. Restul oportunităților rămân în engine (nu s-au generat automat).
+
+**Date reale**: analytics (landing/sessions) — OK sparse; prospecting/acquisition — OK (din faze anterioare). **UNAVAILABLE pe Preview**: GSC (impressions/CTR/position/queries) — se activează în Producție. **Nimic inventat**.
+**Verificare (PASS)**: pytest `test_content_factory_iter232` **18/18** (intent matrix, cluster, content-gap, brief, opportunities honest-GSC, no-system-pages, workflow, publish-guard approved-only, public-published-only, auth) + `test_seo_admin` + `test_design_ecosystem` = **37 passed**; e2e pipeline verificat (draft-publish blocat 400 → approve→publish 200 → /blog/{slug} 200 → sitemap conține → delete → 404; 5 drafturi rămân intacte); screenshot ArticlePage + blog hub + admin Content Factory tab. Build 0 erori. Sitemap index 7 copii (neschimbat). Fără deploy.
+**Automat vs Human**: automat = detecție oportunități + generare draft (la cerere). Human review obligatoriu = review→approved→**publish** (V1 nu publică nimic automat).
+
+---
+
+
 ## 🏛️ DESIGN ECOSYSTEM — Faza 4A (Irene's World + Partner Network prep) (25 sept 2026)
 
 **Cerere**: integrează Irene's World ca prim nod studio + pregătește minimal infra existentă pentru rețea de parteneri/furnizori/branduri/materiale/proiecte. Fără SEO engine nou / marketplace nou / registry paralel / dashboard nou / catalog public / sute de pagini / deploy. Reutilizează infra existentă, zero date inventate.

@@ -821,7 +821,15 @@ async def public_sitemap_static():
 @router.get("/public/sitemap-content.xml")
 async def public_sitemap_content():
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    return FastResponse(content=_wrap_urlset(_content_entries(now_iso)), media_type="application/xml")
+    entries = _content_entries(now_iso)
+    # Content Factory: published + indexable blog articles (reuse existing sitemap infra)
+    try:
+        from routes.content_factory import published_article_slugs
+        for slug, lm in await published_article_slugs():
+            entries.append(_url_xml(f"/blog/{slug}", lm or now_iso, "monthly", "0.7"))
+    except Exception:
+        pass
+    return FastResponse(content=_wrap_urlset(entries), media_type="application/xml")
 
 
 @router.get("/public/sitemap-marketplace.xml")
@@ -861,10 +869,17 @@ async def public_sitemap_blocuri():
 async def write_sitemap_file() -> str:
     """Write the sitemap-index + all child sitemaps into frontend/public/."""
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    content_entries = _content_entries(now_iso)
+    try:
+        from routes.content_factory import published_article_slugs
+        for slug, lm in await published_article_slugs():
+            content_entries.append(_url_xml(f"/blog/{slug}", lm or now_iso, "monthly", "0.7"))
+    except Exception:
+        pass
     files = {
         "sitemap.xml": build_sitemap_index_xml(),
         "sitemap-static.xml": _wrap_urlset(_static_entries(now_iso)),
-        "sitemap-content.xml": _wrap_urlset(_content_entries(now_iso)),
+        "sitemap-content.xml": _wrap_urlset(content_entries),
         "sitemap-marketplace.xml": _wrap_urlset(await _marketplace_entries(now_iso)),
         "sitemap-specialists.xml": _wrap_urlset(await _specialist_entries(now_iso)),
         "sitemap-design.xml": _wrap_urlset(await _design_entries(now_iso)),
