@@ -1,3 +1,21 @@
+## 🔁 CONTENT GROWTH LOOP V1 — FINAL (article → traffic → CTA → lead → decision) (25 sept 2026)
+
+**Cerere**: închide ciclul de creștere peste Content Factory existent (nu reconstrui, fără engine/dashboard paralel, fără date inventate, fără auto-publish, fără deploy). READY FOR DEPLOY.
+
+**Implementat (extindere naturală a Content Factory)**:
+- **Content Performance** (`content_factory.article_performance` + `GET /api/admin/content-factory/performance`): per articol publicat leagă date REALE — GSC (impressions/clicks/CTR/position via `_gsc_page_metrics` reutilizând `admin_seo._gsc_config/_gsc_run_query`), analytics (`analytics_sessions.entry_path=/blog/{slug}`), conversii (`marketing_conversions` signups/leads pe entry_path), revenue (sum value). GSC neconectat pe Preview → `gsc_status=unavailable` (onest); revenue lipsă → `unavailable`. Zero valori inventate.
+- **Growth decision** `_content_decision()` → **KEEP / UPDATE / EXPAND / WAIT / DATA_INSUFFICIENT** din date reale (impresii mari+CTR mic→UPDATE; poziție 5-20→EXPAND; trafic fără conversii→UPDATE; performant→KEEP; date puține→WAIT; nimic→DATA_INSUFFICIENT).
+- **Existing-content-first + next opportunities**: reutilizează `detect_opportunities` + `find_content_gap` (update/expand vs candidate) — propuneri justificate de date; nimic generat automat.
+- **Admin**: extins tab-ul „Content Factory" din **SEO Control Center** cu secțiunea „Performanță conținut (Growth Loop)" — tabel trafic/CTA/signups/leads/revenue + badge decizie, stări UNAVAILABLE/DATA_INSUFFICIENT oneste. Fără dashboard paralel.
+- **Human review păstrat**: draft→review→approved→published→measured; publish doar `approved`; cele 5 drafturi rămân pentru review controlat; **fără auto-publish**.
+
+**Date reale**: analytics/conversii (sparse pe Preview) — OK; **UNAVAILABLE pe Preview**: GSC per-articol + revenue → se activează în Producție. Nimic inventat.
+**Verificare (PASS)**: `test_content_factory_iter232` **24/24** (+ 6 growth decision/performance) și regresie totală **75 passed** (content_factory + seo_admin + design_ecosystem + acquisition + seo_national + seo_growth + design_routing). Build 0 erori. Sitemap neschimbat. Data integrity: 0 published, 5 drafturi intacte. Fără deploy.
+**Status**: Content Growth Loop V1 complet — **READY FOR DEPLOY**.
+
+---
+
+
 ## 🏭 CONTENT GROWTH ENGINE V1 — Content Factory + SEO Opportunity Engine (25 sept 2026)
 
 **Cerere**: motor care transformă date reale search+acquisition în oportunități de conținut comercial → DRAFT-uri cu human review (V1 fără auto-publish). Reutilizează GSC/analytics/admin_seo/blog/sitemap existente; zero engine paralel, zero mock, fără deploy. LLM: **Claude Sonnet 4.6** (Emergent LLM key).

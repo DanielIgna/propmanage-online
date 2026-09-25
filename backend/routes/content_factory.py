@@ -14,6 +14,7 @@ import os
 import re
 import uuid
 import json
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Optional
@@ -318,6 +319,107 @@ async def detect_opportunities(period_days: int = 90) -> dict:
     }
 
 
+# ── Content performance + Growth decision (closes the loop) ──
+async def _gsc_page_metrics(period_days: int = 28) -> Optional[dict]:
+    """Real per-page GSC metrics keyed by page URL. None if GSC not connected (Preview)."""
+    try:
+        from routes.admin_seo import _gsc_config, _gsc_run_query
+        cfg = await _gsc_config()
+        if not cfg:
+            return None
+        from datetime import timedelta, date
+        end = date.today()
+        start = end - timedelta(days=period_days)
+        rows = await asyncio.to_thread(
+            _gsc_run_query, cfg, cfg["property"], start.isoformat(), end.isoformat(), ["page"], 500)
+        out = {}
+        for r in rows:
+            keys = r.get("keys") or []
+            if not keys:
+                continue
+            out[keys[0].rstrip("/")] = {
+                "impressions": int(r.get("impressions", 0)),
+                "clicks": int(r.get("clicks", 0)),
+                "ctr": round(float(r.get("ctr", 0)) * 100, 2),
+                "position": round(float(r.get("position", 0)), 1),
+            }
+        return out
+    except Exception as e:
+        logger.info(f"GSC page metrics unavailable: {e}")
+        return None
+
+
+def _content_decision(gsc: Optional[dict], sessions: int, conversions: int) -> tuple[str, str]:
+    """KEEP / UPDATE / EXPAND / WAIT / DATA_INSUFFICIENT — from REAL data only."""
+    if gsc is None and sessions == 0:
+        return "DATA_INSUFFICIENT", "Fără date GSC (Preview) și fără sesiuni încă."
+    if gsc:
+        imp, clk, ctr, pos = gsc["impressions"], gsc["clicks"], gsc["ctr"], gsc["position"]
+        if imp >= 200 and ctr < 2.0:
+            return "UPDATE", f"Impresii mari ({imp}) dar CTR mic ({ctr}%) — optimizează titlu/meta."
+        if 5 <= pos <= 20 and imp >= 100:
+            return "EXPAND", f"Poziție {pos} cu {imp} impresii — extinde conținutul pentru ranking mai bun."
+        if clk >= 20 and conversions == 0:
+            return "UPDATE", f"{clk} clickuri, 0 conversii — întărește CTA/internal linking."
+        if clk >= 20 and conversions > 0:
+            return "KEEP", f"Performează: {clk} clickuri, {conversions} conversii."
+        if imp < 30:
+            return "WAIT", "Prea puține impresii încă — așteaptă mai multe date."
+    if sessions >= 30 and conversions == 0:
+        return "UPDATE", f"{sessions} sesiuni, 0 conversii — optimizează CTA."
+    if sessions >= 30 and conversions > 0:
+        return "KEEP", f"{sessions} sesiuni și {conversions} conversii."
+    return "WAIT", "Trafic încă mic — mai adună date înainte de o decizie."
+
+
+async def article_performance(period_days: int = 28) -> dict:
+    """Per published article: real GSC + analytics + conversions + growth decision."""
+    site = os.environ.get("APP_PUBLIC_URL", "https://propmanage.ro").rstrip("/")
+    gsc_map = await _gsc_page_metrics(period_days)
+    items = []
+    async for a in db.content_articles.find({"status": "published"}):
+        slug = a.get("slug")
+        path = f"/blog/{slug}"
+        url = f"{site}{path}"
+        gsc = None
+        if gsc_map is not None:
+            gsc = gsc_map.get(url.rstrip("/")) or gsc_map.get(url) or {
+                "impressions": 0, "clicks": 0, "ctr": 0.0, "position": 0.0}
+        sessions = await db.analytics_sessions.count_documents({"entry_path": path})
+        signups = await db.marketing_conversions.count_documents(
+            {"entry_path": path, "action": {"$regex": "sign|account", "$options": "i"}})
+        leads = await db.marketing_conversions.count_documents(
+            {"entry_path": path, "action": {"$regex": "lead|request|offer|form", "$options": "i"}})
+        rev_cursor = db.marketing_conversions.aggregate([
+            {"$match": {"entry_path": path, "value": {"$gt": 0}}},
+            {"$group": {"_id": None, "v": {"$sum": "$value"}}}])
+        revenue = 0.0
+        async for r in rev_cursor:
+            revenue = float(r.get("v", 0))
+        conversions = signups + leads
+        decision, reason = _content_decision(gsc, sessions, conversions)
+        items.append({
+            "slug": slug, "title": a.get("title"), "path": path, "cluster": a.get("cluster"),
+            "cluster_label": CLUSTERS.get(a.get("cluster"), {}).get("label"),
+            "gsc": gsc if gsc_map is not None else None,
+            "gsc_status": "ok" if gsc_map is not None else "unavailable",
+            "sessions": sessions, "signups": signups, "leads": leads,
+            "revenue": revenue if revenue > 0 else None,
+            "revenue_status": "ok" if revenue > 0 else "unavailable",
+            "decision": decision, "decision_reason": reason,
+            "published_at": a.get("published_at"),
+        })
+    published = len(items)
+    return {
+        "period_days": period_days,
+        "gsc_status": "ok" if gsc_map is not None else "unavailable",
+        "gsc_note": "GSC neconectat pe Preview → metrici per-articol UNAVAILABLE; se activează în Producție.",
+        "published_articles": published,
+        "note": "DATA INSUFFICIENT afișat onest când nu există trafic/GSC. Zero date inventate." if published == 0 else None,
+        "items": items,
+    }
+
+
 # ── Content brief ──
 def build_brief(opp: dict) -> dict:
     cluster = opp.get("cluster") or "design_interior"
@@ -464,6 +566,12 @@ def _serialize_article(doc: dict) -> dict:
 @admin_router.get("/opportunities")
 async def get_opportunities(period: int = Query(90, ge=7, le=365), user=Depends(require_role("admin"))):
     return await detect_opportunities(period)
+
+
+@admin_router.get("/performance")
+async def get_performance(period: int = Query(28, ge=7, le=365), user=Depends(require_role("admin"))):
+    """Content Growth Loop: article → traffic → CTA → lead → revenue → decision."""
+    return await article_performance(period)
 
 
 @admin_router.get("/summary")

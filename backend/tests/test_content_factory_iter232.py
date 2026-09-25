@@ -11,7 +11,7 @@ import pytest
 
 from routes.content_factory import (
     classify_intent, _cluster_for, find_content_gap, build_brief,
-    COMMERCIAL_INTENTS, WORKFLOW_STATUSES, CLUSTERS,
+    COMMERCIAL_INTENTS, WORKFLOW_STATUSES, CLUSTERS, _content_decision,
 )
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/")
@@ -154,3 +154,36 @@ class TestAuthGuard:
     def test_opportunities_requires_admin(self):
         r = requests.get(f"{BASE_URL}/api/admin/content-factory/opportunities", timeout=10)
         assert r.status_code in (401, 403)
+
+
+# ── Growth Loop: performance + decision (KEEP/UPDATE/EXPAND/WAIT/DATA_INSUFFICIENT) ──
+class TestGrowthDecision:
+    def test_data_insufficient_no_data(self):
+        d, _ = _content_decision(None, 0, 0)
+        assert d == "DATA_INSUFFICIENT"
+
+    def test_update_high_impr_low_ctr(self):
+        d, _ = _content_decision({"impressions": 500, "clicks": 3, "ctr": 0.6, "position": 8.0}, 0, 0)
+        assert d == "UPDATE"
+
+    def test_expand_ranking_opportunity(self):
+        d, _ = _content_decision({"impressions": 150, "clicks": 10, "ctr": 6.0, "position": 12.0}, 0, 0)
+        assert d == "EXPAND"
+
+    def test_keep_performing(self):
+        d, _ = _content_decision({"impressions": 800, "clicks": 60, "ctr": 7.5, "position": 3.0}, 50, 4)
+        assert d == "KEEP"
+
+    def test_update_traffic_no_conversion(self):
+        d, _ = _content_decision(None, 40, 0)
+        assert d == "UPDATE"
+
+
+class TestPerformanceEndpoint:
+    def test_performance_honest_when_empty(self, admin_session):
+        r = admin_session.get(f"{BASE_URL}/api/admin/content-factory/performance", timeout=30)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        # Preview: GSC not connected → honest 'unavailable', never mocked
+        assert d["gsc_status"] == "unavailable"
+        assert "items" in d and isinstance(d["items"], list)

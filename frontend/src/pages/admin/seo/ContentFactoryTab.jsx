@@ -19,6 +19,7 @@ export const ContentFactoryTab = () => {
   const [summary, setSummary] = useState(null);
   const [opps, setOpps] = useState(null);
   const [articles, setArticles] = useState([]);
+  const [perf, setPerf] = useState(null);
   const [busy, setBusy] = useState("");
   const card = isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200";
   const txt = isDark ? "text-slate-200" : "text-slate-800";
@@ -30,6 +31,7 @@ export const ContentFactoryTab = () => {
         axios.get(`${CF}/summary`), axios.get(`${CF}/opportunities`), axios.get(`${CF}/articles`),
       ]);
       setSummary(s.data); setOpps(o.data); setArticles(a.data.articles || []);
+      try { const p = await axios.get(`${CF}/performance`); setPerf(p.data); } catch { /* noop */ }
     } catch (e) { toast.error("Eroare la încărcarea Content Factory"); }
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
@@ -73,6 +75,49 @@ export const ContentFactoryTab = () => {
           </div>
         </div>
       )}
+
+      {/* Content performance — Growth Loop (article → traffic → CTA → lead → decision) */}
+      <div className={`rounded-xl border ${card}`} data-testid="cf-performance">
+        <div className="p-4 border-b border-slate-800/50 flex items-center justify-between">
+          <h3 className={`font-semibold ${txt}`}>Performanță conținut (Growth Loop)</h3>
+          {perf && <span className={`text-xs ${muted}`}>GSC: <b className={perf.gsc_status === "ok" ? "text-emerald-500" : "text-amber-500"}>{perf.gsc_status}</b></span>}
+        </div>
+        {perf?.published_articles === 0 ? (
+          <div className={`p-6 text-center text-sm ${muted}`} data-testid="cf-perf-empty">
+            Niciun articol publicat încă. După publicare, aici apar: trafic → CTA → lead → revenue → decizie (KEEP/UPDATE/EXPAND/WAIT).
+            {perf?.gsc_status !== "ok" && <div className="text-amber-500 mt-2 text-xs">{perf?.gsc_note}</div>}
+          </div>
+        ) : (
+          <div className="overflow-x-auto p-2">
+            <table className="w-full text-sm">
+              <thead><tr className={`text-left ${muted} text-xs`}>
+                <th className="p-2">Articol</th><th className="p-2">Impr.</th><th className="p-2">Clicks</th><th className="p-2">CTR</th><th className="p-2">Poz.</th><th className="p-2">Sesiuni</th><th className="p-2">Signups</th><th className="p-2">Leads</th><th className="p-2">Revenue</th><th className="p-2">Decizie</th>
+              </tr></thead>
+              <tbody>
+                {(perf?.items || []).map((it) => {
+                  const g = it.gsc;
+                  const na = <span className="text-amber-500/70 text-[11px]">n/a</span>;
+                  const dtone = { KEEP: "bg-emerald-500/15 text-emerald-500", UPDATE: "bg-amber-500/15 text-amber-500", EXPAND: "bg-blue-500/15 text-blue-500", WAIT: "bg-slate-500/15 text-slate-400", DATA_INSUFFICIENT: "bg-slate-500/15 text-slate-500" }[it.decision] || "bg-slate-500/15 text-slate-400";
+                  return (
+                    <tr key={it.slug} className="border-t border-slate-800/40" data-testid={`cf-perf-${it.slug}`} title={it.decision_reason}>
+                      <td className={`p-2 ${txt} max-w-[220px] truncate`}><a href={it.path} target="_blank" rel="noreferrer" className="hover:underline">{it.title}</a></td>
+                      <td className={`p-2 ${muted}`}>{g ? g.impressions : na}</td>
+                      <td className={`p-2 ${muted}`}>{g ? g.clicks : na}</td>
+                      <td className={`p-2 ${muted}`}>{g ? `${g.ctr}%` : na}</td>
+                      <td className={`p-2 ${muted}`}>{g ? g.position : na}</td>
+                      <td className={`p-2 ${muted}`}>{it.sessions}</td>
+                      <td className={`p-2 ${muted}`}>{it.signups}</td>
+                      <td className={`p-2 ${muted}`}>{it.leads}</td>
+                      <td className={`p-2 ${muted}`}>{it.revenue != null ? `${it.revenue} RON` : na}</td>
+                      <td className="p-2"><span className={`text-[11px] px-2 py-0.5 rounded-full ${dtone}`}>{it.decision}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Opportunities */}
       <div className={`rounded-xl border ${card}`}>
