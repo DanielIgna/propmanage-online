@@ -613,6 +613,7 @@ _STATIC_PAGES = [
     ("/servicii-pentru-casa/targu-mures", "0.8",  "weekly"),
     ("/marketplace",         "0.9",  "daily"),
     ("/blog",                "0.85", "weekly"),
+    ("/design-interior/irenes-world", "0.7", "monthly"),
     ("/ghiduri",             "0.85", "weekly"),
     ("/probleme-casa",       "0.85", "weekly"),
     ("/preturi",             "0.85", "weekly"),

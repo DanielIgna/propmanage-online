@@ -1,3 +1,24 @@
+## 🏛️ DESIGN ECOSYSTEM — Faza 4A (Irene's World + Partner Network prep) (25 sept 2026)
+
+**Cerere**: integrează Irene's World ca prim nod studio + pregătește minimal infra existentă pentru rețea de parteneri/furnizori/branduri/materiale/proiecte. Fără SEO engine nou / marketplace nou / registry paralel / dashboard nou / catalog public / sute de pagini / deploy. Reutilizează infra existentă, zero date inventate.
+
+**Implementat**:
+- **Ruta `/design-interior/irenes-world`** (`IrenesWorldPage.jsx`, lazy, înainte de `:slug`): studio/portfolio layer în ecosistem (nu site separat), conținut factual (design interior, selecție mobilier, colaborare branduri/furnizori, implementare prin escrow), FAQ-free dar cu secțiuni proces/proiecte/ecosistem, CTA reale (Începe proiect → `/design-interior#formular`, Creează cont → `/register`), link Facebook extern real (`profile.php?id=100047348265209`, rel noopener nofollow). Fără proiecte inventate, fără claim „dealer/distribuitor oficial/exclusivitate". **INDEX** (conținut original), JSON-LD ProfilePage+Organization(sameAs FB)+BreadcrumbList, în `sitemap-static`, clasificat `studio/design_interior`, gate `index:true`.
+- **Ecosistem** (`service_content_design.DEFAULT_CONTENT`, `content_version` 9→10): Irene's World adăugat ca **primul** link în secțiunea „Ecosistem" din `/design-interior` (upgrade auto la fetch).
+- **City Partners — schema rețea** (`city_partners.py`, non-breaking, opțional): câmpuri noi `partner_type` (studio/city/regional/national/supplier/brand/specialist), `coverage` (city/regional/national), `region`, `services`, `design_stages`, `brands`, `materials`, `projects` + validare `ALLOWED_PARTNER_TYPES/COVERAGE` în create/patch + `_serialize` (legacy → default „city"). **Reutilizează City Partners**, nu creează registry paralel.
+- **Model semantic 17 etape** (`design_ecosystem.py`): `STAGE_ENTITY_MAP` (17 etape → roluri: service/specialist/studio/partner/supplier/brand/material/furniture/platform, aliniat la `process_phases`), `PROJECT_RELATION_CHAIN` (Design→city→style→studio→partner→brand→material→furniture→service→CTA), `ENTITY_SOURCES` (unde trăiește fiecare entitate — reuse map). Nu modifică cele 17 etape.
+- **Observabilitate** (read-only, fără dashboard nou): `GET /api/admin/city-partners/ecosystem-map` → semantic map + partner-network readiness din date reale (by_partner_type, by_coverage) + catalog (materials_total/brands_distinct, real = 0/0) + gaps.
+- **Catalog materiale**: reutilizat `city_partner_products` (brand/material/partner/tags/preț există deja) — expus în ecosystem-map. Fără catalog public masiv, fără prețuri inventate.
+- **/servicii/mobilier**: verificat (rută `/servicii/:id`). Legături design↔mobilier via Ecosistem + irenes→mobilier. Reverse mobilier→irenes = gap viitor (n-am atins ServiceProvidersPage — evit scope creep).
+
+**INDEX/CANDIDATE/NOINDEX**: INDEX = `/design-interior/irenes-world`. CANDIDATE/PREPARED = proiecte (0 reale stocate), pagini per partener/brand/material (doar cu date reale + conținut original + intenție). NOINDEX/reguli globale (robots/canonical/sitemap-architecture/Marketplace/specialist/HartaBlocuri) **neatinse**.
+**Tracking**: reutilizat — CTA-urile duc la pagini cu analytics existent (pageview + signup/lead), fără sistem nou.
+**Verificare (PASS)**: pytest `test_design_ecosystem_iter231` **12/12** (semantic map, clasificare studio, sitemap, gate, ecosistem v10, ecosystem-map endpoint, create partener cu câmpuri noi, validare invalid→400) + `test_city_partners` + `test_seo_admin` = **43 passed, 1 skipped, 0 regresii**; screenshot irenes-world (H1+studio+robots index+FB+17 etape). Build 0 erori. Fără deploy.
+**Gap real rămas**: proiecte reale (model pregătit, fără date); pagini publice partener/brand/material (necesită date+conținut); reverse-link mobilier→irenes; UI admin pentru noile câmpuri partener (API gata, UI opțional).
+
+---
+
+
 ## 🌍 SEO GROWTH ENGINE — Faza 4 (expansiune comercială națională) (25 sept 2026)
 
 **Cerere**: extindere comercială națională controlată (fără doorway/duplicat/keyword stuffing/mock, fără atingeri robots/canonical/sitemap-architecture/Marketplace&specialist indexability/HartaBlocuri, fără deploy). Reutilizează infra SEO existentă.

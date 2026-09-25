@@ -33,6 +33,7 @@ import { MarketplaceLanding } from "./pages/MarketplaceLanding";
 import { GhiduriIndex } from "./pages/GhiduriIndex";
 import { GhidPage } from "./pages/GhidPage";
 const BlogIndex = lazy(() => import("./pages/BlogIndex"));
+const IrenesWorldPage = lazy(() => import("./pages/IrenesWorldPage"));
 import { ProblemeIndex } from "./pages/ProblemeIndex";
 import { ProblemaPage } from "./pages/ProblemaPage";
 import { DesignInteriorPage } from "./pages/DesignInteriorPage";
@@ -1723,6 +1724,7 @@ function App() {
               <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/design-interior" element={<InteriorDesignLanding />} />
+              <Route path="/design-interior/irenes-world" element={<IrenesWorldPage />} />
               <Route path="/design-interior/stil/:slug" element={<DesignInteriorPage kind="style" />} />
               <Route path="/design-interior/:slug" element={<DesignInteriorPage kind="page" />} />
               <Route path="/design-exterior" element={<ServiceHubLanding slug="design-exterior" />} />

@@ -107,6 +107,8 @@ def _classify(path: str):
         return "commercial", "design_interior", True
     if p.startswith("/design-interior/stil/"):
         return "style", "design_interior", True
+    if p == "/design-interior/irenes-world":
+        return "studio", "design_interior", True
     if p.startswith("/design-interior/"):
         seg = p.split("/design-interior/", 1)[1]
         if seg in DESIGN_LOCAL_CITIES:

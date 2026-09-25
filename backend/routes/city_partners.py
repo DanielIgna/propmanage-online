@@ -56,6 +56,10 @@ products_admin_router = APIRouter(prefix="/api/admin/city-partner-products", tag
 
 ALLOWED_STATUS = {"lead", "onboarding", "active", "paused", "terminated"}
 ALLOWED_LEAD_STAGES = {"introduced", "contacted", "onboarded", "converted", "lost"}
+# Partner-network taxonomy (Faza 4A prep) — used to scale studios/city/regional/national
+# partners, suppliers and brands. Optional & additive: existing partners default to "city".
+ALLOWED_PARTNER_TYPES = {"studio", "city", "regional", "national", "supplier", "brand", "specialist"}
+ALLOWED_COVERAGE = {"city", "regional", "national"}
 
 ONBOARDING_STEPS = [
     "Prezentare oficială",
@@ -93,6 +97,15 @@ def _serialize(doc: dict) -> dict:
         "onboarding_complete": bool(doc.get("onboarding_complete")),
         "territory_protected": bool(doc.get("territory_protected")),
         "linked_user_id": str(doc.get("linked_user_id")) if doc.get("linked_user_id") else None,
+        # ── Partner-network relations (Faza 4A prep — optional, additive) ──
+        "partner_type": doc.get("partner_type") or "city",
+        "coverage": doc.get("coverage") or "city",
+        "region": doc.get("region"),
+        "services": doc.get("services") or [],
+        "design_stages": doc.get("design_stages") or [],
+        "brands": doc.get("brands") or [],
+        "materials": doc.get("materials") or [],
+        "projects": doc.get("projects") or [],
         "notes": doc.get("notes"),
         "created_at": doc.get("created_at"),
         "updated_at": doc.get("updated_at"),
@@ -134,6 +147,13 @@ class PartnerCreate(BaseModel):
     portfolio_type: Optional[str] = None
     started_at: Optional[str] = None
     status: str = "lead"
+    partner_type: Optional[str] = None
+    coverage: Optional[str] = None
+    region: Optional[str] = None
+    services: Optional[list] = None
+    design_stages: Optional[list] = None
+    brands: Optional[list] = None
+    materials: Optional[list] = None
     notes: Optional[str] = None
 
 
@@ -150,6 +170,13 @@ class PartnerPatch(BaseModel):
     started_at: Optional[str] = None
     status: Optional[str] = None
     territory_protected: Optional[bool] = None
+    partner_type: Optional[str] = None
+    coverage: Optional[str] = None
+    region: Optional[str] = None
+    services: Optional[list] = None
+    design_stages: Optional[list] = None
+    brands: Optional[list] = None
+    materials: Optional[list] = None
     notes: Optional[str] = None
 
 
@@ -202,6 +229,10 @@ async def create_partner(payload: PartnerCreate, user=Depends(get_current_user))
     _require_super(user)
     if payload.status not in ALLOWED_STATUS:
         raise HTTPException(400, f"status invalid; permis: {sorted(ALLOWED_STATUS)}")
+    if payload.partner_type and payload.partner_type not in ALLOWED_PARTNER_TYPES:
+        raise HTTPException(400, f"partner_type invalid; permis: {sorted(ALLOWED_PARTNER_TYPES)}")
+    if payload.coverage and payload.coverage not in ALLOWED_COVERAGE:
+        raise HTTPException(400, f"coverage invalid; permis: {sorted(ALLOWED_COVERAGE)}")
     existing = await db.city_partners.find_one({"contact_email": payload.contact_email.lower()})
     if existing:
         raise HTTPException(409, f"Există deja partener cu emailul {payload.contact_email}.")
@@ -222,6 +253,14 @@ async def create_partner(payload: PartnerCreate, user=Depends(get_current_user))
         "onboarding_complete": False,
         "territory_protected": False,
         "linked_user_id": None,
+        "partner_type": payload.partner_type or "city",
+        "coverage": payload.coverage or "city",
+        "region": payload.region,
+        "services": payload.services or [],
+        "design_stages": payload.design_stages or [],
+        "brands": payload.brands or [],
+        "materials": payload.materials or [],
+        "projects": [],
         "notes": payload.notes,
         "created_at": now,
         "updated_at": now,
@@ -274,6 +313,43 @@ async def global_stats(user=Depends(get_current_user)):
     }
 
 
+@admin_router.get("/ecosystem-map")
+async def ecosystem_readiness(user=Depends(get_current_user)):
+    """Read-only observability (Faza 4A): the 17-step→entity semantic map + partner-network
+    readiness from REAL data (counts by type/coverage). No new dashboard, no invented data."""
+    _require_super(user)
+    from design_ecosystem import ecosystem_map
+    by_type, by_coverage = {}, {}
+    for t in ALLOWED_PARTNER_TYPES:
+        by_type[t] = await db.city_partners.count_documents({"partner_type": t})
+    # legacy partners without partner_type count as implicit "city"
+    untyped = await db.city_partners.count_documents({"partner_type": {"$exists": False}})
+    if untyped:
+        by_type["city"] = by_type.get("city", 0) + untyped
+    for c in ALLOWED_COVERAGE:
+        by_coverage[c] = await db.city_partners.count_documents({"coverage": c})
+    products_total = await db.city_partner_products.count_documents({})
+    brands = await db.city_partner_products.distinct("brand")
+    brands = [b for b in brands if b]
+    return {
+        "semantic_map": ecosystem_map(),
+        "partner_network": {
+            "partners_total": await db.city_partners.count_documents({}),
+            "by_partner_type": by_type,
+            "by_coverage": by_coverage,
+        },
+        "catalog": {
+            "materials_total": products_total,      # real, may be 0
+            "brands_distinct": len(brands),         # real, may be 0
+            "brands": brands[:50],
+        },
+        "gaps": [
+            "Proiecte reale: 0 stocate — model pregătit (CANDIDATE).",
+            "Brand/supplier: reutilizează city_partners + city_partner_products; nu există registry paralel.",
+        ],
+    }
+
+
 @admin_router.get("/{partner_id}")
 async def get_partner(partner_id: str, user=Depends(get_current_user)):
     _require_super(user)
@@ -297,6 +373,10 @@ async def patch_partner(partner_id: str, payload: PartnerPatch, user=Depends(get
     update = {k: v for k, v in payload.dict(exclude_unset=True).items() if v is not None}
     if "status" in update and update["status"] not in ALLOWED_STATUS:
         raise HTTPException(400, "status invalid")
+    if "partner_type" in update and update["partner_type"] not in ALLOWED_PARTNER_TYPES:
+        raise HTTPException(400, "partner_type invalid")
+    if "coverage" in update and update["coverage"] not in ALLOWED_COVERAGE:
+        raise HTTPException(400, "coverage invalid")
     if "contact_email" in update:
         update["contact_email"] = str(update["contact_email"]).lower()
     update["updated_at"] = datetime.now(timezone.utc).isoformat()

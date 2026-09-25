@@ -13,7 +13,7 @@ IMG = {
 }
 
 DEFAULT_CONTENT: dict[str, Any] = {
-    "content_version": 9,
+    "content_version": 10,
     "active": True,
     "show_on_homepage": True,
     "menu_order": 1,
@@ -217,6 +217,7 @@ DEFAULT_CONTENT: dict[str, Any] = {
         "title": "Parte dintr-un ecosistem complet",
         "intro": "Interior Intelligence nu e un serviciu izolat. Fiecare etapă e conectată la platforma PropManage — aceleași date, aceiași specialiști, aceeași protecție.",
         "links": [
+            {"title": "Irene's World", "text": "Studio de design interior din ecosistem — design, selecție mobilier și colaborare cu branduri.", "href": "/design-interior/irenes-world"},
             {"title": "Imobile Verificate", "text": "Proprietăți cu istoric tehnic transparent.", "href": "/imobile-verificate"},
             {"title": "Mobilier la comandă", "text": "Parteneri verificați, de la proiect la montaj.", "href": "/servicii/mobilier"},
             {"title": "Audit locuință", "text": "Diagnoza tehnică — primul pas al oricărui proiect.", "href": "/house-health"},
