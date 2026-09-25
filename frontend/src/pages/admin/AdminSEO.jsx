@@ -707,6 +707,7 @@ const GSCView = ({ isDark, txt, muted, border, rowBorder }) => {
         if (g === "connected") return { ok: true, text: "Conectat cu Google Search Console ✓" };
         const reason = p.get("reason") || g;
         const detail = p.get("detail");
+        if (reason === "property_no_access") return { ok: false, text: "Contul Google autorizat nu are acces la property-ul sc-domain:propmanage.ro. Adaugă-l ca user în Search Console (Settings → Users and permissions) și reîncearcă." };
         return { ok: false, text: `Conectare GSC eșuată: ${reason}${detail ? ` (${detail})` : ""}` };
       }
     } catch { /* noop */ }

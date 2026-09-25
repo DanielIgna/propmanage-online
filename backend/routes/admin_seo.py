@@ -1046,6 +1046,16 @@ def _gsc_run_query(cfg, prop, start, end, dimensions, row_limit=25):
     return resp.get("rows", [])
 
 
+def _gsc_list_sites(cfg):
+    """List site URLs the authorized account can access (Search Console sites.list).
+    Used to confirm the target property is really accessible before marking connected."""
+    from googleapiclient.discovery import build
+    creds = _gsc_build_credentials(cfg)
+    service = build("searchconsole", "v1", credentials=creds, cache_discovery=False)
+    resp = service.sites().list().execute()
+    return [s.get("siteUrl") for s in resp.get("siteEntry", []) if s.get("siteUrl")]
+
+
 @router.get("/admin/seo/gsc")
 async def seo_gsc(user: dict = Depends(require_role("admin"))):
     cfg = await _gsc_config()
@@ -1268,6 +1278,22 @@ async def seo_gsc_oauth_callback(request: Request):
         return _back("gsc=error&reason=missing_scope")
 
     prop = data.get("p") or "sc-domain:propmanage.ro"
+
+    # Confirm the authorized account actually has access to the target property.
+    # If we can list sites and it's absent → clear error, do NOT persist a false
+    # "connected" state. If listing itself fails (network), proceed and let the
+    # report surface any access error rather than blocking a valid connection.
+    try:
+        import asyncio as _asyncio
+        sites = await _asyncio.to_thread(
+            _gsc_list_sites, {"auth_type": "oauth", "property": prop, "refresh_token": refresh_token}
+        )
+        if sites is not None and prop not in sites:
+            await _gsc_store_last_error("property_no_access")
+            return _back("gsc=error&reason=property_no_access")
+    except Exception as exc:  # noqa: BLE001 — verification best-effort, never leaks tokens
+        logger.warning(f"[gsc] sites.list verification skipped: {type(exc).__name__}")
+
     await db.seo_config.update_one(
         {"key": "gsc"},
         {"$set": {"key": "gsc", "auth_type": "oauth", "property": prop,

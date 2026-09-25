@@ -1,3 +1,18 @@
+## 🔗 GSC OAuth — finalizat READY FOR DEPLOY (25 sept 2026)
+
+**Cerere Fondator**: finalizează conectarea GSC prin **OAuth** (nu Service Account), reutilizând clientul Google existent. Fără deploy — Fondatorul face manual Publish + consimțământul pe propmanage.ro.
+
+**Constatare**: fluxul OAuth era DEJA implementat complet în `admin_seo.py`: `/gsc/oauth/start` (scope minim `webmasters.readonly`, `access_type=offline`, `prompt=consent`, PKCE S256, state JWT semnat 15 min cu property+code_verifier+email admin), `/gsc/oauth/callback` (validează state, schimbă code→token prin POST direct la Google, cere refresh_token + scope, stochează refresh_token server-side în `db.seo_config`, redirect relativ `/admin?tab=seo&gsc=connected`), `_gsc_config`/`_gsc_build_credentials`/`_gsc_run_query`, UI Admin→SEO→GSC cu buton „Conectează cu Google" + stare Connected (fără token-uri afișate) + report 7d/28d/3m. `seo-organic` deja reutilizează aceleași helpere.
+
+**Completat (singurul gap)**: verificarea accesului la property în callback (secțiunea 5 + 12 — să nu marcăm fals „connected"): NOU `_gsc_list_sites(cfg)` (Search Console `sites.list`) apelat în callback după obținerea refresh_token; dacă `sc-domain:propmanage.ro` nu e în lista contului → `gsc=error&reason=property_no_access`, NU persistă config. Dacă listarea eșuează (rețea) → continuă best-effort. Mesaj UI clar pentru `property_no_access` în `AdminSEO.jsx`.
+
+**Redirect URI (producție, nemodificat)**: `https://propmanage.ro/api/admin/seo/gsc/oauth/callback`. Consimțământul se finalizează pe producție, nu pe preview.
+
+**Verificare (PASS pe preview)**: `oauth/start` returnează URL consent real (scope minim, PKCE S256, state, client_id, redirect_uri prod); guards 401 (fără cookie) / 403 (client); callback validează missing_code/bad_state/access_denied cu redirect corect; diagnostic + `seo-organic` rămân onest `not_connected` (fără succes fals); frontend build 0 erori. **Rămâne manual**: deploy pe propmanage.ro + Admin→SEO→GSC→„Conectează cu Google" cu cont care are acces la property + consimțământ. **Nemodificat**: SEO pages/sitemap/robots/canonical/noindex/indexability/Marketplace/HartaBlocuri/specialist&design SEO/UTM/Analytics tracking/Google Login/structura UI seo-organic. Fără Publish/Deploy.
+
+---
+
+
 ## 🔍📊 SEO ORGANIC GROWTH / Search Intelligence — Analytics read-only (25 sept 2026)
 
 **Cerere Fondator**: modul Admin care corelează date REALE (GSC + analytics intern + UTM + conversii) ca să răspundă „SEO-ul aduce oameni/lead-uri reale sau doar pagini?". STRICT read-only, fără mock, fără atingerea paginilor/sitemap/robots/canonical/indexability/Marketplace/HartaBlocuri. Fără deploy.
