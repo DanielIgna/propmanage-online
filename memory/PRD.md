@@ -1,3 +1,20 @@
+## 🎯 SEO RANKING + CONVERSION — Faza 2 (CTA per cluster, 8 pagini) (25 sept 2026)
+
+**Cerere**: pe cele 8 pagini prioritare (impresii + poziții slabe) — title/meta/H1/prime secțiuni/internal linking/CTA. Fără pagini noi, fără deploy, fără robots/canonical/sitemap/indexability/Marketplace/tracking.
+
+**Constatare**: title/meta/H1 + primele secțiuni erau DEJA optimizate keyword-rich pe toate cele 8 (probleme-casa, ghid cost-renovare, design apartament-2-camere/cluj-napoca, preturi dinamic din `price_seo.py`) → NU le-am rescris (nu stric ce funcționează). Gap real = **CTA de conversie**.
+
+**Implementat (CTA per cluster + internal linking)**:
+- `DesignInteriorPage.jsx`: CTA implicit „Cere ofertă pentru design interior" → **„Începe proiectul de design"** (acoperă /design-interior/apartament-2-camere + /cluj-napoca).
+- `PreturiPage.jsx`: pe lângă „Cere oferte gratuit" (→/register), CTA secundare noi **„Caută un specialist"** (→/marketplace) + **„Evaluează-ți casa gratuit"** (→/scorul-casei) — acoperă instalatii-electrice, gresie-faianta, toate paginile de preț.
+- `GhidPage.jsx`: adăugat `cost-renovare-apartament-2-camere` la `SCORE_CTA_SLUGS` → CTA „Evaluează-ți casa gratuit" (cere o evaluare) →/scorul-casei.
+- `ProblemaPage.jsx`: CTA „Evaluează-ți casa gratuit" →/scorul-casei era deja prezent (fisuri-pereti, mucegai-igrasie, umezeala-pereti).
+
+**Verificare (PASS)**: parse + frontend build 0 erori; randare /preturi/instalatii-electrice cu cele 3 CTA (preturi-cta, preturi-cta-specialist, preturi-cta-evaluare) + H1 dinamic corect. „amenajare birou firmă" NU a fost creat (doar notat pentru viitor dacă GSC justifică). Fără deploy — READY FOR REVIEW.
+
+---
+
+
 ## 🎯 ACQUISITION INTELLIGENCE — Faza 2 (surse separate + prospecting) (25 sept 2026)
 
 **Implementat (reutilizând infra, fără deploy, fără atingerea SEO indexability/sitemap/robots/canonical/Marketplace)**:

@@ -169,6 +169,14 @@ export default function PreturiPage() {
                 className="mt-4 inline-flex items-center gap-2 btn-accent px-6 py-3 rounded-full text-sm font-medium">
                 Cere oferte gratuit <ArrowRight className="w-4 h-4" />
               </Link>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm">
+                <Link to="/marketplace" data-testid="preturi-cta-specialist" className="text-[#d4ff3a] hover:underline inline-flex items-center gap-1">
+                  Caută un specialist <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+                <Link to="/scorul-casei" data-testid="preturi-cta-evaluare" className="text-stone-300 hover:text-white inline-flex items-center gap-1">
+                  Evaluează-ți casa gratuit <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
             </div>
 
             {/* FAQ */}

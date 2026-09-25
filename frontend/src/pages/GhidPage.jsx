@@ -24,6 +24,7 @@ const SCORE_CTA_SLUGS = new Set([
   "cartea-casei-istoric-locuinta",
   "cum-pregatesti-apartament-renovare",
   "ce-verifici-inainte-de-renovare-apartament",
+  "cost-renovare-apartament-2-camere",
   "verificare-imobil-digital-twin",
   "cum-verifici-instalator",
 ]);

@@ -107,7 +107,7 @@ const Related = ({ related }) => (
   ) : null
 );
 
-const LeadCTAButton = ({ onLead, label = "Cere ofertă pentru design interior", testid = "di-cta-btn", className = "" }) => (
+const LeadCTAButton = ({ onLead, label = "Începe proiectul de design", testid = "di-cta-btn", className = "" }) => (
   <button onClick={onLead} data-testid={testid}
     className={`inline-flex items-center gap-2 bg-[#d4ff3a] text-black px-7 py-3 rounded-full text-sm font-semibold hover:bg-[#bfe632] transition ${className}`}>
     {label} <ArrowRight className="w-4 h-4" />
