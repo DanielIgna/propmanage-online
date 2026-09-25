@@ -58,7 +58,7 @@ export const SeoOrganicTab = () => {
 
       {/* Organic KPIs (internal analytics — always real) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat label="Sesiuni organice (Google)" value={t.organic_sessions ?? 0} testid="ag-seo-kpi-sessions" />
+        <Stat label="Sesiuni organice calificate" value={t.qualified_organic_sessions ?? t.organic_sessions ?? 0} sub={t.organic_system_excluded ? `${t.organic_system_excluded} excluse (login/app)` : "din căutare, fără login/app"} testid="ag-seo-kpi-sessions" />
         <Stat label="CTA organice" value={t.organic_cta ?? 0} testid="ag-seo-kpi-cta" />
         <Stat label="Conversii organice" value={t.organic_conversions ?? 0} testid="ag-seo-kpi-conv" />
         <Stat label="Rată conversie organică" value={`${t.organic_cvr ?? 0}%`} testid="ag-seo-kpi-cvr" />

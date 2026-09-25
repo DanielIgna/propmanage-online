@@ -1,3 +1,14 @@
+## 🔬 SEO ACQUISITION INTELLIGENCE — Faza 1 (validare attribution + fix) (25 sept 2026)
+
+**Root cause discrepanță GSC (1 click) vs analytics (28 „organic sessions")**: `classify_source` clasifica orice referrer cu „google" ca sursă „google", INCLUSIV redirect-ul OAuth login `accounts.google.com` → traficul de login apărea ca „Google organic", iar `/login`, `/auth/callback`, `/client` apăreau ca landing pages organice. Preview DB ≠ producție (preview are 1 sesiune google); cele 28 sunt din producție, dar logica e independentă de mediu și confirmată (sesiune `/login` clasificată google în preview).
+
+**Fix (doar attribution/reporting, ZERO modificări SEO indexability/sitemap/robots/canonical)**: (1) `analytics_growth.classify_source` — referrer `accounts.google.com`/`myaccount.google.com` → „other" (nu organic); `google.com/search` rămâne organic. (2) `seo-organic` endpoint — căile de sistem/auth (`_SEO_SYSTEM_PREFIXES`: /login,/register,/auth,/client,/specialist,/admin,/account,/dashboard,/my-home,...) excluse din landing pages organice + counter transparent `organic_system_excluded` + `qualified_organic_sessions`. (3) `SeoOrganicTab` afișează „Sesiuni organice calificate" + excluse. FB/IG separation DOAR descrisă (nu implementată, per cerință).
+
+**Verificare (PASS)**: classify_source unit (accounts.google→other, google/search→google, wa.me→whatsapp); `_is_system_path` corect (/auth/callback,/login,/client=True; /design-interior=False); seo-organic returnează noile câmpuri; GSC suite 10/10; frontend build 0 erori. Fără deploy.
+
+---
+
+
 ## 🔧 GSC property target → https://propmanage.ro/ (25 sept 2026)
 
 **Cauză**: contul OAuth `danieligna1@gmail.com` are acces la property-ul URL-prefix `https://propmanage.ro/`, NU la `sc-domain:propmanage.ro` → API returna `property_no_access`. **Fix**: schimbat target-ul GSC implicit din `sc-domain:propmanage.ro` în `https://propmanage.ro/`. Fără integrare/OAuth client/Service Account nou; fără deploy.

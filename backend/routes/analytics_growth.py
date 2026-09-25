@@ -56,6 +56,10 @@ def classify_source(referrer: str = "", utm_source: str = "", campaign_code: str
         return "other"
     if campaign_code:
         return "other"
+    # OAuth/login return traffic from Google account pages is NOT organic search.
+    # (accounts.google.com is the login provider, not google.com/search.)
+    if "accounts.google.com" in r or "myaccount.google.com" in r:
+        return "other"
     if "wa.me" in r or "whatsapp" in r:
         return "whatsapp"
     if "facebook" in r or "fb.com" in r or "instagram" in r:
@@ -1353,6 +1357,19 @@ _CTA_INTENTS = {
     "request_started", "request_created", "spec_local_cta", "whatsapp_opened",
     "client_property_selected", "specialist_action_taken",
 }
+# App/auth/system entry paths that are NOT SEO landing pages. Organic sessions that
+# ENTER on these are login/OAuth/app traffic, not search acquisition — excluded from
+# the SEO landing report (counted separately for transparency). No indexability change.
+_SEO_SYSTEM_PREFIXES = (
+    "/login", "/register", "/logout", "/auth", "/reset-password", "/verify",
+    "/client", "/specialist", "/designer", "/admin", "/account", "/dashboard",
+    "/my-home", "/onboarding",
+)
+
+
+def _is_system_path(path: str) -> bool:
+    p = (path or "/").split("?")[0].rstrip("/") or "/"
+    return any(p == pre or p.startswith(pre + "/") or p == pre for pre in _SEO_SYSTEM_PREFIXES)
 
 
 def _refine_source(source: str, utm_medium: str = "", gclid: str = "") -> tuple:
@@ -1433,6 +1450,7 @@ async def seo_organic_growth(period: str = "28", refresh: int = 0,
     src_label = {}
     page_org = defaultdict(lambda: {"organic_sessions": 0, "cta": 0, "conversions": 0})
     ads_sessions = 0
+    system_excluded = 0
     async for s in db.analytics_sessions.find(
         {"day": {"$gte": cutoff}},
         {"source": 1, "utm_medium": 1, "gclid": 1, "entry_path": 1, "_id": 0},
@@ -1444,7 +1462,10 @@ async def seo_organic_growth(period: str = "28", refresh: int = 0,
             ads_sessions += 1
         if key == "google_organic":
             path = (s.get("entry_path") or "/")[:200]
-            page_org[path]["organic_sessions"] += 1
+            if _is_system_path(path):
+                system_excluded += 1  # login/OAuth/app entry — not a SEO landing page
+            else:
+                page_org[path]["organic_sessions"] += 1
 
     # ── CTA / intent events (analytics_events) ──
     audience = defaultdict(int)
@@ -1459,7 +1480,9 @@ async def seo_organic_growth(period: str = "28", refresh: int = 0,
         src_label.setdefault(key, label)
         src_tally[key]["cta"] += 1
         if key == "google_organic":
-            page_org[(ev.get("path") or "/")[:200]]["cta"] += 1
+            _p = (ev.get("path") or "/")[:200]
+            if not _is_system_path(_p):
+                page_org[_p]["cta"] += 1
             audience[_audience_of(sig)] += 1
 
     # ── Conversions (marketing_conversions + specialist_local signups) ──
@@ -1476,10 +1499,13 @@ async def seo_organic_growth(period: str = "28", refresh: int = 0,
         key=lambda r: r["sessions"], reverse=True,
     )
     org = src_tally.get("google_organic", {"sessions": 0, "cta": 0, "conversions": 0})
+    qualified_org = max(org["sessions"] - system_excluded, 0)
     totals = {
         "organic_sessions": org["sessions"], "organic_cta": org["cta"],
         "organic_conversions": org["conversions"],
         "organic_cvr": round(100.0 * org["conversions"] / org["sessions"], 2) if org["sessions"] else 0.0,
+        "organic_system_excluded": system_excluded,      # login/OAuth/app entry (not SEO)
+        "qualified_organic_sessions": qualified_org,      # real search-landing sessions
     }
 
     landing = sorted(
