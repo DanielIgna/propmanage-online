@@ -21,6 +21,7 @@ import { BounceTab } from "./analytics/BounceTab";
 import { RetentionTab } from "./analytics/RetentionTab";
 import { AbTestingTab } from "./analytics/AbTestingTab";
 import { WhatsAppTab } from "./analytics/WhatsAppTab";
+import { SeoOrganicTab } from "./analytics/SeoOrganicTab";
 
 const SOURCE_COLORS = { whatsapp: "#25D366", facebook: "#1877F2", google: "#EA4335", direct: "#64748b", qr: "#8b5cf6", admin: "#f59e0b", other: "#0ea5e9" };
 
@@ -198,7 +199,7 @@ export default function AnalyticsGrowthPage() {
         {/* 1. Navigare secundară (TabBar standard) */}
         <div className="flex flex-wrap items-center gap-2">
           <TabBar
-            tabs={[["overview", "Dashboard", BarChart3], ["commercial", "Funnel comercial", Workflow], ["heatmap", "Heatmap", Flame], ["bounce", "Bounce", TrendingDown], ["retention", "Retenție", Repeat], ["abtest", "A/B Testing", FlaskConical], ["whatsapp", "WhatsApp", MessageCircle], ["pages", "Pagini", MousePointerClick], ["campaigns", "Campanii", Megaphone], ["integrations", "Integrări", Settings2]]}
+            tabs={[["overview", "Dashboard", BarChart3], ["commercial", "Funnel comercial", Workflow], ["heatmap", "Heatmap", Flame], ["bounce", "Bounce", TrendingDown], ["retention", "Retenție", Repeat], ["abtest", "A/B Testing", FlaskConical], ["whatsapp", "WhatsApp", MessageCircle], ["pages", "Pagini", MousePointerClick], ["seo-organic", "SEO Organic Growth", TrendingUp], ["campaigns", "Campanii", Megaphone], ["integrations", "Integrări", Settings2]]}
             active={tab} onChange={setTab} testidPrefix="ag-tab"
           />
           {/* 2. Action Bar standard: perioadă · CSV · PDF · refresh */}
@@ -356,6 +357,8 @@ export default function AnalyticsGrowthPage() {
             emptyTitle="Fără date încă." emptyHint="Trackerul colectează de la primii vizitatori."
             testid="ag-pages-table"
           />
+        ) : tab === "seo-organic" ? (
+          <SeoOrganicTab />
         ) : tab === "campaigns" ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">

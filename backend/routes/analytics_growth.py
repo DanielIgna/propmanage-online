@@ -1340,3 +1340,198 @@ async def compare_campaigns(
             continue
         results.append(await _campaign_stats_in_period(camp, d_from, d_to))
     return {"period": {"from": d_from, "to": d_to}, "granularity": granularity, "campaigns": results}
+
+
+# ═══════════════════════ SEO ORGANIC GROWTH (read-only) ═══════════════════════
+# Correlates REAL data only: GSC (reused) + analytics_sessions/events + conversions.
+# No mock data. No SEO page/sitemap/robots/canonical changes. Cached ~10 min.
+_SEO_ORG_CACHE: dict = {}
+_SEO_ORG_TTL = 600  # seconds
+_PERIOD_DAYS = {"7": 7, "28": 28, "90": 90}
+_CTA_INTENTS = {
+    "design_seo_cta_click", "lead_started", "lead_submitted", "offer_requested",
+    "request_started", "request_created", "spec_local_cta", "whatsapp_opened",
+    "client_property_selected", "specialist_action_taken",
+}
+
+
+def _refine_source(source: str, utm_medium: str = "", gclid: str = "") -> tuple:
+    """Read-time refinement: separate google/organic from google/cpc. Returns (key,label)."""
+    s = (source or "").lower()
+    m = (utm_medium or "").lower()
+    paid = bool(gclid) or m in ("cpc", "ppc", "paid", "paidsearch", "paid_search")
+    if s == "google":
+        return ("google_ads", "Google Ads (cpc)") if paid else ("google_organic", "Google / organic")
+    if s == "facebook":
+        return ("social", "Facebook / Instagram (social)")
+    if s == "whatsapp":
+        return ("whatsapp", "WhatsApp / referral")
+    if s == "direct":
+        return ("direct", "Direct / none")
+    if s == "qr":
+        return ("qr", "QR")
+    return ("other", "Other")
+
+
+def _audience_of(intent_signal: str) -> str:
+    sig = (intent_signal or "").lower()
+    if sig.startswith("specialist") or sig == "spec_local_cta":
+        return "specialist"
+    if sig.startswith("client") or sig in ("request_started", "request_created"):
+        return "owner"
+    if "design" in sig:
+        return "designer"
+    return "unknown"
+
+
+@admin_router.get("/analytics/seo-organic")
+async def seo_organic_growth(period: str = "28", refresh: int = 0,
+                             user: dict = Depends(require_role("admin"))):
+    days = _PERIOD_DAYS.get(str(period), 28)
+    ck = str(days)
+    now_ts = datetime.now(timezone.utc).timestamp()
+    if not refresh and ck in _SEO_ORG_CACHE:
+        ts, cached = _SEO_ORG_CACHE[ck]
+        if now_ts - ts < _SEO_ORG_TTL:
+            return {**cached, "cached": True}
+
+    cutoff = (datetime.now(timezone.utc).date() - timedelta(days=days)).isoformat()
+
+    # ── GSC (reuse existing integration; honest not_connected in preview) ──
+    gsc = {"status": "not_connected", "overview": None, "queries": [], "pages": []}
+    try:
+        from routes.admin_seo import _gsc_config, _gsc_run_query
+        import asyncio
+        cfg = await _gsc_config()
+        if cfg:
+            end = datetime.now(timezone.utc).date() - timedelta(days=2)
+            start = end - timedelta(days=days)
+            s, e = start.isoformat(), end.isoformat()
+            q = await asyncio.to_thread(_gsc_run_query, cfg, cfg["property"], s, e, ["query"], 25)
+            p = await asyncio.to_thread(_gsc_run_query, cfg, cfg["property"], s, e, ["page"], 25)
+            tc = sum(r.get("clicks", 0) for r in q)
+            ti = sum(r.get("impressions", 0) for r in q)
+            gsc = {
+                "status": "connected", "property": cfg["property"],
+                "overview": {"clicks": tc, "impressions": ti,
+                             "ctr": (tc / ti) if ti else 0.0,
+                             "position": (sum(r.get("position", 0) * r.get("impressions", 0) for r in q) / ti) if ti else 0.0,
+                             "start": s, "end": e},
+                "queries": [{"query": (r.get("keys") or [None])[0], "clicks": r.get("clicks", 0),
+                             "impressions": r.get("impressions", 0), "ctr": r.get("ctr", 0.0),
+                             "position": r.get("position", 0.0)} for r in q],
+                "pages": [{"page": (r.get("keys") or [None])[0], "clicks": r.get("clicks", 0),
+                           "impressions": r.get("impressions", 0), "ctr": r.get("ctr", 0.0),
+                           "position": r.get("position", 0.0)} for r in p],
+            }
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[seo-organic] GSC fetch skipped: {exc}")
+        gsc = {"status": "error", "overview": None, "queries": [], "pages": [], "error": str(exc)[:160]}
+
+    # ── Traffic by refined source (analytics_sessions) ──
+    src_tally = defaultdict(lambda: {"sessions": 0, "cta": 0, "conversions": 0})
+    src_label = {}
+    page_org = defaultdict(lambda: {"organic_sessions": 0, "cta": 0, "conversions": 0})
+    ads_sessions = 0
+    async for s in db.analytics_sessions.find(
+        {"day": {"$gte": cutoff}},
+        {"source": 1, "utm_medium": 1, "gclid": 1, "entry_path": 1, "_id": 0},
+    ):
+        key, label = _refine_source(s.get("source", ""), s.get("utm_medium", ""), s.get("gclid", ""))
+        src_label[key] = label
+        src_tally[key]["sessions"] += 1
+        if key == "google_ads":
+            ads_sessions += 1
+        if key == "google_organic":
+            path = (s.get("entry_path") or "/")[:200]
+            page_org[path]["organic_sessions"] += 1
+
+    # ── CTA / intent events (analytics_events) ──
+    audience = defaultdict(int)
+    async for ev in db.analytics_events.find(
+        {"type": "intent", "day": {"$gte": cutoff}},
+        {"source": 1, "utm_medium": 1, "path": 1, "intent_signal": 1, "_id": 0},
+    ):
+        sig = ev.get("intent_signal", "")
+        if sig not in _CTA_INTENTS:
+            continue
+        key, label = _refine_source(ev.get("source", ""), ev.get("utm_medium", ""))
+        src_label.setdefault(key, label)
+        src_tally[key]["cta"] += 1
+        if key == "google_organic":
+            page_org[(ev.get("path") or "/")[:200]]["cta"] += 1
+            audience[_audience_of(sig)] += 1
+
+    # ── Conversions (marketing_conversions + specialist_local signups) ──
+    async for cv in db.marketing_conversions.find(
+        {"day": {"$gte": cutoff}}, {"source": 1, "gclid": 1, "utm_source": 1, "_id": 0},
+    ):
+        base = cv.get("source", "") or cv.get("utm_source", "")
+        key, label = _refine_source(base, "", cv.get("gclid", ""))
+        src_label.setdefault(key, label)
+        src_tally[key]["conversions"] += 1
+
+    traffic = sorted(
+        [{"key": k, "label": src_label.get(k, k), **v} for k, v in src_tally.items()],
+        key=lambda r: r["sessions"], reverse=True,
+    )
+    org = src_tally.get("google_organic", {"sessions": 0, "cta": 0, "conversions": 0})
+    totals = {
+        "organic_sessions": org["sessions"], "organic_cta": org["cta"],
+        "organic_conversions": org["conversions"],
+        "organic_cvr": round(100.0 * org["conversions"] / org["sessions"], 2) if org["sessions"] else 0.0,
+    }
+
+    landing = sorted(
+        [{"path": p, **v} for p, v in page_org.items()],
+        key=lambda r: r["organic_sessions"], reverse=True,
+    )[:25]
+
+    def _signal(row):
+        gsc_pg = None
+        if gsc.get("status") == "connected":
+            gsc_pg = next((x for x in gsc["pages"] if (x["page"] or "").endswith(row["path"])), None)
+        impr = (gsc_pg or {}).get("impressions", 0)
+        clk = (gsc_pg or {}).get("clicks", 0)
+        if row["conversions"] > 0:
+            state = "Are conversions"
+        elif row["cta"] > 0:
+            state = "Are CTA events"
+        elif row["organic_sessions"] > 0:
+            state = "Are organic traffic"
+        elif clk > 0:
+            state = "Are clicks"
+        elif impr > 0:
+            state = "Are impressions, dar puține clicks"
+        else:
+            state = "Fără date suficiente"
+        return {"path": row["path"], "impressions": impr, "clicks": clk,
+                "organic_sessions": row["organic_sessions"], "cta": row["cta"],
+                "conversions": row["conversions"], "state": state}
+
+    signals = [_signal(r) for r in landing]
+
+    funnel = {
+        "impressions": (gsc["overview"] or {}).get("impressions") if gsc.get("status") == "connected" else None,
+        "clicks": (gsc["overview"] or {}).get("clicks") if gsc.get("status") == "connected" else None,
+        "organic_sessions": totals["organic_sessions"],
+        "cta": totals["organic_cta"],
+        "conversions": totals["organic_conversions"],
+        "by_audience": {"owner": audience.get("owner", 0), "specialist": audience.get("specialist", 0),
+                        "designer": audience.get("designer", 0), "unattributed": audience.get("unknown", 0)},
+    }
+
+    result = {
+        "period": ck, "window_days": days,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "cached": False,
+        "gsc": gsc,
+        "ads_connected": ads_sessions > 0,
+        "traffic": traffic,
+        "totals": totals,
+        "landing_pages": landing,
+        "funnel": funnel,
+        "signals": signals,
+    }
+    _SEO_ORG_CACHE[ck] = (now_ts, result)
+    return result

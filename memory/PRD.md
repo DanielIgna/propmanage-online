@@ -1,3 +1,18 @@
+## 🔍📊 SEO ORGANIC GROWTH / Search Intelligence — Analytics read-only (25 sept 2026)
+
+**Cerere Fondator**: modul Admin care corelează date REALE (GSC + analytics intern + UTM + conversii) ca să răspundă „SEO-ul aduce oameni/lead-uri reale sau doar pagini?". STRICT read-only, fără mock, fără atingerea paginilor/sitemap/robots/canonical/indexability/Marketplace/HartaBlocuri. Fără deploy.
+
+**AUDIT (reutilizat, nemodificat)**: GSC = `admin_seo.py` (`_gsc_config`/`_gsc_run_query`/`/gsc/report`, OAuth pe clientul de login sau Service Account; degradează onest la `not_connected`). Analytics = `analytics_growth.py` (`analytics_sessions` cu `source`/`entry_path`/`utm_*`/`day`, `analytics_events` type=intent cu `intent_signal`/`path`, `classify_source` google/facebook/whatsapp/direct/qr/other). Conversii = `marketing_conversions` (cheia reală `action`, cu `source`/`gclid`/`utm_*`) + `specialist_local_conversions`. UTM deja capturat în tracker (`analytics.js`/track) — REUTILIZAT, fără al doilea sistem.
+
+**LIVRAT (read-only)**:
+- NOU `GET /api/admin/analytics/seo-organic?period=7|28|90` (`analytics_growth.py`, admin-only, cache 10 min): GSC overview/queries/pages (reuse) SAU `not_connected`; trafic pe sursă cu **separare organic vs cpc** la read-time (`_refine_source`: gclid/utm_medium=cpc → `google_ads`; altfel `google_organic`); `ads_connected`; totals organice (sessions/CTA/conv/CVR); landing pages din `entry_path` (sesiuni organice + CTA + conversii); funnel impresii→clicks→sesiuni→CTA→lead/signup cu split owner/specialist/designer/neatribuit; `signals` factuale per pagină („Are impressions dar puține clicks"/„Are clicks"/„Are organic traffic"/„Are CTA"/„Are conversions"/„Fără date suficiente"). Zero mock — stări oneste „not_connected"/„no data".
+- NOU `frontend/src/pages/admin/analytics/SeoOrganicTab.jsx` + tab „SEO Organic Growth" în `AnalyticsGrowthPage.jsx` (selector 7/28/90, KPI organice, GSC cu badge NECONECTAT + link Admin→SEO→GSC, tabel surse organic/Ads/social/direct separate, funnel + audiență, „Ce caută oamenii" GSC, pagini+semnale). Dashboard-ul existent NEATINS.
+
+**Verificare (PASS)**: build 0 erori; endpoint real via curl 7/28/90 (direct 183 / other 38 / google_organic 1; conv 3; GSC not_connected; ads „no connected data"); guard auth 401 (fără cookie) / 403 (client); UI randează tab-ul cu date reale + stări oneste. **Limitări**: GSC neconectat pe preview (lipsesc `GSC_SERVICE_ACCOUNT_JSON`+`GSC_PROPERTY` sau consimțământul OAuth) → panourile GSC arată onest „neconectat"; Google Ads/cpc = fără date (0 sesiuni gclid); Facebook/Instagram lumped în „social" (moștenit din `classify_source`). **No SEO pages, sitemap, robots, canonical or indexability rules were changed.** FĂRĂ deploy.
+
+---
+
+
 ## 📊 SPECIALIST LOCAL — Dovezi sociale reale + Tracking conversie (18 sept 2026)
 
 **Cerere Fondator** (2 enhancement-uri peste paginile de recrutare `/devino-specialist/[categorie]/[localitate]`): (1) dovezi sociale REALE (câți specialiști verificați + câte lucrări în zonă); (2) tracking `spec_local_cta` → funnel de înregistrare (ce localitate/meserie aduce conturi). Fără date inventate, fără atingerea regulii marketplace.
