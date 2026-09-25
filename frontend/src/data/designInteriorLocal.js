@@ -830,6 +830,340 @@ export const DI_LOCAL_CONTENT = {
       { to: "/design-interior/3d", label: "Randări 3D / Digital Twin" },
     ],
   },
+
+  "targu-mures": {
+    name: "Târgu Mureș",
+    intro:
+      "Târgu Mureș îmbină un centru istoric cu arhitectură Secession spectaculoasă (Palatul Culturii, Primăria) cu cartiere de blocuri și zone rezidențiale noi. Orașul are o comunitate multiculturală și o universitate de medicină puternică, ceea ce aduce cereri distincte de amenajare — de la apartamente pentru medici și studenți, la case în zonele rezidențiale. Pe PropManage lucrezi cu designeri verificați, iar proiectul se leagă de execuție prin escrow.",
+    sections: [
+      {
+        h2: "Ce tipuri de locuințe amenajăm în Târgu Mureș",
+        body: ["Fondul locativ mureșean e variat, de la clădiri istorice la ansambluri noi."],
+        bullets: [
+          "**Apartamente în clădiri interbelice și Secession** din centru — tavane înalte, detalii de păstrat, instalații de refăcut",
+          "**Blocuri comuniste** în Tudor Vladimirescu, Cornișa, Dâmbu Pietros — compartimentări de optimizat",
+          "**Ansambluri noi** spre Unirii și zonele periferice — finisare și personalizare",
+          "**Case** în Aleea Carpați, Belvedere și cartierele rezidențiale",
+        ],
+      },
+      {
+        h2: "Nevoi specifice pieței din Târgu Mureș",
+        body: ["Prezența universității de medicină și a companiilor locale generează cerințe recurente:"],
+        bullets: [
+          "Apartamente funcționale pentru medici, rezidenți și cadre universitare",
+          "Amenajări pentru închiriere lângă campus și spitale",
+          "Reabilitarea instalațiilor în blocurile vechi înainte de finisaje",
+          "Restaurarea sensibilă a apartamentelor din clădirile Secession",
+        ],
+      },
+    ],
+    faq: [
+      { q: "Găsesc designeri verificați în Târgu Mureș?", a: "Da. Vezi mai jos designerii verificați care acoperă zona Mureș; dacă lista e scurtă, postezi o cerere și primești oferte de la designeri care lucrează în oraș." },
+      { q: "Amenajați și apartamente din clădirile istorice?", a: "Da, cu atenție la detaliile de patrimoniu (tavane, tâmplărie) și la refacerea corectă a instalațiilor." },
+    ],
+    related: [
+      { to: "/design-interior/apartament", label: "Design interior apartament" },
+      { to: "/design-interior/casa", label: "Design interior casă" },
+      { to: "/design-interior/renovare", label: "Design pentru renovare" },
+      { to: "/servicii-pentru-casa/targu-mures", label: "Servicii pentru casă în Târgu Mureș" },
+    ],
+  },
+
+  "arad": {
+    name: "Arad",
+    intro:
+      "Arad este un oraș din vestul țării cu o arhitectură austro-ungară elegantă (bulevarde largi, clădiri eclectice și Secession) și o economie industrială solidă, aproape de granița cu Ungaria. Fondul locativ merge de la apartamente în clădiri de patrimoniu din centru, la blocuri și ansambluri noi în Aradul Nou și Micălaca. Pe PropManage lucrezi cu designeri verificați, cu execuție legată de proiect prin escrow.",
+    sections: [
+      {
+        h2: "Ce tipuri de locuințe amenajăm în Arad",
+        body: ["Centrul istoric și cartierele au nevoi foarte diferite."],
+        bullets: [
+          "**Apartamente în clădiri eclectice/Secession** din centru — tavane înalte, tâmplărie de epocă",
+          "**Blocuri** în Micălaca, Alfa, Confecții — optimizare de spațiu și lumină",
+          "**Case** în Aradul Nou, Grădiște, Bujac și zonele rezidențiale",
+          "**Ansambluri noi** apărute spre periferie",
+        ],
+      },
+      {
+        h2: "Nevoi specifice pieței din Arad",
+        body: ["Apropierea de granița vestică și profilul industrial aduc cerințe recurente:"],
+        bullets: [
+          "Restaurarea sensibilă a apartamentelor de patrimoniu din centru",
+          "Amenajări pentru închiriere și pentru familii tinere din industrie",
+          "Eficiență energetică și izolare pentru clădirile vechi",
+          "Refacerea instalațiilor înainte de finisaje",
+        ],
+      },
+    ],
+    faq: [
+      { q: "Găsesc designeri verificați în Arad?", a: "Da. Vezi designerii verificați care acoperă zona Arad; dacă lista e scurtă, postezi o cerere pentru oferte reale." },
+      { q: "Amenajați apartamente în clădirile vechi din centru?", a: "Da, cu respect pentru detaliile de patrimoniu și cu instalații refăcute corect." },
+    ],
+    related: [
+      { to: "/design-interior/apartament", label: "Design interior apartament" },
+      { to: "/design-interior/renovare", label: "Design pentru renovare" },
+      { to: "/design-interior/timisoara", label: "Design interior Timișoara" },
+    ],
+  },
+
+  "satu-mare": {
+    name: "Satu Mare",
+    intro:
+      "Satu Mare este un oraș din nord-vestul extrem, cu o puternică amprentă Art Nouveau (clădiri Secession pe centru) și o comunitate multiculturală, aproape de granițele cu Ungaria și Ucraina. Locuințele merg de la apartamente în clădiri istorice pe malul Someșului, la blocuri în cartierele Micro și case în zonele rezidențiale. Pe PropManage lucrezi cu designeri verificați, cu proiectul legat de execuție prin escrow.",
+    sections: [
+      {
+        h2: "Ce tipuri de locuințe amenajăm în Satu Mare",
+        body: ["Fondul locativ combină patrimoniu și blocuri tipizate."],
+        bullets: [
+          "**Apartamente în clădiri Art Nouveau/Secession** din centru — detalii de epocă",
+          "**Blocuri** în cartierele Micro (I–XVII) — suprafețe compacte de optimizat",
+          "**Case** în Carpați, Sătmărel și zonele rezidențiale",
+          "**Apartamente noi** în ansamblurile recente",
+        ],
+      },
+      {
+        h2: "Nevoi specifice pieței din Satu Mare",
+        body: ["Poziția de graniță și fondul locativ mixt generează cereri recurente:"],
+        bullets: [
+          "Optimizarea apartamentelor compacte din cartierele Micro",
+          "Restaurarea apartamentelor din clădirile istorice",
+          "Izolare termică și reducerea facturilor",
+          "Refacerea instalațiilor vechi înainte de finisaje",
+        ],
+      },
+    ],
+    faq: [
+      { q: "Găsesc designeri verificați în Satu Mare?", a: "Da. Vezi designerii verificați care acoperă zona; dacă lista e scurtă, postezi o cerere pentru oferte reale." },
+      { q: "Merită designul pentru un apartament mic din cartierele Micro?", a: "Da — aici depozitarea și circulația bine gândite fac cea mai mare diferență." },
+    ],
+    related: [
+      { to: "/design-interior/apartament", label: "Design interior apartament" },
+      { to: "/design-interior/apartament-mic", label: "Design apartament mic" },
+      { to: "/design-interior/oradea", label: "Design interior Oradea" },
+    ],
+  },
+
+  "bistrita": {
+    name: "Bistrița",
+    intro:
+      "Bistrița păstrează un centru medieval săsesc bine conservat (Biserica Evanghelică, Șirul Sugălete) și se dezvoltă constant în cartierele rezidențiale. Este un oraș liniștit, cu case și apartamente care combină fondul vechi cu ansambluri noi. Pe PropManage lucrezi cu designeri verificați, iar proiectul se leagă de execuție prin escrow.",
+    sections: [
+      {
+        h2: "Ce tipuri de locuințe amenajăm în Bistrița",
+        body: ["Orașul îmbină centrul istoric cu cartiere de blocuri și case."],
+        bullets: [
+          "**Apartamente în centrul istoric** — clădiri vechi cu detalii de păstrat",
+          "**Blocuri** în Subcetate, Unirea, Ștefan cel Mare — optimizare de spațiu",
+          "**Case** în Viișoara, Sărata și zonele rezidențiale",
+          "**Ansambluri noi** apărute la marginea orașului",
+        ],
+      },
+      {
+        h2: "Nevoi specifice pieței din Bistrița",
+        body: ["Ritmul mai așezat al orașului aduce cereri de calitate durabilă:"],
+        bullets: [
+          "Amenajări durabile pentru familii, gândite pe termen lung",
+          "Reabilitarea instalațiilor în blocurile mai vechi",
+          "Izolare termică și eficiență energetică",
+          "Finisarea apartamentelor noi din ansamblurile recente",
+        ],
+      },
+    ],
+    faq: [
+      { q: "Găsesc designeri verificați în Bistrița?", a: "Da. Vezi designerii verificați care acoperă zona; dacă lista e scurtă, postezi o cerere pentru oferte reale." },
+      { q: "Cât costă designul interior în Bistrița?", a: "Un concept pornește de la câteva sute de lei pe cameră; proiectul tehnic complet se calculează pe metru pătrat, în funcție de complexitate." },
+    ],
+    related: [
+      { to: "/design-interior/apartament", label: "Design interior apartament" },
+      { to: "/design-interior/casa", label: "Design interior casă" },
+      { to: "/design-interior/cluj-napoca", label: "Design interior Cluj-Napoca" },
+    ],
+  },
+
+  "alba-iulia": {
+    name: "Alba Iulia",
+    intro:
+      "Alba Iulia este orașul Marii Uniri, dominat de impresionanta Cetate Alba Carolina, cu un profil administrativ și turistic puternic. Locuințele merg de la apartamente în cartierul Cetate și blocuri în Ampoi, la case noi în Micești și Bărăbanț. Pe PropManage lucrezi cu designeri verificați, iar proiectul se leagă de execuția reală prin escrow.",
+    sections: [
+      {
+        h2: "Ce tipuri de locuințe amenajăm în Alba Iulia",
+        body: ["Orașul combină zone rezidențiale liniștite cu ansambluri noi."],
+        bullets: [
+          "**Apartamente** în Cetate, Ampoi, Tolstoi — suprafețe de optimizat",
+          "**Case noi** în Micești, Bărăbanț, Pâclișa",
+          "**Ansambluri rezidențiale noi** apărute în ultimii ani",
+          "**Apartamente pentru închiriere** legate de fluxul turistic și administrativ",
+        ],
+      },
+      {
+        h2: "Nevoi specifice pieței din Alba Iulia",
+        body: ["Profilul turistic și administrativ generează cereri recurente:"],
+        bullets: [
+          "Amenajări pentru închiriere pe termen scurt, lângă Cetate",
+          "Finisarea și personalizarea apartamentelor noi",
+          "Izolare termică și eficiență energetică",
+          "Home office pentru familii cu lucru remote",
+        ],
+      },
+    ],
+    faq: [
+      { q: "Găsesc designeri verificați în Alba Iulia?", a: "Da. Vezi designerii verificați care acoperă zona; dacă lista e scurtă, postezi o cerere pentru oferte reale." },
+      { q: "Amenajați apartamente pentru închiriere turistică?", a: "Da — o amenajare rezistentă și fotogenică crește ocuparea și valoarea unei locuințe date în regim de închiriere." },
+    ],
+    related: [
+      { to: "/design-interior/apartament", label: "Design interior apartament" },
+      { to: "/design-interior/renovare", label: "Design pentru renovare" },
+      { to: "/design-interior/sibiu", label: "Design interior Sibiu" },
+    ],
+  },
+
+  "deva": {
+    name: "Deva",
+    intro:
+      "Deva este reședința județului Hunedoara, dominată de Cetatea Devei pe dealul cu telecabină. Orașul are un fond locativ format din blocuri în Dacia și Gojdu și case în zonele rezidențiale, cu o dezvoltare constantă. Pe PropManage lucrezi cu designeri verificați, iar proiectul se leagă de execuție prin escrow.",
+    sections: [
+      {
+        h2: "Ce tipuri de locuințe amenajăm în Deva",
+        body: ["Fondul locativ e dominat de blocuri și case rezidențiale."],
+        bullets: [
+          "**Blocuri** în Dacia, Gojdu, Progresul — compartimentări de optimizat",
+          "**Case** în Viile Noi și zonele rezidențiale",
+          "**Apartamente noi** în ansamblurile recente",
+          "**Garsoniere** pentru închiriere",
+        ],
+      },
+      {
+        h2: "Nevoi specifice pieței din Deva",
+        body: ["Orașul cere amenajări practice și eficiente energetic:"],
+        bullets: [
+          "Optimizarea apartamentelor din blocurile comuniste",
+          "Izolare termică și reducerea facturilor",
+          "Refacerea instalațiilor vechi înainte de finisaje",
+          "Amenajări pentru închiriere",
+        ],
+      },
+    ],
+    faq: [
+      { q: "Găsesc designeri verificați în Deva?", a: "Da. Vezi designerii verificați care acoperă zona Hunedoara; dacă lista e scurtă, postezi o cerere pentru oferte reale." },
+      { q: "Cât costă designul interior în Deva?", a: "Un concept pornește de la câteva sute de lei pe cameră; proiectul tehnic complet se calculează pe metru pătrat, în funcție de complexitate." },
+    ],
+    related: [
+      { to: "/design-interior/apartament", label: "Design interior apartament" },
+      { to: "/design-interior/renovare", label: "Design pentru renovare" },
+      { to: "/design-interior/hunedoara", label: "Design interior Hunedoara" },
+    ],
+  },
+
+  "hunedoara": {
+    name: "Hunedoara",
+    intro:
+      "Hunedoara este cunoscută pentru Castelul Corvinilor, unul dintre cele mai spectaculoase monumente gotice din România, și pentru trecutul său siderurgic. Fondul locativ e dominat de blocuri ridicate în epoca industrială (OM, Micro) și case în zonele mai vechi. Pe PropManage lucrezi cu designeri verificați, iar proiectul se leagă de execuție prin escrow.",
+    sections: [
+      {
+        h2: "Ce tipuri de locuințe amenajăm în Hunedoara",
+        body: ["Moștenirea industrială a marcat fondul locativ al orașului."],
+        bullets: [
+          "**Blocuri din epoca industrială** în OM, Micro 1–6 — suprafețe de optimizat",
+          "**Case** în cartierele mai vechi și zonele rezidențiale",
+          "**Apartamente** cumpărate la prețuri accesibile, cu potențial mare de renovare",
+          "**Garsoniere** pentru închiriere",
+        ],
+      },
+      {
+        h2: "Nevoi specifice pieței din Hunedoara",
+        body: ["Prețurile accesibile fac renovarea completă foarte atractivă:"],
+        bullets: [
+          "Renovarea completă a apartamentelor cumpărate ieftin",
+          "Reabilitarea instalațiilor electrice și sanitare vechi",
+          "Izolare termică și eficiență energetică",
+          "Optimizarea compartimentărilor rigide din blocuri",
+        ],
+      },
+    ],
+    faq: [
+      { q: "Găsesc designeri verificați în Hunedoara?", a: "Da. Vezi designerii verificați care acoperă zona; dacă lista e scurtă, postezi o cerere pentru oferte reale." },
+      { q: "Merită să renovez un apartament vechi cumpărat ieftin?", a: "Adesea da — un proiect bun de renovare poate transforma complet un apartament la un cost predictibil, crescându-i mult valoarea." },
+    ],
+    related: [
+      { to: "/design-interior/apartament-vechi", label: "Design apartament vechi" },
+      { to: "/design-interior/renovare", label: "Design pentru renovare" },
+      { to: "/design-interior/deva", label: "Design interior Deva" },
+    ],
+  },
+
+  "turda": {
+    name: "Turda",
+    intro:
+      "Turda este un oraș aflat la sud de Cluj-Napoca, celebru pentru Salina Turda și Cheile Turzii, cu un fond locativ care combină centrul vechi cu blocuri și case. Apropierea de Cluj o transformă tot mai mult într-o alternativă rezidențială mai accesibilă. Pe PropManage lucrezi cu designeri verificați, iar proiectul se leagă de execuție prin escrow.",
+    sections: [
+      {
+        h2: "Ce tipuri de locuințe amenajăm în Turda",
+        body: ["Orașul îmbină clădiri vechi cu blocuri și case rezidențiale."],
+        bullets: [
+          "**Apartamente în centrul vechi** — clădiri cu detalii de păstrat",
+          "**Blocuri** în Micro I–IV, Oprișani — compartimentări de optimizat",
+          "**Case** în Turda Nouă, Poiana și zonele rezidențiale",
+          "**Apartamente** cumpărate ca alternativă mai accesibilă la Cluj",
+        ],
+      },
+      {
+        h2: "Nevoi specifice pieței din Turda",
+        body: ["Poziția de oraș-satelit al Clujului aduce cereri recurente:"],
+        bullets: [
+          "Amenajări pentru familii mutate din Cluj, în căutare de spațiu mai accesibil",
+          "Reabilitarea instalațiilor în blocurile mai vechi",
+          "Home office pentru cei care fac naveta la Cluj",
+          "Izolare termică și reducerea facturilor",
+        ],
+      },
+    ],
+    faq: [
+      { q: "Găsesc designeri verificați în Turda?", a: "Da. Designerii verificați din zona Cluj acoperă și Turda; postezi o cerere pentru oferte reale." },
+      { q: "E mai ieftin să amenajez în Turda decât în Cluj?", a: "Costul manoperei poate fi ceva mai accesibil, dar depinde de proiect. Un plan clar și o listă de materiale îți dau un buget realist." },
+    ],
+    related: [
+      { to: "/design-interior/apartament", label: "Design interior apartament" },
+      { to: "/design-interior/cluj-napoca", label: "Design interior Cluj-Napoca" },
+      { to: "/servicii-pentru-casa/cluj-napoca", label: "Servicii pentru casă în zona Cluj" },
+    ],
+  },
+
+  "zalau": {
+    name: "Zalău",
+    intro:
+      "Zalău este reședința județului Sălaj, un oraș de dimensiuni medii cu un fond locativ dominat de blocuri (Brădet, Dumbrava) și case în zonele rezidențiale. Orașul are un ritm liniștit și o piață în care renovarea și amenajarea eficientă contează mult. Pe PropManage lucrezi cu designeri verificați, iar proiectul se leagă de execuție prin escrow.",
+    sections: [
+      {
+        h2: "Ce tipuri de locuințe amenajăm în Zalău",
+        body: ["Fondul locativ e dominat de blocuri și case rezidențiale."],
+        bullets: [
+          "**Blocuri** în Brădet, Dumbrava, Meseș — compartimentări de optimizat",
+          "**Case** în zonele rezidențiale și la marginea orașului",
+          "**Apartamente noi** în ansamblurile recente",
+          "**Garsoniere** pentru închiriere",
+        ],
+      },
+      {
+        h2: "Nevoi specifice pieței din Zalău",
+        body: ["Orașul cere amenajări practice, durabile și eficiente:"],
+        bullets: [
+          "Optimizarea apartamentelor din blocurile comuniste",
+          "Reabilitarea instalațiilor vechi înainte de finisaje",
+          "Izolare termică și reducerea facturilor",
+          "Amenajări durabile pentru familii",
+        ],
+      },
+    ],
+    faq: [
+      { q: "Găsesc designeri verificați în Zalău?", a: "Da. Vezi designerii verificați care acoperă zona Sălaj; dacă lista e scurtă, postezi o cerere pentru oferte reale." },
+      { q: "Cât costă designul interior în Zalău?", a: "Un concept pornește de la câteva sute de lei pe cameră; proiectul tehnic complet se calculează pe metru pătrat, în funcție de complexitate." },
+    ],
+    related: [
+      { to: "/design-interior/apartament", label: "Design interior apartament" },
+      { to: "/design-interior/renovare", label: "Design pentru renovare" },
+      { to: "/design-interior/cluj-napoca", label: "Design interior Cluj-Napoca" },
+    ],
+  },
 };
 
 export const DI_LOCAL_INDEXABLE = Object.keys(DI_LOCAL_CONTENT);

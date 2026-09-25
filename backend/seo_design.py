@@ -65,6 +65,9 @@ DESIGN_LOCAL_CITIES: list[str] = [
     "baneasa", "otopeni", "corbeanca", "buftea", "balotesti",
     # București neighborhoods (batch 3)
     "militari", "titan", "pipera",
+    # National commercial expansion (Faza 4) — Transylvania + West
+    "targu-mures", "arad", "satu-mare", "bistrita", "alba-iulia",
+    "deva", "hunedoara", "turda", "zalau",
 ]
 
 # Local pages with UNIQUE authored content (INDEX). Cities NOT listed here render a
@@ -74,6 +77,8 @@ DESIGN_LOCAL_INDEXABLE: set[str] = {
     "floresti", "baciu", "apahida", "marasti-cluj", "gheorgheni-cluj",
     "baneasa", "otopeni", "corbeanca", "buftea", "balotesti",
     "militari", "titan", "pipera",
+    "targu-mures", "arad", "satu-mare", "bistrita", "alba-iulia",
+    "deva", "hunedoara", "turda", "zalau",
 }
 
 DESIGN_PAGE_SLUGS = {s for s, _ in DESIGN_PAGES}

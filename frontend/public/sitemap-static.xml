@@ -121,6 +121,42 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://propmanage.ro/servicii-pentru-casa/bucuresti</loc>
+    <lastmod>2026-09-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://propmanage.ro/servicii-pentru-casa/timisoara</loc>
+    <lastmod>2026-09-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://propmanage.ro/servicii-pentru-casa/brasov</loc>
+    <lastmod>2026-09-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://propmanage.ro/servicii-pentru-casa/oradea</loc>
+    <lastmod>2026-09-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://propmanage.ro/servicii-pentru-casa/sibiu</loc>
+    <lastmod>2026-09-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://propmanage.ro/servicii-pentru-casa/targu-mures</loc>
+    <lastmod>2026-09-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://propmanage.ro/marketplace</loc>
     <lastmod>2026-09-25</lastmod>
     <changefreq>daily</changefreq>

@@ -392,6 +392,8 @@ export const DI_LOCAL_CITIES = {
   baneasa: "Băneasa (București)", otopeni: "Otopeni (Ilfov)", corbeanca: "Corbeanca (Ilfov)",
   buftea: "Buftea (Ilfov)", balotesti: "Balotești (Ilfov)",
   militari: "Militari (București)", titan: "Titan (București)", pipera: "Pipera (București)",
+  "targu-mures": "Târgu Mureș", arad: "Arad", "satu-mare": "Satu Mare", bistrita: "Bistrița",
+  "alba-iulia": "Alba Iulia", deva: "Deva", hunedoara: "Hunedoara", turda: "Turda", zalau: "Zalău",
 };
 
 export const getDesignPage = (slug) => DI_PAGES[slug] || null;

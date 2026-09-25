@@ -1,3 +1,19 @@
+## 🌍 SEO GROWTH ENGINE — Faza 4 (expansiune comercială națională) (25 sept 2026)
+
+**Cerere**: extindere comercială națională controlată (fără doorway/duplicat/keyword stuffing/mock, fără atingeri robots/canonical/sitemap-architecture/Marketplace&specialist indexability/HartaBlocuri, fără deploy). Reutilizează infra SEO existentă.
+
+**Implementat (conținut distinct real, INDEX, în infra existentă)**:
+- **Design Interior +9 orașe** (`designInteriorLocal.js DI_LOCAL_CONTENT` + `designInterior.js DI_LOCAL_CITIES` + `seo_design.DESIGN_LOCAL_CITIES/INDEXABLE` → 21→30): **Târgu Mureș, Arad, Satu Mare, Bistrița, Alba Iulia, Deva, Hunedoara, Turda, Zalău**. Fiecare cu conținut local autentic distinct (cartiere reale, fond locativ specific, nevoi de piață, context economic — Secession Mureș/Art Nouveau Satu Mare/Corvin Hunedoara/Salina Turda etc.), FAQ, related cross-links, CTA comercial „Începe proiectul de design". Gate server confirmă `index:true` (`compute_design_gate`). Randate de `LocalDesignPage` (robots=index), în `sitemap-design.xml`, clasificate `local/design_interior`.
+- **Servicii pentru casă +6 huburi naționale** (`localSeo.js LOCAL_HUBS` + `public._STATIC_PAGES`): **București, Timișoara, Brașov, Oradea, Sibiu, Târgu Mureș**. Fiecare cu localContext/housingTypes/ownerNeeds/specialistsIntro/FAQ distinct real (patrimoniu, blocuri, case, nevoi specifice — ex. Brașov: hidroizolație montană + închiriere turistică; Oradea: Art Nouveau + balnear Felix). CTA → cont gratuit/specialist. În `sitemap-static.xml`, clasificate `local/local_cluj`. Servicii = servicii PropManage reale (aceeași ofertă), diferențierea = context local.
+- **Internal linking**: DI city → apartament/casă/renovare + servicii-pentru-casă (același oraș, unde există) + orașe vecine; hub servicii → Scorul Casei/Cartea Casei/Digital Twin/Imobile Verificate/specialiști + huburi surori. Fără linkuri artificiale.
+- **Project types**: living/bucătărie/baie/dormitor/apartament-2/3-camere + vila/horeca (Faza 3) acoperă lista. Restul = CANDIDATE (fără conținut distinct suficient acum).
+
+**Verificare (PASS)**: pytest `test_seo_national_iter230` (registry + gate index:true pe toate 9 + sitemap DI 9 + huburi 6) + `test_seo_growth_engine_iter229` + `test_design_interior_routing_iter219` + `test_seo_admin_iter218` = **24/24**; screenshot DI Târgu Mureș (H1+Secession+robots index+CTA) și hub Brașov (H1+conținut montan). Frontend build 0 erori.
+**INDEX**: 9 DI cities + 6 local hubs (+17 stiluri/2 project-types/blog din Faza 3). **CANDIDATE (faza următoare)**: alte orașe DI (Zalău/Deva prezente; extra doar cu conținut autorat), `/servicii-pentru-casa` alte orașe, DI×project-type suplimentare, articole blog originale (Content Factory = fază separată). **NOINDEX neschimbat** (reguli Marketplace/specialist/HartaBlocuri neatinse). Fără deploy.
+
+---
+
+
 ## 📊 ACQUISITION ATTRIBUTION + PROSPECTING ECONOMICS — Faza 3 (25 sept 2026)
 
 **Cerere**: completare goluri peste Faza 1+2 (fără reconstrucție, fără sistem nou de tracking, fără atingeri SEO/sitemap/robots/canonical, fără deploy). Signup attribution pe audiență; prospecting extins doar cu date reale; model de venit configurat; cost indisponibil onest.
