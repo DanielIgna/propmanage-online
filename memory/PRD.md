@@ -1,3 +1,14 @@
+## 🔧 GSC property target → https://propmanage.ro/ (25 sept 2026)
+
+**Cauză**: contul OAuth `danieligna1@gmail.com` are acces la property-ul URL-prefix `https://propmanage.ro/`, NU la `sc-domain:propmanage.ro` → API returna `property_no_access`. **Fix**: schimbat target-ul GSC implicit din `sc-domain:propmanage.ro` în `https://propmanage.ro/`. Fără integrare/OAuth client/Service Account nou; fără deploy.
+
+**Modificat**: `backend/routes/admin_seo.py` — default `seo_gsc_oauth_start(property=...)` și fallback `prop` din callback: `sc-domain:propmanage.ro` → `https://propmanage.ro/`; `property_expected`/help/eroare conectare actualizate să conducă cu URL-prefix. `frontend/src/pages/admin/AdminSEO.jsx` — default `prop` state, mesaj `property_no_access`, 2 placeholder-e → `https://propmanage.ro/`. `_gsc_list_sites` rămâne generic (`prop in sites`), verifică acum URL-prefix. Refresh token NU e șters/recreat în cod (reautorizare manuală). **Nemodificat**: OAuth flow/scopes/PKCE/state/refresh handling/callback URI/admin auth/cache/date-lag/seo-organic endpoint & UI/GSC UI. Doar mențiuni informative păstrează `sc-domain` ca exemplu alternativ (nu ca target).
+
+**Teste**: `tests/test_gsc_oauth_iter220.py` actualizat (param → https) + 2 teste noi (`test_gsc_property_target_is_url_prefix` decode state → `p == https://propmanage.ro/` + `property_expected`; `test_gsc_list_sites_matches_url_prefix_property` mock sites.list). **10/10 PASS**; frontend build 0 erori. READY FOR DEPLOY.
+
+---
+
+
 ## 🔗 GSC OAuth — finalizat READY FOR DEPLOY (25 sept 2026)
 
 **Cerere Fondator**: finalizează conectarea GSC prin **OAuth** (nu Service Account), reutilizând clientul Google existent. Fără deploy — Fondatorul face manual Publish + consimțământul pe propmanage.ro.

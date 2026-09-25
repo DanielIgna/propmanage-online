@@ -692,7 +692,7 @@ const PagesView = ({ data, isDark, txt, muted, border, rowBorder }) => {
 const GSCView = ({ isDark, txt, muted, border, rowBorder }) => {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [prop, setProp] = useState("sc-domain:propmanage.ro");
+  const [prop, setProp] = useState("https://propmanage.ro/");
   const [json, setJson] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [oauthBusy, setOauthBusy] = useState(false);
@@ -707,7 +707,7 @@ const GSCView = ({ isDark, txt, muted, border, rowBorder }) => {
         if (g === "connected") return { ok: true, text: "Conectat cu Google Search Console ✓" };
         const reason = p.get("reason") || g;
         const detail = p.get("detail");
-        if (reason === "property_no_access") return { ok: false, text: "Contul Google autorizat nu are acces la property-ul sc-domain:propmanage.ro. Adaugă-l ca user în Search Console (Settings → Users and permissions) și reîncearcă." };
+        if (reason === "property_no_access") return { ok: false, text: "Contul Google autorizat nu are acces la property-ul https://propmanage.ro/. Adaugă-l ca user în Search Console (Settings → Users and permissions) și reîncearcă." };
         return { ok: false, text: `Conectare GSC eșuată: ${reason}${detail ? ` (${detail})` : ""}` };
       }
     } catch { /* noop */ }
@@ -786,7 +786,7 @@ const GSCView = ({ isDark, txt, muted, border, rowBorder }) => {
             <div className="flex flex-wrap items-center gap-2">
               <input value={prop} onChange={(e) => setProp(e.target.value)} data-testid="seo-gsc-oauth-property"
                 className={`flex-1 min-w-[220px] rounded-lg border px-3 py-2 text-sm ${border} ${isDark ? "bg-slate-900 text-slate-200" : "bg-white text-slate-700"}`}
-                placeholder="sc-domain:propmanage.ro" />
+                placeholder="https://propmanage.ro/" />
               <AdminBtn onClick={oauthConnect} disabled={oauthBusy} data-testid="seo-gsc-oauth-btn">
                 {oauthBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plug className="w-4 h-4 mr-1 inline" /> Conectează cu Google</>}
               </AdminBtn>
@@ -807,7 +807,7 @@ const GSCView = ({ isDark, txt, muted, border, rowBorder }) => {
               <label className={`text-xs ${muted}`}>Property GSC</label>
               <input value={prop} onChange={(e) => setProp(e.target.value)} data-testid="seo-gsc-property"
                 className={`w-full mt-1 rounded-lg border px-3 py-2 text-sm ${border} ${isDark ? "bg-slate-900 text-slate-200" : "bg-white text-slate-700"}`}
-                placeholder="sc-domain:propmanage.ro" />
+                placeholder="https://propmanage.ro/" />
             </div>
             <div>
               <label className={`text-xs ${muted}`}>Service Account JSON (nu este expus niciodată)</label>

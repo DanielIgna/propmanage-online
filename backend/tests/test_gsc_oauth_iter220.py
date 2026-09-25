@@ -36,7 +36,7 @@ def test_gsc_status_exposes_oauth_and_redirect_uri(admin):
 
 def test_gsc_oauth_start_builds_valid_consent_url(admin):
     d = admin.get(f"{API}/admin/seo/gsc/oauth/start",
-                  params={"property": "sc-domain:propmanage.ro"}, timeout=20).json()
+                  params={"property": "https://propmanage.ro/"}, timeout=20).json()
     assert d["ok"] is True
     q = dict(up.parse_qsl(up.urlparse(d["authorization_url"]).query))
     assert q["scope"] == "https://www.googleapis.com/auth/webmasters.readonly"
@@ -47,6 +47,40 @@ def test_gsc_oauth_start_builds_valid_consent_url(admin):
     # PKCE must be present in the auth request (and the matching verifier is sent at exchange)
     assert q.get("code_challenge_method") == "S256"
     assert len(q.get("code_challenge", "")) >= 20
+
+
+def test_gsc_property_target_is_url_prefix(admin):
+    """The GSC target must be the URL-prefix property https://propmanage.ro/ (the one the
+    OAuth account danieligna1@gmail.com actually has access to), NOT sc-domain:*."""
+    import jwt as _jwt
+    # default (no property param) must carry the URL-prefix property in the signed state
+    d = admin.get(f"{API}/admin/seo/gsc/oauth/start", timeout=20).json()
+    state = dict(up.parse_qsl(up.urlparse(d["authorization_url"]).query))["state"]
+    claims = _jwt.decode(state, options={"verify_signature": False})
+    assert claims.get("p") == "https://propmanage.ro/", f"default target wrong: {claims.get('p')}"
+    # diagnostic must expose the URL-prefix as the expected property
+    g = admin.get(f"{API}/admin/seo/gsc", timeout=20).json()
+    assert g["property_expected"].startswith("https://propmanage.ro/")
+
+
+def test_gsc_list_sites_matches_url_prefix_property():
+    """Property-access verification (_gsc_list_sites) must return the account's site URLs
+    so the callback can confirm https://propmanage.ro/ is accessible before marking
+    connected. Uses a mocked Search Console client — no live Google call."""
+    from unittest import mock
+    import routes.admin_seo as m
+    fake_service = mock.MagicMock()
+    fake_service.sites.return_value.list.return_value.execute.return_value = {
+        "siteEntry": [
+            {"siteUrl": "https://propmanage.ro/", "permissionLevel": "siteOwner"},
+            {"siteUrl": "sc-domain:example.com", "permissionLevel": "siteFullUser"},
+        ]
+    }
+    with mock.patch.object(m, "_gsc_build_credentials", return_value=object()), \
+         mock.patch("googleapiclient.discovery.build", return_value=fake_service):
+        sites = m._gsc_list_sites({"auth_type": "oauth", "property": "https://propmanage.ro/", "refresh_token": "x"})
+    assert "https://propmanage.ro/" in sites          # target accessible → connect allowed
+    assert "sc-domain:propmanage.ro" not in sites      # old target NOT present → would be rejected
 
 
 def test_gsc_report_disconnected_returns_empty_not_fake(admin):

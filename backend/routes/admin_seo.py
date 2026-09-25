@@ -1081,9 +1081,9 @@ async def seo_gsc(user: dict = Depends(require_role("admin"))):
             "how_to": [
                 "Alternativ (Service Account): Google Cloud → activează Search Console API + creează Service Account + cheie JSON.",
                 "Search Console → Settings → Users and permissions → adaugă email-ul service account-ului.",
-                "Lipește property-ul (sc-domain:propmanage.ro sau https://propmanage.ro/) + JSON-ul aici.",
+                "Lipește property-ul (https://propmanage.ro/ sau sc-domain:propmanage.ro) + JSON-ul aici.",
             ],
-            "property_expected": "sc-domain:propmanage.ro sau https://propmanage.ro/",
+            "property_expected": "https://propmanage.ro/ (sau sc-domain:propmanage.ro)",
             "site_verification_meta_present": token is not None,
             "site_verification_token": token,
             "metrics": None,
@@ -1113,7 +1113,7 @@ async def seo_gsc_connect(payload: GSCConnectIn, user: dict = Depends(require_ro
     prop = (payload.property or "").strip()
     raw = (payload.service_account_json or "").strip()
     if not prop:
-        return {"ok": False, "error": "Property lipsă (ex: sc-domain:propmanage.ro)"}
+        return {"ok": False, "error": "Property lipsă (ex: https://propmanage.ro/)"}
     try:
         info = _json.loads(raw)
     except Exception:
@@ -1167,7 +1167,7 @@ async def _gsc_store_last_error(code: str):
 
 
 @router.get("/admin/seo/gsc/oauth/start")
-async def seo_gsc_oauth_start(property: str = "sc-domain:propmanage.ro",
+async def seo_gsc_oauth_start(property: str = "https://propmanage.ro/",
                               user: dict = Depends(require_role("admin"))):
     """Return the Google consent URL (scope webmasters.readonly, offline access).
     Reuses the existing GOOGLE_CLIENT_ID/SECRET — no Service Account needed."""
@@ -1277,7 +1277,7 @@ async def seo_gsc_oauth_callback(request: Request):
         await _gsc_store_last_error("missing_scope")
         return _back("gsc=error&reason=missing_scope")
 
-    prop = data.get("p") or "sc-domain:propmanage.ro"
+    prop = data.get("p") or "https://propmanage.ro/"
 
     # Confirm the authorized account actually has access to the target property.
     # If we can list sites and it's absent → clear error, do NOT persist a false
