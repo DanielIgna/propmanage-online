@@ -1,3 +1,20 @@
+## 🔗 CONTENT FACTORY — GSC unified with existing integration (fix) (25 sept 2026)
+
+**Problemă (Production)**: tab-ul GSC = CONNECTED cu date reale, dar Content Factory afișa „GSC unavailable". **Cauză**: `detect_opportunities`/performance verificau `cfg.get("connected")`, cheie inexistentă în `_gsc_config()` (care returnează `{property, auth_type, refresh_token/json, ...}`). Tab-ul GSC testează conectivitatea prin `cfg.get("property")`.
+
+**Fix (reutilizare, fără integrare nouă)**:
+- Content Factory folosește ACUM exact aceeași sursă ca tab-ul GSC: `routes.admin_seo._gsc_config` + `_gsc_run_query` (db.seo_config key="gsc"). Zero al doilea client OAuth, zero credentials separate.
+- Connectivity test corectat la `cfg.get("property")` (identic cu GSC tab/report).
+- `detect_opportunities` consumă acum queries REALE (dimensiune ["query"], 200 rânduri) și construiește oportunități din metrici reale: **HIGH_IMPRESSION_LOW_CTR** (impr≥100 & CTR<2%), **RANKING_OPPORTUNITY** (poziție 5-20 & impr≥30), **COMMERCIAL_INTENT** (intent comercial & impr≥10), **EMERGING_QUERY** (impr≥50); combinat cu analytics + structural-gap existente. Fără date inventate (skip când semnalul e insuficient).
+- `article_performance` per-articol deja folosea `_gsc_config` corect (page metrics reale în Production).
+- `gsc_note` acum condiționat (conectat vs neconectat).
+
+**Comportament**: **Preview** → GSC rămâne `unavailable` (fără OAuth acolo) — NU e bug, acceptat. **Production** → Content Factory folosește automat conexiunea GSC existentă din Live și transformă query-urile reale în oportunități.
+**Verificare (PASS)**: 31 teste (content_factory 24/24 + seo_admin 7/7); build 0 erori; Preview confirmă `gsc: unavailable` onest. Reguli SEO/human-review/no-auto-publish/no-mock/sitemap/Marketplace neatinse. Fără deploy.
+
+---
+
+
 ## 🔁 CONTENT GROWTH LOOP V1 — FINAL (article → traffic → CTA → lead → decision) (25 sept 2026)
 
 **Cerere**: închide ciclul de creștere peste Content Factory existent (nu reconstrui, fără engine/dashboard paralel, fără date inventate, fără auto-publish, fără deploy). READY FOR DEPLOY.

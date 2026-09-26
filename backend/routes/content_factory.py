@@ -219,15 +219,68 @@ async def detect_opportunities(period_days: int = 90) -> dict:
     opportunities = []
     sources_status = {}
 
-    # ── Source 1: GSC (queries / impressions / CTR / position) ──
+    # ── Source 1: GSC — REUSES the exact same integration as the GSC tab ──
+    # (routes.admin_seo._gsc_config + _gsc_run_query, db.seo_config key="gsc").
+    # No second OAuth client, no separate credentials. Connected == cfg has a property.
     gsc_status = "unavailable"
     try:
-        from routes.admin_seo import _gsc_config, _gsc_build_credentials, _gsc_run_query
+        from routes.admin_seo import _gsc_config, _gsc_run_query
+        from datetime import timedelta, date
         cfg = await _gsc_config()
-        if cfg and cfg.get("connected"):
+        if cfg and cfg.get("property"):          # same connectivity test as the GSC tab
             gsc_status = "ok"
-            # NOTE: real GSC parsing happens here in production (impressions/CTR/position).
-            # Categories A/B/C/D are computed from real rows only.
+            end = date.today()
+            start = end - timedelta(days=min(period_days, 90))
+            q_rows = await asyncio.to_thread(
+                _gsc_run_query, cfg, cfg["property"], start.isoformat(), end.isoformat(), ["query"], 200)
+            for r in q_rows:
+                keys = r.get("keys") or []
+                if not keys:
+                    continue
+                query = keys[0]
+                impr = int(r.get("impressions", 0))
+                clicks = int(r.get("clicks", 0))
+                ctr = round(float(r.get("ctr", 0)) * 100, 2)
+                pos = round(float(r.get("position", 0)), 1)
+                intents = classify_intent(query)
+                cluster = _cluster_for(query, intents)
+                city = _detect_city(query)
+                gap = find_content_gap(query, published_slugs)
+                commercial = bool(set(intents) & COMMERCIAL_INTENTS)
+                # Category detection from REAL metrics only
+                category, prio = None, 40
+                if impr >= 100 and ctr < 2.0:
+                    category, prio = "high_impression_low_ctr", 80
+                elif 5 <= pos <= 20 and impr >= 30:
+                    category, prio = "ranking_opportunity", 75
+                elif commercial and impr >= 10:
+                    category, prio = "commercial_intent", 68
+                elif impr >= 50:
+                    category, prio = "emerging_query", 55
+                if not category:
+                    continue  # not enough signal → skip (no invented demand)
+                if commercial:
+                    prio += 8
+                if city:
+                    prio += 5
+                opportunities.append({
+                    "id": str(uuid.uuid4()),
+                    "source": "gsc",
+                    "category": category,
+                    "topic": query,
+                    "query": query,
+                    "intent": intents,
+                    "cluster": cluster,
+                    "city": city,
+                    "existing_page": gap["existing_page"],
+                    "gap": gap["gap"],
+                    "impressions": impr, "clicks": clicks, "ctr": ctr, "position": pos,
+                    "sessions": None,
+                    "priority": min(100, prio),
+                    "rationale": f"GSC real: {impr} impresii, {clicks} clickuri, CTR {ctr}%, poziție {pos}. "
+                                 f"Gap: {gap['gap']}. Cluster {CLUSTERS[cluster]['label']}.",
+                    "data_status": "ok",
+                })
     except Exception as e:
         logger.info(f"GSC opportunity source unavailable: {e}")
     sources_status["gsc"] = gsc_status
@@ -309,11 +362,14 @@ async def detect_opportunities(period_days: int = 90) -> dict:
     opportunities.extend(structural)
 
     opportunities.sort(key=lambda o: o["priority"], reverse=True)
+    _gsc_ok = sources_status.get("gsc") == "ok"
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "sources_status": sources_status,
-        "gsc_note": "GSC neconectat pe Preview — categoriile bazate pe impresii/CTR/poziție = UNAVAILABLE. "
-                    "Se activează automat în Producție unde GSC e conectat.",
+        "gsc_note": ("GSC conectat — categoriile bazate pe impresii/CTR/poziție folosesc date reale."
+                     if _gsc_ok else
+                     "GSC neconectat pe Preview — categoriile bazate pe impresii/CTR/poziție = UNAVAILABLE. "
+                     "Se activează automat în Producție unde GSC e conectat."),
         "count": len(opportunities),
         "opportunities": opportunities,
     }
@@ -410,10 +466,13 @@ async def article_performance(period_days: int = 28) -> dict:
             "published_at": a.get("published_at"),
         })
     published = len(items)
+    _gsc_ok = gsc_map is not None
     return {
         "period_days": period_days,
-        "gsc_status": "ok" if gsc_map is not None else "unavailable",
-        "gsc_note": "GSC neconectat pe Preview → metrici per-articol UNAVAILABLE; se activează în Producție.",
+        "gsc_status": "ok" if _gsc_ok else "unavailable",
+        "gsc_note": ("GSC conectat — metrici per-articol din date reale."
+                     if _gsc_ok else
+                     "GSC neconectat pe Preview → metrici per-articol UNAVAILABLE; se activează în Producție."),
         "published_articles": published,
         "note": "DATA INSUFFICIENT afișat onest când nu există trafic/GSC. Zero date inventate." if published == 0 else None,
         "items": items,
