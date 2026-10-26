@@ -1,0 +1,39 @@
+{
+  "summary": "Tested the Bucin Mob strategic prospect, the shared partner portal (real and DEMO) and manual admin activation, on both backend and frontend. Backend: 14/15 pytest tests pass. The one failure is a security gap: a PATCH request can turn on portal_access_enabled for a partner that has no login, which skips the 'create login first' check. Frontend: every requested element and flow works on the admin detail page and in the DEMO portal (6 tabs, filters, banner). Bucin Mob is back to its original state (status negotiation, no login, portal_access_enabled=false, collaboration_agreed=false, zones [], 6 categories).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "PATCH /api/admin/city-partners/{id}", "issue": "PartnerPatch accepts portal_access_enabled. PATCH {portal_access_enabled:true} on Bucin Mob (no linked_user_id) returned 200 and saved true. This skips the guard in POST /{id}/portal-access, which returns 400 when there is no login. The value was set back to false during the test.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/admin/city-partners/{id}/create-login", "issue": "Bucin Mob has contact_email=null. If its status changes to agreed/active, create-login would run find_one({email:''}) and could create or link a user with an empty email. The endpoint should require a valid contact_email."},
+      {"endpoint": "POST /api/admin/city-partners/{id}/create-login", "issue": "When a user already exists with that email, the endpoint links it without checking that its role is city_partner and without setting partner_id. The linked account then cannot use the portal (it gets 403/404). It could also link an admin or client account. This is older behaviour."},
+      {"endpoint": "_require_partner", "issue": "portal_access_enabled=None (legacy records) is treated as allowed. This is probably intended for backward compatibility, but it should be documented."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PartnerPortal Rapoarte", "issues": ["The brief asks for filters by period, category and status. Only period and status exist; there is no category filter.", "The date filters use the browser's native date picker (mm/dd/yyyy) instead of the shadcn Calendar, which also clashes with the RO locale."]},
+      {"screen": "CityPartnerDetailPage 'Cont City Partner' card", "issues": ["When linked_user_id is set, the card shows 'Cont activ — partenerul poate accesa portalul' even if portal access is suspended. This is misleading."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_bucinmob_partner_portal_iter232.py", "/app/test_reports/pytest/pytest_iter232.xml"],
+  "action_items": [
+    "Remove portal_access_enabled from PartnerPatch, or reject it when there is no linked_user_id, so that only POST /{id}/portal-access can change access",
+    "In create-login, require a non-empty contact_email; when linking an existing user, check its role is city_partner and set partner_id",
+    "Optional: add a category filter to Rapoarte and use the shadcn date picker",
+    "Make the 'Cont City Partner' message reflect portal_access_enabled"
+  ],
+  "critical_code_review_comments": [
+    "The PATCH endpoint can change any field in PartnerPatch, including the access switch. Access changes should go only through set_portal_access.",
+    "The DEMO endpoint is correctly limited to super admins and never writes to the DB. All DEMO data is labelled.",
+    "Data isolation in the real portal is correct: queries filter by user.partner_id."
+  ],
+  "updated_files": ["/app/backend/tests/test_bucinmob_partner_portal_iter232.py"],
+  "success_rate": {"backend": "93% (14/15)", "frontend": "100%"},
+  "seed_data_creation": "None. Temporary TEST_ categories and zones were added and then restored. Bucin Mob was verified in its original state at the end.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Bucin Mob id 6adf5b65219980e1e22a386f must stay status=negotiation, linked_user_id=null, portal_access_enabled=false. The test file restores state in finally blocks. Requests need the header X-PM-Client: propmanage-app. Once PATCH stops accepting portal_access_enabled, test_patch_cannot_bypass_portal_access_guard should pass."
+}

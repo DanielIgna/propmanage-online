@@ -7142,3 +7142,23 @@ Testat în preview: pagina se încarcă, click → „32 emailuri repuse în coa
 - Tested via testing_agent (iteration_229): backend 16/17, frontend core pass; all valid issues fixed. NOT deployed (READY FOR DEPLOY).
 
 **Still backlog (requested, not started):** (1) resend-verification-email button + 24h reminder, (2) beta-tester guided onboarding with progress, (3) KYC E2E test (upload->admin approve->badge), (4) orphan-data integrity scan + admin report + downloadable backup export.
+
+---
+## Changelog — 2026-06 (Bucin Mob Strategic Partner Portal)
+**Decision (user):** Extend existing City Partners system (NO parallel partner system, NO general re-audit). Add Bucin Mob SRL as a strategic prospect + a reusable shared partner portal with strict backend data isolation and manual Admin activation. DEMO mode must be explicitly labeled. No deploy/publish.
+
+**Implemented & verified:**
+- Seed `seed_bucinmob_prospect.py` (idempotent, upsert by company): Bucin Mob SRL, website https://bucinmob.ro/, Reghin/Mureș/România, categories (mobilier lemn masiv, uși, ferestre, tâmplărie stratificat, obloane, căsuțe grădină). status=`negotiation`, collaboration_agreed=false, portal_access_enabled=false, NO login, territories/capacity/exclusivity/commissions marked unconfirmed (`coverage_confirmed=false`), info_source=public. Verified not duplicated.
+- `city_partners.py` backend:
+  - `portal_access_enabled` field in `_serialize`; `_require_partner` now rejects when portal access is explicitly disabled (suspended).
+  - New `POST /api/admin/city-partners/{id}/portal-access {enabled}` (super-admin only) — the ONLY way to toggle portal access; requires a login to exist before enabling.
+  - `portal_access_enabled` REMOVED from `PartnerPatch` (HIGH fix: PATCH could previously bypass the create-login guard).
+  - `create-login` hardened: requires valid contact_email (400 otherwise), blocks email already owned by a non-city_partner role, sets role+partner_id on linked existing user, auto-enables portal_access on login creation.
+  - Consolidated `GET /api/partner/portal` (real data, scoped to caller's partner_id — leads, catalog, agreement via strategic_partners `_serialize_agreement`, computed stats) and `GET /api/partner/portal/demo?partner_id=` (super-admin only, synthetic DEMO-labeled payload).
+- Frontend:
+  - `pages/partner/PartnerPortal.jsx` at route `/partners/portal` — shared reusable portal, tabs: Dashboard, Profil & Catalog, Clienți & Cereri, Oferte & Conversii, Acord & Comisioane, Rapoarte (filters: period/status/category + category-filtered catalog). DEMO banner + footer disclaimer. Axios sets `X-PM-Client` header.
+  - `Auth.jsx`: `city_partner` roleHome → `/partners/portal`.
+  - `CityPartnerDetailPage.jsx`: Admin "Acces portal & activare" card — status select, editable authorized categories/territories (save), portal access state + Suspend/Reactivate/create-login-first guidance, "Previzualizează portal (DEMO)" button. Account-status message now reflects portal access.
+- Testing: iteration_232 — frontend 100%, backend fixes (PATCH bypass + create-login email guard) verified via curl. NOT deployed.
+
+**Isolation:** All partner-facing queries filter by the authenticated user's own `partner_id`; `/api/partner/portal` requires `city_partner` role; demo endpoint requires super-admin. Prospect stays inactive (no login, portal access false) until explicit Admin action.

@@ -71,6 +71,7 @@ const PartnerPortal = () => {
   const [rFrom, setRFrom] = useState("");
   const [rTo, setRTo] = useState("");
   const [rStage, setRStage] = useState("all");
+  const [rCat, setRCat] = useState("all");
 
   useEffect(() => {
     (async () => {
@@ -100,6 +101,14 @@ const PartnerPortal = () => {
   const isDemo = !!data?.demo;
 
   const converted = useMemo(() => leads.filter((l) => l.stage === "converted"), [leads]);
+  const reportCategories = useMemo(() => {
+    const set = new Set([...(p?.categories || []), ...catalog.map((c) => c.category).filter(Boolean)]);
+    return Array.from(set);
+  }, [p, catalog]);
+  const filteredCatalog = useMemo(
+    () => (rCat === "all" ? catalog : catalog.filter((c) => c.category === rCat)),
+    [catalog, rCat]
+  );
   const filteredLeads = useMemo(() => {
     return leads.filter((l) => {
       if (rStage !== "all" && l.stage !== rStage) return false;
@@ -322,9 +331,16 @@ const PartnerPortal = () => {
                   {Object.keys(STAGE_LBL).map((s) => <option key={s} value={s}>{STAGE_LBL[s]}</option>)}
                 </select>
               </div>
-              <button onClick={() => { setRFrom(""); setRTo(""); setRStage("all"); }} className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-sm text-slate-600 dark:text-slate-300" data-testid="report-reset">Resetează</button>
+              <div>
+                <label className="block text-[11px] text-slate-500 mb-1">Categorie (catalog)</label>
+                <select value={rCat} onChange={(e) => setRCat(e.target.value)} className="px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="report-category">
+                  <option value="all">Toate</option>
+                  {reportCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <button onClick={() => { setRFrom(""); setRTo(""); setRStage("all"); setRCat("all"); }} className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-sm text-slate-600 dark:text-slate-300" data-testid="report-reset">Resetează</button>
             </div>
-            <div className="text-xs text-slate-500 mb-2" data-testid="report-count">{filteredLeads.length} rezultate · venit: {money(filteredLeads.reduce((s, l) => s + (l.revenue_generated || 0), 0))}</div>
+            <div className="text-xs text-slate-500 mb-2" data-testid="report-count">{filteredLeads.length} cereri/clienți · venit: {money(filteredLeads.reduce((s, l) => s + (l.revenue_generated || 0), 0))} · {filteredCatalog.length} produse în catalog</div>
             {filteredLeads.length === 0
               ? <div className="text-sm text-slate-500 py-6 text-center">Niciun rezultat pentru filtrele selectate.</div>
               : <div className="divide-y divide-slate-100 dark:divide-slate-800 border-t border-slate-100 dark:border-slate-800">
@@ -339,6 +355,22 @@ const PartnerPortal = () => {
                   </div>
                 ))}
               </div>}
+            <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Catalog filtrat după categorie ({filteredCatalog.length})</div>
+              {filteredCatalog.length === 0
+                ? <div className="text-sm text-slate-500">Niciun produs pentru categoria selectată.</div>
+                : <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {filteredCatalog.map((c) => (
+                    <div key={c.id} className="py-2 flex items-center gap-3" data-testid={`report-catalog-${c.id}`}>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-slate-800 dark:text-slate-100 truncate">{c.name}</div>
+                        <div className="text-[11px] text-slate-500">{c.category || "—"}</div>
+                      </div>
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">{c.price_min}{c.price_max && c.price_max !== c.price_min ? `–${c.price_max}` : ""} {c.currency}</span>
+                    </div>
+                  ))}
+                </div>}
+            </div>
           </SectionCard>
         )}
 

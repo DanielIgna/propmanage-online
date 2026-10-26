@@ -264,7 +264,6 @@ class PartnerPatch(BaseModel):
     origin_confirmed: Optional[bool] = None
     coverage_confirmed: Optional[bool] = None
     collaboration_metrics: Optional[dict] = None
-    portal_access_enabled: Optional[bool] = None
 
 
 class OnboardingStepUpdate(BaseModel):
@@ -581,14 +580,18 @@ async def create_partner_login(partner_id: str, user=Depends(get_current_user)):
         if existing_user:
             return {"ok": True, "already_exists": True, "user_id": str(existing_user["_id"]), "email": existing_user["email"]}
 
-    email = (p.get("contact_email") or "").lower()
+    email = (p.get("contact_email") or "").strip().lower()
+    if not email:
+        raise HTTPException(400, "Partenerul nu are un email de contact valid. Adaugă-l înainte de a crea contul.")
     existing = await db.users.find_one({"email": email})
     if existing:
-        # Just link it
+        if existing.get("role") not in (None, "city_partner"):
+            raise HTTPException(400, f"Există deja un cont cu acest email și alt rol ({existing.get('role')}).")
         await db.city_partners.update_one(
             {"_id": oid},
             {"$set": {"linked_user_id": str(existing["_id"]), "portal_access_enabled": True, "updated_at": datetime.now(timezone.utc).isoformat()}},
         )
+        await db.users.update_one({"_id": existing["_id"]}, {"$set": {"role": "city_partner", "partner_id": str(p["_id"])}})
         return {"ok": True, "linked_existing": True, "user_id": str(existing["_id"]), "email": email}
 
     temp_password = secrets.token_urlsafe(12).replace("_", "X").replace("-", "Y")[:14] + "!1A"

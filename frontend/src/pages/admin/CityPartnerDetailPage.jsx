@@ -231,7 +231,9 @@ const CityPartnerDetailPage = () => {
               <KeyRound className="w-3.5 h-3.5" /> Cont City Partner
             </div>
             {partner.linked_user_id
-              ? <div className="text-sm text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> Cont activ — partenerul poate accesa portalul</div>
+              ? (partner.portal_access_enabled === false
+                  ? <div className="text-sm text-amber-700 dark:text-amber-300 flex items-center gap-1.5"><AlertTriangle className="w-4 h-4" /> Cont existent — acces portal SUSPENDAT</div>
+                  : <div className="text-sm text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> Cont activ — are acces la portal</div>)
               : CAN_CREATE_LOGIN.has(partner.status)
                 ? <>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Generează credențiale dedicate ca partenerul să acceseze portalul propriu (vede doar lead-urile sale).</p>
