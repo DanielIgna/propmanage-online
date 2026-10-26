@@ -109,6 +109,7 @@ const CityPartnerDetailPage = () => {
       if (stage === "lost") {
         const reason = window.prompt("Motiv pierdere lead (obligatoriu pentru raportare):", "");
         if (reason === null) return; // cancelled
+        if (!reason.trim()) { alert("Motivul pierderii este obligatoriu."); return; }
         body.lost_reason = reason.trim();
       }
       const { data } = await ax.patch(`/api/admin/city-partners/leads/${leadId}`, body);
@@ -153,6 +154,15 @@ const CityPartnerDetailPage = () => {
               <div><div className="text-slate-400">Apartamente</div><div className="font-bold text-slate-900 dark:text-white">{partner.units_managed}</div></div>
               <div><div className="text-slate-400">Ritm creștere</div><div className="font-bold text-slate-900 dark:text-white">{partner.growth_rate || "—"}</div></div>
               <div className="col-span-2"><div className="text-slate-400">Tip portofoliu</div><div className="font-medium text-slate-700 dark:text-slate-200">{partner.portfolio_type || "—"}</div></div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2 text-xs" data-testid="partner-profile-block">
+              <div className="flex gap-2">
+                <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300">{partner.partner_type || "city"}</span>
+                <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300">acoperire: {partner.coverage || "city"}</span>
+              </div>
+              {(partner.categories?.length > 0) && <div><span className="text-slate-400">Categorii: </span><span className="text-slate-700 dark:text-slate-200">{partner.categories.join(", ")}</span></div>}
+              {(partner.zones?.length > 0) && <div><span className="text-slate-400">Zone: </span><span className="text-slate-700 dark:text-slate-200">{partner.zones.join(", ")}</span></div>}
+              {(partner.services?.length > 0) && <div><span className="text-slate-400">Servicii: </span><span className="text-slate-700 dark:text-slate-200">{partner.services.join(", ")}</span></div>}
             </div>
             {partner.notes && <div className="mt-3 text-xs text-slate-500 italic">„{partner.notes}”</div>}
           </div>

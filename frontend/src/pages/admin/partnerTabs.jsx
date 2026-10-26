@@ -149,7 +149,7 @@ const AgreementForm = ({ onClose, onSaved, partners, taxonomy }) => {
     } finally { setSaving(false); }
   };
 
-  const options = partners.filter(p => p.kind === f.kind);
+  const options = partners.filter(p => p.kind === f.kind && p.status !== "terminated");
   return (
     <div className="fixed inset-0 z-[95] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" data-testid="agreement-form-modal">
       <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 max-h-[88vh] overflow-y-auto">
@@ -170,7 +170,7 @@ const AgreementForm = ({ onClose, onSaved, partners, taxonomy }) => {
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Partener</label>
               <select value={f.partner_id} onChange={e => set("partner_id", e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="agr-field-partner">
                 <option value="">— selectează —</option>
-                {options.map(p => <option key={p.id} value={p.id}>{p.company} ({p.city})</option>)}
+                {options.map(p => <option key={p.id} value={p.id}>{p.company}{p.city ? ` (${p.city})` : ""} · {p.status}</option>)}
               </select>
             </div>
           </div>

@@ -4,6 +4,32 @@ Rol: jurnal cronologic al schimbărilor semnificative + sincronizărilor de cuno
 
 ---
 
+## 2026-06 · Strategic City Partnership + City nZEB (P0→P2) — PREVIEW/BUILT
+Implementare controlată, aditivă, nedistructivă peste sistemele existente City Partners + Marketplace Partners. FĂRĂ sistem al 3-lea de parteneri, FĂRĂ ștergere date, FĂRĂ activare automată exclusivitate, FĂRĂ deploy. Toată logica comercială nouă e TRANSVERSALĂ și referă `{kind, partner_id}`. Testat: iteration_230 — backend 24/24 pytest pass, frontend 100% fluxuri cerute; +7 fix-uri de corectitudine verificate prin curl.
+
+**P0-1 Profil partener (City)** — câmpuri opționale `partner_type, coverage, categories[], zones[], services[]` expuse în `CityPartnersPage` (formular) + afișate în `CityPartnerDetailPage` (card). Legacy partners fără aceste câmpuri funcționează (default `city`/`city`, liste goale). Backend: `city_partners.py` (model L153-158/177-183, validare ALLOWED_PARTNER_TYPES/ALLOWED_COVERAGE).
+
+**P0-2 lost_reason** — PATCH lead City + Marketplace acceptă `lost_reason`; se golește automat când stage ≠ lost. UI City: prompt obligatoriu la trecerea în „lost", afișat sub lead. (Marketplace: suportat API, UI per-lead inexistent → backlog.)
+
+**P0-3 Funnel real** — `GET /api/admin/strategic-partners/funnel`: invitați→conturi activate (match lead.email↔users.email, fără duplicare)→conversii, per partener + totaluri. Tab „Funnel".
+
+**P1-4/5/6 Acorduri transversale** — colecție `partner_agreements` {kind, partner_id, categories, territory_*, coverage, segment, period_*, exclusivity, status, commission_terms}. CRUD admin super-admin. Detectare conflict exclusivitate (categorie∩ ∧ teritoriu∩ ∧ perioadă∩) → HTTP 409 + aprobare explicită (`acknowledge_conflicts` → approved_by). Exclude agreements ale propriului partener și ale partenerilor terminated. Tab „Acorduri" cu formular + conflict box.
+
+**P1-7 Comisioane eligibile** — `GET /commissions-report`: calcul din regulile marketplace configurate (percent/per_sale/per_lead/fixed/subscription) × conversii/venit real. Doar estimare, fără plăți. Tab „Comisioane".
+
+**P2-8 Taxonomie nZEB** — `GET /taxonomy`: categorii + grup `nZEB` (audit energetic, consultanță, tâmplărie, izolații, HVAC, pompe căldură, fotovoltaice, renovări). Fără colecție paralelă.
+
+**P2-9 Rutare cereri** — `POST /route-request`: scor pe acord activ (live în perioadă) + exclusivitate + categorie profil + teritoriu + capacitate; păstrează istoric în `partner_route_history`; exclude parteneri terminated/acorduri expirate. Sugestie, nu auto-assign. Tab „Rutare cereri".
+
+**Fix-uri corectitudine (post-test)**: rutare/conflict respectă perioada acordului; refuz creare acord pt partener terminated; PATCH nu re-ridică 409 pt conflicte deja aprobate / câmpuri neconflictuale; validare period_to≥period_from; dropdown parteneri exclude terminated; `re.escape` pe filtrul city.
+
+**Fișiere**: `backend/routes/strategic_partners.py` (+~600 linii), `city_partners.py`, `marketplace_partners.py`; `frontend/.../StrategicPartnersDashboard.jsx` (tab-uri), `partnerTabs.jsx` (nou), `CityPartnersPage.jsx`, `CityPartnerDetailPage.jsx`. Teste: `backend/tests/test_strategic_partnership_p0_p2_iter230.py`.
+
+**Backlog**: UI lost_reason marketplace per-lead; UI editare acord (PATCH); date picker shadcn în loc de input nativ; split `strategic_partners.py` (>700 linii) + aggregation pentru funnel/comisioane la scară; TTL/index pe `partner_route_history`.
+
+---
+
+
 ## 2026-06 · HartaBlocuri Phase 1 — Contextul clădirii + Admin Import Center + Typology prep — PREVIEW/BUILT
 Continuare a integrării HartaBlocuri (aditiv, nedistructiv). Testat: iteration_222 — backend 8/8, frontend 100%.
 

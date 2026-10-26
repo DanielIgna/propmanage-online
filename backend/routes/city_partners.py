@@ -35,6 +35,7 @@ Collections:
 """
 import logging
 import os
+import re
 import secrets
 from datetime import datetime, timezone
 from typing import Optional
@@ -226,7 +227,7 @@ async def list_partners(
     if status and status != "all":
         q["status"] = status
     if city:
-        q["city"] = {"$regex": f"^{city}$", "$options": "i"}
+        q["city"] = {"$regex": f"^{re.escape(city)}$", "$options": "i"}
     cur = db.city_partners.find(q).sort("created_at", -1)
     items = [_serialize(d) async for d in cur]
     return {"items": items, "count": len(items)}

@@ -493,15 +493,38 @@ def _period_overlap(a: dict, b: dict) -> bool:
     return True
 
 
+def _is_live_today(a: dict) -> bool:
+    """An agreement is enforceable only while today is inside its period window."""
+    today = datetime.now(timezone.utc).date()
+    pf, pt = _parse_date(a.get("period_from")), _parse_date(a.get("period_to"))
+    if pf and today < pf:
+        return False
+    if pt and today > pt:
+        return False
+    return True
+
+
+def _validate_period(period_from, period_to):
+    pf, pt = _parse_date(period_from), _parse_date(period_to)
+    if pf and pt and pt < pf:
+        raise HTTPException(400, "period_to nu poate fi înaintea lui period_from.")
+
+
 async def _find_conflicts(candidate: dict, exclude_id: Optional[ObjectId] = None) -> list:
     """Return active agreements that conflict with the candidate.
-    Conflict = at least one side exclusive AND categories∩ AND territory∩ AND period∩.
+    Conflict = at least one side exclusive AND categories∩ AND territory∩ AND period∩,
+    excluding the same partner's own agreements and agreements of terminated partners.
     """
     conflicts = []
+    cand_kind = candidate.get("kind")
+    cand_pid = str(candidate.get("partner_id")) if candidate.get("partner_id") else None
     q = {"status": "active"}
     if exclude_id:
         q["_id"] = {"$ne": exclude_id}
     async for other in db.partner_agreements.find(q):
+        # same partner's own agreement (renewal/extension) is not a conflict
+        if cand_pid and other.get("kind") == cand_kind and str(other.get("partner_id")) == cand_pid:
+            continue
         if not (candidate.get("exclusivity") or other.get("exclusivity")):
             continue
         if not _categories_overlap(candidate, other):
@@ -509,6 +532,10 @@ async def _find_conflicts(candidate: dict, exclude_id: Optional[ObjectId] = None
         if not _territory_overlap(candidate, other):
             continue
         if not _period_overlap(candidate, other):
+            continue
+        # ignore agreements whose owning partner is terminated
+        owner = await _partner_lookup(other.get("kind"), str(other.get("partner_id")))
+        if not owner or owner.get("status") == "terminated":
             continue
         reasons = []
         if candidate.get("exclusivity") and other.get("exclusivity"):
@@ -570,6 +597,9 @@ async def create_agreement(payload: AgreementIn, user=Depends(get_current_user))
     partner = await _partner_lookup(payload.kind, payload.partner_id)
     if not partner:
         raise HTTPException(404, "Partener inexistent pentru acest acord.")
+    if partner.get("status") == "terminated":
+        raise HTTPException(400, "Nu se poate crea un acord pentru un partener încetat.")
+    _validate_period(payload.period_from, payload.period_to)
     cand = payload.dict()
     conflicts = await _find_conflicts(cand)
     # Explicit approval gate: only ACTIVE agreements enforce the exclusivity conflict block.
@@ -635,10 +665,22 @@ async def patch_agreement(agreement_id: str, payload: AgreementPatch, user=Depen
               if k != "acknowledge_conflicts" and v is not None}
     if "status" in update and update["status"] not in AGREEMENT_STATUS:
         raise HTTPException(400, "status invalid")
+    if "period_from" in update or "period_to" in update:
+        _validate_period(update.get("period_from", current.get("period_from")),
+                          update.get("period_to", current.get("period_to")))
     # Build the prospective agreement to re-check conflicts when it will be active.
     merged = {**current, **update}
     will_be_active = merged.get("status") == "active"
-    conflicts = await _find_conflicts(merged, exclude_id=oid) if will_be_active else []
+    # Only re-run conflict detection when a conflict-relevant field actually changes.
+    conflict_fields = {"categories", "territory_cities", "territory_counties", "territory_regions",
+                       "coverage", "exclusivity", "status", "period_from", "period_to"}
+    relevant_change = bool(conflict_fields & set(update.keys()))
+    already_ack = set(current.get("acknowledged_conflicts") or [])
+    conflicts = []
+    if will_be_active and relevant_change:
+        found = await _find_conflicts(merged, exclude_id=oid)
+        # ignore conflicts the admin already explicitly approved for this agreement
+        conflicts = [c for c in found if c["agreement_id"] not in already_ack]
     if conflicts and not payload.acknowledge_conflicts:
         raise HTTPException(status_code=409, detail={
             "message": "Modificarea creează un conflict de exclusivitate. Aprobare explicită necesară.",
@@ -646,7 +688,7 @@ async def patch_agreement(agreement_id: str, payload: AgreementPatch, user=Depen
         })
     if conflicts and payload.acknowledge_conflicts:
         update["approved_by"] = user.get("email")
-        update["acknowledged_conflicts"] = [c["agreement_id"] for c in conflicts]
+        update["acknowledged_conflicts"] = sorted(already_ack | {c["agreement_id"] for c in conflicts})
     update["updated_at"] = datetime.now(timezone.utc).isoformat()
     res = await db.partner_agreements.find_one_and_update({"_id": oid}, {"$set": update}, return_document=True)
     out = _serialize_agreement(res)
@@ -771,6 +813,8 @@ async def route_request(payload: RouteRequestIn, user=Depends(get_current_user))
     # Active agreements matching category — these give priority + exclusivity signal.
     agg_by_partner = {}
     async for a in db.partner_agreements.find({"status": "active"}):
+        if not _is_live_today(a):
+            continue  # expired/not-yet-started agreements do not route
         a_cats = {str(x).strip().lower() for x in (a.get("categories") or [])}
         if a_cats and cat not in a_cats:
             continue

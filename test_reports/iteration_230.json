@@ -1,0 +1,52 @@
+{
+  "summary": "Strategic City Partnership + City nZEB (P0->P2) tested end-to-end. Backend: 24/24 pytest pass (profile fields + legacy defaults, lost_reason city+marketplace set/clear, funnel derived from real leads/users, taxonomy, agreements CRUD + 409 conflict/ack/dry-run/non-overlap cases/PATCH re-check/soft delete, commissions report percent/subscription/per_lead, routing ranking + history + terminated exclusion, RBAC client/specialist/unauth 401/403, CSRF guard, regression GETs). Frontend: all 5 tabs render w/o API errors; agreement create -> conflict box -> 'Aprobă explicit' works; routing UI ranks + history; City Partner edit form profile fields persist; lead->lost prompt stores and displays lost_reason, cleared when stage changes. Extra probes found several logic gaps (no blockers). All test data cleaned (partner_agreements=0, partner_route_history=0, city_partners count back to 12).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PATCH /api/admin/strategic-partners/agreements/{id}", "issue": "Editing ANY field (e.g. only notes) on an active agreement whose conflict was already acknowledged returns 409 again; conflict re-check should run only when conflict-relevant fields (categories/territory/period/exclusivity/status/coverage) change, or skip conflicts already in acknowledged_conflicts."},
+      {"endpoint": "POST /api/admin/strategic-partners/route-request", "issue": "Routing ignores agreement period: an 'active' agreement with period_to in the past (2020) still gives +60/+20 score and has_active_agreement=true."},
+      {"endpoint": "POST /agreements + _find_conflicts", "issue": "Agreements can be created for terminated partners (no partner status check), and active agreements belonging to terminated partners still block other partners with 409. Routing then silently drops that partner (scan only active/onboarding)."},
+      {"endpoint": "_find_conflicts", "issue": "Same partner's own active agreements are reported as conflicts (renewal/extension of the same partner triggers 409). Consider excluding same kind+partner_id or labeling differently."},
+      {"endpoint": "POST/PATCH /agreements", "issue": "No validation period_to >= period_from (2026-12-01 -> 2026-01-01 accepted); invalid date strings silently treated as open-ended."},
+      {"endpoint": "PATCH /agreements, PATCH city/marketplace partners", "issue": "Fields set to null are filtered out (v is not None), so e.g. period_to/coverage cannot be cleared via PATCH."},
+      {"endpoint": "GET /api/admin/city-partners?city=", "issue": "city filter passes raw user input into $regex without re.escape (regex injection / errors on special chars)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AgreementForm partner dropdown", "issue": "Lists terminated/lead partners (e.g. many 'Test Studio Node' terminated) without status label; user can create an active exclusive agreement for a terminated partner.", "selector": "[data-testid='agr-field-partner']", "priority": "MEDIUM"},
+      {"component": "CityPartnerDetailPage lost prompt", "issue": "Prompt says reason is 'obligatoriu' but empty string is accepted and then nothing is displayed.", "selector": "[data-testid^='lead-stage-']", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Marketplace lead -> lost", "issue": "Backend supports lost_reason on marketplace leads but no marketplace admin UI captures/displays it (only CityPartnerDetailPage references lost_reason).", "affected_selectors": []},
+      {"flow": "Agreements tab", "issue": "No edit (PATCH) UI for agreements, only create + archive.", "affected_selectors": ["[data-testid^='agreement-']"]}
+    ],
+    "design_issues": [
+      {"screen": "AgreementForm / PartnerForm", "issues": ["Uses native <input type='date'> instead of shadcn Calendar/date picker", "Partner option shows empty parentheses '()' when partner city is missing ([TEST] Partener Demo Guardian ())"]},
+      {"screen": "CityPartnerDetailPage", "issues": ["New profile fields (partner_type, coverage, categories, zones, services) are not shown in the Contact/details card"]},
+      {"screen": "Commissions tab", "issues": ["basis text shows inconsistent number formatting ('venit 0' vs 'venit 0.0')"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_strategic_partnership_p0_p2_iter230.py", "/app/test_reports/pytest/pytest_iter230.xml"],
+  "action_items": [
+    "PATCH agreements: don't re-raise 409 for already-acknowledged conflicts / non-conflict field edits",
+    "Routing + conflict detection: respect agreement period (today within period_from..period_to) and ignore agreements of terminated partners",
+    "Reject agreement creation for terminated partners (backend) and filter/label partner dropdown by status (frontend)",
+    "Validate period_to >= period_from and date format on agreements",
+    "Optionally exclude same-partner agreements from conflict list",
+    "Add lost_reason capture/display to marketplace partner lead UI; enforce non-empty reason in City prompt",
+    "re.escape the city filter regex in list_partners"
+  ],
+  "critical_code_review_comments": [
+    "strategic_partners.py is 872 lines (>700) - split agreements/routing/funnel into separate modules",
+    "_funnel_for and commissions_report do N+1 queries (find per partner, to_list(1000) cap) - use aggregation for scale",
+    "partner_route_history stores full ranked[] snapshot unbounded - consider TTL/index on created_at"
+  ],
+  "updated_files": ["/app/backend/tests/test_strategic_partnership_p0_p2_iter230.py"],
+  "success_rate": {"backend": "100% (24/24) core; 7 minor logic gaps from probes", "frontend": "100% of requested flows working; minor UX gaps"},
+  "test_credentials": "admin@propmanage.io / 1!nasov01ADMIN; client@propmanage.io / Client123!; specialist@propmanage.io / Spec123! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Only TEST_ prefixed partners/leads/agreements/route-history created and hard-deleted after tests.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest tests/test_strategic_partnership_p0_p2_iter230.py from /app/backend (self-cleaning via pymongo). CSRF guard only blocks requests WITH Origin header lacking X-PM-Client. Probe script logic in iteration_230 minor issues can be turned into regression tests once fixed."
+}
