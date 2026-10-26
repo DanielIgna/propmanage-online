@@ -114,6 +114,7 @@ def _serialize_lead(d: dict) -> dict:
         "estimated_value": d.get("estimated_value") or 0,
         "revenue_generated": d.get("revenue_generated") or 0,
         "source": d.get("source"),
+        "lost_reason": d.get("lost_reason"),
         "notes": d.get("notes"),
         "created_at": d.get("created_at"),
         "updated_at": d.get("updated_at"),
@@ -192,6 +193,7 @@ class LeadPatch(BaseModel):
     stage: Optional[str] = None
     estimated_value: Optional[float] = None
     revenue_generated: Optional[float] = None
+    lost_reason: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -471,6 +473,8 @@ async def patch_lead(lead_id: str, payload: LeadPatch, user=Depends(get_current_
     update = {k: v for k, v in payload.dict(exclude_unset=True).items() if v is not None}
     if "stage" in update and update["stage"] not in ALLOWED_LEAD_STAGES:
         raise HTTPException(400, "stage invalid")
+    if "stage" in update and update["stage"] != "lost":
+        update["lost_reason"] = None
     update["updated_at"] = datetime.now(timezone.utc).isoformat()
     res = await db.marketplace_leads.find_one_and_update({"_id": oid}, {"$set": update}, return_document=True)
     if not res:

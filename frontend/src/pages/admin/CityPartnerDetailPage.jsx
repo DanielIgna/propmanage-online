@@ -105,7 +105,13 @@ const CityPartnerDetailPage = () => {
 
   const updateLeadStage = async (leadId, stage) => {
     try {
-      const { data } = await ax.patch(`/api/admin/city-partners/leads/${leadId}`, { stage });
+      const body = { stage };
+      if (stage === "lost") {
+        const reason = window.prompt("Motiv pierdere lead (obligatoriu pentru raportare):", "");
+        if (reason === null) return; // cancelled
+        body.lost_reason = reason.trim();
+      }
+      const { data } = await ax.patch(`/api/admin/city-partners/leads/${leadId}`, body);
       setLeads(arr => arr.map(x => x.id === data.id ? data : x));
     } catch (e) { alert(e.response?.data?.detail || e.message); }
   };
@@ -224,6 +230,9 @@ const CityPartnerDetailPage = () => {
                       <div className="text-[11px] text-slate-500 truncate">
                         {l.lead_email || "—"} · {l.source || "fără sursă"} · {l.introduced_at ? new Date(l.introduced_at).toLocaleDateString("ro-RO") : ""}
                       </div>
+                      {l.stage === "lost" && l.lost_reason && (
+                        <div className="text-[11px] text-rose-500 mt-0.5" data-testid={`lead-lost-reason-${l.id}`}>Pierdut: {l.lost_reason}</div>
+                      )}
                     </div>
                     <select value={l.stage} onChange={e => updateLeadStage(l.id, e.target.value)} className={`text-[10px] font-bold uppercase px-1.5 py-1 rounded ${STAGE_COLORS[l.stage] || STAGE_COLORS.introduced} border-0`} data-testid={`lead-stage-${l.id}`}>
                       {Object.keys(STAGE_COLORS).map(s => <option key={s} value={s}>{s}</option>)}

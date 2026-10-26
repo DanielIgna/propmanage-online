@@ -7,10 +7,19 @@ import { Link } from "react-router-dom";
 import {
   Network, Building2, ShoppingBag, TrendingUp, Users, ChevronLeft, Loader2,
   Sparkles, ArrowRight, Mail, Copy, Zap, AlertTriangle, MapPin, CheckCircle2,
-  AlertCircle, X,
+  AlertCircle, X, LayoutGrid, Filter, FileText, Percent, Target,
 } from "lucide-react";
+import { FunnelTab, AgreementsTab, CommissionsTab, RoutingTab } from "./partnerTabs";
 
 const API = process.env.REACT_APP_BACKEND_URL;
+
+const TABS = [
+  { id: "overview", label: "Overview", icon: LayoutGrid },
+  { id: "funnel", label: "Funnel", icon: Filter },
+  { id: "agreements", label: "Acorduri", icon: FileText },
+  { id: "commissions", label: "Comisioane", icon: Percent },
+  { id: "routing", label: "Rutare cereri", icon: Target },
+];
 const ax = axios.create({ baseURL: API, withCredentials: true });
 
 const StatCard = ({ icon: Icon, label, value, color, bg }) => (
@@ -90,6 +99,7 @@ const StrategicPartnersDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeLead, setActiveLead] = useState(null);
+  const [tab, setTab] = useState("overview");
 
   const load = async () => {
     setLoading(true);
@@ -122,6 +132,25 @@ const StrategicPartnersDashboard = () => {
         <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-400">Cross-Program AI</span>
       </div>
 
+      {/* Tabs */}
+      <div className="flex items-center gap-1 mb-6 border-b border-slate-200 dark:border-slate-800 overflow-x-auto">
+        {TABS.map(t => {
+          const Icon = t.icon;
+          return (
+            <button key={t.id} onClick={() => setTab(t.id)} data-testid={`tab-${t.id}`}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${tab === t.id ? "border-violet-500 text-violet-600 dark:text-violet-400" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"}`}>
+              <Icon className="w-4 h-4" /> {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "funnel" && <FunnelTab />}
+      {tab === "agreements" && <AgreementsTab />}
+      {tab === "commissions" && <CommissionsTab />}
+      {tab === "routing" && <RoutingTab />}
+
+      {tab === "overview" && (<>
       {/* Global totals */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <StatCard icon={Users} label="Total parteneri" value={data.totals.partners} color="text-blue-500" />
@@ -249,6 +278,7 @@ const StrategicPartnersDashboard = () => {
           }
         </div>
       </div>
+      </>)}
 
       {activeLead && <CrossRefModal lead={activeLead} onClose={() => setActiveLead(null)} onDone={load} />}
     </div>

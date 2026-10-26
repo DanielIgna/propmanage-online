@@ -32,12 +32,28 @@ const PartnerForm = ({ initial, onSave, onClose, saving }) => {
     portfolio_type: initial?.portfolio_type || "",
     started_at: initial?.started_at?.slice(0, 10) || "",
     status: initial?.status || "lead",
+    partner_type: initial?.partner_type || "city",
+    coverage: initial?.coverage || "city",
+    categories: (initial?.categories || []).join(", "),
+    zones: (initial?.zones || []).join(", "),
+    services: (initial?.services || []).join(", "),
     notes: initial?.notes || "",
   }));
   const set = (k, v) => setF(x => ({ ...x, [k]: v }));
+  const toArr = (s) => (s || "").split(",").map(x => x.trim()).filter(Boolean);
+  const submit = (e) => {
+    e.preventDefault();
+    onSave({
+      ...f,
+      units_managed: Number(f.units_managed) || 0,
+      categories: toArr(f.categories),
+      zones: toArr(f.zones),
+      services: toArr(f.services),
+    });
+  };
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" data-testid="partner-form-modal">
-      <form onSubmit={e => { e.preventDefault(); onSave({ ...f, units_managed: Number(f.units_managed) || 0 }); }}
+      <form onSubmit={submit}
         className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
           <h2 className="text-lg font-bold text-slate-900 dark:text-white">{initial ? "Editează partener" : "Adaugă partener strategic"}</h2>
@@ -69,6 +85,35 @@ const PartnerForm = ({ initial, onSave, onClose, saving }) => {
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="partner-field-status">
               {Object.entries(STATUS_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Tip partener</label>
+            <select value={f.partner_type} onChange={e => set("partner_type", e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="partner-field-partner_type">
+              {["studio", "city", "regional", "national", "supplier", "brand", "specialist"].map(k => <option key={k} value={k}>{k}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Acoperire</label>
+            <select value={f.coverage} onChange={e => set("coverage", e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="partner-field-coverage">
+              {["city", "regional", "national"].map(k => <option key={k} value={k}>{k}</option>)}
+            </select>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Categorii <span className="text-slate-400 font-normal">(separate prin virgulă, opțional)</span></label>
+            <input value={f.categories} onChange={e => set("categories", e.target.value)} placeholder="ex: Pompe de căldură, Sisteme fotovoltaice"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="partner-field-categories" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Zone / teritorii <span className="text-slate-400 font-normal">(virgulă, opțional)</span></label>
+            <input value={f.zones} onChange={e => set("zones", e.target.value)} placeholder="ex: București, Ilfov, Cluj"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="partner-field-zones" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Servicii <span className="text-slate-400 font-normal">(virgulă, opțional)</span></label>
+            <input value={f.services} onChange={e => set("services", e.target.value)} placeholder="ex: Audit energetic, Consultanță, Montaj"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="partner-field-services" />
           </div>
           <div className="sm:col-span-2">
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Note interne</label>

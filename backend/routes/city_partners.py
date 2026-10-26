@@ -101,6 +101,8 @@ def _serialize(doc: dict) -> dict:
         "partner_type": doc.get("partner_type") or "city",
         "coverage": doc.get("coverage") or "city",
         "region": doc.get("region"),
+        "categories": doc.get("categories") or [],
+        "zones": doc.get("zones") or [],
         "services": doc.get("services") or [],
         "design_stages": doc.get("design_stages") or [],
         "brands": doc.get("brands") or [],
@@ -126,6 +128,7 @@ def _serialize_lead(d: dict) -> dict:
         "stage": d.get("stage") or "introduced",
         "conversion_date": d.get("conversion_date"),
         "revenue_generated": d.get("revenue_generated") or 0,
+        "lost_reason": d.get("lost_reason"),
         "notes": d.get("notes"),
         "created_at": d.get("created_at"),
         "updated_at": d.get("updated_at"),
@@ -150,6 +153,8 @@ class PartnerCreate(BaseModel):
     partner_type: Optional[str] = None
     coverage: Optional[str] = None
     region: Optional[str] = None
+    categories: Optional[list] = None
+    zones: Optional[list] = None
     services: Optional[list] = None
     design_stages: Optional[list] = None
     brands: Optional[list] = None
@@ -173,6 +178,8 @@ class PartnerPatch(BaseModel):
     partner_type: Optional[str] = None
     coverage: Optional[str] = None
     region: Optional[str] = None
+    categories: Optional[list] = None
+    zones: Optional[list] = None
     services: Optional[list] = None
     design_stages: Optional[list] = None
     brands: Optional[list] = None
@@ -201,6 +208,7 @@ class LeadPatch(BaseModel):
     stage: Optional[str] = None
     conversion_date: Optional[str] = None
     revenue_generated: Optional[float] = None
+    lost_reason: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -256,6 +264,8 @@ async def create_partner(payload: PartnerCreate, user=Depends(get_current_user))
         "partner_type": payload.partner_type or "city",
         "coverage": payload.coverage or "city",
         "region": payload.region,
+        "categories": payload.categories or [],
+        "zones": payload.zones or [],
         "services": payload.services or [],
         "design_stages": payload.design_stages or [],
         "brands": payload.brands or [],
@@ -539,6 +549,8 @@ async def patch_lead(lead_id: str, payload: LeadPatch, user=Depends(get_current_
             raise HTTPException(400, "stage invalid")
         if update["stage"] == "converted" and not update.get("conversion_date"):
             update["conversion_date"] = datetime.now(timezone.utc).isoformat()
+        if update["stage"] != "lost":
+            update["lost_reason"] = None
     if "lead_email" in update:
         update["lead_email"] = str(update["lead_email"]).lower()
     update["updated_at"] = datetime.now(timezone.utc).isoformat()
