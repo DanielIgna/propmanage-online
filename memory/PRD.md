@@ -7128,3 +7128,17 @@ Testat în preview: pagina se încarcă, click → „32 emailuri repuse în coa
 - **"Altă zonă" (specialist):** câmp text opțional (`other_zone`, max 200) afișat când se alege "Altă zonă"; stocat pe user la register. Model `RegisterIn.other_zone`.
 - **Admin SPA nav:** verificat LIVE — UTILIZATORI + subsecțiuni (Toți userii, Verificare specialiști, KYC, Beta Testers) comută corect conținutul. Bug raportat NEreproductibil în build-ul curent (probabil deploy prod vechi) → se rezolvă la următorul publish.
 **NESCHIMBAT:** restul platformei (admin modules, SEO, HartaBlocuri, Digital Twin, OAuth, payments).
+
+---
+## Changelog — 2026-06 (Marketplace cleanup + redesign)
+**Decision (user):** Public marketplace must be CLEAN of all test/demo/QA specialists (filter at query time, NO data deleted/modified). Marketplace shows honest "Early Access" empty state until real specialists register. CRITICAL: client request flow must keep working with an empty marketplace so demand can be measured.
+
+**Implemented & verified:**
+- `seo_gate.py`: added `TEST_EMAIL_RE`, `is_test_account(u)`, and `PUBLIC_SPECIALIST_EXCLUDE` mongo fragment (excludes `is_demo_account`, `_seed_tag`, `_tier_demo`, internal/test email domains propmanage.io/test.*/example.com + test/qa/wv-test/specnew local-part prefixes).
+- Applied `PUBLIC_SPECIALIST_EXCLUDE` to: `GET /api/marketplace/specialists`, `GET /api/marketplace/filters`, sitemap `_specialist_entries` (via `is_test_account`), SEO gate `_count_verified_specialists`, and cluj local-stats count in `public.py`. Result: public marketplace returns 0 (all 380 are fixtures), no data touched.
+- Verified request/demand flow intact with empty marketplace: `POST /api/requests` creates `status:open, specialist_id:null`. Added `ObjectId.is_valid` guard (invalid property_id -> 404 instead of 500).
+- `marketplace/filters` style list now always scoped to public specialists' portfolios (was leaking test portfolio styles).
+- `Marketplace.jsx` redesign: airy two-tone hero, sticky(desktop)/static(mobile) labeled filter bar, uniform cards (fixed badge area, pinned CTA), polished Early Access state with 3 trust pillars + dual demand-capture CTAs. Early Access/owner-CTA now stays visible even when a filter returns 0 (demand-capture path preserved).
+- Tested via testing_agent (iteration_229): backend 16/17, frontend core pass; all valid issues fixed. NOT deployed (READY FOR DEPLOY).
+
+**Still backlog (requested, not started):** (1) resend-verification-email button + 24h reminder, (2) beta-tester guided onboarding with progress, (3) KYC E2E test (upload->admin approve->badge), (4) orphan-data integrity scan + admin report + downloadable backup export.

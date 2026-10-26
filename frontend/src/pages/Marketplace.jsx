@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { Building2, Star, CheckCircle2, Search, Filter, ArrowLeft, Shield, QrCode, Copy, Check, Calendar, Wrench, AlertTriangle, CreditCard, MapPin } from "lucide-react";
 import { useAuth, formatApiError } from "../auth";
 import { useSEO } from "../hooks/useSEO";
-import { PMCard, PMPillButton, PMChip, PMSectionHeader, PMEmptyState } from "../components/pm";
+import { PMCard, PMPillButton, PMChip } from "../components/pm";
 import { MarketplaceBenefitStrip } from "../components/pb/PbEverywhere";
 import { EcosystemFlow } from "../components/ecosystem/EcosystemFlow";
 
@@ -99,7 +99,7 @@ export const PublicMarketplace = () => {
         <MarketplaceBenefitStrip />
 
         {/* Filters */}
-        <div className="pm-card-glass !p-4 sm:!p-5 mt-10 mb-5 sticky top-3 z-20 pm-fade-in-delay-1" data-testid="mkt-filters">
+        <div className="pm-card-glass !p-4 sm:!p-5 mt-10 mb-5 sm:sticky sm:top-3 z-20 pm-fade-in-delay-1" data-testid="mkt-filters">
           <div className="flex flex-wrap gap-3 items-center">
             <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-stone-500 mr-1">
               <Filter className="w-3.5 h-3.5" /> Filtre
@@ -199,14 +199,14 @@ export const PublicMarketplace = () => {
         </div>
 
         {specialists.length === 0 && !loading && (
-          (filters.category || filters.verified_only) ? (
-            <PMEmptyState
-              icon={Search}
-              title="Niciun specialist găsit"
-              description="Încearcă să ajustezi filtrele sau revino mai târziu."
-            />
-          ) : (
-            /* GBOS P0 — marketplace-ul nu arată niciodată „gol": early access onest */
+          <>
+            {(filters.category || filters.verified_only) && (
+              <div className="pm-card-glass !p-4 mb-5 flex items-center gap-3 text-sm text-stone-400" data-testid="mkt-no-filter-results">
+                <Search className="w-4 h-4 text-stone-500 shrink-0" />
+                <span>Niciun specialist pentru filtrele alese. Îți lăsăm mai jos cum să fii printre primii.</span>
+              </div>
+            )}
+            {/* GBOS P0 — marketplace-ul nu arată niciodată „gol": early access onest + cale de captare cerere */}
             <div className="pm-card-glass !p-8 sm:!p-14 text-center relative overflow-hidden" data-testid="mkt-early-access">
               <PMChip variant="primary" className="mb-5">EARLY ACCESS</PMChip>
               <h2 className="font-serif text-3xl sm:text-4xl mb-4 max-w-2xl mx-auto leading-tight">Construim rețeaua de încredere, oraș cu oraș</h2>
@@ -238,7 +238,7 @@ export const PublicMarketplace = () => {
                 </Link>
               </div>
             </div>
-          )
+          </>
         )}
 
         {/* SEO internal-link block — surfaces all category/city landing pages */}

@@ -246,9 +246,9 @@ async def marketplace_filters(category: Optional[str] = None):
     portfolio_query = {}
     if category:
         portfolio_query["category"] = category
-        # Restrict styles to portfolios of specialists in scope
-        spec_ids = await db.users.distinct("_id", spec_query)
-        portfolio_query["specialist_id"] = {"$in": [str(s) for s in spec_ids]}
+    # Always restrict styles to portfolios of public (non-test) specialists in scope
+    spec_ids = await db.users.distinct("_id", spec_query)
+    portfolio_query["specialist_id"] = {"$in": [str(s) for s in spec_ids]}
     styles = await db.portfolio.distinct("style", portfolio_query)
     styles = sorted([s for s in styles if s])
 

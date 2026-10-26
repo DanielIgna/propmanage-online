@@ -18,6 +18,8 @@ router = APIRouter(prefix="/api", tags=["requests"])
 # ============= REQUESTS =============
 @router.post("/requests")
 async def create_request(data: RequestIn, background_tasks: BackgroundTasks, user: dict = Depends(require_role("client"))):
+    if not ObjectId.is_valid(data.property_id):
+        raise HTTPException(404, "Property not found")
     prop = await db.properties.find_one({"_id": ObjectId(data.property_id), "owner_id": user["id"]})
     if not prop: raise HTTPException(404, "Property not found")
     doc = {

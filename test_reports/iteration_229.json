@@ -1,0 +1,40 @@
+{
+  "summary": "Tested the marketplace cleanup and the request flow with an empty marketplace (backend + UI). Backend: 16 of 17 pytest checks passed. /api/marketplace/specialists returns [] with no filters and with every filter combination tried (category, verified_only, sort rating/reviews/recent/unknown, min_rating, city, zone, style), with no 500s. /api/marketplace/filters returns {zones: [], styles: [...]}. A logged-in client created a request: 200, status 'open', specialist_id null, and it shows up in GET /api/requests. One failure: POST /api/requests with a malformed property_id returns 500. UI: /marketplace shows all requested data-testids at 1920 and 390 width (no horizontal overflow at 390). Both Early Access buttons go to the right pages (/register?role=specialist and /register). The category, verified and sort controls work and the page does not crash. Gap: once any category or the verified checkbox is set, the Early Access block is replaced by a generic 'Niciun specialist găsit' message, while the review request expects it to stay visible.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/requests", "issue": "A malformed property_id (e.g. 'not-an-objectid') returns 500 instead of 400/404/422. Cause: ObjectId(data.property_id) in routes/requests.py:21 is called without catching InvalidId."},
+      {"endpoint": "GET /api/marketplace/filters", "issue": "When no category is given, the style list comes from db.portfolio.distinct('style', {}) for all portfolios, so it still includes styles (industrial/modern/scandinavian) from test/demo specialists' portfolios. Zones are filtered correctly. Fix: always limit portfolio_query.specialist_id to the ids matched by the public specialist query."},
+      {"endpoint": "POST /api/requests (lead notification)", "issue": "Lead notifications still go to every specialist, test/demo accounts included (spec_query does not use PUBLIC_SPECIALIST_EXCLUDE). No public impact; it just sends internal notifications to fixture accounts. Leave it if that is intended."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PublicMarketplace empty state", "issue": "When filters.category or filters.verified_only is set, Marketplace.jsx (lines 201-208) shows PMEmptyState 'Niciun specialist găsit — Încearcă să ajustezi filtrele'. The Early Access block (data-testid=mkt-early-access) disappears, and so does the 'Sunt proprietar — las prima cerere' button. Telling users to adjust filters is misleading because the whole marketplace is empty, and it removes a path to demand capture. The review request expects Early Access to stay visible.", "selector": "[data-testid='mkt-early-access']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/marketplace mobile 390", "issues": ["The sticky filter bar (sticky top-3, roughly 170px tall on mobile because the controls wrap onto 3 rows) sits under the topbar and covers about 20% of the screen while scrolling the Early Access content. Consider making it non-sticky, or a compact single row, on small screens."]},
+      {"screen": "/marketplace", "issues": ["The 'EARLY ACCESS' and 'MARKETPLACE PROPMANAGE' labels (dark green text on dark green on a near-black background) have low contrast."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_marketplace_cleanup_iter229.py", "/app/test_reports/pytest/pytest_iter229.xml"],
+  "action_items": [
+    "Keep showing the Early Access block (or at least the CTA to post a request) when filters return 0 results and the marketplace has no real specialists at all.",
+    "Validate property_id in POST /api/requests (catch bson InvalidId and return 400/404).",
+    "Limit the /api/marketplace/filters style list to public (non-test) specialists' portfolios even when no category is given.",
+    "Optional: make the mobile filter bar non-sticky or compact; improve chip contrast."
+  ],
+  "critical_code_review_comments": [
+    "seo_gate.PUBLIC_SPECIALIST_EXCLUDE is correct: _tier_demo $in [None, False] also matches a missing field; email $not regex also matches docs without an email.",
+    "The email regex excludes every @propmanage.io address. That is intended, but any future real team specialist on that domain will also be hidden.",
+    "Marketplace.jsx: the 401 console errors come from the anonymous auth/me check (harmless)."
+  ],
+  "updated_files": ["/app/backend/tests/test_marketplace_cleanup_iter229.py"],
+  "success_rate": {"backend": "94% (16/17)", "frontend": "90%"},
+  "test_credentials": "client@propmanage.io / Client123! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "One request titled 'TEST_demand_capture_iter229' (category electric) was created for client@propmanage.io by the demand-capture test. No other DB data was changed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The marketplace is intentionally empty (all 380 specialists are fixtures). Run tests/test_marketplace_cleanup_iter229.py as a regression check; each run creates one TEST_ request. The invalid property_id test fails until requests.py validates the ObjectId."
+}
