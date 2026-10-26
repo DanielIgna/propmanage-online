@@ -1,0 +1,54 @@
+{
+  "summary": "Tested the Bucin Mob multi-user portal end to end on backend and frontend: viewer/operator roles, manual and email invites, accept-invite, notifications, CSV export, DEMO mode, strict isolation and regression. Backend: 21/23 new pytest tests pass, plus 24/24 regression tests in test_city_partners.py (create-login, portal-access). The 2 failures are real security/isolation bugs (details below). Frontend: every requested flow works. I found one critical bug in AcceptInvitePage: the input lost focus after every keystroke, so a real user could not type a password. I fixed it and re-verified with real keyboard typing. Operator stage edit persists after a reload. Viewer is read-only. Cross-partner PATCH returns 404 and viewer PATCH returns 403. Notification badge, dropdown, single read and mark-all all work and persist after a reload. CSV downloads with the filtered rows. DEMO shows the banner and hides the bell, role badge, export and stage selects.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/partner/leads", "issue": "A VIEWER (read-only) can create leads: it returns 200 and the lead is saved. partner_add_lead never calls _partner_role/_require_operator. Fix: block the viewer role with 403 (same guard as PATCH).", "priority": "HIGH"},
+      {"endpoint": "DELETE /api/admin/city-partners/{partner_id}/users/{user_id}", "issue": "It does not check that user_id belongs to partner_id. DELETE /{BucinMob}/users/{owner_of_BlocAdmin} returned 200 and UNSET partner_id on the BlocAdmin owner's user doc, which breaks another partner's portal (I restored it after the test). Fix: require that user_id is in this partner's portal_users (or that users.partner_id == partner_id) before running $unset; otherwise return 404.", "priority": "HIGH"},
+      {"endpoint": "POST /api/admin/city-partners/{partner_id}/users", "issue": "Found by code review, not executed. If the email belongs to an existing city_partner user of ANOTHER partner, including that partner's owner/linked_user_id, the code silently overwrites users.partner_id and moves the account to this partner. The old partner keeps a stale portal_users entry or linked_user_id. Fix: reject with 400 when existing.partner_id is set and differs from partner_id.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "_partner_role", "issue": "Falls back to 'owner' (full edit) when the user is neither linked_user_id nor in portal_users, for example a legacy account or an inconsistent record. The default should be the least privilege ('viewer'), or it could use users.partner_sub_role."},
+      {"endpoint": "POST /{pid}/users and /portal-access", "issue": "No commercial-status gate. Bucin Mob is in status 'negotiation' (collaboration_agreed=false) yet has portal_access_enabled=true and active sub-users. The 'Cont City Partner' card still says accounts are only allowed after the agreement. The requirement 'activate access when agreement signed' is not enforced for sub-users."},
+      {"endpoint": "POST /{pid}/users/{uid}/invite", "issue": "Re-sending an invite does not invalidate earlier unused tokens, so several valid tokens exist at once. Mark previous unused invites as used=true when a new one is issued."},
+      {"endpoint": "_notify_partner / email templates", "issue": "lead_name is inserted into the email HTML (title/body) without escaping, which allows HTML injection in emails. Use html.escape."},
+      {"endpoint": "_app_base_url", "issue": "Invite and notification links use FRONTEND_PUBLIC_URL, which is the preview URL. In production, check that this env points to the production domain, otherwise emailed links go to preview."},
+      {"endpoint": "PATCH /api/partner/leads/{id}", "issue": "When an operator changes a stage, no notification is sent to the other users of the same partner. Notifications only fire for admin actions. This may be acceptable; confirm it is the intended product behaviour."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AcceptInvitePage", "issue": "FIXED by testing agent. Shell was declared inside the component, so it remounted on every state change and the password inputs lost focus after 1 character (keyboard.type kept only 'U'). Shell is now hoisted to module scope; re-verified that typing gives full 14-character values and activation succeeds.", "selector": "[data-testid=invite-password]", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [
+      {"flow": "Partner portal stats after operator stage edit", "issue": "updateStage only updates data.leads. Dashboard stats (stats.leads_by_stage, conversion_rate, revenue) stay stale until a reload.", "affected_selectors": ["[data-testid^=lead-stage-select-]", "[data-testid=funnel-card]"]},
+      {"flow": "Rapoarte category filter", "issue": "The category filter only filters the catalog, not leads or the CSV export. A user may expect the CSV to be filtered by category.", "affected_selectors": ["[data-testid=report-category]", "[data-testid=report-export-csv]"]}
+    ],
+    "design_issues": [
+      {"screen": "Partner portal (viewer/operator)", "issues": ["The global 'AI Mentor' side panel opens automatically for city_partner users on /partners/portal and covers part of the portal. Hide it for role=city_partner.", "Rapoarte date filters still use the native browser date picker (mm/dd/yyyy) instead of the shadcn Calendar (RO locale)."]},
+      {"screen": "/admin/city-partners as a partner user", "issues": ["There is no frontend route guard: a partner user sees the admin page shell (tabs, 'Adaugă furnizor' button) with a 403 error. The backend correctly blocks the data. Redirect city_partner users to /partners/portal."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_partner_multiuser_notif_iter233.py", "/app/test_reports/pytest/pytest_results_iter233.xml"],
+  "action_items": [
+    "Block the viewer role on POST /api/partner/leads (403).",
+    "In DELETE /{pid}/users/{uid}, check that the user belongs to pid before unsetting partner_id (404 otherwise).",
+    "In POST /{pid}/users, reject emails of city_partner users already attached to a different partner.",
+    "Change the _partner_role fallback from 'owner' to least privilege.",
+    "Invalidate earlier unused invite tokens on resend; html-escape lead_name in email templates.",
+    "Refresh portal stats after an operator stage change; hide AI Mentor for city_partner; add a frontend guard on /admin/* for city_partner.",
+    "Decide whether sub-user creation and portal activation require status agreed/active (the 'activate when agreement signed' requirement)."
+  ],
+  "critical_code_review_comments": [
+    "city_partners.py is 1450 lines; split the partner_router (portal, notifications, invites) into its own module.",
+    "AcceptInvitePage: avoid declaring components inside components (fixed).",
+    "PartnerPortal.jsx: `catalog` should be memoized (react-hooks/exhaustive-deps warning at line 123)."
+  ],
+  "updated_files": ["/app/frontend/src/pages/partner/AcceptInvitePage.jsx", "/app/backend/tests/test_partner_multiuser_notif_iter233.py"],
+  "success_rate": {"backend": "91% (21/23 new + 24/24 regression)", "frontend": "100% of requested flows after the AcceptInvite focus fix"},
+  "test_credentials": "admin@propmanage.io / 1!nasov01ADMIN (super admin); viewer.bucinmob@test.propmanage.io / ViewerPass123!",
+  "seed_data_creation": "All TEST data was cleaned up: TEST operator users, their invites, TEST leads and notifications. The Bucin Mob lead 'Client Real Test' was restored to stage 'introduced'. The BlocAdmin owner's partner_id was restored after the DELETE bug test. Bucin Mob still has the 2 pre-existing sub-users and portal_access_enabled=true. Real Resend emails were sent to @test.propmanage.io addresses.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest tests/test_partner_multiuser_notif_iter233.py; the 2 failures are expected until the backend fixes land. Other partner with leads for the isolation test: 6ab6d89300ef836651823783. Owner/linked user test partner: BlocAdmin 6a3cf6645108a83d3d6c0776. Playwright: add a dialog handler (with import asyncio) for the remove confirm, and use keyboard.type on accept-invite to catch focus regressions.",
+  "rca of the issue": "AcceptInvite focus loss: `const Shell = ({children}) => ...` was defined inside AcceptInvitePage, so each setPwd re-render created a new component type and React unmounted and remounted the input. Mitigation: hoist Shell to module scope (done). Viewer lead creation: partner_add_lead was not updated with a role guard when roles were introduced. Foreign unlink: remove_partner_user runs users.update_one({_id}) with $unset without checking partner_id."
+}

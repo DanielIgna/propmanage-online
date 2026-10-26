@@ -127,7 +127,7 @@ def _partner_role(user: dict, partner: dict) -> str:
     for pu in (partner.get("portal_users") or []):
         if str(pu.get("user_id")) == uid:
             return pu.get("role") or "viewer"
-    return "owner"
+    return user.get("partner_sub_role") or "viewer"
 
 
 async def _portal_user_emails(partner: dict) -> list:
@@ -752,6 +752,8 @@ async def add_partner_user(partner_id: str, payload: PartnerUserCreate, user=Dep
     existing = await db.users.find_one({"email": email})
     if existing and existing.get("role") not in (None, "city_partner"):
         raise HTTPException(400, f"Există deja un cont cu acest email și alt rol ({existing.get('role')}).")
+    if existing and existing.get("partner_id") and str(existing.get("partner_id")) != str(p["_id"]):
+        raise HTTPException(400, "Acest email este deja asociat altui partener. Elimină-l mai întâi din celălalt partener.")
     now = datetime.now(timezone.utc).isoformat()
     temp_password = None
     if existing:
@@ -797,6 +799,8 @@ async def invite_partner_user(partner_id: str, user_id: str, user=Depends(get_cu
         raise HTTPException(404, "Utilizatorul nu aparține acestui partener.")
     if not target.get("email"):
         raise HTTPException(400, "Utilizatorul nu are email.")
+    # Invalidate earlier unused invites so only the newest link works.
+    await db.partner_invites.update_many({"user_id": str(uoid), "used": False}, {"$set": {"used": True}})
     token = secrets.token_urlsafe(32)
     now = datetime.now(timezone.utc)
     await db.partner_invites.insert_one({
@@ -829,12 +833,18 @@ async def remove_partner_user(partner_id: str, user_id: str, user=Depends(get_cu
         raise HTTPException(404, "Partener inexistent.")
     if str(p.get("linked_user_id") or "") == str(user_id):
         raise HTTPException(400, "Contul principal nu poate fi eliminat. Folosește suspendarea accesului la portal.")
+    in_users = any(str(pu.get("user_id")) == str(user_id) for pu in (p.get("portal_users") or []))
+    try:
+        tgt = await db.users.find_one({"_id": ObjectId(user_id)})
+    except Exception:
+        raise HTTPException(400, "ID invalid.")
+    belongs = in_users or (tgt and str(tgt.get("partner_id") or "") == str(p["_id"]))
+    if not belongs:
+        raise HTTPException(404, "Utilizatorul nu aparține acestui partener.")
     now = datetime.now(timezone.utc).isoformat()
     await db.city_partners.update_one({"_id": oid}, {"$pull": {"portal_users": {"user_id": str(user_id)}}, "$set": {"updated_at": now}})
-    try:
-        await db.users.update_one({"_id": ObjectId(user_id)}, {"$unset": {"partner_id": "", "partner_sub_role": ""}})
-    except Exception:
-        pass
+    if tgt:
+        await db.users.update_one({"_id": tgt["_id"]}, {"$unset": {"partner_id": "", "partner_sub_role": ""}})
     await db.partner_invites.update_many({"user_id": str(user_id), "used": False}, {"$set": {"used": True}})
     return {"ok": True}
 
@@ -962,6 +972,8 @@ async def partner_my_leads(user=Depends(get_current_user)):
 @partner_router.post("/leads")
 async def partner_add_lead(payload: LeadCreate, user=Depends(get_current_user)):
     p = await _require_partner(user)
+    if _partner_role(user, p) == "viewer":
+        raise HTTPException(403, "Rol de vizualizare: nu poți adăuga cereri.")
     if payload.stage not in ALLOWED_LEAD_STAGES:
         raise HTTPException(400, "stage invalid")
     now = datetime.now(timezone.utc).isoformat()

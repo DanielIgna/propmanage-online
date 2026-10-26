@@ -2,16 +2,16 @@
 // Route: /admin/city-partners/:id
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, Navigate } from "react-router-dom";
 import {
   Building2, ChevronLeft, ChevronRight, Loader2, CheckCircle2, Circle,
   Users, Plus, Mail, Phone, MapPin, TrendingUp, KeyRound, Copy, X,
   AlertTriangle, Save, Edit3, Shield, Power, Eye, Tags,
 } from "lucide-react";
+import { useAuth } from "../../auth";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 const ax = axios.create({ baseURL: API, withCredentials: true });
-
 const STAGE_COLORS = {
   introduced: "bg-slate-100 text-slate-700 dark:bg-slate-700/40 dark:text-slate-300",
   contacted: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
@@ -78,6 +78,7 @@ const LeadForm = ({ onClose, onSave, saving }) => {
 const CityPartnerDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const [partner, setPartner] = useState(null);
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -208,8 +209,8 @@ const CityPartnerDetailPage = () => {
     catch (e) { alert(e.response?.data?.detail || e.message); }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>;
-  if (error) return <div className="p-8 text-rose-500"><AlertTriangle className="w-4 h-4 inline mr-1" /> {error}</div>;
+  if (authUser && authUser.role === "city_partner") return <Navigate to="/partners/portal" replace />;
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>;  if (error) return <div className="p-8 text-rose-500"><AlertTriangle className="w-4 h-4 inline mr-1" /> {error}</div>;
   if (!partner) return null;
 
   return (

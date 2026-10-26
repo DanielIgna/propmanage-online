@@ -507,19 +507,26 @@ async def send_template(template_fn, *args, to: Optional[str] = None, fire_and_f
 # ===================== Partner portal templates =====================
 
 def tpl_partner_lead_notification(partner_company: str, title: str, body_text: str, portal_url: str) -> dict:
+    import html as _html
+    pc = _html.escape(partner_company or "")
+    t = _html.escape(title or "")
+    bt = _html.escape(body_text or "")
     body = f"""
       <p>Bună,</p>
-      <p>{body_text}</p>
-      <p>Autentifică-te în portalul de partener <strong style="color:#d4ff3a;">{partner_company}</strong> pentru detalii complete.</p>
+      <p>{bt}</p>
+      <p>Autentifică-te în portalul de partener <strong style="color:#d4ff3a;">{pc}</strong> pentru detalii complete.</p>
     """
-    return {"subject": f"{title} · PropManage Partener", "html": _layout(title, body_text, body, portal_url, "Deschide portalul")}
+    return {"subject": f"{title} · PropManage Partener", "html": _layout(t, bt, body, portal_url, "Deschide portalul")}
 
 
 def tpl_partner_invite(partner_company: str, invite_url: str, role_label: str) -> dict:
+    import html as _html
+    pc = _html.escape(partner_company or "")
+    rl = _html.escape(role_label or "")
     body = f"""
       <p>Bună,</p>
-      <p>Ai fost invitat să accesezi portalul de partener <strong style="color:#d4ff3a;">{partner_company}</strong> pe PropManage, cu rolul <strong>{role_label}</strong>.</p>
+      <p>Ai fost invitat să accesezi portalul de partener <strong style="color:#d4ff3a;">{pc}</strong> pe PropManage, cu rolul <strong>{rl}</strong>.</p>
       <p>Apasă butonul de mai jos pentru a-ți seta parola și a-ți activa contul. Linkul este valabil 7 zile.</p>
       <p style="color:#666; font-size:11px; margin-top:16px; word-break:break-all;">Link alternativ: <span style="color:#a8a8b0;">{invite_url}</span></p>
     """
-    return {"subject": f"Invitație portal partener · {partner_company}", "html": _layout("Activează-ți contul de partener", f"Invitație pentru {partner_company}", body, invite_url, "Setează parola")}
+    return {"subject": f"Invitație portal partener · {partner_company}", "html": _layout("Activează-ți contul de partener", f"Invitație pentru {pc}", body, invite_url, "Setează parola")}

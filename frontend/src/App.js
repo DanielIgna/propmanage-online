@@ -1707,6 +1707,7 @@ const PreviewBanner = () => (
 const ExplainThisMount = () => {
   const { user } = useAuth();
   if (!user) return null;
+  if (user.role === "city_partner") return null;
   return <ExplainThis role={user.role} />;
 };
 

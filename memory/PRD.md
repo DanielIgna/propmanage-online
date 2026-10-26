@@ -7162,3 +7162,24 @@ Testat în preview: pagina se încarcă, click → „32 emailuri repuse în coa
 - Testing: iteration_232 — frontend 100%, backend fixes (PATCH bypass + create-login email guard) verified via curl. NOT deployed.
 
 **Isolation:** All partner-facing queries filter by the authenticated user's own `partner_id`; `/api/partner/portal` requires `city_partner` role; demo endpoint requires super-admin. Prospect stays inactive (no login, portal access false) until explicit Admin action.
+
+---
+## Changelog — 2026-06 (Bucin Mob Portal: multi-user, invites, notifications, CSV)
+**Decision (user):** notifications = real email + in-app; exports = CSV; two sub-roles = Vizualizare (viewer, read-only) + Operator; activation supports BOTH admin manual account+password AND email invitation (with resend/manual fallback). No deploy/publish. Reuse existing City Partners + Resend email_service.
+
+**Implemented & tested (iteration_233, backend 21/23 new + 24/24 regression; frontend 100% after fixes):**
+- Multi-user per City Partner (`city_partners.py`):
+  - `portal_users[]` array on the partner doc. Admin endpoints (super-admin only): `GET/POST /api/admin/city-partners/{id}/users`, `POST /{id}/users/{uid}/invite`, `DELETE /{id}/users/{uid}`.
+  - Roles: owner (= linked_user_id), operator, viewer. `_partner_role()` resolves role; fallback = least privilege (viewer). `_require_partner` + per-endpoint role checks enforce isolation.
+  - Manual account: POST /users creates a city_partner user (partner_id + partner_sub_role), returns one-time temp_password. Email invite: POST /users/{uid}/invite issues a token (`partner_invites`, 7-day expiry), invalidates earlier unused tokens, emails a set-password link via Resend, returns email_sent + invite_url (manual fallback).
+  - Public (no-auth) endpoints: `GET /api/partner/invite/{token}` (validate), `POST /api/partner/accept-invite {token,password}` (sets bcrypt password, marks accepted).
+- Lead notifications: admin create_lead + patch_lead (stage change) call `_notify_partner()` → inserts `partner_notifications` (partner-scoped, per-user read_by[]) and emails active portal users via Resend (lead_name html-escaped). Partner endpoints: `GET /api/partner/notifications` (items + unread), `POST /api/partner/notifications/{id}/read`.
+- Partner lead editing: `PATCH /api/partner/leads/{lead_id}` — operator/owner only (viewer 403), strict isolation (cross-partner → 404). `/api/partner/portal` now returns `role` + `notifications_unread`.
+- Security fixes (all HIGH, verified): viewer blocked on POST /partner/leads (403); DELETE /users/{uid} verifies the user belongs to the partner before unset (404 otherwise, no cross-partner damage); POST /users rejects an email already attached to another partner (400).
+- Frontend:
+  - `PartnerPortal.jsx`: notification bell + unread badge + dropdown (mark one / mark all), role badge, role-based editable stage dropdown in Clienți tab (viewer read-only), Export CSV in Rapoarte (client-side, respects date/status filters), stats refetched after an operator stage change. AI Mentor (ExplainThis) hidden for city_partner.
+  - `AcceptInvitePage.jsx` (route `/partners/accept-invite`): public set-password page (Shell hoisted to module scope — focus bug fixed by testing agent).
+  - `CityPartnerDetailPage.jsx`: "Utilizatori portal" card (list/add/invite/remove, temp-password + invite-url display); redirects city_partner users away from /admin → /partners/portal.
+- Email: reuses existing `email_service.py` (Resend active via RESEND_API_KEY); added `tpl_partner_lead_notification` + `tpl_partner_invite` (html-escaped).
+
+**Notes / known product decisions:** sub-user creation + portal activation remain manually Admin-controlled (not hard-gated on commercial status); invite/notification links use FRONTEND_PUBLIC_URL (preview) — point to prod domain before publishing. CSV category filter applies to catalog only (leads are not categorized).

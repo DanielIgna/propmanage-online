@@ -8,6 +8,22 @@ import { Building2, Loader2, CheckCircle2, AlertTriangle, KeyRound } from "lucid
 const API = process.env.REACT_APP_BACKEND_URL;
 const ax = axios.create({ baseURL: API, headers: { "X-PM-Client": "propmanage-app" } });
 
+// Hoisted outside the component so inputs don't remount (focus loss) on every keystroke.
+const Shell = ({ children }) => (
+  <div className="min-h-screen flex items-center justify-center p-6 bg-[#0a0a0b] text-white relative overflow-hidden" data-testid="accept-invite-page">
+    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full bg-[#d4ff3a] blur-[200px] opacity-10" />
+    <div className="relative w-full max-w-md">
+      <Link to="/" className="flex items-center justify-center gap-2 mb-8">
+        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#d4ff3a] to-[#a8e028] flex items-center justify-center">
+          <Building2 className="w-5 h-5 text-black" strokeWidth={2.5} />
+        </div>
+        <span className="font-serif text-2xl font-semibold">PropManage</span>
+      </Link>
+      <div className="bg-white/[0.04] border border-white/10 rounded-2xl p-8 backdrop-blur-xl">{children}</div>
+    </div>
+  </div>
+);
+
 const AcceptInvitePage = () => {
   const [params] = useSearchParams();
   const token = params.get("token") || "";
@@ -52,20 +68,6 @@ const AcceptInvitePage = () => {
     }
   };
 
-  const Shell = ({ children }) => (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-[#0a0a0b] text-white relative overflow-hidden" data-testid="accept-invite-page">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full bg-[#d4ff3a] blur-[200px] opacity-10" />
-      <div className="relative w-full max-w-md">
-        <Link to="/" className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#d4ff3a] to-[#a8e028] flex items-center justify-center">
-            <Building2 className="w-5 h-5 text-black" strokeWidth={2.5} />
-          </div>
-          <span className="font-serif text-2xl font-semibold">PropManage</span>
-        </Link>
-        <div className="bg-white/[0.04] border border-white/10 rounded-2xl p-8 backdrop-blur-xl">{children}</div>
-      </div>
-    </div>
-  );
 
   if (loading) return <Shell><div className="flex justify-center py-6"><Loader2 className="w-6 h-6 animate-spin text-[#d4ff3a]" /></div></Shell>;
 

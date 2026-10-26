@@ -129,8 +129,9 @@ const PartnerPortal = () => {
 
   const updateStage = async (lead, stage) => {
     try {
-      const { data: upd } = await ax.patch(`/api/partner/leads/${lead.id}`, { stage });
-      setData((d) => ({ ...d, leads: d.leads.map((l) => (l.id === lead.id ? upd : l)) }));
+      await ax.patch(`/api/partner/leads/${lead.id}`, { stage });
+      const { data: fresh } = await ax.get(`/api/partner/portal`);
+      setData(fresh);
     } catch (e) {
       alert(e.response?.data?.detail || e.message);
     }
