@@ -207,8 +207,8 @@ export const RegisterPage = () => {
     email: "", password: "", name: "", role: _inviteRole === "specialist" ? "specialist" : "client", phone: "",
     specialty: _inviteCategory || "hvac",
     service_categories: [_inviteCategory || "hvac"],
-    coverage_zones: ["Bucuresti-Sector1"],
-    zone: "Bucuresti-Sector1",
+    coverage_zones: ["national"],
+    zone: "bucuresti",
     referrer_id: referrerId || undefined,
     terms_accepted: false,
     privacy_policy_accepted: false,
@@ -237,12 +237,32 @@ export const RegisterPage = () => {
     { value: "other", label: "Alte servicii", icon: "🛠" },
   ];
 
+  // Zone de acoperire — acoperire națională. Sugestii = reședințe de județ + București.
+  // "national" și "alta-zona" garantează că niciun specialist nu e blocat la înscriere.
   const ZONES = [
-    "Bucuresti-Sector1", "Bucuresti-Sector2", "Bucuresti-Sector3",
-    "Bucuresti-Sector4", "Bucuresti-Sector5", "Bucuresti-Sector6",
-    "Cluj-Centru", "Cluj-Manastur",
-    "Timisoara-Iosefin", "Timisoara-Fabric",
-    "Iasi-Centru", "Brasov-Centru", "Constanta-Centru",
+    { value: "national", label: "La nivel național (toată țara)" },
+    { value: "bucuresti", label: "București" },
+    { value: "alba-iulia", label: "Alba Iulia" }, { value: "arad", label: "Arad" },
+    { value: "pitesti", label: "Pitești" }, { value: "bacau", label: "Bacău" },
+    { value: "oradea", label: "Oradea" }, { value: "bistrita", label: "Bistrița" },
+    { value: "botosani", label: "Botoșani" }, { value: "brasov", label: "Brașov" },
+    { value: "braila", label: "Brăila" }, { value: "buzau", label: "Buzău" },
+    { value: "resita", label: "Reșița" }, { value: "calarasi", label: "Călărași" },
+    { value: "cluj-napoca", label: "Cluj-Napoca" }, { value: "constanta", label: "Constanța" },
+    { value: "sfantu-gheorghe", label: "Sfântu Gheorghe" }, { value: "targoviste", label: "Târgoviște" },
+    { value: "craiova", label: "Craiova" }, { value: "galati", label: "Galați" },
+    { value: "giurgiu", label: "Giurgiu" }, { value: "targu-jiu", label: "Târgu Jiu" },
+    { value: "miercurea-ciuc", label: "Miercurea Ciuc" }, { value: "deva", label: "Deva" },
+    { value: "slobozia", label: "Slobozia" }, { value: "iasi", label: "Iași" },
+    { value: "baia-mare", label: "Baia Mare" }, { value: "drobeta-turnu-severin", label: "Drobeta-Turnu Severin" },
+    { value: "targu-mures", label: "Târgu Mureș" }, { value: "piatra-neamt", label: "Piatra Neamț" },
+    { value: "slatina", label: "Slatina" }, { value: "ploiesti", label: "Ploiești" },
+    { value: "satu-mare", label: "Satu Mare" }, { value: "zalau", label: "Zalău" },
+    { value: "sibiu", label: "Sibiu" }, { value: "suceava", label: "Suceava" },
+    { value: "alexandria", label: "Alexandria" }, { value: "timisoara", label: "Timișoara" },
+    { value: "tulcea", label: "Tulcea" }, { value: "vaslui", label: "Vaslui" },
+    { value: "ramnicu-valcea", label: "Râmnicu Vâlcea" }, { value: "focsani", label: "Focșani" },
+    { value: "alta-zona", label: "Altă zonă (o stabilim ulterior)" },
   ];
 
   const toggleCategory = (val) => {
@@ -264,7 +284,8 @@ export const RegisterPage = () => {
         throw new Error("Selectează cel puțin o categorie de specialitate");
       }
       if (form.role === "specialist" && form.coverage_zones.length === 0) {
-        throw new Error("Selectează cel puțin o zonă de acoperire");
+        // Nu blocăm înscrierea — dacă nu a ales nimic, presupunem acoperire națională.
+        form.coverage_zones = ["national"];
       }
       const phoneDigits = (form.phone || "").replace(/[^\d+]/g, "");
       if (form.role === "specialist" && !phoneDigits) throw new Error("Numărul de telefon este obligatoriu pentru specialiști");
@@ -387,15 +408,18 @@ export const RegisterPage = () => {
                   </label>
                   <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1" data-testid="zone-grid">
                     {ZONES.map(z => {
-                      const sel = form.coverage_zones.includes(z);
+                      const sel = form.coverage_zones.includes(z.value);
                       return (
-                        <button type="button" key={z} onClick={() => toggleZone(z)}
+                        <button type="button" key={z.value} onClick={() => toggleZone(z.value)}
                           className={`px-2.5 py-2 rounded-lg text-[11px] border transition ${sel ? "bg-[#d4ff3a]/15 border-[#d4ff3a]/50 text-white" : "bg-white/5 border-white/10 text-stone-400 hover:bg-white/10"}`}
-                          data-testid={`zone-${z}`}>
-                          {z.replace(/-/g, " ")}
+                          data-testid={`zone-${z.value}`}>
+                          {z.label}
                         </button>
                       );
                     })}
+                  </div>
+                  <div className="mt-2 text-[11px] text-stone-400">
+                    Alege reședința/reședințele de județ unde lucrezi, „La nivel național" sau „Altă zonă" dacă acoperi altceva — te putem contacta ulterior.
                   </div>
                 </div>
               </motion.div>
@@ -408,7 +432,7 @@ export const RegisterPage = () => {
                 <select value={form.zone} onChange={e => setForm({...form, zone: e.target.value})}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#d4ff3a]/50"
                   data-testid="register-zone">
-                  {ZONES.map(z => <option key={z} value={z}>{z.replace(/-/g, " ")}</option>)}
+                  {ZONES.filter(z => z.value !== "national" && z.value !== "alta-zona").map(z => <option key={z.value} value={z.value}>{z.label}</option>)}
                 </select>
               </div>
             )}
