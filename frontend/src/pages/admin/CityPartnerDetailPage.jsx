@@ -20,6 +20,21 @@ const STAGE_COLORS = {
   lost: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
 };
 
+const STATUS_META = {
+  prospect: { label: "Prospect / Necontactat", color: "bg-slate-100 text-slate-600 dark:bg-slate-700/40 dark:text-slate-300" },
+  contacted: { label: "Contactat", color: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" },
+  discussion: { label: "Discuție inițiată", color: "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300" },
+  negotiation: { label: "Negociere", color: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
+  agreed: { label: "Partener agreat", color: "bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300" },
+  active: { label: "Activ", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
+  paused: { label: "Pauzat", color: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
+  rejected: { label: "Respins", color: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" },
+  lead: { label: "Lead", color: "bg-slate-100 text-slate-700 dark:bg-slate-700/40 dark:text-slate-300" },
+  onboarding: { label: "Onboarding", color: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
+  terminated: { label: "Încetat", color: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" },
+};
+const CAN_CREATE_LOGIN = new Set(["agreed", "active", "onboarding"]);
+
 const ONBOARDING_STEPS = [
   "Prezentare oficială",
   "Introducere în ecosistem",
@@ -136,7 +151,11 @@ const CityPartnerDetailPage = () => {
         <span className="text-slate-300">·</span>
         <Building2 className="w-5 h-5 text-cyan-500" />
         <h1 className="text-xl lg:text-2xl font-bold text-slate-900 dark:text-white">{partner.company}</h1>
-        <span className="text-xs text-slate-500">{partner.city}{partner.county ? `, ${partner.county}` : ""}</span>
+        {(() => { const st = STATUS_META[partner.status] || STATUS_META.lead; return (
+          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${st.color}`} data-testid="detail-status-badge">{st.label}</span>
+        ); })()}
+        {!partner.public_visible && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-700/40 dark:text-slate-400" title="Nu este afișat public ca partener activ" data-testid="detail-nepublic-badge">nepublic</span>}
+        <span className="text-xs text-slate-500">{[partner.city, partner.county].filter(Boolean).join(", ")}</span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -149,7 +168,7 @@ const CityPartnerDetailPage = () => {
               {partner.contact_email && <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200"><Mail className="w-4 h-4 text-slate-400" />{partner.contact_email}</div>}
               {partner.contact_phone && <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200"><Phone className="w-4 h-4 text-slate-400" />{partner.contact_phone}</div>}
               {partner.website && <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400"><Building2 className="w-4 h-4 text-slate-400" /><a href={partner.website.startsWith("http") ? partner.website : `https://${partner.website}`} target="_blank" rel="noreferrer" className="hover:underline" data-testid="partner-website">{partner.website}</a></div>}
-              <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200"><MapPin className="w-4 h-4 text-slate-400" />{[partner.country, partner.city, partner.county].filter(Boolean).join(", ") || "Origine neconfirmată"}{!partner.origin_confirmed && <span className="text-[10px] text-amber-500">(neconfirmat)</span>}</div>
+              <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200"><MapPin className="w-4 h-4 text-slate-400" />{[partner.country, partner.city, partner.county].filter(Boolean).join(", ") || "Origine neconfirmată"}{[partner.country, partner.city, partner.county].some(Boolean) && !partner.origin_confirmed && <span className="text-[10px] text-amber-500">(neconfirmat)</span>}</div>
             </div>
             <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-xs">
               <div><div className="text-slate-400">Apartamente</div><div className="font-bold text-slate-900 dark:text-white">{partner.units_managed}</div></div>
@@ -182,12 +201,17 @@ const CityPartnerDetailPage = () => {
             </div>
             {partner.linked_user_id
               ? <div className="text-sm text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> Cont activ — partenerul poate accesa portalul</div>
-              : <>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Generează credențiale dedicate ca partenerul să acceseze portalul propriu (vede doar lead-urile sale).</p>
-                <button onClick={createLogin} className="w-full px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-medium flex items-center justify-center gap-1.5" data-testid="create-login">
-                  <KeyRound className="w-3.5 h-3.5" /> Creează cont CITY_PARTNER
-                </button>
-              </>
+              : CAN_CREATE_LOGIN.has(partner.status)
+                ? <>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Generează credențiale dedicate ca partenerul să acceseze portalul propriu (vede doar lead-urile sale).</p>
+                  <button onClick={createLogin} className="w-full px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-medium flex items-center justify-center gap-1.5" data-testid="create-login">
+                    <KeyRound className="w-3.5 h-3.5" /> Creează cont CITY_PARTNER
+                  </button>
+                </>
+                : <div className="text-xs text-slate-500 dark:text-slate-400 flex items-start gap-1.5" data-testid="create-login-blocked">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                    Contul se poate crea doar după ce colaborarea este agreată (status „Partener agreat” sau „Activ”). Prospectul nu a fost contactat/confirmat.
+                  </div>
             }
             {creds?.temp_password && (
               <div className="mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30">

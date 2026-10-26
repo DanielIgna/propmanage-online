@@ -4,6 +4,22 @@ Rol: jurnal cronologic al schimbărilor semnificative + sincronizărilor de cuno
 
 ---
 
+
+## 2026-06 · City Partners — Registru PROSPECTARE + City nZEB — PREVIEW/BUILT
+Extindere aditivă, nedistructivă a modulului existent City Partners (colecția `city_partners`) pentru prospectarea rețelei de furnizori/producători nZEB. FĂRĂ registru paralel, FĂRĂ deploy, FĂRĂ conturi create pentru furnizori, FĂRĂ publicare ca partener activ. Testat: iteration_231 — frontend 95% (toate fluxurile cerute pass, 0 erori consolă); backend verificat e2e prin curl.
+
+**Statusuri comerciale** — `city_partners.py` extinde `ALLOWED_STATUS` cu `prospect, contacted, discussion, negotiation, agreed, rejected` (legacy `lead/onboarding/active/paused/terminated` păstrate). `COMMERCIAL_STATUS_META` marchează `public=True` doar pentru `active`. Serializarea întoarce `public_visible` (True doar la status=active) → un prospect NU e afișat ca partener verificat/activ (chip „nepublic" în listă + detaliu).
+
+**Profil furnizor (opțional, unconfirmed-friendly)** — câmpuri noi în model + serialize + create/patch: `website, contact_role, country, target_client_type, capacity_note, applications[], next_action, info_source, collaboration_agreed, origin_confirmed, coverage_confirmed, collaboration_metrics{}`. `contact_name`/`contact_email` devin OPȚIONALE (prospect fără date de contact se poate crea). Indicatorii de colaborare sunt pregătiți (schema) dar NU auto-populați.
+
+**Categorii City nZEB** — taxonomie reutilizabilă actualizată (8 categorii: Ventilație și recuperare de căldură, Audit și consultanță energetică, Tâmplărie și anvelopa clădirii, Izolații și renovări, HVAC și instalații, Pompe de căldură, Fotovoltaice și stocare, Alte soluții). Sincronizată și în `strategic_partners.py` `NZEB_CATEGORIES` + `GET /api/admin/city-partners/meta`.
+
+**Filtre admin** — `GET /api/admin/city-partners` acceptă `status` (inclusiv `prospects`), `city`, `category` (membership, case-insensitive), `country` (origine), `zone` (teritoriu comercial). UI: taburi status + dropdown categorii + input origine + input teritoriu + Resetează. Furnizorii cu servicii suprapuse se păstrează toți, diferențiați prin origine/teritoriu/categorii/capacitate/status (fără dedup, fără exclusivitate).
+
+**Primul profil DEMO** — `backend/seed_freshr_prospect.py` (idempotent, upsert pe company+website) înregistrează Fresh-r ca Prospect/Necontactat: website fresh-r.com, contact Jelle van Kraaij (Business Development & R&D), jelle@fresh-r.eu, +31 85 226 15 20, categorie „Ventilație și recuperare de căldură", aplicații renovare/modernizare/construcții noi, origine & acoperire RO neconfirmate, collaboration_agreed=false. NU s-a trimis mesaj, NU s-a creat cont.
+
+**UI corectitudine (din iteration_231)** — detaliu partener afișează badge status + „nepublic"; butonul „Creează cont CITY_PARTNER" e gated (doar status agreed/active/onboarding), altfel mesaj explicativ; marker „origine neconfirmată" când country gol; `load()` curăță eroarea la refetch; tab „Discuție" adăugat.
+
 ## 2026-06 · Strategic City Partnership + City nZEB (P0→P2) — PREVIEW/BUILT
 Implementare controlată, aditivă, nedistructivă peste sistemele existente City Partners + Marketplace Partners. FĂRĂ sistem al 3-lea de parteneri, FĂRĂ ștergere date, FĂRĂ activare automată exclusivitate, FĂRĂ deploy. Toată logica comercială nouă e TRANSVERSALĂ și referă `{kind, partner_id}`. Testat: iteration_230 — backend 24/24 pytest pass, frontend 100% fluxuri cerute; +7 fix-uri de corectitudine verificate prin curl.
 

@@ -220,6 +220,7 @@ const CityPartnersPage = () => {
 
   const load = async () => {
     setLoading(true);
+    setError("");
     try {
       const params = {};
       if (filterStatus !== "all") params.status = filterStatus;
@@ -284,7 +285,7 @@ const CityPartnersPage = () => {
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <div className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 flex-wrap">
-          {[["all", "Toți"], ["prospects", "Prospecte"], ["prospect", "Necontactat"], ["contacted", "Contactat"], ["negotiation", "Negociere"], ["agreed", "Agreat"], ["active", "Activ"], ["paused", "Pauzat"], ["rejected", "Respins"]].map(([k, lbl]) => (
+          {[["all", "Toți"], ["prospects", "Prospecte"], ["prospect", "Necontactat"], ["contacted", "Contactat"], ["discussion", "Discuție"], ["negotiation", "Negociere"], ["agreed", "Agreat"], ["active", "Activ"], ["paused", "Pauzat"], ["rejected", "Respins"]].map(([k, lbl]) => (
             <button key={k} onClick={() => setFilterStatus(k)} className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${filterStatus === k ? "bg-blue-600 text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"}`} data-testid={`filter-${k}`}>
               {lbl}
             </button>
@@ -311,7 +312,7 @@ const CityPartnersPage = () => {
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
         {loading && <div className="p-10 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-slate-400" /></div>}
         {error && <div className="p-6 text-rose-500 text-sm flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> {error}</div>}
-        {!loading && items.length === 0 && !error && <div className="p-10 text-center text-sm text-slate-500">Niciun partener. Apasă „Adaugă partener” pentru a începe.</div>}
+        {!loading && items.length === 0 && !error && <div className="p-10 text-center text-sm text-slate-500">Niciun furnizor. Apasă „Adaugă furnizor” pentru a începe.</div>}
         {!loading && items.length > 0 && (
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {items.map(p => {
@@ -332,7 +333,9 @@ const CityPartnersPage = () => {
                       {p.contact_phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{p.contact_phone}</span>}
                     </div>
                     <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2 flex-wrap">
-                      {p.country && <span>Origine: {p.country}{!p.origin_confirmed && <em className="text-amber-500 not-italic"> (neconfirmat)</em>}</span>}
+                      {p.country
+                        ? <span>Origine: {p.country}{!p.origin_confirmed && <em className="text-amber-500 not-italic"> (neconfirmat)</em>}</span>
+                        : <span className="text-amber-500">origine neconfirmată</span>}
                       {p.categories?.length > 0 && <span className="text-cyan-600 dark:text-cyan-400">{p.categories.join(" · ")}</span>}
                       {!p.coverage_confirmed && (p.status === "prospect" || p.status === "contacted") && <span className="text-amber-500">acoperire neconfirmată</span>}
                     </div>

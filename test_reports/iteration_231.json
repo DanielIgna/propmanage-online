@@ -1,0 +1,37 @@
+{
+  "summary": "Frontend-only test of the City Partners prospecting registry (/admin/city-partners and /admin/city-partners/:id), logged in as admin@propmanage.io, who has super-admin access. Passing: all 4 stat cards, all 9 status tabs, the category/country/zone filters and Resetează, the create form (every new field, 8 datalist categories, 11 status options, default status prospect), creating a profile with only a company name, editing (all new fields kept after a reload), the Fresh-r row, the detail page profile card, and the nepublic chip on non-active profiles. No console errors. Only minor issues and code-review points were found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CityPartnersPage row", "issue": "The origin '(neconfirmat)' marker only shows when p.country is set. Fresh-r has country=null, so its list row shows no origin marker, only 'acoperire neconfirmată'. Show e.g. 'Origine: neconfirmată' when country is empty.", "selector": "[data-testid^=partner-row-]", "priority": "LOW"},
+      {"component": "CityPartnerDetailPage contact card", "issue": "When origin is empty, the line repeats itself: 'Origine neconfirmată (neconfirmat)'.", "selector": "[data-testid=city-partner-detail]", "priority": "LOW"},
+      {"component": "CityPartnerDetailPage header", "issue": "The detail page does not show the commercial status badge or the 'nepublic'/public indicator, so a prospect cannot be told apart from an active partner there. The green 'Creează cont CITY_PARTNER' button is shown prominently even for an uncontacted prospect. Suggest showing the status and nepublic badges, and hiding or disabling create-login unless the status is agreed or active.", "selector": "[data-testid=create-login]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Partner form", "issues": ["'Început colaborare' uses the browser's native date input (mm/dd/yyyy) instead of the shadcn calendar", "Empty-state text says 'Adaugă partener' but the button is 'Adaugă furnizor'"]},
+      {"screen": "Status tabs", "issues": ["There is no tab for status 'discussion' (Discuție inițiată). It is only reachable through the 'Prospecte' tab."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Detail page: show the status badge and the nepublic indicator; gate create-login for prospect statuses",
+    "List row: show an 'origine neconfirmată' marker when country is empty",
+    "Detail page: remove the duplicated 'neconfirmat' text",
+    "Optional: debounce the country/zone filter inputs (one request per keystroke, plus a possible race on out-of-order responses)",
+    "Optional: reset error state in load(). setError is never cleared, so one failed fetch leaves the error banner up permanently"
+  ],
+  "critical_code_review_comments": [
+    "CityPartnersPage.load() never clears error; once an error occurs it stays even after a successful refetch",
+    "Country and zone filters fire 2 API calls (list + stats) on every keystroke with no debounce or abort, so a slower earlier response can overwrite a later one",
+    "PartnerForm deletes an empty contact_email before PATCH, so an admin can never clear an existing email",
+    "Archiving inside a status-filtered view keeps the row visible with status 'Încetat' instead of removing it from the filtered list",
+    "Stats 'Prospecte' count is computed client-side from a hardcoded status list duplicated from the backend; use the backend's prospects grouping or the meta endpoint"
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "skipped (frontend-only)", "frontend": "95%"},
+  "seed_data_creation": "Created TEST_Prospect_UI (6adf5822a917d202adbb1876) and TEST_Prospect_UI2 (6adf5886a917d202adbb188a), both archived to status=terminated through the UI. They are still in city_partners (soft delete) and can be hard-deleted if needed. No logins created.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Fresh-r id 6adf5743baf7d59ecba24cd3 (status prospect, country null, coverage national, categories Ventilație...). The DB already holds older test records (Test Studio Node terminated, TEST_Partner_* active). The admin login works through the /login UI; in-page fetch needs the 'X-PM-Client: web' header."
+}
