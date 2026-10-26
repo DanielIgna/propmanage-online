@@ -175,6 +175,7 @@ const DemoActivityPage = lazy(() => import("./pages/admin/DemoActivityPage"));
 const PartnerDashboard = lazy(() => import("./pages/partner/PartnerDashboard"));
 const MarketplacePartnerPortal = lazy(() => import("./pages/partner/MarketplacePartnerPortal"));
 const PartnerPortal = lazy(() => import("./pages/partner/PartnerPortal"));
+const AcceptInvitePage = lazy(() => import("./pages/partner/AcceptInvitePage"));
 const ClientJuniorDashboard = lazy(() => import("./pages/dashboard/ClientJuniorDashboard"));
 const ClientDashboardV2 = lazy(() => import("./pages/clientv2/ClientDashboardV2"));
 const AdministratorWorkspace = lazy(() => import("./pages/AdministratorWorkspace"));
@@ -1867,6 +1868,7 @@ function App() {
               <Route path="/admin/demo-activity" element={<DemoActivityPage />} />
               <Route path="/partner/dashboard" element={<PartnerDashboard />} />
               <Route path="/partners/portal" element={<PartnerPortal />} />
+              <Route path="/partners/accept-invite" element={<AcceptInvitePage />} />
               <Route path="/partner/marketplace" element={<MarketplacePartnerPortal />} />
               <Route path="/dashboard/client-junior" element={<ClientJuniorDashboard />} />
               <Route path="/incepe" element={<ClientJuniorDashboard />} />

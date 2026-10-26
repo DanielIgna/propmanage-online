@@ -107,6 +107,70 @@ def _require_super(user: dict) -> None:
         raise HTTPException(403, "Doar super admin poate gestiona City Partners.")
 
 
+# ── Partner portal sub-users, roles & notifications (reusable) ──────────────
+PARTNER_SUB_ROLES = {"viewer", "operator"}
+PARTNER_ROLE_LABELS = {"owner": "Administrator partener", "operator": "Operator", "viewer": "Vizualizare"}
+
+
+def _user_id(user: dict) -> str:
+    return str(user.get("id") or user.get("_id") or "")
+
+
+def _app_base_url() -> str:
+    return (os.environ.get("FRONTEND_PUBLIC_URL") or os.environ.get("APP_PUBLIC_URL") or "").rstrip("/")
+
+
+def _partner_role(user: dict, partner: dict) -> str:
+    uid = _user_id(user)
+    if partner.get("linked_user_id") and str(partner.get("linked_user_id")) == uid:
+        return "owner"
+    for pu in (partner.get("portal_users") or []):
+        if str(pu.get("user_id")) == uid:
+            return pu.get("role") or "viewer"
+    return "owner"
+
+
+async def _portal_user_emails(partner: dict) -> list:
+    emails = []
+    lid = partner.get("linked_user_id")
+    if lid:
+        try:
+            owner = await db.users.find_one({"_id": ObjectId(str(lid))})
+            if owner and owner.get("email"):
+                emails.append(owner["email"])
+        except Exception:  # noqa: BLE001
+            pass
+    for pu in (partner.get("portal_users") or []):
+        if pu.get("email") and pu.get("active", True):
+            emails.append(pu["email"])
+    return list(dict.fromkeys(emails))
+
+
+async def _notify_partner(partner: dict, *, title: str, body: str, lead_id=None) -> None:
+    """Record an in-app notification for a partner's portal users and email them."""
+    now = datetime.now(timezone.utc).isoformat()
+    await db.partner_notifications.insert_one({
+        "partner_id": partner["_id"],
+        "title": title,
+        "body": body,
+        "lead_id": str(lead_id) if lead_id else None,
+        "read_by": [],
+        "created_at": now,
+    })
+    if partner.get("portal_access_enabled") is not True:
+        return
+    emails = await _portal_user_emails(partner)
+    if not emails:
+        return
+    try:
+        from email_service import send_template, tpl_partner_lead_notification
+        portal_url = f"{_app_base_url()}/partners/portal"
+        for em in emails:
+            await send_template(tpl_partner_lead_notification, partner.get("company"), title, body, portal_url, to=em, fire_and_forget=True)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"Partner lead email failed: {e}")
+
+
 def _serialize(doc: dict) -> dict:
     if not doc:
         return doc
@@ -272,6 +336,17 @@ class OnboardingStepUpdate(BaseModel):
 
 class PortalAccessUpdate(BaseModel):
     enabled: bool
+
+
+class PartnerUserCreate(BaseModel):
+    email: EmailStr
+    name: Optional[str] = None
+    role: str = "viewer"
+
+
+class AcceptInviteBody(BaseModel):
+    token: str
+    password: str = Field(min_length=8, max_length=128)
 
 
 class LeadCreate(BaseModel):
@@ -627,7 +702,7 @@ async def set_portal_access(partner_id: str, payload: PortalAccessUpdate, user=D
     p = await db.city_partners.find_one({"_id": oid})
     if not p:
         raise HTTPException(404, "Partener inexistent.")
-    if payload.enabled and not p.get("linked_user_id"):
+    if payload.enabled and not p.get("linked_user_id") and not (p.get("portal_users")):
         raise HTTPException(400, "Creează întâi un cont de portal pentru acest partener.")
     res = await db.city_partners.find_one_and_update(
         {"_id": oid},
@@ -635,6 +710,133 @@ async def set_portal_access(partner_id: str, payload: PortalAccessUpdate, user=D
         return_document=True,
     )
     return _serialize(res)
+
+
+@admin_router.get("/{partner_id}/users")
+async def list_partner_users(partner_id: str, user=Depends(get_current_user)):
+    _require_super(user)
+    try:
+        oid = ObjectId(partner_id)
+    except Exception:
+        raise HTTPException(400, "ID invalid.")
+    p = await db.city_partners.find_one({"_id": oid})
+    if not p:
+        raise HTTPException(404, "Partener inexistent.")
+    items = []
+    lid = p.get("linked_user_id")
+    if lid:
+        try:
+            owner = await db.users.find_one({"_id": ObjectId(str(lid))})
+        except Exception:
+            owner = None
+        if owner:
+            items.append({"user_id": str(owner["_id"]), "email": owner.get("email"), "name": owner.get("name"), "role": "owner", "active": True, "invited": False, "accepted": True})
+    for pu in (p.get("portal_users") or []):
+        items.append({"user_id": str(pu.get("user_id")), "email": pu.get("email"), "name": pu.get("name"), "role": pu.get("role") or "viewer", "active": pu.get("active", True), "invited": bool(pu.get("invited")), "accepted": bool(pu.get("accepted"))})
+    return {"items": items, "count": len(items), "portal_access_enabled": p.get("portal_access_enabled"), "roles": sorted(PARTNER_SUB_ROLES)}
+
+
+@admin_router.post("/{partner_id}/users")
+async def add_partner_user(partner_id: str, payload: PartnerUserCreate, user=Depends(get_current_user)):
+    _require_super(user)
+    if payload.role not in PARTNER_SUB_ROLES:
+        raise HTTPException(400, "Rol invalid. Folosește 'viewer' sau 'operator'.")
+    try:
+        oid = ObjectId(partner_id)
+    except Exception:
+        raise HTTPException(400, "ID invalid.")
+    p = await db.city_partners.find_one({"_id": oid})
+    if not p:
+        raise HTTPException(404, "Partener inexistent.")
+    email = payload.email.strip().lower()
+    existing = await db.users.find_one({"email": email})
+    if existing and existing.get("role") not in (None, "city_partner"):
+        raise HTTPException(400, f"Există deja un cont cu acest email și alt rol ({existing.get('role')}).")
+    now = datetime.now(timezone.utc).isoformat()
+    temp_password = None
+    if existing:
+        uid = existing["_id"]
+        await db.users.update_one({"_id": uid}, {"$set": {"role": "city_partner", "partner_id": str(p["_id"]), "partner_sub_role": payload.role}})
+    else:
+        temp_password = secrets.token_urlsafe(12).replace("_", "X").replace("-", "Y")[:14] + "!1A"
+        ures = await db.users.insert_one({
+            "email": email,
+            "password_hash": bcrypt.hash(temp_password),
+            "name": payload.name or p.get("company"),
+            "role": "city_partner",
+            "verified_email": True,
+            "terms_accepted": True,
+            "privacy_policy_accepted": True,
+            "created_at": now,
+            "partner_id": str(p["_id"]),
+            "partner_sub_role": payload.role,
+            "must_set_password": True,
+        })
+        uid = ures.inserted_id
+    await db.city_partners.update_one({"_id": oid}, {"$pull": {"portal_users": {"user_id": str(uid)}}})
+    await db.city_partners.update_one({"_id": oid}, {
+        "$push": {"portal_users": {"user_id": str(uid), "email": email, "name": payload.name or (existing or {}).get("name"), "role": payload.role, "active": True, "invited": False, "accepted": bool(existing), "added_at": now}},
+        "$set": {"updated_at": now},
+    })
+    return {"ok": True, "user_id": str(uid), "email": email, "role": payload.role, "temp_password": temp_password}
+
+
+@admin_router.post("/{partner_id}/users/{user_id}/invite")
+async def invite_partner_user(partner_id: str, user_id: str, user=Depends(get_current_user)):
+    _require_super(user)
+    try:
+        oid = ObjectId(partner_id)
+        uoid = ObjectId(user_id)
+    except Exception:
+        raise HTTPException(400, "ID invalid.")
+    p = await db.city_partners.find_one({"_id": oid})
+    if not p:
+        raise HTTPException(404, "Partener inexistent.")
+    target = await db.users.find_one({"_id": uoid})
+    if not target or str(target.get("partner_id")) != str(p["_id"]):
+        raise HTTPException(404, "Utilizatorul nu aparține acestui partener.")
+    if not target.get("email"):
+        raise HTTPException(400, "Utilizatorul nu are email.")
+    token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    await db.partner_invites.insert_one({
+        "token": token, "user_id": str(uoid), "partner_id": str(p["_id"]),
+        "email": target.get("email"), "created_at": now.isoformat(),
+        "expires_at": (now + timedelta(days=7)).isoformat(), "used": False,
+    })
+    await db.city_partners.update_one({"_id": oid, "portal_users.user_id": str(uoid)}, {"$set": {"portal_users.$.invited": True}})
+    invite_url = f"{_app_base_url()}/partners/accept-invite?token={token}"
+    role_label = PARTNER_ROLE_LABELS.get(target.get("partner_sub_role") or "viewer", "Vizualizare")
+    email_sent = False
+    try:
+        from email_service import send_template, tpl_partner_invite
+        sent = await send_template(tpl_partner_invite, p.get("company"), invite_url, role_label, to=target["email"], fire_and_forget=False)
+        email_sent = bool(sent and sent.get("ok"))
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"Invite email failed: {e}")
+    return {"ok": True, "invite_url": invite_url, "email_sent": email_sent}
+
+
+@admin_router.delete("/{partner_id}/users/{user_id}")
+async def remove_partner_user(partner_id: str, user_id: str, user=Depends(get_current_user)):
+    _require_super(user)
+    try:
+        oid = ObjectId(partner_id)
+    except Exception:
+        raise HTTPException(400, "ID invalid.")
+    p = await db.city_partners.find_one({"_id": oid})
+    if not p:
+        raise HTTPException(404, "Partener inexistent.")
+    if str(p.get("linked_user_id") or "") == str(user_id):
+        raise HTTPException(400, "Contul principal nu poate fi eliminat. Folosește suspendarea accesului la portal.")
+    now = datetime.now(timezone.utc).isoformat()
+    await db.city_partners.update_one({"_id": oid}, {"$pull": {"portal_users": {"user_id": str(user_id)}}, "$set": {"updated_at": now}})
+    try:
+        await db.users.update_one({"_id": ObjectId(user_id)}, {"$unset": {"partner_id": "", "partner_sub_role": ""}})
+    except Exception:
+        pass
+    await db.partner_invites.update_many({"user_id": str(user_id), "used": False}, {"$set": {"used": True}})
+    return {"ok": True}
 
 
 # ─── Leads (admin side) ────────────────────────────────────────────────────
@@ -682,6 +884,7 @@ async def create_lead(partner_id: str, payload: LeadCreate, user=Depends(get_cur
     doc["_id"] = res.inserted_id
     from leads_store import sync_lead
     await sync_lead("city_partner", doc)
+    await _notify_partner(partner, title=f"Lead nou: {payload.lead_name}", body=f"Un lead nou ți-a fost repartizat (status: {payload.stage}).", lead_id=res.inserted_id)
     return _serialize_lead(doc)
 
 
@@ -708,6 +911,10 @@ async def patch_lead(lead_id: str, payload: LeadPatch, user=Depends(get_current_
         raise HTTPException(404, "Lead inexistent.")
     from leads_store import sync_lead
     await sync_lead("city_partner", res)
+    if "stage" in update:
+        partner = await db.city_partners.find_one({"_id": res.get("partner_id")})
+        if partner:
+            await _notify_partner(partner, title=f"Status actualizat: {res.get('lead_name')}", body=f"Statusul cererii este acum: {update['stage']}.", lead_id=res["_id"])
     return _serialize_lead(res)
 
 
@@ -778,6 +985,97 @@ async def partner_add_lead(payload: LeadCreate, user=Depends(get_current_user)):
     from leads_store import sync_lead
     await sync_lead("city_partner", doc)
     return _serialize_lead(doc)
+
+
+@partner_router.patch("/leads/{lead_id}")
+async def partner_update_lead(lead_id: str, payload: LeadPatch, user=Depends(get_current_user)):
+    """Operator/owner can update their OWN leads. Viewer is read-only. Strict isolation."""
+    p = await _require_partner(user)
+    if _partner_role(user, p) == "viewer":
+        raise HTTPException(403, "Rol de vizualizare: nu poți modifica cereri.")
+    try:
+        oid = ObjectId(lead_id)
+    except Exception:
+        raise HTTPException(400, "ID invalid.")
+    lead = await db.city_partner_leads.find_one({"_id": oid})
+    if not lead or str(lead.get("partner_id")) != str(p["_id"]):
+        raise HTTPException(404, "Cerere inexistentă.")
+    update = {k: v for k, v in payload.dict(exclude_unset=True).items() if v is not None}
+    if "stage" in update:
+        if update["stage"] not in ALLOWED_LEAD_STAGES:
+            raise HTTPException(400, "stage invalid")
+        if update["stage"] == "converted" and not update.get("conversion_date"):
+            update["conversion_date"] = datetime.now(timezone.utc).isoformat()
+        if update["stage"] != "lost":
+            update["lost_reason"] = None
+    if "lead_email" in update:
+        update["lead_email"] = str(update["lead_email"]).lower()
+    update["updated_at"] = datetime.now(timezone.utc).isoformat()
+    res = await db.city_partner_leads.find_one_and_update({"_id": oid}, {"$set": update}, return_document=True)
+    from leads_store import sync_lead
+    await sync_lead("city_partner", res)
+    return _serialize_lead(res)
+
+
+@partner_router.get("/notifications")
+async def partner_list_notifications(user=Depends(get_current_user)):
+    p = await _require_partner(user)
+    uid = _user_id(user)
+    items, unread = [], 0
+    async for d in db.partner_notifications.find({"partner_id": p["_id"]}).sort("created_at", -1).limit(50):
+        read = uid in [str(x) for x in (d.get("read_by") or [])]
+        if not read:
+            unread += 1
+        items.append({"id": str(d["_id"]), "title": d.get("title"), "body": d.get("body"), "lead_id": d.get("lead_id"), "created_at": d.get("created_at"), "read": read})
+    return {"items": items, "unread": unread}
+
+
+@partner_router.post("/notifications/{note_id}/read")
+async def partner_mark_notification_read(note_id: str, user=Depends(get_current_user)):
+    p = await _require_partner(user)
+    try:
+        oid = ObjectId(note_id)
+    except Exception:
+        raise HTTPException(400, "ID invalid.")
+    await db.partner_notifications.update_one({"_id": oid, "partner_id": p["_id"]}, {"$addToSet": {"read_by": _user_id(user)}})
+    return {"ok": True}
+
+
+@partner_router.get("/invite/{token}")
+async def partner_invite_info(token: str):
+    """PUBLIC — validate an invite token (no auth)."""
+    inv = await db.partner_invites.find_one({"token": token})
+    if not inv or inv.get("used"):
+        return {"valid": False, "reason": "used_or_missing"}
+    if inv.get("expires_at") and inv["expires_at"] < datetime.now(timezone.utc).isoformat():
+        return {"valid": False, "reason": "expired"}
+    partner = None
+    try:
+        partner = await db.city_partners.find_one({"_id": ObjectId(inv["partner_id"])})
+    except Exception:
+        pass
+    return {"valid": True, "email": inv.get("email"), "partner_company": partner.get("company") if partner else None}
+
+
+@partner_router.post("/accept-invite")
+async def partner_accept_invite(payload: AcceptInviteBody):
+    """PUBLIC — set password from an invite token (no auth)."""
+    inv = await db.partner_invites.find_one({"token": payload.token})
+    if not inv or inv.get("used"):
+        raise HTTPException(400, "Invitație invalidă sau deja folosită.")
+    if inv.get("expires_at") and inv["expires_at"] < datetime.now(timezone.utc).isoformat():
+        raise HTTPException(400, "Invitația a expirat.")
+    try:
+        uid = ObjectId(inv["user_id"])
+    except Exception:
+        raise HTTPException(400, "Invitație coruptă.")
+    await db.users.update_one({"_id": uid}, {"$set": {"password_hash": bcrypt.hash(payload.password), "verified_email": True}, "$unset": {"must_set_password": ""}})
+    await db.partner_invites.update_one({"_id": inv["_id"]}, {"$set": {"used": True, "used_at": datetime.now(timezone.utc).isoformat()}})
+    try:
+        await db.city_partners.update_one({"_id": ObjectId(inv["partner_id"]), "portal_users.user_id": inv["user_id"]}, {"$set": {"portal_users.$.accepted": True}})
+    except Exception:
+        pass
+    return {"ok": True}
 
 
 @partner_router.get("/stats")
@@ -890,13 +1188,18 @@ def _demo_portal(p: dict, user: dict) -> dict:
         "catalog": catalog,
         "agreement": agreement,
         "user": {"name": user.get("name"), "email": user.get("email")},
+        "role": "owner",
+        "notifications_unread": 0,
     }
 
 
 @partner_router.get("/portal")
 async def partner_portal(user=Depends(get_current_user)):
     p = await _require_partner(user)
-    return await _assemble_portal(p, user.get("name"), user.get("email"))
+    data = await _assemble_portal(p, user.get("name"), user.get("email"))
+    data["role"] = _partner_role(user, p)
+    data["notifications_unread"] = await db.partner_notifications.count_documents({"partner_id": p["_id"], "read_by": {"$ne": _user_id(user)}})
+    return data
 
 
 @partner_router.get("/portal/demo")

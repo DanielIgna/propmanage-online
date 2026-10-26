@@ -7,7 +7,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Building2, Users, TrendingUp, LogOut, Loader2, MapPin, CheckCircle2,
   AlertTriangle, Mail, Package, FileText, Handshake, BarChart3, LayoutDashboard,
-  Globe, Coins, ArrowUpRight, FlaskConical,
+  Globe, Coins, ArrowUpRight, FlaskConical, Bell, Download, Eye,
 } from "lucide-react";
 import { useAuth } from "../../auth";
 
@@ -73,6 +73,10 @@ const PartnerPortal = () => {
   const [rStage, setRStage] = useState("all");
   const [rCat, setRCat] = useState("all");
 
+  // Notifications
+  const [notes, setNotes] = useState([]);
+  const [noteOpen, setNoteOpen] = useState(false);
+
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -91,7 +95,27 @@ const PartnerPortal = () => {
     })();
   }, [demoId]);
 
+  useEffect(() => {
+    if (demoId) return;
+    (async () => {
+      try {
+        const { data } = await ax.get(`/api/partner/notifications`);
+        setNotes(data.items || []);
+      } catch { /* non-blocking */ }
+    })();
+  }, [demoId]);
+
   const doLogout = async () => { await logout(); navigate("/login"); };
+
+  const markRead = async (id) => {
+    setNotes((ns) => ns.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    try { await ax.post(`/api/partner/notifications/${id}/read`); } catch { /* ignore */ }
+  };
+  const markAllRead = async () => {
+    const unreadIds = notes.filter((n) => !n.read).map((n) => n.id);
+    setNotes((ns) => ns.map((n) => ({ ...n, read: true })));
+    await Promise.all(unreadIds.map((id) => ax.post(`/api/partner/notifications/${id}/read`).catch(() => {})));
+  };
 
   const p = data?.partner;
   const stats = data?.stats || {};
@@ -99,6 +123,36 @@ const PartnerPortal = () => {
   const catalog = data?.catalog || [];
   const agreement = data?.agreement;
   const isDemo = !!data?.demo;
+  const role = data?.role || "owner";
+  const canEdit = !isDemo && (role === "owner" || role === "operator");
+  const unread = notes.filter((n) => !n.read).length;
+
+  const updateStage = async (lead, stage) => {
+    try {
+      const { data: upd } = await ax.patch(`/api/partner/leads/${lead.id}`, { stage });
+      setData((d) => ({ ...d, leads: d.leads.map((l) => (l.id === lead.id ? upd : l)) }));
+    } catch (e) {
+      alert(e.response?.data?.detail || e.message);
+    }
+  };
+
+  const exportCsv = () => {
+    const header = ["Nume", "Email", "Telefon", "Sursa", "Status", "Data introducere", "Data conversie", "Venit (RON)", "Motiv pierdut"];
+    const rows = [header];
+    filteredLeads.forEach((l) => rows.push([
+      l.lead_name, l.lead_email || "", l.lead_phone || "", l.source || "",
+      STAGE_LBL[l.stage] || l.stage, fmtDate(l.introduced_at), fmtDate(l.conversion_date),
+      l.revenue_generated || 0, l.lost_reason || "",
+    ]));
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `raport-${(p?.company || "partener").replace(/\s+/g, "-")}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const converted = useMemo(() => leads.filter((l) => l.stage === "converted"), [leads]);
   const reportCategories = useMemo(() => {
@@ -149,6 +203,38 @@ const PartnerPortal = () => {
           <span className="text-[10px] font-bold uppercase px-2 py-1 rounded bg-cyan-100 dark:bg-cyan-500/15 text-cyan-700 dark:text-cyan-400">Portal Partener</span>
           {!isDemo && (
             <>
+              <span className="text-[10px] font-bold uppercase px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300" data-testid="portal-role">
+                {role === "owner" ? "Administrator" : role === "operator" ? "Operator" : "Vizualizare"}
+              </span>
+              {/* Notification bell */}
+              <div className="relative">
+                <button onClick={() => setNoteOpen((o) => !o)} className="relative p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800" title="Notificări" data-testid="notif-bell">
+                  <Bell className="w-4 h-4" />
+                  {unread > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center" data-testid="notif-badge">{unread}</span>}
+                </button>
+                {noteOpen && (
+                  <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl z-50" data-testid="notif-dropdown">
+                    <div className="flex items-center justify-between p-3 border-b border-slate-100 dark:border-slate-800">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Notificări</span>
+                      {unread > 0 && <button onClick={markAllRead} className="text-[11px] text-cyan-600 hover:underline" data-testid="notif-mark-all">Marchează tot citit</button>}
+                    </div>
+                    {notes.length === 0
+                      ? <div className="p-6 text-center text-sm text-slate-400">Nicio notificare încă.</div>
+                      : notes.map((n) => (
+                        <button key={n.id} onClick={() => markRead(n.id)} className={`w-full text-left p-3 border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/40 ${!n.read ? "bg-cyan-50/60 dark:bg-cyan-500/5" : ""}`} data-testid={`notif-item-${n.id}`}>
+                          <div className="flex items-start gap-2">
+                            {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 mt-1.5 shrink-0" />}
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-slate-900 dark:text-white truncate">{n.title}</div>
+                              <div className="text-[11px] text-slate-500">{n.body}</div>
+                              <div className="text-[10px] text-slate-400 mt-0.5">{fmtDate(n.created_at)}</div>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
               <Link to="/legal/sign" className="text-xs text-slate-600 hover:text-slate-900 dark:hover:text-white flex items-center gap-1"><Mail className="w-3 h-3" /> Contract</Link>
               <button onClick={doLogout} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800" title="Logout" data-testid="portal-logout"><LogOut className="w-4 h-4" /></button>
             </>
@@ -255,7 +341,11 @@ const PartnerPortal = () => {
                       <div className="text-[11px] text-slate-500 truncate">{l.lead_email || "—"} · {l.source || "—"} · {fmtDate(l.introduced_at)}</div>
                       {l.stage === "lost" && l.lost_reason && <div className="text-[11px] text-rose-500 mt-0.5">Pierdut: {l.lost_reason}</div>}
                     </div>
-                    <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${STAGE_COLOR[l.stage] || STAGE_COLOR.introduced}`}>{STAGE_LBL[l.stage] || l.stage}</span>
+                    {canEdit
+                      ? <select value={l.stage} onChange={(e) => updateStage(l, e.target.value)} className="text-xs px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200" data-testid={`lead-stage-select-${l.id}`}>
+                          {Object.keys(STAGE_LBL).map((s) => <option key={s} value={s}>{STAGE_LBL[s]}</option>)}
+                        </select>
+                      : <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${STAGE_COLOR[l.stage] || STAGE_COLOR.introduced}`}>{STAGE_LBL[l.stage] || l.stage}</span>}
                   </div>
                 ))}
               </div>}
@@ -339,6 +429,7 @@ const PartnerPortal = () => {
                 </select>
               </div>
               <button onClick={() => { setRFrom(""); setRTo(""); setRStage("all"); setRCat("all"); }} className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-sm text-slate-600 dark:text-slate-300" data-testid="report-reset">Resetează</button>
+              {!isDemo && <button onClick={exportCsv} disabled={filteredLeads.length === 0} className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-700 disabled:opacity-40 text-white text-sm flex items-center gap-1.5" data-testid="report-export-csv"><Download className="w-4 h-4" /> Export CSV</button>}
             </div>
             <div className="text-xs text-slate-500 mb-2" data-testid="report-count">{filteredLeads.length} cereri/clienți · venit: {money(filteredLeads.reduce((s, l) => s + (l.revenue_generated || 0), 0))} · {filteredCatalog.length} produse în catalog</div>
             {filteredLeads.length === 0

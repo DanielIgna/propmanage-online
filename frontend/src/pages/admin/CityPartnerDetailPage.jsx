@@ -85,6 +85,11 @@ const CityPartnerDetailPage = () => {
   const [leadFormOpen, setLeadFormOpen] = useState(false);
   const [savingLead, setSavingLead] = useState(false);
   const [creds, setCreds] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [uForm, setUForm] = useState({ email: "", name: "", role: "viewer" });
+  const [uBusy, setUBusy] = useState(false);
+  const [manualCred, setManualCred] = useState(null);
+  const [inviteInfo, setInviteInfo] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -169,6 +174,38 @@ const CityPartnerDetailPage = () => {
       const { data } = await ax.post(`/api/admin/city-partners/${id}/portal-access`, { enabled });
       setPartner(data);
     } catch (e) { alert(e.response?.data?.detail || e.message); }
+  };
+
+  const loadUsers = async () => {
+    try { const { data } = await ax.get(`/api/admin/city-partners/${id}/users`); setUsers(data.items || []); }
+    catch { /* ignore */ }
+  };
+  useEffect(() => { loadUsers(); }, [id]);
+
+  const addUser = async () => {
+    if (!uForm.email.trim()) { alert("Email obligatoriu"); return; }
+    setUBusy(true); setManualCred(null); setInviteInfo(null);
+    try {
+      const { data } = await ax.post(`/api/admin/city-partners/${id}/users`, uForm);
+      if (data.temp_password) setManualCred(data);
+      setUForm({ email: "", name: "", role: "viewer" });
+      await loadUsers();
+    } catch (e) { alert(e.response?.data?.detail || e.message); }
+    finally { setUBusy(false); }
+  };
+  const inviteUser = async (uid) => {
+    setUBusy(true); setInviteInfo(null);
+    try {
+      const { data } = await ax.post(`/api/admin/city-partners/${id}/users/${uid}/invite`);
+      setInviteInfo(data);
+      await loadUsers();
+    } catch (e) { alert(e.response?.data?.detail || e.message); }
+    finally { setUBusy(false); }
+  };
+  const removeUser = async (uid) => {
+    if (!window.confirm("Elimini acest utilizator din portal? Accesul lui va fi revocat.")) return;
+    try { await ax.delete(`/api/admin/city-partners/${id}/users/${uid}`); await loadUsers(); }
+    catch (e) { alert(e.response?.data?.detail || e.message); }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>;
@@ -288,8 +325,8 @@ const CityPartnerDetailPage = () => {
                   ? <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" data-testid="portal-access-state">Activ</span>
                   : <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-700/40 dark:text-slate-400" data-testid="portal-access-state">Inactiv</span>}
               </div>
-              {!partner.linked_user_id
-                ? <div className="text-[11px] text-slate-500 flex items-start gap-1.5"><AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" /> Creează întâi un cont de portal pentru a putea activa accesul.</div>
+              {!partner.linked_user_id && users.length === 0
+                ? <div className="text-[11px] text-slate-500 flex items-start gap-1.5"><AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" /> Creează un cont de portal sau adaugă un utilizator pentru a putea activa accesul.</div>
                 : partner.portal_access_enabled
                   ? <button onClick={() => setPortalAccess(false)} className="w-full px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-medium flex items-center justify-center gap-1.5" data-testid="suspend-access"><Power className="w-3.5 h-3.5" /> Suspendă accesul</button>
                   : <button onClick={() => setPortalAccess(true)} className="w-full px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium flex items-center justify-center gap-1.5" data-testid="reactivate-access"><Power className="w-3.5 h-3.5" /> Reactivează accesul</button>}
@@ -300,6 +337,71 @@ const CityPartnerDetailPage = () => {
               <Eye className="w-3.5 h-3.5" /> Previzualizează portal (DEMO)
             </a>
             <p className="mt-2 text-[10px] text-slate-400 italic">Preview demonstrativ cu date sintetice. Nu creează cont și nu acordă acces real.</p>
+          </div>
+
+          {/* Utilizatori portal (multi-user) */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800" data-testid="portal-users-card">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5" /> Utilizatori portal ({users.length})
+            </div>
+            <p className="text-[11px] text-slate-500 mb-3"><strong>Operator</strong> poate actualiza cereri; <strong>Vizualizare</strong> e read-only. Fiecare vede doar datele acestui partener.</p>
+
+            {users.length > 0 && (
+              <div className="space-y-2 mb-4">
+                {users.map((u) => (
+                  <div key={u.user_id} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50" data-testid={`portal-user-${u.user_id}`}>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium text-slate-800 dark:text-slate-100 truncate">{u.email}</div>
+                      <div className="text-[10px] text-slate-500 flex items-center gap-1.5 flex-wrap">
+                        <span className={`font-bold uppercase px-1 rounded ${u.role === "owner" ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300" : u.role === "operator" ? "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300"}`}>{u.role === "owner" ? "Administrator" : u.role === "operator" ? "Operator" : "Vizualizare"}</span>
+                        {u.accepted ? <span className="text-emerald-600">activat</span> : u.invited ? <span className="text-amber-600">invitat</span> : <span className="text-slate-400">neinvitat</span>}
+                      </div>
+                    </div>
+                    {u.role !== "owner" && (
+                      <>
+                        <button onClick={() => inviteUser(u.user_id)} disabled={uBusy} className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500" title="Trimite invitație email" data-testid={`invite-user-${u.user_id}`}><Mail className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => removeUser(u.user_id)} className="p-1.5 rounded hover:bg-rose-100 dark:hover:bg-rose-500/20 text-rose-500" title="Elimină" data-testid={`remove-user-${u.user_id}`}><X className="w-3.5 h-3.5" /></button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <input value={uForm.email} onChange={e => setUForm(f => ({ ...f, email: e.target.value }))} placeholder="email@partener.ro" className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="new-user-email" />
+              <input value={uForm.name} onChange={e => setUForm(f => ({ ...f, name: e.target.value }))} placeholder="Nume (opțional)" className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="new-user-name" />
+              <div className="flex gap-2">
+                <select value={uForm.role} onChange={e => setUForm(f => ({ ...f, role: e.target.value }))} className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="new-user-role">
+                  <option value="viewer">Vizualizare</option>
+                  <option value="operator">Operator</option>
+                </select>
+                <button onClick={addUser} disabled={uBusy} className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-medium flex items-center gap-1.5 disabled:opacity-60" data-testid="add-user-btn">
+                  {uBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Adaugă
+                </button>
+              </div>
+            </div>
+
+            {manualCred?.temp_password && (
+              <div className="mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30" data-testid="manual-cred">
+                <div className="text-[11px] font-bold uppercase text-amber-700 dark:text-amber-300 mb-1">Parolă temporară — comunic-o manual</div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs bg-white dark:bg-slate-900 px-2 py-1 rounded font-mono">{manualCred.temp_password}</code>
+                  <button onClick={() => navigator.clipboard.writeText(manualCred.temp_password)} className="p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-500/20"><Copy className="w-3.5 h-3.5" /></button>
+                </div>
+                <div className="text-[10px] text-amber-700 dark:text-amber-300 mt-1">{manualCred.email}</div>
+              </div>
+            )}
+            {inviteInfo && (
+              <div className="mt-3 p-3 rounded-lg bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/30" data-testid="invite-result">
+                <div className="text-[11px] font-bold uppercase text-cyan-700 dark:text-cyan-300 mb-1 flex items-center gap-1">{inviteInfo.email_sent ? <><CheckCircle2 className="w-3 h-3" /> Invitație trimisă pe email</> : "Invitație generată (email neconfirmat)"}</div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-[10px] bg-white dark:bg-slate-900 px-2 py-1 rounded font-mono break-all">{inviteInfo.invite_url}</code>
+                  <button onClick={() => navigator.clipboard.writeText(inviteInfo.invite_url)} className="p-1 rounded hover:bg-cyan-100 dark:hover:bg-cyan-500/20"><Copy className="w-3.5 h-3.5" /></button>
+                </div>
+                <div className="text-[10px] text-cyan-700 dark:text-cyan-300 mt-1">Fallback manual: dacă emailul nu ajunge, copiază linkul și trimite-l direct.</div>
+              </div>
+            )}
           </div>
         </div>
 
