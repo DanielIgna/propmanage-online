@@ -4,6 +4,8 @@ from bson import ObjectId
 from fastapi import APIRouter, HTTPException
 
 from db import db
+from seo_gate import is_test_account
+from privacy import public_person_name
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["specialist_profile"])
@@ -18,6 +20,9 @@ async def specialist_profile(spec_id: str):
     except Exception:
         raise HTTPException(404, "Specialist not found")
     if not spec:
+        raise HTTPException(404, "Specialist not found")
+    # Demo/QA placeholder profiles must not be publicly viewable.
+    if is_test_account(spec):
         raise HTTPException(404, "Specialist not found")
     
     # Get reviews
@@ -69,7 +74,7 @@ async def specialist_profile(spec_id: str):
     
     return {
         "id": str(spec["_id"]),
-        "name": spec.get("name"),
+        "name": public_person_name(spec),
         # NOTE: email is PII — intentionally NOT exposed on public profile.
         # Avatar is exposed only as a sanitized URL/base64 thumbnail.
         "picture": spec.get("picture"),

@@ -80,4 +80,9 @@ TAXONOMY = [
         ("Garduri & Porți", ["Gard plasă / panouri", "Gard beton / cărămidă", "Porți auto & automatizări"]),
         ("Grădină & Peisagistică", ["Gazon rulou / semănat", "Sisteme irigații", "Plantări & design peisagistic", "Terase & foișoare"]),
     ]),
+    ("eficienta_energetica", "Eficiență energetică & nZEB", [
+        ("Audit & Certificare", ["Audit energetic", "Certificat de performanță energetică", "Consultanță nZEB", "Termografie clădire"]),
+        ("Surse regenerabile", ["Sistem fotovoltaic", "Stocare energie (baterii)", "Pompă de căldură aer-apă", "Panouri solare termice"]),
+        ("Anvelopă & Eficiență", ["Termoizolație anvelopă", "Ventilație cu recuperare de căldură (nZEB)", "Test etanșeitate (Blower Door)", "Eliminare punți termice", "Tâmplărie termoizolantă performantă"]),
+    ]),
 ]

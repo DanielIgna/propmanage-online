@@ -22,6 +22,7 @@ class RegisterIn(BaseModel):
     name: str
     role: Role = "client"
     phone: Optional[str] = None
+    account_type: Optional[str] = None  # "individual" (default) | "company"
     specialty: Optional[str] = None
     service_categories: Optional[List[str]] = None
     coverage_zones: Optional[List[str]] = None
@@ -104,6 +105,7 @@ class RequestIn(BaseModel):
     photos: Optional[List[str]] = None
     taxonomy_node_id: Optional[str] = None
     subcategory: Optional[str] = None
+    suggested_service_name: Optional[str] = None
 
     @field_validator("priority", mode="before")
     @classmethod

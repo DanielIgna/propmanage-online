@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { ArrowLeft, PaintRoller, Building, Briefcase, Wrench, Zap, Wind, Palette, Hammer, PartyPopper } from "lucide-react";
+import { ArrowLeft, PaintRoller, Building, Briefcase, Wrench, Zap, Wind, Palette, Hammer, PartyPopper, Leaf, Lightbulb } from "lucide-react";
 import { API } from "../DashShared";
 import { formatApiError } from "../../auth";
 import { GREEN, GREEN_SOFT, CTA, AmountInput } from "./ui";
@@ -9,6 +9,7 @@ const CATS = [
   ["zugravit", "Zugrăvit", PaintRoller], ["parchet", "Parchet", Building], ["faianta", "Faianță / Gresie", Building],
   ["handyman", "Handyman", Briefcase], ["gips_carton", "Gips-carton", Hammer], ["hvac", "HVAC / Climatizare", Wind],
   ["electric", "Electric", Zap], ["plumbing", "Sanitar", Wrench], ["interior_design", "Design Interior", Palette],
+  ["eficienta_energetica", "Eficiență & nZEB", Leaf],
 ];
 
 // Wizard „Solicită" — o întrebare pe ecran (model Client Junior), POST real la /requests
@@ -16,6 +17,8 @@ export const RequestWizard = ({ property, onClose, onCreated }) => {
   const [step, setStep] = useState(0);
   // budget_estimate is a string during editing (avoids cursor jump / "0" prefix); parsed at submit.
   const [form, setForm] = useState({ category: "", title: "", description: "", priority: "normal", budget_estimate: "200", subcategory: "", taxonomy_node_id: null });
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [suggestName, setSuggestName] = useState("");
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
   // GI-2 Intent Score: început → (finalizat | abandonat)
@@ -60,7 +63,16 @@ export const RequestWizard = ({ property, onClose, onCreated }) => {
   const submit = async () => {
     setLoading(true);
     try {
-      const payload = { ...form, budget_estimate: parseFloat(form.budget_estimate) || 0, property_id: property.id, photos: [] };
+      const customName = suggestName.trim();
+      const usingSuggestion = suggestOpen && !!customName && !form.category;
+      const payload = {
+        ...form,
+        category: form.category || (usingSuggestion ? "altul" : form.category),
+        suggested_service_name: customName || undefined,
+        budget_estimate: parseFloat(form.budget_estimate) || 0,
+        property_id: property.id,
+        photos: [],
+      };
       const { data } = await axios.post(`${API}/requests`, payload);
       if (window.__pmWizardCreated) window.__pmWizardCreated();
       // Funnel comercial (etapa 4): cerere creată real în db.requests (+ semnalul existent offer_requested)
@@ -91,12 +103,12 @@ export const RequestWizard = ({ property, onClose, onCreated }) => {
   const steps = [
     {
       q: "Ce serviciu ai nevoie?",
-      valid: !!form.category,
+      valid: !!form.category || (suggestOpen && suggestName.trim().length >= 2),
       body: (
         <div>
           <div className="grid grid-cols-2 gap-2.5">
             {CATS.map(([id, label, Icon]) => (
-              <button key={id} onClick={() => setForm(f => ({ ...f, category: id, subcategory: "", taxonomy_node_id: null }))} data-testid={`v2-wiz-cat-${id}`}
+              <button key={id} onClick={() => { setSuggestOpen(false); setSuggestName(""); setForm(f => ({ ...f, category: id, subcategory: "", taxonomy_node_id: null })); }} data-testid={`v2-wiz-cat-${id}`}
                 className={`rounded-2xl border-2 p-3.5 text-left transition-colors ${form.category === id ? "border-[#34C759] bg-[#34C759]/5" : "border-slate-200 bg-white"}`}>
                 <Icon className="w-5 h-5" style={{ color: GREEN }} />
                 <div className="mt-1.5 text-xs font-bold text-slate-900">{label}</div>
@@ -119,6 +131,22 @@ export const RequestWizard = ({ property, onClose, onCreated }) => {
               </div>
             </div>
           )}
+          <div className="mt-5 pt-4 border-t border-slate-100" data-testid="v2-wiz-suggest">
+            {!suggestOpen ? (
+              <button type="button" onClick={() => { setSuggestOpen(true); setForm(f => ({ ...f, category: "", subcategory: "", taxonomy_node_id: null })); }}
+                className="flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-slate-900" data-testid="v2-wiz-suggest-open">
+                <Lightbulb className="w-4 h-4" style={{ color: GREEN }} /> Nu găsești serviciul? Sugerează-l
+              </button>
+            ) : (
+              <div className="cv2-fade">
+                <div className="text-xs font-bold text-slate-500 flex items-center gap-1.5"><Lightbulb className="w-4 h-4" style={{ color: GREEN }} /> Scrie serviciul de care ai nevoie</div>
+                <input value={suggestName} onChange={e => setSuggestName(e.target.value)} placeholder="ex: Montaj stație încărcare auto (wallbox)"
+                  className="mt-2 w-full px-4 py-3.5 rounded-2xl border-2 border-slate-200 text-sm outline-none focus:border-[#34C759]" data-testid="v2-wiz-suggest-input" />
+                <div className="mt-1.5 text-[11px] text-slate-400">Trimitem propunerea echipei PropManage. Cererea ta pornește oricum imediat.</div>
+                <button type="button" onClick={() => { setSuggestOpen(false); setSuggestName(""); }} className="mt-2 text-[11px] text-slate-500 underline" data-testid="v2-wiz-suggest-cancel">Renunță</button>
+              </div>
+            )}
+          </div>
         </div>
       ),
     },

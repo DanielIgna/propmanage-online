@@ -22,6 +22,7 @@ from routes.specialist_profile import router as specialist_profile_router
 from routes.notifications import router as notifications_router
 from routes.ai import router as ai_router
 from routes.marketplace import router as marketplace_router
+from routes.suggested_services import router as suggested_services_router, admin_router as suggested_services_admin_router
 from routes.property_timeline import router as property_timeline_router
 from routes.regions import router as regions_router
 from routes.matching import router as matching_router
@@ -192,6 +193,7 @@ ALL_ROUTERS = (
     disputes_router, design_router, portfolio_router,
     payments_router, chat_router, specialist_profile_router,
     notifications_router, ai_router, marketplace_router,
+    suggested_services_router, suggested_services_admin_router,
     property_timeline_router, regions_router, matching_router,
     services_avail_router, projects_router, trust_router, root_router,
     admin_console_router, cms_public_router, admin_ai_router,

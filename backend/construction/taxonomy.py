@@ -68,6 +68,41 @@ async def seed_construction_taxonomy() -> dict:
     return {"seeded": True, "nodes": len(docs)}
 
 
+async def sync_taxonomy_additions() -> dict:
+    """Additive, idempotent: insert any seed nodes missing from the DB.
+
+    Never updates or deletes existing nodes — only adds new roots / subcategories /
+    services introduced in TAXONOMY (e.g. the Eficiență energetică & nZEB branch).
+    Safe to run on every startup; existing catalog + admin edits are untouched.
+    """
+    from construction.taxonomy_data import TAXONOMY
+    added = 0
+    for r_i, (legacy, root_name, subs) in enumerate(TAXONOMY):
+        root = await db.construction_taxonomy.find_one({"depth_level": 0, "legacy_category": legacy})
+        if not root:
+            root_doc = _node(root_name, None, 0, legacy, r_i)
+            root_doc["slug"] = legacy
+            await db.construction_taxonomy.insert_one({**root_doc})
+            root = root_doc
+            added += 1
+        for s_i, (sub_name, services) in enumerate(subs):
+            sub = await db.construction_taxonomy.find_one(
+                {"parent_id": root["id"], "slug": slugify(sub_name)})
+            if not sub:
+                sub = _node(sub_name, root["id"], 1, legacy, s_i)
+                await db.construction_taxonomy.insert_one({**sub})
+                added += 1
+            for v_i, svc in enumerate(services):
+                exists = await db.construction_taxonomy.find_one(
+                    {"parent_id": sub["id"], "slug": slugify(svc)})
+                if not exists:
+                    await db.construction_taxonomy.insert_one({**_node(svc, sub["id"], 2, legacy, v_i)})
+                    added += 1
+    if added:
+        logger.info(f"[construction] taxonomy additions synced: +{added} nodes")
+    return {"added": added}
+
+
 async def get_specialist_counts() -> dict:
     """Verified specialists count per flat category (specialty ∪ service_categories)."""
     counts: dict = {}

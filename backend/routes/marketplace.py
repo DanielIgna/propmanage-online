@@ -5,6 +5,7 @@ from fastapi import APIRouter
 
 from db import db
 from seo_gate import PUBLIC_SPECIALIST_EXCLUDE
+from privacy import public_person_name
 # (models import * removed — no symbols from models are used in this file)
 
 logger = logging.getLogger(__name__)
@@ -217,7 +218,7 @@ async def public_marketplace(
 
     return [{
         "id": str(d["_id"]),
-        "name": d.get("name"),
+        "name": public_person_name(d),
         "picture": d.get("picture"),
         "avatar": d.get("avatar"),
         "specialty": d.get("specialty"),

@@ -29,12 +29,18 @@ TEST_EMAIL_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Branded/demo placeholder profiles (e.g. "PropManage Oradea") must never surface
+# in PUBLIC listings. Real people are not named "PropManage …".
+DEMO_NAME_RE = re.compile(r"^\s*propmanage\b", re.IGNORECASE)
+
 
 def is_test_account(u: dict) -> bool:
     """True for QA/demo/seed specialist accounts that must stay out of public lists."""
     if not u:
         return False
     if u.get("is_demo_account") or u.get("_seed_tag") or u.get("_tier_demo"):
+        return True
+    if DEMO_NAME_RE.search(u.get("name") or ""):
         return True
     return bool(TEST_EMAIL_RE.search(u.get("email") or ""))
 
@@ -45,6 +51,7 @@ PUBLIC_SPECIALIST_EXCLUDE = {
     "_seed_tag": {"$exists": False},
     "_tier_demo": {"$in": [None, False]},
     "email": {"$not": TEST_EMAIL_RE},
+    "name": {"$not": DEMO_NAME_RE},
 }
 
 

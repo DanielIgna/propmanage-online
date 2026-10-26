@@ -129,6 +129,7 @@ async def register(data: RegisterIn, request: Request, response: Response):
         "reviews_count": 0,
         "verified": False,
         "tier": "ENTRY" if data.role == "specialist" else None,
+        "account_type": (str(data.account_type).lower() if data.account_type in ("individual", "company") else "individual"),
         "created_at": now_iso,
         # GDPR + verification
         "terms_accepted": True,

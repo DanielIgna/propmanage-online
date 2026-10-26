@@ -6,7 +6,7 @@ import axios from "axios";
 import {
   Hammer, ChevronLeft, ChevronRight, ChevronDown, Loader2, RefreshCcw, Plus,
   Pencil, Trash2, Eye, EyeOff, Users, AlertTriangle, Download, Search,
-  FolderTree, FolderKanban, Sparkles, CheckCircle2, Coins,
+  FolderTree, FolderKanban, Sparkles, CheckCircle2, Coins, Lightbulb,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -386,6 +386,103 @@ const PricesTab = ({ categories }) => {
 };
 
 // ============================ PAGE ============================
+const SuggestedTab = () => {
+  const [data, setData] = useState({ items: [], counts: {} });
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("pending");
+  const [roots, setRoots] = useState([]);
+  const [busy, setBusy] = useState(null);
+  const [msg, setMsg] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = filter === "all" ? {} : { status: filter };
+      const [a, b] = await Promise.all([
+        ax.get("/api/admin/suggested-services", { params }),
+        ax.get("/api/construction/taxonomy"),
+      ]);
+      setData(a.data || { items: [], counts: {} });
+      setRoots((b.data?.tree || []).map(r => ({ id: r.id, name: r.name })));
+    } catch (e) { setMsg(e.response?.data?.detail || e.message); }
+    finally { setLoading(false); }
+  }, [filter]);
+  useEffect(() => { load(); }, [load]);
+
+  const approve = async (item, parentId) => {
+    setBusy(item.id);
+    try {
+      await ax.post(`/api/admin/suggested-services/${item.id}/approve`, parentId ? { parent_id: parentId } : {});
+      setMsg(`„${item.name}" adăugat în catalog.`);
+      await load();
+    } catch (e) { setMsg(e.response?.data?.detail || e.message); }
+    finally { setBusy(null); }
+  };
+  const reject = async (item) => {
+    const reason = window.prompt(`Respingi „${item.name}"? Motiv (opțional):`, "");
+    if (reason === null) return;
+    setBusy(item.id);
+    try {
+      await ax.post(`/api/admin/suggested-services/${item.id}/reject`, { reason: reason || null });
+      await load();
+    } catch (e) { setMsg(e.response?.data?.detail || e.message); }
+    finally { setBusy(null); }
+  };
+
+  const BADGE = { pending: "bg-amber-500/15 text-amber-300", approved: "bg-emerald-500/15 text-emerald-300", rejected: "bg-rose-500/15 text-rose-300" };
+  return (
+    <div data-testid="cip-suggested-tab">
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        {[["pending", "În așteptare"], ["approved", "Aprobate"], ["rejected", "Respinse"], ["all", "Toate"]].map(([k, l]) => (
+          <button key={k} onClick={() => setFilter(k)} data-testid={`sug-filter-${k}`}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg border ${filter === k ? "border-amber-400 bg-amber-500/10 text-white" : "border-stone-700 text-stone-400 hover:text-stone-200"}`}>
+            {l}{data.counts?.[k] != null && k !== "all" ? ` (${data.counts[k]})` : ""}
+          </button>
+        ))}
+        <div className="flex-1" />
+        <button onClick={load} className="p-1.5 rounded-lg border border-stone-700 text-stone-400 hover:text-white" data-testid="sug-refresh"><RefreshCcw className="w-3.5 h-3.5" /></button>
+      </div>
+      {msg && <div className="mb-3 px-4 py-2 rounded-xl bg-stone-900/60 border border-stone-700 text-sm text-stone-200" data-testid="sug-message">{msg}</div>}
+      <div className="bg-stone-900/30 border border-stone-800 rounded-2xl p-2 space-y-2" data-testid="sug-list">
+        {loading ? <div className="p-10 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-stone-500" /></div>
+          : data.items.length === 0 ? <div className="p-10 text-center text-sm text-stone-500">Nicio sugestie în această categorie.</div>
+          : data.items.map(it => (
+            <div key={it.id} className="rounded-xl bg-stone-900/50 border border-stone-800 p-3" data-testid={`sug-item-${it.id}`}>
+              <div className="flex items-start gap-3 flex-wrap">
+                <div className="flex-1 min-w-[200px]">
+                  <div className="flex items-center gap-2">
+                    <span className="text-white font-semibold">{it.name}</span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${BADGE[it.status]}`}>{it.status}</span>
+                    <span className="text-[10px] text-stone-400">· {it.votes} cereri</span>
+                    {it.category_hint && <span className="text-[10px] text-cyan-300">· sugestie: {it.category_hint}</span>}
+                  </div>
+                  {it.description && <div className="text-xs text-stone-400 mt-0.5">{it.description}</div>}
+                  {it.reject_reason && <div className="text-[11px] text-rose-300 mt-0.5">Motiv respingere: {it.reject_reason}</div>}
+                </div>
+                {it.status === "pending" && (
+                  <div className="flex items-center gap-1.5">
+                    <select defaultValue="" id={`sug-parent-${it.id}`} data-testid={`sug-parent-${it.id}`}
+                      className="px-2 py-1.5 text-xs rounded-lg bg-stone-800 border border-stone-700 text-stone-200 max-w-[160px]">
+                      <option value="">Categorie nouă</option>
+                      {roots.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </select>
+                    <button disabled={busy === it.id} data-testid={`sug-approve-${it.id}`}
+                      onClick={() => approve(it, document.getElementById(`sug-parent-${it.id}`).value)}
+                      className="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-emerald-500/90 hover:bg-emerald-400 text-stone-950 flex items-center gap-1">
+                      {busy === it.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />} Aprobă
+                    </button>
+                    <button disabled={busy === it.id} data-testid={`sug-reject-${it.id}`} onClick={() => reject(it)}
+                      className="px-2.5 py-1.5 text-xs font-bold rounded-lg border border-rose-500/40 text-rose-300 hover:bg-rose-500/10">Respinge</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+};
+
 export default function ConstructionIntelligencePage() {
   const [tab, setTab] = useState("taxonomy");
   const [ov, setOv] = useState(null);
@@ -453,7 +550,7 @@ export default function ConstructionIntelligencePage() {
         )}
 
         <div className="flex items-center gap-1 mb-4 border-b border-stone-800">
-          {[["taxonomy", "Nomenclator", FolderTree], ["projects", "Proiecte (vedere centrală)", FolderKanban], ["prices", "Prețuri (Observatory)", Coins]].map(([id, label, Icon]) => (
+          {[["taxonomy", "Nomenclator", FolderTree], ["projects", "Proiecte (vedere centrală)", FolderKanban], ["prices", "Prețuri (Observatory)", Coins], ["suggested", "Servicii sugerate", Lightbulb]].map(([id, label, Icon]) => (
             <button key={id} onClick={() => setTab(id)} data-testid={`cip-tab-${id}`}
               className={`px-4 py-2.5 text-sm font-medium flex items-center gap-1.5 border-b-2 -mb-px transition-colors ${tab === id ? "border-amber-400 text-white" : "border-transparent text-stone-500 hover:text-stone-300"}`}>
               <Icon className="w-4 h-4" /> {label}
@@ -464,6 +561,7 @@ export default function ConstructionIntelligencePage() {
         {tab === "taxonomy" && <TaxonomyTab onChanged={loadOverview} />}
         {tab === "projects" && <ProjectsTab categories={ov?.coverage || []} />}
         {tab === "prices" && <PricesTab categories={ov?.coverage || []} />}
+        {tab === "suggested" && <SuggestedTab />}
       </div>
     </div>
   );

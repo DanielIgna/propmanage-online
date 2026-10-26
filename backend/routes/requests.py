@@ -44,6 +44,17 @@ async def create_request(data: RequestIn, background_tasks: BackgroundTasks, use
     res = await db.requests.insert_one(doc)
     doc["id"] = str(res.inserted_id)
     doc.pop("_id", None)
+    # Feature: "serviciu nou sugerat" — if the client typed a missing service name,
+    # record it as a suggestion linked to this request (deduped, admin-reviewable).
+    if getattr(data, "suggested_service_name", None):
+        try:
+            from routes.suggested_services import record_suggestion
+            await record_suggestion(
+                name=data.suggested_service_name, user_id=user["id"],
+                category_hint=data.category, description=data.title, request_id=doc["id"],
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("[suggested_service] record failed for req=%s: %s", doc["id"], e)
     await log_event(doc["id"], "request.created", actor=user, property_id=data.property_id,
                     payload={"title": data.title, "category": data.category, "priority": data.priority, "budget_estimate": data.budget_estimate})
     # Notify all eligible specialists about the new lead

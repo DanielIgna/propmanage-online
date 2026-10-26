@@ -291,8 +291,9 @@ async def _startup_impl():
         logger.warning(f"Autonomy autopilot bootstrap failed: {e}")
     # CIP-A: seed nomenclator construcții + gate inițial de vizibilitate (idempotent)
     try:
-        from construction.taxonomy import seed_construction_taxonomy, refresh_category_visibility
+        from construction.taxonomy import seed_construction_taxonomy, refresh_category_visibility, sync_taxonomy_additions
         await seed_construction_taxonomy()
+        await sync_taxonomy_additions()
         await refresh_category_visibility()
     except Exception as e:
         logger.warning(f"Construction taxonomy bootstrap failed: {e}")
