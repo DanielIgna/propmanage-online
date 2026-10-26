@@ -50,7 +50,7 @@ export const LoginPage = () => {
   const safeNext = _isSafeNext(nextPath) ? nextPath : null;
 
   const roleHome = (role) => ({
-    city_partner: "/partner/dashboard",
+    city_partner: "/partners/portal",
     marketplace_partner: "/partner/marketplace",
     marketing_manager: "/admin/marketing",
   }[role] || `/${role}`);

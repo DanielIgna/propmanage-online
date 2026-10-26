@@ -37,7 +37,7 @@ import logging
 import os
 import re
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from bson import ObjectId
@@ -125,6 +125,8 @@ def _serialize(doc: dict) -> dict:
         "status": doc.get("status") or "lead",
         "public_visible": (doc.get("status") == "active"),
         "collaboration_agreed": bool(doc.get("collaboration_agreed")),
+        # Portal access kill-switch (explicit admin action). None = never set (legacy).
+        "portal_access_enabled": (None if doc.get("portal_access_enabled") is None else bool(doc.get("portal_access_enabled"))),
         # ── Prospect / supplier origin & commercial profile (City nZEB) — optional ──
         "website": doc.get("website"),
         "contact_role": doc.get("contact_role"),
@@ -262,10 +264,15 @@ class PartnerPatch(BaseModel):
     origin_confirmed: Optional[bool] = None
     coverage_confirmed: Optional[bool] = None
     collaboration_metrics: Optional[dict] = None
+    portal_access_enabled: Optional[bool] = None
 
 
 class OnboardingStepUpdate(BaseModel):
     step: int = Field(ge=0, le=len(ONBOARDING_STEPS))
+
+
+class PortalAccessUpdate(BaseModel):
+    enabled: bool
 
 
 class LeadCreate(BaseModel):
@@ -580,7 +587,7 @@ async def create_partner_login(partner_id: str, user=Depends(get_current_user)):
         # Just link it
         await db.city_partners.update_one(
             {"_id": oid},
-            {"$set": {"linked_user_id": str(existing["_id"]), "updated_at": datetime.now(timezone.utc).isoformat()}},
+            {"$set": {"linked_user_id": str(existing["_id"]), "portal_access_enabled": True, "updated_at": datetime.now(timezone.utc).isoformat()}},
         )
         return {"ok": True, "linked_existing": True, "user_id": str(existing["_id"]), "email": email}
 
@@ -601,9 +608,30 @@ async def create_partner_login(partner_id: str, user=Depends(get_current_user)):
     ures = await db.users.insert_one(new_user)
     await db.city_partners.update_one(
         {"_id": oid},
-        {"$set": {"linked_user_id": str(ures.inserted_id), "updated_at": datetime.now(timezone.utc).isoformat()}},
+        {"$set": {"linked_user_id": str(ures.inserted_id), "portal_access_enabled": True, "updated_at": datetime.now(timezone.utc).isoformat()}},
     )
     return {"ok": True, "created": True, "user_id": str(ures.inserted_id), "email": email, "temp_password": temp_password}
+
+
+@admin_router.post("/{partner_id}/portal-access")
+async def set_portal_access(partner_id: str, payload: PortalAccessUpdate, user=Depends(get_current_user)):
+    """Enable / suspend partner portal access. Explicit admin action only (section 3)."""
+    _require_super(user)
+    try:
+        oid = ObjectId(partner_id)
+    except Exception:
+        raise HTTPException(400, "ID invalid.")
+    p = await db.city_partners.find_one({"_id": oid})
+    if not p:
+        raise HTTPException(404, "Partener inexistent.")
+    if payload.enabled and not p.get("linked_user_id"):
+        raise HTTPException(400, "Creează întâi un cont de portal pentru acest partener.")
+    res = await db.city_partners.find_one_and_update(
+        {"_id": oid},
+        {"$set": {"portal_access_enabled": payload.enabled, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        return_document=True,
+    )
+    return _serialize(res)
 
 
 # ─── Leads (admin side) ────────────────────────────────────────────────────
@@ -698,6 +726,8 @@ async def _require_partner(user: dict) -> dict:
         raise HTTPException(404, "Partener inexistent.")
     if p.get("status") == "terminated":
         raise HTTPException(403, "Colaborarea a fost încheiată.")
+    if p.get("portal_access_enabled") is False:
+        raise HTTPException(403, "Accesul la portal este suspendat de administrator.")
     return p
 
 
@@ -776,6 +806,108 @@ async def partner_my_stats(user=Depends(get_current_user)):
         "revenue_generated": revenue,
         "conversion_rate": conv_rate,
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PARTNER PORTAL — consolidated view (/partners/portal) + DEMO preview
+# Reuses leads, products (catalog) and partner_agreements. No parallel system.
+# ─────────────────────────────────────────────────────────────────────────────
+def _compute_portal_stats(leads: list) -> dict:
+    by_stage = {st: 0 for st in ALLOWED_LEAD_STAGES}
+    revenue = 0
+    for l in leads:
+        st = l.get("stage") or "introduced"
+        by_stage[st] = by_stage.get(st, 0) + 1
+        revenue += l.get("revenue_generated") or 0
+    total = len(leads)
+    conv = by_stage.get("converted", 0)
+    return {
+        "leads_total": total,
+        "leads_by_stage": by_stage,
+        "revenue_generated": revenue,
+        "conversion_rate": round(conv / total * 100, 1) if total else 0,
+    }
+
+
+async def _assemble_portal(p: dict, user_name, user_email) -> dict:
+    pid = p["_id"]
+    leads = [_serialize_lead(d) async for d in db.city_partner_leads.find({"partner_id": pid}).sort("created_at", -1)]
+    catalog = [_serialize_product(d) async for d in db.city_partner_products.find({"partner_id": pid}).sort("created_at", -1)]
+    agreement = None
+    agr = await db.partner_agreements.find_one({"partner_id": pid, "status": {"$ne": "terminated"}})
+    if agr:
+        try:
+            from strategic_partners import _serialize_agreement
+            agreement = _serialize_agreement(agr)
+        except Exception:  # noqa: BLE001
+            agreement = None
+    return {
+        "demo": False,
+        "partner": _serialize(p),
+        "stats": _compute_portal_stats(leads),
+        "leads": leads,
+        "catalog": catalog,
+        "agreement": agreement,
+        "user": {"name": user_name, "email": user_email},
+    }
+
+
+def _demo_portal(p: dict, user: dict) -> dict:
+    now = datetime.now(timezone.utc)
+
+    def _iso(days):
+        return (now - timedelta(days=days)).isoformat()
+
+    cats = p.get("categories") or ["Servicii"]
+    leads = [
+        {"id": "demo-1", "partner_id": str(p["_id"]), "lead_name": "DEMO — Asociația Primăverii nr. 12", "lead_email": "demo1@exemplu.ro", "lead_phone": None, "source": "recomandare", "introduced_at": _iso(2), "stage": "introduced", "conversion_date": None, "revenue_generated": 0, "lost_reason": None, "notes": "Date demonstrative", "created_at": _iso(2), "updated_at": _iso(2)},
+        {"id": "demo-2", "partner_id": str(p["_id"]), "lead_name": "DEMO — Dezvoltator Rezidențial Nord", "lead_email": "demo2@exemplu.ro", "lead_phone": None, "source": "eveniment local", "introduced_at": _iso(9), "stage": "contacted", "conversion_date": None, "revenue_generated": 0, "lost_reason": None, "notes": "Date demonstrative", "created_at": _iso(9), "updated_at": _iso(5)},
+        {"id": "demo-3", "partner_id": str(p["_id"]), "lead_name": "DEMO — Primăria Reghin (proiect pilot)", "lead_email": "demo3@exemplu.ro", "lead_phone": None, "source": "parteneriat", "introduced_at": _iso(21), "stage": "onboarded", "conversion_date": None, "revenue_generated": 0, "lost_reason": None, "notes": "Date demonstrative", "created_at": _iso(21), "updated_at": _iso(7)},
+        {"id": "demo-4", "partner_id": str(p["_id"]), "lead_name": "DEMO — Ansamblu Case Verzi", "lead_email": "demo4@exemplu.ro", "lead_phone": None, "source": "recomandare", "introduced_at": _iso(40), "stage": "converted", "conversion_date": _iso(12), "revenue_generated": 18500, "lost_reason": None, "notes": "Date demonstrative", "created_at": _iso(40), "updated_at": _iso(12)},
+        {"id": "demo-5", "partner_id": str(p["_id"]), "lead_name": "DEMO — Client indecis", "lead_email": None, "lead_phone": None, "source": "website", "introduced_at": _iso(30), "stage": "lost", "conversion_date": None, "revenue_generated": 0, "lost_reason": "Buget indisponibil (DEMO)", "notes": "Date demonstrative", "created_at": _iso(30), "updated_at": _iso(15)},
+    ]
+    catalog = [
+        {"id": "demo-p1", "name": f"DEMO — {cats[0]}", "brand": p.get("company"), "category": cats[0], "unit": "buc", "price_min": 1200, "price_max": 2400, "currency": "RON", "partner_id": str(p["_id"]), "partner_name": p.get("company"), "url": None, "tags": ["demo"], "active": True, "created_at": _iso(60), "updated_at": _iso(60)},
+        {"id": "demo-p2", "name": f"DEMO — {(cats[1] if len(cats) > 1 else 'Serviciu complementar')}", "brand": p.get("company"), "category": (cats[1] if len(cats) > 1 else None), "unit": "mp", "price_min": 85, "price_max": 140, "currency": "RON", "partner_id": str(p["_id"]), "partner_name": p.get("company"), "url": None, "tags": ["demo"], "active": True, "created_at": _iso(60), "updated_at": _iso(60)},
+    ]
+    agreement = {
+        "id": "demo-agr", "kind": "city", "partner_id": str(p["_id"]), "partner_name": p.get("company"),
+        "categories": cats, "territory_cities": ([p.get("city")] if p.get("city") else []),
+        "territory_counties": ([p.get("county")] if p.get("county") else []), "territory_regions": [],
+        "coverage": p.get("coverage") or "city", "segment": None, "period_from": None, "period_to": None,
+        "exclusivity": False, "commission_terms": "DEMO — 8% din valoarea proiectelor convertite", "status": "demo",
+        "notes": "Acord demonstrativ, neobligatoriu. Valorile sunt sintetice.", "approved_by": None,
+        "acknowledged_conflicts": [], "created_at": _iso(60), "updated_at": _iso(60),
+    }
+    return {
+        "demo": True,
+        "partner": _serialize(p),
+        "stats": _compute_portal_stats(leads),
+        "leads": leads,
+        "catalog": catalog,
+        "agreement": agreement,
+        "user": {"name": user.get("name"), "email": user.get("email")},
+    }
+
+
+@partner_router.get("/portal")
+async def partner_portal(user=Depends(get_current_user)):
+    p = await _require_partner(user)
+    return await _assemble_portal(p, user.get("name"), user.get("email"))
+
+
+@partner_router.get("/portal/demo")
+async def partner_portal_demo(partner_id: str, user=Depends(get_current_user)):
+    """Super-admin preview of the portal with synthetic DEMO data — no access granted."""
+    _require_super(user)
+    try:
+        oid = ObjectId(partner_id)
+    except Exception:
+        raise HTTPException(400, "ID invalid.")
+    p = await db.city_partners.find_one({"_id": oid})
+    if not p:
+        raise HTTPException(404, "Partener inexistent.")
+    return _demo_portal(p, user)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

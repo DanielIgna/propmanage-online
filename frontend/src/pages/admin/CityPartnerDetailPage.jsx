@@ -6,7 +6,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Building2, ChevronLeft, ChevronRight, Loader2, CheckCircle2, Circle,
   Users, Plus, Mail, Phone, MapPin, TrendingUp, KeyRound, Copy, X,
-  AlertTriangle, Save, Edit3,
+  AlertTriangle, Save, Edit3, Shield, Power, Eye, Tags,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -137,6 +137,37 @@ const CityPartnerDetailPage = () => {
     try {
       const { data } = await ax.post(`/api/admin/city-partners/${id}/create-login`);
       setCreds(data);
+      load();
+    } catch (e) { alert(e.response?.data?.detail || e.message); }
+  };
+
+  const [saving, setSaving] = useState(false);
+  const [catsInput, setCatsInput] = useState("");
+  const [zonesInput, setZonesInput] = useState("");
+  useEffect(() => {
+    if (partner) {
+      setCatsInput((partner.categories || []).join(", "));
+      setZonesInput((partner.zones || []).join(", "));
+    }
+  }, [partner]);
+
+  const patchPartner = async (fields) => {
+    setSaving(true);
+    try {
+      const { data } = await ax.patch(`/api/admin/city-partners/${id}`, fields);
+      setPartner(data);
+    } catch (e) { alert(e.response?.data?.detail || e.message); }
+    finally { setSaving(false); }
+  };
+  const saveAuthorized = () => patchPartner({
+    categories: catsInput.split(",").map(s => s.trim()).filter(Boolean),
+    zones: zonesInput.split(",").map(s => s.trim()).filter(Boolean),
+  });
+  const setPortalAccess = async (enabled) => {
+    if (!enabled && !window.confirm(`Suspendezi accesul la portal pentru ${partner.company}?`)) return;
+    try {
+      const { data } = await ax.post(`/api/admin/city-partners/${id}/portal-access`, { enabled });
+      setPartner(data);
     } catch (e) { alert(e.response?.data?.detail || e.message); }
   };
 
@@ -223,6 +254,50 @@ const CityPartnerDetailPage = () => {
                 <div className="text-[10px] text-amber-700 dark:text-amber-300 mt-1">Trimite-o partenerului prin canal sigur. Email: <strong>{creds.email}</strong></div>
               </div>
             )}
+          </div>
+
+          {/* Acces portal & activare */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800" data-testid="activation-card">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5" /> Acces portal & activare
+            </div>
+
+            {/* Status comercial */}
+            <label className="block text-[11px] text-slate-500 mb-1">Status comercial</label>
+            <select value={partner.status} onChange={e => patchPartner({ status: e.target.value })} disabled={saving}
+              className="w-full px-3 py-2 mb-4 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="status-select">
+              {Object.keys(STATUS_META).map(s => <option key={s} value={s}>{STATUS_META[s].label}</option>)}
+            </select>
+
+            {/* Categorii & teritorii autorizate */}
+            <label className="block text-[11px] text-slate-500 mb-1 flex items-center gap-1"><Tags className="w-3 h-3" /> Categorii autorizate (separate prin virgulă)</label>
+            <input value={catsInput} onChange={e => setCatsInput(e.target.value)} placeholder="ex: Uși, Ferestre" className="w-full px-3 py-2 mb-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="auth-categories" />
+            <label className="block text-[11px] text-slate-500 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> Teritorii autorizate (separate prin virgulă)</label>
+            <input value={zonesInput} onChange={e => setZonesInput(e.target.value)} placeholder="ex: Mureș, Cluj" className="w-full px-3 py-2 mb-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="auth-territories" />
+            <button onClick={saveAuthorized} disabled={saving} className="w-full px-3 py-1.5 mb-4 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center justify-center gap-1.5 disabled:opacity-60" data-testid="save-authorized">
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Salvează categorii & teritorii
+            </button>
+
+            {/* Acces portal (kill-switch) */}
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] text-slate-500">Acces portal</span>
+                {partner.portal_access_enabled
+                  ? <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" data-testid="portal-access-state">Activ</span>
+                  : <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-700/40 dark:text-slate-400" data-testid="portal-access-state">Inactiv</span>}
+              </div>
+              {!partner.linked_user_id
+                ? <div className="text-[11px] text-slate-500 flex items-start gap-1.5"><AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" /> Creează întâi un cont de portal pentru a putea activa accesul.</div>
+                : partner.portal_access_enabled
+                  ? <button onClick={() => setPortalAccess(false)} className="w-full px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-medium flex items-center justify-center gap-1.5" data-testid="suspend-access"><Power className="w-3.5 h-3.5" /> Suspendă accesul</button>
+                  : <button onClick={() => setPortalAccess(true)} className="w-full px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium flex items-center justify-center gap-1.5" data-testid="reactivate-access"><Power className="w-3.5 h-3.5" /> Reactivează accesul</button>}
+            </div>
+
+            {/* Preview DEMO */}
+            <a href={`/partners/portal?demo=${id}`} target="_blank" rel="noreferrer" className="mt-4 w-full px-3 py-1.5 rounded-lg border border-cyan-300 dark:border-cyan-500/40 text-cyan-700 dark:text-cyan-300 text-xs font-medium flex items-center justify-center gap-1.5 hover:bg-cyan-50 dark:hover:bg-cyan-500/10" data-testid="preview-demo-portal">
+              <Eye className="w-3.5 h-3.5" /> Previzualizează portal (DEMO)
+            </a>
+            <p className="mt-2 text-[10px] text-slate-400 italic">Preview demonstrativ cu date sintetice. Nu creează cont și nu acordă acces real.</p>
           </div>
         </div>
 
