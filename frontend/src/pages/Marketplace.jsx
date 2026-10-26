@@ -80,112 +80,116 @@ export const PublicMarketplace = () => {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
-        <div className="pm-fade-in">
-          <PMChip variant="primary" className="mb-3">MARKETPLACE PROPMANAGE</PMChip>
-          <h1 className="font-serif text-4xl sm:text-6xl tracking-tight mb-3" data-testid="mkt-title">Specialiști verificați</h1>
-          <p className="text-stone-400 mb-6 max-w-xl">Descoperă cei mai buni profesioniști pentru proprietatea ta. Recenzii reale, plăți escrow, garanție lucrare.</p>
-          <div className="pm-card-glass !p-4 mb-8" data-testid="mkt-ecosystem-flow">
-            <EcosystemFlow dark compact activeKey="specialists" />
-          </div>
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
+        <div className="pm-fade-in max-w-2xl">
+          <PMChip variant="primary" className="mb-4">MARKETPLACE PROPMANAGE</PMChip>
+          <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl tracking-tight mb-4 leading-[1.05]" data-testid="mkt-title">
+            Specialiști verificați,<br /><span className="text-[var(--pm-primary)]">fără bătăi de cap</span>
+          </h1>
+          <p className="text-stone-400 text-base sm:text-lg leading-relaxed">
+            Descoperă profesioniști de încredere pentru proprietatea ta. Recenzii reale din lucrări finalizate,
+            plăți escrow securizate și garanție pe fiecare intervenție.
+          </p>
+        </div>
+
+        <div className="pm-card-glass !p-4 sm:!p-5 mt-8 mb-10" data-testid="mkt-ecosystem-flow">
+          <EcosystemFlow dark compact activeKey="specialists" />
         </div>
 
         <MarketplaceBenefitStrip />
 
         {/* Filters */}
-        <div className="pm-card-glass !p-4 mb-6 flex flex-wrap gap-3 items-center pm-fade-in-delay-1">
-          <select value={filters.category} onChange={e => setFilters({...filters, category: e.target.value})}
-            className="bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[var(--pm-primary)]/50" data-testid="mkt-cat">
-            <option value="">Toate categoriile</option>
-            <option value="hvac">HVAC</option>
-            <option value="electric">Electric</option>
-            <option value="plumbing">Sanitar</option>
-            <option value="other">Altele</option>
-          </select>
-          <label className="flex items-center gap-2 text-sm cursor-pointer px-4 py-2 bg-white/5 border border-white/10 rounded-full hover:bg-white/10 transition-colors">
-            <input type="checkbox" checked={filters.verified_only} onChange={e => setFilters({...filters, verified_only: e.target.checked})} className="rounded accent-[var(--pm-primary)]" data-testid="mkt-verified" />
-            <CheckCircle2 className="w-4 h-4 text-[var(--pm-primary)]" />
-            <span>Doar verificați</span>
-          </label>
-          <select value={filters.sort} onChange={e => setFilters({...filters, sort: e.target.value})}
-            className="bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm ml-auto focus:outline-none focus:border-[var(--pm-primary)]/50" data-testid="mkt-sort">
-            <option value="rating">Cele mai bune ratinguri</option>
-            <option value="reviews">Cele mai multe recenzii</option>
-            <option value="recent">Cei mai noi</option>
-          </select>
+        <div className="pm-card-glass !p-4 sm:!p-5 mt-10 mb-5 sticky top-3 z-20 pm-fade-in-delay-1" data-testid="mkt-filters">
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-stone-500 mr-1">
+              <Filter className="w-3.5 h-3.5" /> Filtre
+            </div>
+            <select value={filters.category} onChange={e => setFilters({...filters, category: e.target.value})}
+              className="bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[var(--pm-primary)]/50 transition-colors" data-testid="mkt-cat">
+              <option value="">Toate categoriile</option>
+              <option value="hvac">HVAC</option>
+              <option value="electric">Electric</option>
+              <option value="plumbing">Sanitar</option>
+              <option value="other">Altele</option>
+            </select>
+            <label className="flex items-center gap-2 text-sm cursor-pointer px-4 py-2 bg-white/5 border border-white/10 rounded-full hover:bg-white/10 transition-colors">
+              <input type="checkbox" checked={filters.verified_only} onChange={e => setFilters({...filters, verified_only: e.target.checked})} className="rounded accent-[var(--pm-primary)]" data-testid="mkt-verified" />
+              <CheckCircle2 className="w-4 h-4 text-[var(--pm-primary)]" />
+              <span>Doar verificați</span>
+            </label>
+            <select value={filters.sort} onChange={e => setFilters({...filters, sort: e.target.value})}
+              className="bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm ml-auto focus:outline-none focus:border-[var(--pm-primary)]/50 transition-colors" data-testid="mkt-sort">
+              <option value="rating">Cele mai bune ratinguri</option>
+              <option value="reviews">Cele mai multe recenzii</option>
+              <option value="recent">Cei mai noi</option>
+            </select>
+          </div>
         </div>
 
-        <div className="text-xs text-stone-500 mb-4">{loading ? "Se încarcă..." : `${visibleSpecialists.length} specialiști`}</div>
+        <div className="text-xs text-stone-500 mb-5" data-testid="mkt-count">{loading ? "Se încarcă..." : `${visibleSpecialists.length} ${visibleSpecialists.length === 1 ? "specialist disponibil" : "specialiști disponibili"}`}</div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 pm-fade-in-delay-2">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 pm-fade-in-delay-2">
           {visibleSpecialists.map((s, i) => (
             <motion.div key={s.id}
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-              <PMCard className="hover:!border-[var(--pm-primary)]/30 transition-all group h-full flex flex-col" testid={`mkt-card-${s.id}`}>
+              <PMCard className="hover:!border-[var(--pm-primary)]/40 hover:!-translate-y-0.5 transition-all duration-300 group h-full flex flex-col" testid={`mkt-card-${s.id}`}>
                 <div className="flex items-start gap-3 mb-4">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--pm-primary)] to-[var(--pm-primary-dim)] flex items-center justify-center font-bold text-black shrink-0 text-lg">
-                    {s.name?.[0]}
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--pm-primary)] to-[var(--pm-primary-dim)] flex items-center justify-center font-bold text-black shrink-0 text-xl">
+                    {s.name?.[0]?.toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 mb-0.5">
+                    <div className="flex items-center gap-1.5">
                       <div className="font-semibold truncate">{s.name}</div>
                       {s.verified && <CheckCircle2 className="w-4 h-4 text-[var(--pm-primary)] shrink-0 fill-[var(--pm-primary)]/20" />}
                     </div>
-                    <div className="text-xs text-stone-400 capitalize">{s.specialty || "Specialist"}</div>
+                    <div className="text-xs text-stone-400 capitalize truncate">{s.specialty || "Specialist"}</div>
+                    {s.zone && (
+                      <div className="flex items-center gap-1 text-[11px] text-stone-500 mt-0.5">
+                        <MapPin className="w-3 h-3 shrink-0" /><span className="truncate">{s.zone}</span>
+                      </div>
+                    )}
                   </div>
+                  {PUBLIC_TIERS.includes(String(s.tier || "").toUpperCase()) && <PMChip variant="primary">{s.tier}</PMChip>}
                 </div>
-                <div className="flex items-center gap-2 text-xs mb-4 flex-wrap flex-1">
-                  {s.trust?.trust_score != null && (
-                    <div className="flex items-center gap-1 bg-[var(--pm-primary)]/10 border border-[var(--pm-primary)]/30 text-[var(--pm-primary)] px-2.5 py-1 rounded-full" data-testid={`mkt-trust-score-${s.id}`}>
-                      <span className="font-black">Trust {s.trust.trust_score}</span>
-                      <span className="opacity-70">/100</span>
-                    </div>
-                  )}
-                  {(s.trust?.confirmed_jobs || 0) > 0 && (
-                    <div className="flex items-center gap-1 bg-sky-500/15 border border-sky-500/30 text-sky-300 px-2.5 py-1 rounded-full" data-testid={`mkt-confirmed-${s.id}`}>
-                      <span className="font-semibold">{s.trust.confirmed_jobs}</span>
-                      <span className="opacity-70">lucrări confirmate</span>
-                    </div>
-                  )}
-                  {(s.trust?.ambassadors || 0) > 0 && (
-                    <div className="flex items-center gap-1 bg-violet-500/15 border border-violet-500/30 text-violet-300 px-2.5 py-1 rounded-full" data-testid={`mkt-ambassadors-${s.id}`}>
-                      <span>🏅</span>
-                      <span className="font-semibold">{s.trust.ambassadors}</span>
-                      <span className="opacity-70">{s.trust.ambassadors === 1 ? "ambasador" : "ambasadori"}</span>
-                    </div>
-                  )}
-                  {(s.trust?.community_value || 0) > 0 && (
-                    <div className="flex items-center gap-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-2.5 py-1 rounded-full" data-testid={`mkt-community-value-${s.id}`}>
-                      <span className="font-semibold">{s.trust.community_value} RON</span>
-                      <span className="opacity-70">beneficii generate comunității</span>
-                    </div>
-                  )}
-                  {s.trust?.rebook_show && (
-                    <div className="flex items-center gap-1 bg-rose-500/15 border border-rose-500/30 text-rose-300 px-2.5 py-1 rounded-full" data-testid={`mkt-rebook-${s.id}`}>
-                      <span>❤️</span>
-                      <span className="font-semibold">{s.trust.rebook_pct}%</span>
-                      <span className="opacity-70">ar angaja din nou</span>
-                    </div>
-                  )}
-                  {(s.trust?.recommenders || 0) > 0 && (
-                    <div className="flex items-center gap-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-2.5 py-1 rounded-full" data-testid={`mkt-recommenders-${s.id}`}>
-                      <span className="font-semibold">{s.trust.recommenders}</span>
-                      <span className="opacity-70">{s.trust.recommenders === 1 ? "proprietar recomandă" : "proprietari recomandă"}</span>
-                    </div>
-                  )}
+
+                {/* primary stat row */}
+                <div className="flex items-center gap-2 flex-wrap mb-3">
                   {(s.reviews_count || 0) >= 1 ? (
-                    <div className="flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 text-amber-300 px-2.5 py-1 rounded-full">
+                    <div className="flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 text-amber-300 px-2.5 py-1 rounded-full text-xs" data-testid={`mkt-rating-${s.id}`}>
                       <Star className="w-3 h-3 fill-current" />
                       <span className="font-semibold">{s.rating || "—"}</span>
                       <span className="opacity-70">({s.reviews_count})</span>
                     </div>
                   ) : (
-                    <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-stone-400" data-testid={`mkt-new-${s.id}`}>Nou pe platformă</span>
+                    <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-stone-400 text-xs" data-testid={`mkt-new-${s.id}`}>Nou pe platformă</span>
                   )}
-                  {PUBLIC_TIERS.includes(String(s.tier || "").toUpperCase()) && <PMChip variant="primary">{s.tier}</PMChip>}
+                  {s.trust?.trust_score != null && (
+                    <div className="flex items-center gap-1 bg-[var(--pm-primary)]/10 border border-[var(--pm-primary)]/30 text-[var(--pm-primary)] px-2.5 py-1 rounded-full text-xs" data-testid={`mkt-trust-score-${s.id}`}>
+                      <span className="font-black">Trust {s.trust.trust_score}</span>
+                      <span className="opacity-70">/100</span>
+                    </div>
+                  )}
                 </div>
-                <Link to={`/specialists/${s.id}`} className="block" data-testid={`mkt-view-${s.id}`}>
-                  <PMPillButton variant="ghost" className="w-full">
+
+                {/* secondary muted signals — fixed height keeps cards uniform */}
+                <div className="text-xs text-stone-400 space-y-1 mb-5 min-h-[2.5rem]">
+                  {(s.trust?.confirmed_jobs || 0) > 0 && (
+                    <div data-testid={`mkt-confirmed-${s.id}`}>
+                      <span className="text-stone-200 font-semibold">{s.trust.confirmed_jobs}</span> lucrări confirmate
+                    </div>
+                  )}
+                  {(s.trust?.recommenders || 0) > 0 && (
+                    <div data-testid={`mkt-recommenders-${s.id}`}>
+                      <span className="text-stone-200 font-semibold">{s.trust.recommenders}</span> {s.trust.recommenders === 1 ? "proprietar recomandă" : "proprietari recomandă"}
+                    </div>
+                  )}
+                  {(s.trust?.confirmed_jobs || 0) === 0 && (s.trust?.recommenders || 0) === 0 && (
+                    <div className="text-stone-500">Profil nou — fii primul care colaborează</div>
+                  )}
+                </div>
+
+                <Link to={`/specialists/${s.id}`} className="block mt-auto" data-testid={`mkt-view-${s.id}`}>
+                  <PMPillButton variant="ghost" className="w-full group-hover:!bg-[var(--pm-primary)]/10">
                     Vezi profil
                   </PMPillButton>
                 </Link>
@@ -203,13 +207,28 @@ export const PublicMarketplace = () => {
             />
           ) : (
             /* GBOS P0 — marketplace-ul nu arată niciodată „gol": early access onest */
-            <div className="pm-card-glass !p-8 sm:!p-12 text-center" data-testid="mkt-early-access">
-              <PMChip variant="primary" className="mb-4">EARLY ACCESS</PMChip>
-              <h2 className="font-serif text-3xl sm:text-4xl mb-3">Construim rețeaua de încredere, oraș cu oraș</h2>
-              <p className="text-stone-400 max-w-xl mx-auto mb-8">
+            <div className="pm-card-glass !p-8 sm:!p-14 text-center relative overflow-hidden" data-testid="mkt-early-access">
+              <PMChip variant="primary" className="mb-5">EARLY ACCESS</PMChip>
+              <h2 className="font-serif text-3xl sm:text-4xl mb-4 max-w-2xl mx-auto leading-tight">Construim rețeaua de încredere, oraș cu oraș</h2>
+              <p className="text-stone-400 text-base max-w-xl mx-auto mb-10 leading-relaxed">
                 Primii specialiști intră pe platformă prin recomandările proprietarilor — nu prin reclame.
                 Fiecare profil vine cu recenzii verificate din lucrări reale, plăți escrow și garanție.
               </p>
+              <div className="grid sm:grid-cols-3 gap-4 max-w-2xl mx-auto mb-10 text-left">
+                {[
+                  { icon: Shield, t: "Plăți escrow", d: "Banii se eliberează doar la finalizarea lucrării" },
+                  { icon: CheckCircle2, t: "Recenzii verificate", d: "Doar din lucrări reale, confirmate de proprietari" },
+                  { icon: Star, t: "Garanție lucrare", d: "Protecție pe fiecare intervenție realizată" },
+                ].map(({ icon: Ic, t, d }) => (
+                  <div key={t} className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                    <div className="w-9 h-9 rounded-xl bg-[var(--pm-primary)]/15 flex items-center justify-center mb-3">
+                      <Ic className="w-4 h-4 text-[var(--pm-primary)]" />
+                    </div>
+                    <div className="font-semibold text-sm mb-1">{t}</div>
+                    <div className="text-xs text-stone-400 leading-relaxed">{d}</div>
+                  </div>
+                ))}
+              </div>
               <div className="flex flex-wrap justify-center gap-3">
                 <Link to="/register?role=specialist" data-testid="mkt-ea-specialist">
                   <PMPillButton variant="primary">Sunt specialist — vreau primele cereri</PMPillButton>

@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import APIRouter
 
 from db import db
+from seo_gate import PUBLIC_SPECIALIST_EXCLUDE
 # (models import * removed — no symbols from models are used in this file)
 
 logger = logging.getLogger(__name__)
@@ -29,7 +30,8 @@ async def public_marketplace(
       - city:     expands to ALL zones inside that city (uses regions collection).
       - style:    matches at least one portfolio item with that style.
     """
-    q = {"role": "specialist", "deleted": {"$ne": True}, "medic_suspended": {"$ne": True}}
+    q = {"role": "specialist", "deleted": {"$ne": True}, "medic_suspended": {"$ne": True},
+         **PUBLIC_SPECIALIST_EXCLUDE}
     if category:
         q["$or"] = [{"specialty": category}, {"service_categories": category}]
     if verified_only:
@@ -235,7 +237,7 @@ async def public_marketplace(
 @router.get("/marketplace/filters")
 async def marketplace_filters(category: Optional[str] = None):
     """Returns available zones + styles for filter dropdowns (scoped by category if provided)."""
-    spec_query = {"role": "specialist", "deleted": {"$ne": True}}
+    spec_query = {"role": "specialist", "deleted": {"$ne": True}, **PUBLIC_SPECIALIST_EXCLUDE}
     if category:
         spec_query["$or"] = [{"specialty": category}, {"service_categories": category}]
     zones = await db.users.distinct("coverage_zones", spec_query)

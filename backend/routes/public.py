@@ -473,6 +473,8 @@ from seo_slugs import (  # noqa: E402
 from seo_gate import (  # noqa: E402
     gate_service_city,
     specialist_is_indexable,
+    is_test_account,
+    PUBLIC_SPECIALIST_EXCLUDE,
     decision as _gate_decision,
 )
 from seo_guides import GUIDE_SLUGS  # noqa: E402
@@ -523,6 +525,7 @@ async def _count_verified_specialists(category_db: str, city_db=None, zones_cach
     q = {
         "role": "specialist", "verified": True, "deleted": {"$ne": True},
         "$or": [{"specialty": category_db}, {"service_categories": category_db}],
+        **PUBLIC_SPECIALIST_EXCLUDE,
     }
     if city_db:
         if zones_cache is not None:
@@ -695,7 +698,7 @@ async def _specialist_entries(now_iso: str) -> list:
          "rating": 1, "bio": 1, "about": 1, "portfolio": 1, "verified": 1, "deleted": 1},
     ).limit(5000)
     async for u in cursor:
-        if not specialist_is_indexable(u):
+        if is_test_account(u) or not specialist_is_indexable(u):
             continue
         spec_id = str(u["_id"])
         lastmod = u.get("updated_at") or u.get("created_at")
@@ -930,6 +933,7 @@ async def specialist_local_stats(trade: str, loc: str = "cluj-napoca"):
     cluj_specialist = {
         "role": "specialist", "verified": True, "deleted": {"$ne": True},
         "$or": [{"county": {"$regex": "Cluj", "$options": "i"}}],
+        **PUBLIC_SPECIALIST_EXCLUDE,
     }
     if zones:
         cluj_specialist["$or"].append({"coverage_zones": {"$in": zones}})

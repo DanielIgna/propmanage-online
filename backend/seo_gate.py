@@ -13,8 +13,39 @@ Only gate-passing URLs are emitted in the sitemap.
 """
 from __future__ import annotations
 
+import re
+
 MIN_SPECIALISTS_SERVICE_CITY = 3
 MIN_LISTINGS_ESTATE_HUB = 1
+
+# Internal / QA / demo accounts must never surface in PUBLIC specialist listings
+# (marketplace, filters, sitemaps). Real signups use real email domains, so excluding
+# internal domains + demo/seed flags cleans the listings without touching any data.
+# NOTE: this does NOT affect request/lead creation — owners can still post requests
+# (open-request model) so demand keeps being measured even with an empty marketplace.
+TEST_EMAIL_RE = re.compile(
+    r"(^(test[_\-]|qa[_\-]|wv-test|specnew|pending@))"
+    r"|(@(propmanage\.io|test\.com|test\.io|test\.ro|example\.com)$)",
+    re.IGNORECASE,
+)
+
+
+def is_test_account(u: dict) -> bool:
+    """True for QA/demo/seed specialist accounts that must stay out of public lists."""
+    if not u:
+        return False
+    if u.get("is_demo_account") or u.get("_seed_tag") or u.get("_tier_demo"):
+        return True
+    return bool(TEST_EMAIL_RE.search(u.get("email") or ""))
+
+
+# Mongo query fragment: merge into any specialists query to drop test/demo/QA accounts.
+PUBLIC_SPECIALIST_EXCLUDE = {
+    "is_demo_account": {"$ne": True},
+    "_seed_tag": {"$exists": False},
+    "_tier_demo": {"$in": [None, False]},
+    "email": {"$not": TEST_EMAIL_RE},
+}
 
 
 def decision(index: bool, canonical: str | None = None, reason: str = "") -> dict:
