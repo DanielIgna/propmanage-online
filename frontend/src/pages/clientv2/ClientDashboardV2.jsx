@@ -41,6 +41,10 @@ export default function ClientDashboardV2() {
   useMobileDock(64);
   const navigate = useNavigate();
   const { user, refreshUser, logout } = useAuth();
+  // Guest guard: trimite vizitatorii neautentificați la login, cu revenire pe /client.
+  useEffect(() => {
+    if (user === false) navigate(`/login?next=${encodeURIComponent("/client")}`, { replace: true });
+  }, [user, navigate]);
   const flowOpenedRef = useRef(false);
   const [loaded, setLoaded] = useState(false);
   const [properties, setProperties] = useState([]);

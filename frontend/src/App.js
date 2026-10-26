@@ -34,6 +34,7 @@ import { GhiduriIndex } from "./pages/GhiduriIndex";
 import { GhidPage } from "./pages/GhidPage";
 const BlogIndex = lazy(() => import("./pages/BlogIndex"));
 const ArticlePage = lazy(() => import("./pages/ArticlePage"));
+const ServiciiOverview = lazy(() => import("./pages/ServiciiOverview"));
 const IrenesWorldPage = lazy(() => import("./pages/IrenesWorldPage"));
 import { ProblemeIndex } from "./pages/ProblemeIndex";
 import { ProblemaPage } from "./pages/ProblemaPage";
@@ -1772,6 +1773,9 @@ function App() {
               <Route path="/servicii/:id" element={<ServiceProvidersPage />} />
               <Route path="/imobile-verificate" element={<EstateBrowse />} />
               <Route path="/de-ce-noi" element={<WhyUsPage />} />
+              <Route path="/despre-noi" element={<Navigate to="/de-ce-noi" replace />} />
+              <Route path="/servicii" element={<ServiciiOverview />} />
+              <Route path="/mobilier" element={<Navigate to="/servicii/mobilier" replace />} />
               <Route path="/imobile-verificate/sell" element={<SellMyProperty />} />
               <Route path="/admin/imobile-verificate" element={<VerifiedEstateAdmin />} />
               <Route path="/admin/settings-control" element={<AdminSettingsControl />} />

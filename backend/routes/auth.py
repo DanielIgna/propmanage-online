@@ -151,6 +151,9 @@ async def register(data: RegisterIn, request: Request, response: Response):
         user["specialty"] = data.specialty or cats[0]
         user["service_categories"] = cats
         user["coverage_zones"] = data.coverage_zones or []
+        _other_zone = (data.other_zone or "").strip()
+        if _other_zone:
+            user["other_zone"] = _other_zone[:200]
         user["availability_status"] = "available"
         user["documents"] = []
     elif data.role == "client":

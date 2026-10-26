@@ -7116,3 +7116,15 @@ Testat în preview: pagina se încarcă, click → „32 emailuri repuse în coa
 **Data Integrity — financiar CLEAN:** wallet↔tranzacții=0, solduri negative=0, proprietăți fără owner=0, emailuri duplicate=0, twins orfane=0, dispute active pe cereri închise=0.
 **Anomalii legacy/demo rămase (NEmodificate per reguli B/C/J — fără ștergere/invenție):** cereri→proprietate inexistentă=5 (WARN), cereri→user inexistent=1 (CRIT), dispute→cerere inexistentă=14 (CRIT). Toate = referințe orfane din fixture/demo (resetate nightly de demo_reset), zero impact financiar. Nu există mecanism sigur de archive pentru requests/disputes (doar pentru twins) → raportate ca known legacy anomalies.
 **NESCHIMBAT:** HartaBlocuri/import/Truth Layer/SEO/sitemap/Marketplace/House Health/Digital Twin/GIS/Google Maps/robots/OAuth. Fără deploy/publish.
+
+---
+
+## Public Routes & Auth UX Fixes — 2026-06
+**Status:** IMPLEMENTAT + VERIFICAT (screenshots + curl live preview).
+- **/marketplace reparat:** cauză = serviciul `specialisti` era `active=False` → `ServiceGate` redirecta non-adminii la `/`. Fix: migrare `site_menu` v2→v3 (`_activate_service_v3`) + `SERVICE_DEFAULTS.specialisti.active=True`. Acum `/marketplace` afișează marketplace-ul complet (98 specialiști, filtre meserie/zonă/rating, toggle "Doar verificați"). `MENU_VERSION=3` (migrare non-distructivă, idempotentă).
+- **Rute publice lipsă:** `/servicii` → pagină nouă `ServiciiOverview.jsx` (listă servicii active din site-menu); `/despre-noi` → redirect `/de-ce-noi`; `/mobilier` → redirect `/servicii/mobilier`.
+- **/client guest guard:** vizitatorii neautentificați → redirect `/login?next=/client` (fără `alert("Not authenticated")`).
+- **Validare Login/Register:** hint-uri inline "Email invalid" (login + register) + "Parola minim 6 caractere" (register); buton "Creează cont" dezactivat până email valid + parolă ≥6.
+- **"Altă zonă" (specialist):** câmp text opțional (`other_zone`, max 200) afișat când se alege "Altă zonă"; stocat pe user la register. Model `RegisterIn.other_zone`.
+- **Admin SPA nav:** verificat LIVE — UTILIZATORI + subsecțiuni (Toți userii, Verificare specialiști, KYC, Beta Testers) comută corect conținutul. Bug raportat NEreproductibil în build-ul curent (probabil deploy prod vechi) → se rezolvă la următorul publish.
+**NESCHIMBAT:** restul platformei (admin modules, SEO, HartaBlocuri, Digital Twin, OAuth, payments).

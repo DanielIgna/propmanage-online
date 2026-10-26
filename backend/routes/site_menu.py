@@ -17,7 +17,7 @@ logger = logging.getLogger("propmanage.site_menu")
 
 # visibility: "all" | "guests" (doar vizitatori) | "auth" (doar autentificați)
 # dest_type (servicii): "internal" | "marketplace" | "external" | "none"
-MENU_VERSION = 2
+MENU_VERSION = 3
 
 
 def _svc(id, label, href, icon, *, active, category, description, dest_type="internal", providers=None):
@@ -53,8 +53,8 @@ SERVICE_DEFAULTS = [
     _svc("amenajari", "Amenajări", "/marketplace?categorie=amenajari", "Brush",
          active=False, category="executie", dest_type="marketplace", description="Amenajări interioare și exterioare."),
     _svc("specialisti", "Specialiști", "/marketplace", "Users",
-         active=False, category="marketplace", dest_type="marketplace",
-         description="Marketplace-ul de specialiști verificați — în dezvoltare, se activează din Admin când e complet."),
+         active=True, category="marketplace", dest_type="marketplace",
+         description="Marketplace-ul de specialiști verificați — meseriași cu KYC, rating și istoric real."),
     _svc("consultanta", "Consultanță", "/marketplace?categorie=consultanta", "MessageCircle",
          active=False, category="servicii", dest_type="marketplace", description="Consultanță tehnică și imobiliară."),
 ]
@@ -151,15 +151,30 @@ async def _get_menu_doc() -> dict:
         await db.site_menu.insert_one(dict(doc))
         return doc
     if (doc.get("version") or 1) < MENU_VERSION:
-        doc["items"] = _upgrade_items_v2(doc.get("items") or [])
+        ver = doc.get("version") or 1
+        items = doc.get("items") or []
+        if ver < 2:
+            items = _upgrade_items_v2(items)
+        if ver < 3:
+            items = _activate_service_v3(items, "specialisti")
+        doc["items"] = items
         doc["version"] = MENU_VERSION
         await db.site_menu.update_one(
             {"key": "main"},
             {"$set": {"items": doc["items"], "version": MENU_VERSION,
                       "updated_at": datetime.now(timezone.utc).isoformat(),
-                      "updated_by": "migration:service_manager_v2"}})
-        logger.info("[site-menu] migrat la v2 (Service Manager + config Beta)")
+                      "updated_by": "migration:site_menu_v3"}})
+        logger.info("[site-menu] migrat la v%s (marketplace specialiști activ)", MENU_VERSION)
     return doc
+
+
+def _activate_service_v3(items: list, service_id: str) -> list:
+    """v2→v3: activează public marketplace-ul de specialiști fără a atinge restul config-ului."""
+    svc = _find_service(items, service_id)
+    if svc:
+        svc["active"] = True
+        svc["visible_site"] = True
+    return items
 
 
 def _upgrade_items_v2(items: list) -> list:

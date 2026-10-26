@@ -25,6 +25,7 @@ class RegisterIn(BaseModel):
     specialty: Optional[str] = None
     service_categories: Optional[List[str]] = None
     coverage_zones: Optional[List[str]] = None
+    other_zone: Optional[str] = None
     zone: Optional[str] = None
     referrer_id: Optional[str] = None
     # GDPR consent — terms + privacy MUST be True for register to succeed

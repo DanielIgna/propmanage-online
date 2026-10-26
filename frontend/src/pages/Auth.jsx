@@ -109,6 +109,9 @@ export const LoginPage = () => {
                 placeholder="name@example.com"
                 data-testid="login-email"
               />
+              {email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && (
+                <div className="text-[11px] text-red-400 mt-1" data-testid="login-email-hint">Email invalid</div>
+              )}
             </div>
             <div>
               <label className="text-xs uppercase tracking-wider text-stone-400 mb-1.5 block">{t("common.password")}</label>
@@ -208,6 +211,7 @@ export const RegisterPage = () => {
     specialty: _inviteCategory || "hvac",
     service_categories: [_inviteCategory || "hvac"],
     coverage_zones: ["national"],
+    other_zone: "",
     zone: "bucuresti",
     referrer_id: referrerId || undefined,
     terms_accepted: false,
@@ -346,12 +350,18 @@ export const RegisterPage = () => {
               <input type="email" required value={form.email} onChange={e => setForm({...form, email: e.target.value})}
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#d4ff3a]/50"
                 data-testid="register-email" />
+              {form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) && (
+                <div className="text-[11px] text-red-400 mt-1" data-testid="register-email-hint">Email invalid</div>
+              )}
             </div>
             <div>
               <label className="text-xs uppercase tracking-wider text-stone-400 mb-1.5 block">{t("common.password")}</label>
               <input type="password" required minLength={6} value={form.password} onChange={e => setForm({...form, password: e.target.value})}
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#d4ff3a]/50"
                 data-testid="register-password" />
+              {form.password && form.password.length < 6 && (
+                <div className="text-[11px] text-red-400 mt-1" data-testid="register-password-hint">Parola trebuie să aibă minim 6 caractere</div>
+              )}
             </div>
             <div>
               <label className="text-xs uppercase tracking-wider text-stone-400 mb-1.5 block">Telefon {form.role === "specialist" ? <span className="text-red-400">*</span> : <span className="text-stone-500 lowercase">(opțional)</span>}</label>
@@ -421,6 +431,20 @@ export const RegisterPage = () => {
                   <div className="mt-2 text-[11px] text-stone-400">
                     Alege reședința/reședințele de județ unde lucrezi, „La nivel național" sau „Altă zonă" dacă acoperi altceva — te putem contacta ulterior.
                   </div>
+                  {form.coverage_zones.includes("alta-zona") && (
+                    <div className="mt-3">
+                      <label className="text-xs uppercase tracking-wider text-stone-400 mb-1.5 block">
+                        Unde lucrezi exact? <span className="text-stone-600">(opțional)</span>
+                      </label>
+                      <input type="text" value={form.other_zone}
+                        onChange={e => setForm({ ...form, other_zone: e.target.value })}
+                        placeholder="Ex: Valea Prahovei, zona Brașov–Predeal, sat/comună…"
+                        maxLength={200}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#d4ff3a]/50"
+                        data-testid="register-other-zone" />
+                      <div className="text-[10px] text-stone-500 mt-1">Ne ajută să știm exact unde activezi, ca să-ți trimitem cereri relevante.</div>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -470,7 +494,7 @@ export const RegisterPage = () => {
               </label>
             </div>
 
-            <button type="submit" disabled={loading || !form.terms_accepted || !form.privacy_policy_accepted || (form.role === "specialist" && !form.phone) || !form.name || !form.email} className="btn-accent w-full py-3 rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed" data-testid="register-submit">
+            <button type="submit" disabled={loading || !form.terms_accepted || !form.privacy_policy_accepted || (form.role === "specialist" && !form.phone) || !form.name || !form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) || form.password.length < 6} className="btn-accent w-full py-3 rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed" data-testid="register-submit">
               {loading ? t("common.loading") : t("register.submit")}
             </button>
           </form>
