@@ -298,6 +298,55 @@ async def accept_offer(req_id: str, offer_id: str, user: dict = Depends(require_
     except Exception as e:  # noqa: BLE001
         logger.warning("[house_health] commission capture failed for req=%s: %s", req_id, e)
 
+    # City Partner referral attribution — eligible commission is recorded ONLY now,
+    # at the sale (offer accepted = serviciu vândut), never on a mere request.
+    # Reuses the existing city_partner_leads mechanism (stage "converted"); revenue is
+    # left at 0 for the Admin to confirm from the real offer/project value. The actual
+    # commission amount follows each partner's editable working model (percentage / fee /
+    # subscription / custom) configured on the partner profile — no fixed % is applied here.
+    try:
+        rp_id = req.get("referred_partner_id")
+        if rp_id and ObjectId.is_valid(rp_id):
+            p_oid = ObjectId(rp_id)
+            existing = await db.city_partner_leads.find_one({"partner_id": p_oid, "origin_request_id": req_id})
+            lead_fields = {
+                "partner_id": p_oid,
+                "lead_name": req.get("client_name") or "Client referit",
+                "source": "referral_link",
+                "stage": "converted",
+                "conversion_date": now_iso,
+                "revenue_generated": 0,  # Admin confirmă valoarea reală ulterior
+                "origin_request_id": req_id,
+                "origin_zone": req.get("coverage_zone"),
+                "commission_status": "eligible",
+                "notes": f"Vânzare eligibilă din cerere referită: {req.get('title','')}".strip(),
+                "updated_at": now_iso,
+            }
+            if existing:
+                await db.city_partner_leads.update_one({"_id": existing["_id"]}, {"$set": lead_fields})
+                lead_doc = {**existing, **lead_fields}
+            else:
+                lead_fields["introduced_at"] = now_iso
+                lead_fields["created_at"] = now_iso
+                ins = await db.city_partner_leads.insert_one(lead_fields)
+                lead_fields["_id"] = ins.inserted_id
+                lead_doc = lead_fields
+            await db.requests.update_one(
+                {"_id": ObjectId(req_id)},
+                {"$set": {
+                    "referred_partner_commission_status": "eligible",
+                    "referred_partner_lead_id": str(lead_doc["_id"]),
+                    "referred_partner_converted_at": now_iso,
+                }},
+            )
+            try:
+                from leads_store import sync_lead
+                await sync_lead("city_partner", lead_doc)
+            except Exception:  # noqa: BLE001
+                pass
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[city_partner] referral attribution failed for req=%s: %s", req_id, e)
+
     return {"ok": True, "specialist_id": offer["specialist_id"], "specialist_name": offer.get("specialist_name", "")}
 
 

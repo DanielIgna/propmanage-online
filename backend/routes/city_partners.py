@@ -92,6 +92,26 @@ ALLOWED_LEAD_STAGES = {"introduced", "contacted", "onboarded", "converted", "los
 ALLOWED_PARTNER_TYPES = {"studio", "city", "regional", "national", "supplier", "brand", "specialist"}
 ALLOWED_COVERAGE = {"city", "regional", "national"}
 
+# Per-partner commission / working model (editable from Admin). Flexible by design:
+# different partners may work on a % of value, an annual subscription, a flat fee, or custom terms.
+ALLOWED_COMMISSION_MODELS = {"percentage", "subscription", "fee", "custom"}
+ALLOWED_COMMISSION_BASES = {"project_value", "benefit"}
+DEFAULT_COMMISSION = {"model": "percentage", "rate": 5.0, "basis": "project_value", "notes": None}
+
+
+def _clean_commission(c) -> dict:
+    """Normalize + validate a partner commission config. Falls back to defaults."""
+    if not isinstance(c, dict):
+        return dict(DEFAULT_COMMISSION)
+    model = c.get("model") if c.get("model") in ALLOWED_COMMISSION_MODELS else "percentage"
+    basis = c.get("basis") if c.get("basis") in ALLOWED_COMMISSION_BASES else ("project_value" if model == "percentage" else None)
+    rate = c.get("rate")
+    try:
+        rate = round(float(rate), 2) if rate is not None else None
+    except (TypeError, ValueError):
+        rate = None
+    return {"model": model, "rate": rate, "basis": basis, "notes": (c.get("notes") or None)}
+
 ONBOARDING_STEPS = [
     "Prezentare oficială",
     "Introducere în ecosistem",
@@ -228,6 +248,7 @@ def _serialize(doc: dict) -> dict:
         "materials": doc.get("materials") or [],
         "projects": doc.get("projects") or [],
         "notes": doc.get("notes"),
+        "commission": _clean_commission(doc.get("commission")),
         "created_at": doc.get("created_at"),
         "updated_at": doc.get("updated_at"),
     }
@@ -292,6 +313,7 @@ class PartnerCreate(BaseModel):
     origin_confirmed: Optional[bool] = None
     coverage_confirmed: Optional[bool] = None
     collaboration_metrics: Optional[dict] = None
+    commission: Optional[dict] = None
 
 
 class PartnerPatch(BaseModel):
@@ -329,6 +351,7 @@ class PartnerPatch(BaseModel):
     origin_confirmed: Optional[bool] = None
     coverage_confirmed: Optional[bool] = None
     collaboration_metrics: Optional[dict] = None
+    commission: Optional[dict] = None
 
 
 class OnboardingStepUpdate(BaseModel):
@@ -416,6 +439,8 @@ async def partner_meta(user=Depends(get_current_user)):
         "partner_types": sorted(ALLOWED_PARTNER_TYPES),
         "coverage_levels": sorted(ALLOWED_COVERAGE),
         "client_coverage_zones": zones_list(),
+        "commission_models": sorted(ALLOWED_COMMISSION_MODELS),
+        "commission_bases": sorted(ALLOWED_COMMISSION_BASES),
     }
 
 
@@ -487,6 +512,7 @@ async def create_partner(payload: PartnerCreate, user=Depends(get_current_user))
         "origin_confirmed": bool(payload.origin_confirmed),
         "coverage_confirmed": bool(payload.coverage_confirmed),
         "collaboration_metrics": payload.collaboration_metrics or {},
+        "commission": _clean_commission(payload.commission),
         "created_at": now,
         "updated_at": now,
         "created_by": user.get("email"),
@@ -604,6 +630,8 @@ async def patch_partner(partner_id: str, payload: PartnerPatch, user=Depends(get
         raise HTTPException(400, "coverage invalid")
     if "contact_email" in update:
         update["contact_email"] = str(update["contact_email"]).lower()
+    if "commission" in update:
+        update["commission"] = _clean_commission(update["commission"])
     update["updated_at"] = datetime.now(timezone.utc).isoformat()
     res = await db.city_partners.find_one_and_update({"_id": oid}, {"$set": update}, return_document=True)
     if not res:

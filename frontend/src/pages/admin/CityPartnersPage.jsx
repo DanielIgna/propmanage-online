@@ -71,6 +71,10 @@ const PartnerForm = ({ initial, onSave, onClose, saving }) => {
     collaboration_agreed: !!initial?.collaboration_agreed,
     origin_confirmed: !!initial?.origin_confirmed,
     coverage_confirmed: !!initial?.coverage_confirmed,
+    comm_model: initial?.commission?.model || "percentage",
+    comm_rate: initial?.commission?.rate ?? 5,
+    comm_basis: initial?.commission?.basis || "project_value",
+    comm_notes: initial?.commission?.notes || "",
     notes: initial?.notes || "",
   }));
   const set = (k, v) => setF(x => ({ ...x, [k]: v }));
@@ -85,6 +89,14 @@ const PartnerForm = ({ initial, onSave, onClose, saving }) => {
       services: toArr(f.services),
       applications: toArr(f.applications),
     };
+    // Build editable per-partner commission / working model.
+    payload.commission = {
+      model: f.comm_model,
+      rate: f.comm_rate === "" || f.comm_rate === null ? null : Number(f.comm_rate),
+      basis: f.comm_model === "percentage" ? f.comm_basis : null,
+      notes: f.comm_notes || null,
+    };
+    ["comm_model", "comm_rate", "comm_basis", "comm_notes"].forEach(k => delete payload[k]);
     // Optional email: never send an empty string (fails EmailStr validation).
     if (!payload.contact_email) delete payload.contact_email;
     onSave(payload);
@@ -187,6 +199,39 @@ const PartnerForm = ({ initial, onSave, onClose, saving }) => {
               <input type="checkbox" checked={f.coverage_confirmed} onChange={e => set("coverage_confirmed", e.target.checked)} data-testid="partner-field-coverage_confirmed" />
               Acoperire comercială confirmată
             </label>
+          </div>
+          <div className="sm:col-span-2 rounded-xl border border-slate-200 dark:border-slate-800 p-3 bg-slate-50/60 dark:bg-slate-800/30" data-testid="partner-commission-section">
+            <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">Comision & mod de lucru <span className="font-normal text-slate-400">(editabil per partener)</span></div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">Model</label>
+                <select value={f.comm_model} onChange={e => set("comm_model", e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="partner-field-comm_model">
+                  <option value="percentage">Procent (%)</option>
+                  <option value="fee">Fee fix</option>
+                  <option value="subscription">Abonament anual</option>
+                  <option value="custom">Personalizat</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                  {f.comm_model === "percentage" ? "Procent (%)" : f.comm_model === "subscription" ? "Valoare / an" : f.comm_model === "fee" ? "Fee (RON)" : "Valoare"}
+                </label>
+                <input type="number" step="0.01" min="0" value={f.comm_rate} onChange={e => set("comm_rate", e.target.value)}
+                  placeholder={f.comm_model === "percentage" ? "ex: 5" : "ex: 1200"}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="partner-field-comm_rate" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">Bază calcul</label>
+                <select value={f.comm_basis} onChange={e => set("comm_basis", e.target.value)} disabled={f.comm_model !== "percentage"}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm disabled:opacity-50" data-testid="partner-field-comm_basis">
+                  <option value="project_value">Din valoarea proiectului</option>
+                  <option value="benefit">Din beneficiu</option>
+                </select>
+              </div>
+            </div>
+            <input value={f.comm_notes} onChange={e => set("comm_notes", e.target.value)} placeholder="Termeni / mod de lucru agreat (opțional)"
+              className="w-full mt-3 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="partner-field-comm_notes" />
           </div>
           <div className="sm:col-span-2">
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Note interne</label>

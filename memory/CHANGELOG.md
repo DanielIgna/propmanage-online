@@ -301,3 +301,15 @@ Implementat:
 Neatins: NZEB_CATEGORIES (toate zonele mapează pe categorii existente — nicio categorie nouă necesară), reguli comision/procente, flux referral existent, taxonomie construcții, Design Interior, home, cont client.
 
 Verificare: endpoint-uri 200 (zones=7, match ok, admin coverage-overview=7 zone); logica de matching + referral verificată end-to-end cu partener tranzitoriu activ Cluj (șters după test); fără erori backend; pagina admin încarcă cu stats intacte (fără regresie).
+
+## 2026-06 — Atribuire la vânzare (referred_partner) + model de comision editabil per partener
+User: comision eligibil DOAR la serviciu vândut; revenue=0 la vânzare (Admin confirmă valoarea reală); comision 5% implicit dar EDITABIL per partener (procent/fee/abonament/custom), după modul de lucru agreat.
+
+Implementat (aditiv, reutilizează mecanismul existent `city_partner_leads`):
+- `routes/city_partners.py`: config comision pe partener — `ALLOWED_COMMISSION_MODELS` {percentage,fee,subscription,custom}, `ALLOWED_COMMISSION_BASES` {project_value,benefit}, `DEFAULT_COMMISSION` (percentage 5% project_value), helper `_clean_commission`. Adăugat `commission` în `_serialize`, `PartnerCreate`, `PartnerPatch`, `create_partner`, validare în `patch_partner`, + `commission_models`/`commission_bases` în `/meta`.
+- `routes/marketplace_offers.py` (la accept ofertă = serviciu vândut): dacă cererea are `referred_partner_id`, creează/actualizează un lead `city_partner_leads` stage=`converted`, `revenue_generated=0` (Admin confirmă), `commission_status=eligible`, `origin_request_id` (idempotent, 1 lead/cerere), partner_id ca ObjectId (apare în list_leads); stampează pe cerere `referred_partner_commission_status=eligible` + `referred_partner_lead_id`; sync prin `leads_store.sync_lead`. Non-blocking (try/except). Niciun procent fix aplicat automat — suma urmează modelul editabil al partenerului.
+- Frontend `pages/admin/CityPartnersPage.jsx`: secțiune „Comision & mod de lucru (editabil per partener)" în formular (model/rate/bază/note), implicit 5%.
+
+Respectă regulile: comision doar la vânzare (nu pe simpla solicitare), revenue 0 (fără umflare rapoarte), fără procente hardcodate, fără sistem paralel. NEATINS: reguli/dashboard existente HH, flux referral, taxonomie, Design Interior, home, cont client.
+
+Verificare: meta + create/patch comision OK (percentage 7.5%→fee 1500 RON); hook de atribuire validat end-to-end cu scenariu tranzitoriu (lead converted, revenue 0, eligible, partner_id ObjectId, flags pe cerere, idempotent, sync_lead) — curățat după test; formular afișat corect (screenshot). NOTĂ: hook-ul a fost validat prin replicare fidelă a blocului, nu printr-un flux HTTP complet de accept-ofertă.
