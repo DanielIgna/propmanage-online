@@ -295,6 +295,11 @@ async def _startup_impl():
         await seed_construction_taxonomy()
         await sync_taxonomy_additions()
         await refresh_category_visibility()
+        try:
+            from db import db as _db
+            await _db.suggested_services.create_index("normalized", unique=True)
+        except Exception as _e:
+            logger.warning(f"[suggested_services] index ensure failed: {_e}")
     except Exception as e:
         logger.warning(f"Construction taxonomy bootstrap failed: {e}")
     # CIP-B: seed Price Observatory cu date orientative (idempotent)

@@ -1,0 +1,45 @@
+{
+  "summary": "Tested the 3 PropManage improvements end-to-end on the public URL. Backend: 21/22 pytest pass. Working: anonymization on marketplace and public profile (individual 'Lucian Faragau' shown as 'Lucian F..', company name kept in full, real name in DB unchanged), 'PropManage Oradea' left out of the marketplace and its profile returns 404, nZEB root and all 8 named services present in admin taxonomy, suggested-service submit/dedup (case and spacing)/403 for client/admin list+counts/approve with parent (node source=suggested, legacy and depth inherited)/approve idempotent/reject with reason/400 for bad id/404 for missing id, and request creation with suggested_service_name linking request_id. Frontend: client wizard shows 'Eficiență & nZEB' card; the suggest toggle clears the category and enables Continue; the full wizard created a real request and a pending suggestion linked to it. The admin 'Servicii sugerate' tab lists it with filters and counts; approve under 'Instalații electrice' and reject via prompt both work and update the lists. Public /marketplace and /specialists/:id UI show 'Călin T..' and no surname. One failure: the public trust-score endpoint leaks the full name.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/specialists/{id}/trust-score", "issue": "This public endpoint needs no login and is called by the public SpecialistProfile page. It returns the full unanonymized name (spec.get('name') in routes/trust.py:113), e.g. 'Lucian Faragau', so the last name is exposed. Use public_person_name(spec) and also block test/demo accounts.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "suggested_services collection", "issue": "There is no unique index on 'normalized'. Dedup relies on find_one followed by insert, so two submissions at the same moment can create duplicates. Add create_index('normalized', unique=True) at startup and handle DuplicateKeyError."},
+      {"endpoint": "POST /api/admin/suggested-services/{id}/approve", "issue": "Does not check whether a catalog node with the same name or slug already exists under the parent, so approving can duplicate an existing catalog service."},
+      {"endpoint": "POST /api/suggested-services", "issue": "votes is incremented every time, even when the same user resubmits the same name, so one user can inflate votes. Consider adding the user to a set (suggested_by_ids) instead."},
+      {"endpoint": "POST /api/requests (suggested flow)", "issue": "A suggestion-only request is saved with category='altul', which most likely no specialist covers. The request may get no notifications or offers, and the client is told 'Specialiștii verificați vor trimite oferte'. Consider routing these to an operator/admin queue."},
+      {"endpoint": "public profile vs marketplace exclusion", "issue": "The marketplace uses the PUBLIC_SPECIALIST_EXCLUDE query (is_demo_account, _seed_tag, _tier_demo) but the profile uses is_test_account(). A seeded specialist hidden from the marketplace could still have a reachable public profile. Use one shared rule for both."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "RequestWizard done screen (v2-wizard-done)", "issues": ["Under the dark theme the heading 'Am primit cererea ta!' and subtitle are white or very light on a light-lime background, so they are barely readable."]},
+      {"screen": "RequestWizard step 1", "issues": ["After clicking 'Sugerează-l', the previously clicked nZEB card still looked highlighted in the screenshot, even though its class no longer has the selected state (likely a focus/active style). This is confusing.", "The suggest label and helper text are low contrast in the dark theme."]},
+      {"screen": "Admin Servicii sugerate", "issues": ["category_hint shows the raw code 'sugestie: altul'.", "Grammar: '1 cereri' should be '1 cerere'.", "The success message stays visible after switching filters.", "Rejected and approved items have no actions (no reopen) and no link to the created catalog node.", "The parent <select> is limited to max-w-[160px], so long names are cut off."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_privacy_catalog_suggested_iter234.py", "/app/test_reports/pytest/pytest_iter234.xml"],
+  "action_items": [
+    "HIGH: anonymize 'name' in the public GET /api/specialists/{id}/trust-score (routes/trust.py:113) using public_person_name, and return 404 for is_test_account.",
+    "Add a unique index on suggested_services.normalized.",
+    "In the approve endpoint, check for an existing taxonomy node with the same slug under the parent before inserting.",
+    "Decide how 'altul' category requests reach specialists or operators.",
+    "Fix contrast of the wizard done-screen text in the dark theme."
+  ],
+  "critical_code_review_comments": [
+    "routes/trust.py public endpoint leaks the full name, which breaks the privacy requirement.",
+    "record_suggestion uses find-then-insert without a unique index, so it is not safe when submissions arrive at the same moment.",
+    "Votes can be inflated by the same user resubmitting.",
+    "The marketplace and the public profile use different demo-exclusion rules (query vs is_test_account)."
+  ],
+  "updated_files": ["/app/backend/tests/test_privacy_catalog_suggested_iter234.py"],
+  "success_rate": {"backend": "95% (21/22)", "frontend": "100% of requested flows"},
+  "seed_data_creation": "Temporary specialists ('Lucian Faragau', 'Termo Instal SRL', 'PropManage Oradea', 'Călin Tulus') were inserted and then deleted. Left in place: TEST_ suggestions (some approved, creating catalog nodes with source=suggested under 'Eficiență energetică & nZEB' and 'Instalații electrice'), and TEST requests for client@propmanage.io (category 'altul').",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest tests/test_privacy_catalog_suggested_iter234.py. The fixture inserts and deletes temporary specialists through pymongo. Wizard: /client?tab=request opens RequestWizard directly. Admin tab: /admin/construction, then cip-tab-suggested. Reject uses window.prompt, so accept the dialog in Playwright.",
+  "test_credentials": "client@propmanage.io / Client123!, admin@propmanage.io / 1!nasov01ADMIN"
+}

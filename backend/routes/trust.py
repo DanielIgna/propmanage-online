@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 from db import db
 from core_utils import serialize_doc
 from deps import get_current_user
+from seo_gate import is_test_account
+from privacy import public_person_name
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["trust"])
@@ -49,6 +51,8 @@ async def get_trust_score(spec_id: str):
     except Exception:
         raise HTTPException(404, "Specialist inexistent.")
     if not spec:
+        raise HTTPException(404, "Specialist inexistent.")
+    if is_test_account(spec):
         raise HTTPException(404, "Specialist inexistent.")
 
     # 1. Task on-time delivery: % of assigned tasks completed before due_date
@@ -110,7 +114,7 @@ async def get_trust_score(spec_id: str):
     total_score = round(on_time_pts + rating_pts + attachment_pts + warranty_pts, 1)
     return {
         "specialist_id": spec_id,
-        "name": spec.get("name"),
+        "name": public_person_name(spec),
         "score": total_score,
         "level": _trust_level(total_score),
         "factors": {

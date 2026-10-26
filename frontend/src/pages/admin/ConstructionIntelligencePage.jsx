@@ -395,7 +395,7 @@ const SuggestedTab = () => {
   const [msg, setMsg] = useState(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    setLoading(true); setMsg(null);
     try {
       const params = filter === "all" ? {} : { status: filter };
       const [a, b] = await Promise.all([
@@ -453,8 +453,8 @@ const SuggestedTab = () => {
                   <div className="flex items-center gap-2">
                     <span className="text-white font-semibold">{it.name}</span>
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${BADGE[it.status]}`}>{it.status}</span>
-                    <span className="text-[10px] text-stone-400">· {it.votes} cereri</span>
-                    {it.category_hint && <span className="text-[10px] text-cyan-300">· sugestie: {it.category_hint}</span>}
+                    <span className="text-[10px] text-stone-400">· {it.votes} {it.votes === 1 ? "cerere" : "cereri"}</span>
+                    {it.category_hint && <span className="text-[10px] text-cyan-300">· sugerat la: {it.category_hint === "altul" ? "fără categorie" : it.category_hint}</span>}
                   </div>
                   {it.description && <div className="text-xs text-stone-400 mt-0.5">{it.description}</div>}
                   {it.reject_reason && <div className="text-[11px] text-rose-300 mt-0.5">Motiv respingere: {it.reject_reason}</div>}
@@ -462,7 +462,7 @@ const SuggestedTab = () => {
                 {it.status === "pending" && (
                   <div className="flex items-center gap-1.5">
                     <select defaultValue="" id={`sug-parent-${it.id}`} data-testid={`sug-parent-${it.id}`}
-                      className="px-2 py-1.5 text-xs rounded-lg bg-stone-800 border border-stone-700 text-stone-200 max-w-[160px]">
+                      className="px-2 py-1.5 text-xs rounded-lg bg-stone-800 border border-stone-700 text-stone-200 max-w-[220px]">
                       <option value="">Categorie nouă</option>
                       {roots.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                     </select>

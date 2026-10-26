@@ -25,6 +25,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel, Field
+from pymongo.errors import DuplicateKeyError
 
 from db import db
 from deps import get_current_user, require_role
@@ -111,9 +112,19 @@ async def record_suggestion(*, name: str, user_id: str, category_hint: Optional[
         "created_at": now,
         "updated_at": now,
     }
-    res = await db.suggested_services.insert_one(doc)
-    doc["_id"] = res.inserted_id
-    return _serialize(doc)
+    try:
+        res = await db.suggested_services.insert_one(doc)
+        doc["_id"] = res.inserted_id
+        return _serialize(doc)
+    except DuplicateKeyError:
+        # Race: another concurrent submit created it first → link to that one.
+        again = await db.suggested_services.find_one_and_update(
+            {"normalized": normalized},
+            {"$set": {"updated_at": now}, "$inc": {"votes": 1},
+             **({"$addToSet": {"request_ids": request_id}} if request_id else {})},
+            return_document=True,
+        )
+        return _serialize(again)
 
 
 class SuggestIn(BaseModel):
@@ -183,6 +194,16 @@ async def approve_suggestion(sug_id: str, payload: ApproveIn = Body(default=Appr
         depth = 0
         legacy = payload.legacy_category or tax_slugify(name)
     siblings = await db.construction_taxonomy.count_documents({"parent_id": parent_id})
+    # Prevent duplicating an existing catalog node under the same parent.
+    dup = await db.construction_taxonomy.find_one({"parent_id": parent_id, "slug": tax_slugify(name)})
+    if dup:
+        await db.suggested_services.update_one(
+            {"_id": sug["_id"]},
+            {"$set": {"status": "approved", "taxonomy_node_id": dup["id"],
+                      "reviewed_by": user.get("email"), "reviewed_at": _now(),
+                      "reject_reason": None, "updated_at": _now()}},
+        )
+        return _serialize(await db.suggested_services.find_one({"_id": sug["_id"]}))
     node = {
         "id": uuid.uuid4().hex,
         "name": name,
