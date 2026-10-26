@@ -55,7 +55,36 @@ admin_router = APIRouter(prefix="/api/admin/city-partners", tags=["admin-city-pa
 partner_router = APIRouter(prefix="/api/partner", tags=["city-partner-portal"])
 products_admin_router = APIRouter(prefix="/api/admin/city-partner-products", tags=["admin-city-partner-products"])
 
-ALLOWED_STATUS = {"lead", "onboarding", "active", "paused", "terminated"}
+# Commercial prospecting statuses (City nZEB expansion) — additive, kept compatible
+# with the legacy lifecycle statuses. A "prospect" is NOT a public/verified partner.
+PROSPECT_STATUSES = {"prospect", "contacted", "discussion", "negotiation", "agreed", "rejected"}
+ALLOWED_STATUS = {"lead", "onboarding", "active", "paused", "terminated"} | PROSPECT_STATUSES
+# Ordered funnel metadata (admin UI + reporting). `public` = may be shown as a live partner.
+COMMERCIAL_STATUS_META = [
+    {"key": "prospect", "label": "Prospect / Necontactat", "public": False},
+    {"key": "contacted", "label": "Contactat", "public": False},
+    {"key": "discussion", "label": "Discuție inițiată", "public": False},
+    {"key": "negotiation", "label": "Negociere", "public": False},
+    {"key": "agreed", "label": "Partener agreat", "public": False},
+    {"key": "active", "label": "Activ", "public": True},
+    {"key": "paused", "label": "Pauzat", "public": False},
+    {"key": "rejected", "label": "Respins", "public": False},
+    # legacy lifecycle statuses kept for backward compatibility
+    {"key": "lead", "label": "Lead (legacy)", "public": False},
+    {"key": "onboarding", "label": "Onboarding (legacy)", "public": False},
+    {"key": "terminated", "label": "Încetat (legacy)", "public": False},
+]
+# Reusable City nZEB category taxonomy (extensible, not a parallel registry).
+NZEB_CATEGORIES = [
+    "Ventilație și recuperare de căldură",
+    "Audit și consultanță energetică",
+    "Tâmplărie și anvelopa clădirii",
+    "Izolații și renovări",
+    "HVAC și instalații",
+    "Pompe de căldură",
+    "Fotovoltaice și stocare",
+    "Alte soluții pentru eficiență energetică",
+]
 ALLOWED_LEAD_STAGES = {"introduced", "contacted", "onboarded", "converted", "lost"}
 # Partner-network taxonomy (Faza 4A prep) — used to scale studios/city/regional/national
 # partners, suppliers and brands. Optional & additive: existing partners default to "city".
@@ -94,6 +123,28 @@ def _serialize(doc: dict) -> dict:
         "portfolio_type": doc.get("portfolio_type"),
         "started_at": doc.get("started_at"),
         "status": doc.get("status") or "lead",
+        "public_visible": (doc.get("status") == "active"),
+        "collaboration_agreed": bool(doc.get("collaboration_agreed")),
+        # ── Prospect / supplier origin & commercial profile (City nZEB) — optional ──
+        "website": doc.get("website"),
+        "contact_role": doc.get("contact_role"),
+        "country": doc.get("country"),
+        "target_client_type": doc.get("target_client_type"),
+        "capacity_note": doc.get("capacity_note"),
+        "applications": doc.get("applications") or [],
+        "next_action": doc.get("next_action"),
+        "info_source": doc.get("info_source"),
+        "origin_confirmed": bool(doc.get("origin_confirmed")),
+        "coverage_confirmed": bool(doc.get("coverage_confirmed")),
+        # Forward-looking collaboration indicators — prepared, never auto-filled.
+        "collaboration_metrics": doc.get("collaboration_metrics") or {
+            "invitable_clients": None,
+            "requests_generated": None,
+            "requests_taken": None,
+            "conversions": None,
+            "can_recommend_complementary": None,
+            "network_contribution": None,
+        },
         "onboarding_step": doc.get("onboarding_step") or 0,
         "onboarding_complete": bool(doc.get("onboarding_complete")),
         "territory_protected": bool(doc.get("territory_protected")),
@@ -141,10 +192,10 @@ def _serialize_lead(d: dict) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 class PartnerCreate(BaseModel):
     company: str = Field(min_length=2, max_length=200)
-    contact_name: str = Field(min_length=2, max_length=120)
-    contact_email: EmailStr
+    contact_name: Optional[str] = None
+    contact_email: Optional[EmailStr] = None
     contact_phone: Optional[str] = None
-    city: str = Field(min_length=2, max_length=80)
+    city: Optional[str] = None
     county: Optional[str] = None
     units_managed: Optional[int] = 0
     growth_rate: Optional[str] = None
@@ -161,6 +212,19 @@ class PartnerCreate(BaseModel):
     brands: Optional[list] = None
     materials: Optional[list] = None
     notes: Optional[str] = None
+    # Prospect / supplier origin & commercial profile (optional, unconfirmed-friendly)
+    website: Optional[str] = None
+    contact_role: Optional[str] = None
+    country: Optional[str] = None
+    target_client_type: Optional[str] = None
+    capacity_note: Optional[str] = None
+    applications: Optional[list] = None
+    next_action: Optional[str] = None
+    info_source: Optional[str] = None
+    collaboration_agreed: Optional[bool] = None
+    origin_confirmed: Optional[bool] = None
+    coverage_confirmed: Optional[bool] = None
+    collaboration_metrics: Optional[dict] = None
 
 
 class PartnerPatch(BaseModel):
@@ -186,6 +250,18 @@ class PartnerPatch(BaseModel):
     brands: Optional[list] = None
     materials: Optional[list] = None
     notes: Optional[str] = None
+    website: Optional[str] = None
+    contact_role: Optional[str] = None
+    country: Optional[str] = None
+    target_client_type: Optional[str] = None
+    capacity_note: Optional[str] = None
+    applications: Optional[list] = None
+    next_action: Optional[str] = None
+    info_source: Optional[str] = None
+    collaboration_agreed: Optional[bool] = None
+    origin_confirmed: Optional[bool] = None
+    coverage_confirmed: Optional[bool] = None
+    collaboration_metrics: Optional[dict] = None
 
 
 class OnboardingStepUpdate(BaseModel):
@@ -220,17 +296,43 @@ class LeadPatch(BaseModel):
 async def list_partners(
     status: Optional[str] = None,
     city: Optional[str] = None,
+    category: Optional[str] = None,
+    country: Optional[str] = None,
+    zone: Optional[str] = None,
     user=Depends(get_current_user),
 ):
     _require_super(user)
     q = {}
     if status and status != "all":
-        q["status"] = status
+        if status == "prospects":
+            q["status"] = {"$in": sorted(PROSPECT_STATUSES)}
+        else:
+            q["status"] = status
     if city:
         q["city"] = {"$regex": f"^{re.escape(city)}$", "$options": "i"}
+    if category:
+        q["categories"] = {"$regex": f"{re.escape(category)}", "$options": "i"}
+    if country:
+        q["country"] = {"$regex": f"^{re.escape(country)}$", "$options": "i"}
+    if zone:
+        q["zones"] = {"$regex": f"{re.escape(zone)}", "$options": "i"}
     cur = db.city_partners.find(q).sort("created_at", -1)
     items = [_serialize(d) async for d in cur]
     return {"items": items, "count": len(items)}
+
+
+@admin_router.get("/meta")
+async def partner_meta(user=Depends(get_current_user)):
+    """Shared taxonomy for the City Partners / City nZEB registry: commercial statuses,
+    nZEB categories, partner types and coverage levels. Single source for admin filters."""
+    _require_super(user)
+    return {
+        "statuses": COMMERCIAL_STATUS_META,
+        "prospect_statuses": sorted(PROSPECT_STATUSES),
+        "nzeb_categories": NZEB_CATEGORIES,
+        "partner_types": sorted(ALLOWED_PARTNER_TYPES),
+        "coverage_levels": sorted(ALLOWED_COVERAGE),
+    }
 
 
 @admin_router.post("")
@@ -242,14 +344,16 @@ async def create_partner(payload: PartnerCreate, user=Depends(get_current_user))
         raise HTTPException(400, f"partner_type invalid; permis: {sorted(ALLOWED_PARTNER_TYPES)}")
     if payload.coverage and payload.coverage not in ALLOWED_COVERAGE:
         raise HTTPException(400, f"coverage invalid; permis: {sorted(ALLOWED_COVERAGE)}")
-    existing = await db.city_partners.find_one({"contact_email": payload.contact_email.lower()})
-    if existing:
-        raise HTTPException(409, f"Există deja partener cu emailul {payload.contact_email}.")
+    email = payload.contact_email.lower() if payload.contact_email else None
+    if email:
+        existing = await db.city_partners.find_one({"contact_email": email})
+        if existing:
+            raise HTTPException(409, f"Există deja partener cu emailul {payload.contact_email}.")
     now = datetime.now(timezone.utc).isoformat()
     doc = {
         "company": payload.company,
         "contact_name": payload.contact_name,
-        "contact_email": payload.contact_email.lower(),
+        "contact_email": email,
         "contact_phone": payload.contact_phone,
         "city": payload.city,
         "county": payload.county,
@@ -273,6 +377,19 @@ async def create_partner(payload: PartnerCreate, user=Depends(get_current_user))
         "materials": payload.materials or [],
         "projects": [],
         "notes": payload.notes,
+        # Prospect / supplier origin & commercial profile (optional)
+        "website": payload.website,
+        "contact_role": payload.contact_role,
+        "country": payload.country,
+        "target_client_type": payload.target_client_type,
+        "capacity_note": payload.capacity_note,
+        "applications": payload.applications or [],
+        "next_action": payload.next_action,
+        "info_source": payload.info_source,
+        "collaboration_agreed": bool(payload.collaboration_agreed),
+        "origin_confirmed": bool(payload.origin_confirmed),
+        "coverage_confirmed": bool(payload.coverage_confirmed),
+        "collaboration_metrics": payload.collaboration_metrics or {},
         "created_at": now,
         "updated_at": now,
         "created_by": user.get("email"),

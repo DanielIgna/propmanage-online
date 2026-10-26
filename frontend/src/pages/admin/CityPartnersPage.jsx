@@ -12,64 +12,106 @@ const API = process.env.REACT_APP_BACKEND_URL;
 const ax = axios.create({ baseURL: API, withCredentials: true });
 
 const STATUS_META = {
+  prospect: { label: "Prospect / Necontactat", color: "bg-slate-100 text-slate-600 dark:bg-slate-700/40 dark:text-slate-300" },
+  contacted: { label: "Contactat", color: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" },
+  discussion: { label: "Discuție inițiată", color: "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300" },
+  negotiation: { label: "Negociere", color: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
+  agreed: { label: "Partener agreat", color: "bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300" },
+  active: { label: "Activ", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
+  paused: { label: "Pauzat", color: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
+  rejected: { label: "Respins", color: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" },
   lead: { label: "Lead", color: "bg-slate-100 text-slate-700 dark:bg-slate-700/40 dark:text-slate-300" },
   onboarding: { label: "Onboarding", color: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
-  active: { label: "Activ", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
-  paused: { label: "Pauzat", color: "bg-slate-200 text-slate-700 dark:bg-slate-700/40 dark:text-slate-300" },
   terminated: { label: "Încetat", color: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" },
 };
+
+const STATUS_OPTIONS = [
+  "prospect", "contacted", "discussion", "negotiation", "agreed", "active", "paused", "rejected",
+  "lead", "onboarding", "terminated",
+];
+
+const NZEB_CATEGORIES = [
+  "Ventilație și recuperare de căldură",
+  "Audit și consultanță energetică",
+  "Tâmplărie și anvelopa clădirii",
+  "Izolații și renovări",
+  "HVAC și instalații",
+  "Pompe de căldură",
+  "Fotovoltaice și stocare",
+  "Alte soluții pentru eficiență energetică",
+];
 
 const PartnerForm = ({ initial, onSave, onClose, saving }) => {
   const [f, setF] = useState(() => ({
     company: initial?.company || "",
     contact_name: initial?.contact_name || "",
+    contact_role: initial?.contact_role || "",
     contact_email: initial?.contact_email || "",
     contact_phone: initial?.contact_phone || "",
+    website: initial?.website || "",
+    country: initial?.country || "",
     city: initial?.city || "",
     county: initial?.county || "",
     units_managed: initial?.units_managed || 0,
     growth_rate: initial?.growth_rate || "",
     portfolio_type: initial?.portfolio_type || "",
+    capacity_note: initial?.capacity_note || "",
+    target_client_type: initial?.target_client_type || "",
     started_at: initial?.started_at?.slice(0, 10) || "",
-    status: initial?.status || "lead",
-    partner_type: initial?.partner_type || "city",
-    coverage: initial?.coverage || "city",
+    status: initial?.status || "prospect",
+    partner_type: initial?.partner_type || "supplier",
+    coverage: initial?.coverage || "regional",
     categories: (initial?.categories || []).join(", "),
     zones: (initial?.zones || []).join(", "),
     services: (initial?.services || []).join(", "),
+    applications: (initial?.applications || []).join(", "),
+    next_action: initial?.next_action || "",
+    info_source: initial?.info_source || "",
+    collaboration_agreed: !!initial?.collaboration_agreed,
+    origin_confirmed: !!initial?.origin_confirmed,
+    coverage_confirmed: !!initial?.coverage_confirmed,
     notes: initial?.notes || "",
   }));
   const set = (k, v) => setF(x => ({ ...x, [k]: v }));
   const toArr = (s) => (s || "").split(",").map(x => x.trim()).filter(Boolean);
   const submit = (e) => {
     e.preventDefault();
-    onSave({
+    const payload = {
       ...f,
       units_managed: Number(f.units_managed) || 0,
       categories: toArr(f.categories),
       zones: toArr(f.zones),
       services: toArr(f.services),
-    });
+      applications: toArr(f.applications),
+    };
+    // Optional email: never send an empty string (fails EmailStr validation).
+    if (!payload.contact_email) delete payload.contact_email;
+    onSave(payload);
   };
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" data-testid="partner-form-modal">
       <form onSubmit={submit}
         className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">{initial ? "Editează partener" : "Adaugă partener strategic"}</h2>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">{initial ? "Editează profil" : "Adaugă furnizor / prospect"}</h2>
           <button type="button" onClick={onClose} className="text-slate-400"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto">
           {[
             ["Companie *", "company", "text", true],
-            ["Persoană contact *", "contact_name", "text", true],
-            ["Email contact *", "contact_email", "email", true],
-            ["Telefon", "contact_phone", "tel", false],
-            ["Oraș *", "city", "text", true],
-            ["Județ / Sector", "county", "text", false],
+            ["Website", "website", "text", false, "ex: fresh-r.com"],
+            ["Persoană contact", "contact_name", "text", false],
+            ["Funcție", "contact_role", "text", false, "ex: Business Development"],
+            ["Email contact", "contact_email", "email", false],
+            ["Telefon", "contact_phone", "tel", false, "ex: +31 85 226 15 20"],
+            ["Țară (origine)", "country", "text", false, "ex: Olanda"],
+            ["Oraș / Localitate", "city", "text", false],
+            ["Județ / Regiune", "county", "text", false],
             ["Apartamente administrate", "units_managed", "number", false],
             ["Ritm creștere", "growth_rate", "text", false, "ex: +8%/lună"],
             ["Tip portofoliu", "portfolio_type", "text", false, "ex: Condominii rezidențiale"],
+            ["Capacitate", "capacity_note", "text", false, "ex: producție proprie"],
+            ["Tip client vizat", "target_client_type", "text", false, "ex: rezidențial, administratori"],
             ["Început colaborare", "started_at", "date", false],
           ].map(([lbl, key, type, req, ph]) => (
             <div key={key}>
@@ -80,10 +122,10 @@ const PartnerForm = ({ initial, onSave, onClose, saving }) => {
             </div>
           ))}
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Status</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Status comercial</label>
             <select value={f.status} onChange={e => set("status", e.target.value)}
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="partner-field-status">
-              {Object.entries(STATUS_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              {STATUS_OPTIONS.map(k => <option key={k} value={k}>{STATUS_META[k]?.label || k}</option>)}
             </select>
           </div>
           <div>
@@ -101,12 +143,13 @@ const PartnerForm = ({ initial, onSave, onClose, saving }) => {
             </select>
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Categorii <span className="text-slate-400 font-normal">(separate prin virgulă, opțional)</span></label>
-            <input value={f.categories} onChange={e => set("categories", e.target.value)} placeholder="ex: Pompe de căldură, Sisteme fotovoltaice"
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Categorii City nZEB <span className="text-slate-400 font-normal">(virgulă, opțional)</span></label>
+            <input list="nzeb-cats" value={f.categories} onChange={e => set("categories", e.target.value)} placeholder="ex: Ventilație și recuperare de căldură"
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="partner-field-categories" />
+            <datalist id="nzeb-cats">{NZEB_CATEGORIES.map(c => <option key={c} value={c} />)}</datalist>
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Zone / teritorii <span className="text-slate-400 font-normal">(virgulă, opțional)</span></label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Zonă comercială / teritoriu <span className="text-slate-400 font-normal">(virgulă, opțional)</span></label>
             <input value={f.zones} onChange={e => set("zones", e.target.value)} placeholder="ex: București, Ilfov, Cluj"
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="partner-field-zones" />
           </div>
@@ -114,6 +157,35 @@ const PartnerForm = ({ initial, onSave, onClose, saving }) => {
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Servicii <span className="text-slate-400 font-normal">(virgulă, opțional)</span></label>
             <input value={f.services} onChange={e => set("services", e.target.value)} placeholder="ex: Audit energetic, Consultanță, Montaj"
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="partner-field-services" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Aplicații prezentate <span className="text-slate-400 font-normal">(virgulă, opțional)</span></label>
+            <input value={f.applications} onChange={e => set("applications", e.target.value)} placeholder="ex: renovare, modernizare, construcții noi"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="partner-field-applications" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Următoarea acțiune</label>
+            <input value={f.next_action} onChange={e => set("next_action", e.target.value)} placeholder="ex: trimite prezentare rețea"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="partner-field-next_action" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Sursa informației</label>
+            <input value={f.info_source} onChange={e => set("info_source", e.target.value)} placeholder="ex: site oficial, târg, recomandare"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" data-testid="partner-field-info_source" />
+          </div>
+          <div className="sm:col-span-2 flex flex-wrap gap-4 pt-1">
+            <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+              <input type="checkbox" checked={f.collaboration_agreed} onChange={e => set("collaboration_agreed", e.target.checked)} data-testid="partner-field-collaboration_agreed" />
+              Colaborare agreată
+            </label>
+            <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+              <input type="checkbox" checked={f.origin_confirmed} onChange={e => set("origin_confirmed", e.target.checked)} data-testid="partner-field-origin_confirmed" />
+              Origine confirmată
+            </label>
+            <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+              <input type="checkbox" checked={f.coverage_confirmed} onChange={e => set("coverage_confirmed", e.target.checked)} data-testid="partner-field-coverage_confirmed" />
+              Acoperire comercială confirmată
+            </label>
           </div>
           <div className="sm:col-span-2">
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Note interne</label>
@@ -139,6 +211,9 @@ const CityPartnersPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterCountry, setFilterCountry] = useState("");
+  const [filterZone, setFilterZone] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -146,8 +221,13 @@ const CityPartnersPage = () => {
   const load = async () => {
     setLoading(true);
     try {
+      const params = {};
+      if (filterStatus !== "all") params.status = filterStatus;
+      if (filterCategory) params.category = filterCategory;
+      if (filterCountry.trim()) params.country = filterCountry.trim();
+      if (filterZone.trim()) params.zone = filterZone.trim();
       const [a, b] = await Promise.all([
-        ax.get("/api/admin/city-partners", { params: filterStatus !== "all" ? { status: filterStatus } : {} }),
+        ax.get("/api/admin/city-partners", { params }),
         ax.get("/api/admin/city-partners/stats"),
       ]);
       setItems(a.data?.items || []);
@@ -156,7 +236,7 @@ const CityPartnersPage = () => {
       setError(e.response?.data?.detail || e.message);
     } finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, [filterStatus]);
+  useEffect(() => { load(); }, [filterStatus, filterCategory, filterCountry, filterZone]);
 
   const save = async (payload) => {
     setSaving(true);
@@ -195,16 +275,16 @@ const CityPartnersPage = () => {
 
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          <StatCard icon={Users} label="Parteneri total" value={stats.total_partners} color="text-blue-500" />
+          <StatCard icon={Users} label="Profiluri total" value={stats.total_partners} color="text-blue-500" />
+          <StatCard icon={MapPin} label="Prospecte" value={["prospect", "contacted", "discussion", "negotiation", "agreed"].reduce((s, k) => s + (stats.by_status?.[k] || 0), 0)} color="text-amber-500" />
           <StatCard icon={TrendingUp} label="Activi" value={stats.by_status?.active || 0} color="text-emerald-500" />
-          <StatCard icon={MapPin} label="Lead-uri introduse" value={stats.total_leads} color="text-amber-500" />
-          <StatCard icon={Building2} label="Conversii" value={stats.leads_by_stage?.converted || 0} color="text-violet-500" />
+          <StatCard icon={Building2} label="Lead-uri / Conversii" value={`${stats.total_leads} / ${stats.leads_by_stage?.converted || 0}`} color="text-violet-500" />
         </div>
       )}
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 p-0.5">
-          {[["all", "Toți"], ["lead", "Lead"], ["onboarding", "Onboarding"], ["active", "Activ"], ["paused", "Pauzat"]].map(([k, lbl]) => (
+        <div className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 flex-wrap">
+          {[["all", "Toți"], ["prospects", "Prospecte"], ["prospect", "Necontactat"], ["contacted", "Contactat"], ["negotiation", "Negociere"], ["agreed", "Agreat"], ["active", "Activ"], ["paused", "Pauzat"], ["rejected", "Respins"]].map(([k, lbl]) => (
             <button key={k} onClick={() => setFilterStatus(k)} className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${filterStatus === k ? "bg-blue-600 text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"}`} data-testid={`filter-${k}`}>
               {lbl}
             </button>
@@ -212,8 +292,20 @@ const CityPartnersPage = () => {
         </div>
         <div className="flex-1" />
         <button onClick={() => { setEditing(null); setFormOpen(true); }} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5" data-testid="add-partner">
-          <Plus className="w-3.5 h-3.5" /> Adaugă partener
+          <Plus className="w-3.5 h-3.5" /> Adaugă furnizor
         </button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200" data-testid="filter-category">
+          <option value="">Toate categoriile nZEB</option>
+          {NZEB_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <input value={filterCountry} onChange={e => setFilterCountry(e.target.value)} placeholder="Filtru origine (țară)" className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 w-44" data-testid="filter-country" />
+        <input value={filterZone} onChange={e => setFilterZone(e.target.value)} placeholder="Filtru teritoriu comercial" className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 w-48" data-testid="filter-zone" />
+        {(filterCategory || filterCountry || filterZone) && (
+          <button onClick={() => { setFilterCategory(""); setFilterCountry(""); setFilterZone(""); }} className="px-2.5 py-1.5 text-xs rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" data-testid="filter-clear">Resetează</button>
+        )}
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
@@ -230,15 +322,19 @@ const CityPartnersPage = () => {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-semibold text-slate-900 dark:text-white">{p.company}</span>
                       <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${st.color}`}>{st.label}</span>
-                      <span className="text-[10px] text-slate-400">{p.city}{p.county ? `, ${p.county}` : ""}</span>
+                      {!p.public_visible && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-700/40 dark:text-slate-400" title="Nu este afișat public ca partener activ">nepublic</span>}
+                      {p.website && <a href={p.website.startsWith("http") ? p.website : `https://${p.website}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="text-[10px] text-blue-500 hover:underline" data-testid={`website-${p.id}`}>{p.website}</a>}
+                      <span className="text-[10px] text-slate-400">{[p.city, p.county].filter(Boolean).join(", ") || "—"}</span>
                     </div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-3 flex-wrap">
-                      <span className="flex items-center gap-1"><Users className="w-3 h-3" />{p.contact_name}</span>
-                      <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{p.contact_email}</span>
+                      {p.contact_name && <span className="flex items-center gap-1"><Users className="w-3 h-3" />{p.contact_name}{p.contact_role ? ` · ${p.contact_role}` : ""}</span>}
+                      {p.contact_email && <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{p.contact_email}</span>}
                       {p.contact_phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{p.contact_phone}</span>}
                     </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
-                      {p.units_managed} apart. · {p.growth_rate || "—"} · {p.portfolio_type || "—"}
+                    <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2 flex-wrap">
+                      {p.country && <span>Origine: {p.country}{!p.origin_confirmed && <em className="text-amber-500 not-italic"> (neconfirmat)</em>}</span>}
+                      {p.categories?.length > 0 && <span className="text-cyan-600 dark:text-cyan-400">{p.categories.join(" · ")}</span>}
+                      {!p.coverage_confirmed && (p.status === "prospect" || p.status === "contacted") && <span className="text-amber-500">acoperire neconfirmată</span>}
                     </div>
                   </div>
                   <div className="text-center text-xs">

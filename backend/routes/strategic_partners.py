@@ -346,8 +346,14 @@ MARKETPLACE_CATEGORIES = [
     "Producător", "Depozit", "Fabrică", "Furnizor servicii",
 ]
 NZEB_CATEGORIES = [
-    "Audit energetic", "Consultanță nZEB", "Tâmplărie performantă", "Izolații termice",
-    "Instalații / HVAC", "Pompe de căldură", "Sisteme fotovoltaice", "Renovări energetice",
+    "Ventilație și recuperare de căldură",
+    "Audit și consultanță energetică",
+    "Tâmplărie și anvelopa clădirii",
+    "Izolații și renovări",
+    "HVAC și instalații",
+    "Pompe de căldură",
+    "Fotovoltaice și stocare",
+    "Alte soluții pentru eficiență energetică",
 ]
 PARTNER_TYPES = ["studio", "city", "regional", "national", "supplier", "brand", "specialist"]
 COVERAGE_LEVELS = ["city", "regional", "national"]

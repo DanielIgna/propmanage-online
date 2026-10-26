@@ -145,24 +145,32 @@ const CityPartnerDetailPage = () => {
           <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800">
             <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">Contact</div>
             <div className="space-y-2 text-sm">
-              <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200"><Users className="w-4 h-4 text-slate-400" />{partner.contact_name}</div>
-              <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200"><Mail className="w-4 h-4 text-slate-400" />{partner.contact_email}</div>
+              {partner.contact_name && <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200"><Users className="w-4 h-4 text-slate-400" />{partner.contact_name}{partner.contact_role ? <span className="text-xs text-slate-400">· {partner.contact_role}</span> : null}</div>}
+              {partner.contact_email && <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200"><Mail className="w-4 h-4 text-slate-400" />{partner.contact_email}</div>}
               {partner.contact_phone && <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200"><Phone className="w-4 h-4 text-slate-400" />{partner.contact_phone}</div>}
-              <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200"><MapPin className="w-4 h-4 text-slate-400" />{partner.city}{partner.county ? `, ${partner.county}` : ""}</div>
+              {partner.website && <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400"><Building2 className="w-4 h-4 text-slate-400" /><a href={partner.website.startsWith("http") ? partner.website : `https://${partner.website}`} target="_blank" rel="noreferrer" className="hover:underline" data-testid="partner-website">{partner.website}</a></div>}
+              <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200"><MapPin className="w-4 h-4 text-slate-400" />{[partner.country, partner.city, partner.county].filter(Boolean).join(", ") || "Origine neconfirmată"}{!partner.origin_confirmed && <span className="text-[10px] text-amber-500">(neconfirmat)</span>}</div>
             </div>
             <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-xs">
               <div><div className="text-slate-400">Apartamente</div><div className="font-bold text-slate-900 dark:text-white">{partner.units_managed}</div></div>
               <div><div className="text-slate-400">Ritm creștere</div><div className="font-bold text-slate-900 dark:text-white">{partner.growth_rate || "—"}</div></div>
               <div className="col-span-2"><div className="text-slate-400">Tip portofoliu</div><div className="font-medium text-slate-700 dark:text-slate-200">{partner.portfolio_type || "—"}</div></div>
+              {partner.capacity_note && <div className="col-span-2"><div className="text-slate-400">Capacitate</div><div className="font-medium text-slate-700 dark:text-slate-200">{partner.capacity_note}</div></div>}
+              {partner.target_client_type && <div className="col-span-2"><div className="text-slate-400">Tip client vizat</div><div className="font-medium text-slate-700 dark:text-slate-200">{partner.target_client_type}</div></div>}
             </div>
             <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2 text-xs" data-testid="partner-profile-block">
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300">{partner.partner_type || "city"}</span>
                 <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300">acoperire: {partner.coverage || "city"}</span>
+                <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${partner.collaboration_agreed ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-slate-100 text-slate-500 dark:bg-slate-700/40 dark:text-slate-400"}`} data-testid="collab-agreed-badge">colaborare: {partner.collaboration_agreed ? "agreată" : "neagreată"}</span>
+                {!partner.coverage_confirmed && <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">acoperire neconfirmată</span>}
               </div>
               {(partner.categories?.length > 0) && <div><span className="text-slate-400">Categorii: </span><span className="text-slate-700 dark:text-slate-200">{partner.categories.join(", ")}</span></div>}
-              {(partner.zones?.length > 0) && <div><span className="text-slate-400">Zone: </span><span className="text-slate-700 dark:text-slate-200">{partner.zones.join(", ")}</span></div>}
+              {(partner.zones?.length > 0) && <div><span className="text-slate-400">Teritoriu comercial: </span><span className="text-slate-700 dark:text-slate-200">{partner.zones.join(", ")}</span></div>}
               {(partner.services?.length > 0) && <div><span className="text-slate-400">Servicii: </span><span className="text-slate-700 dark:text-slate-200">{partner.services.join(", ")}</span></div>}
+              {(partner.applications?.length > 0) && <div><span className="text-slate-400">Aplicații: </span><span className="text-slate-700 dark:text-slate-200">{partner.applications.join(", ")}</span></div>}
+              {partner.next_action && <div><span className="text-slate-400">Următoarea acțiune: </span><span className="text-slate-700 dark:text-slate-200">{partner.next_action}</span></div>}
+              {partner.info_source && <div><span className="text-slate-400">Sursa info: </span><span className="text-slate-700 dark:text-slate-200">{partner.info_source}</span></div>}
             </div>
             {partner.notes && <div className="mt-3 text-xs text-slate-500 italic">„{partner.notes}”</div>}
           </div>
