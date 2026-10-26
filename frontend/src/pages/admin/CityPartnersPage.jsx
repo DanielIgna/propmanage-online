@@ -6,6 +6,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   Building2, Plus, Users, MapPin, TrendingUp, Loader2, ChevronLeft, X,
   Save, Edit3, Eye, KeyRound, Mail, Phone, AlertTriangle, Trash2,
+  Layers, ChevronDown, Link2,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -204,6 +205,70 @@ const PartnerForm = ({ initial, onSave, onClose, saving }) => {
   );
 };
 
+// Read-only: client House Health zones ↔ active City Partners that cover them (derived, additive).
+const CoveragePanel = () => {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  const load = async () => {
+    if (data) return;
+    setLoading(true); setErr("");
+    try {
+      const { data: d } = await ax.get("/api/admin/city-partners/coverage-overview", { params: { county: "Cluj" } });
+      setData(d);
+    } catch (e) { setErr(e.response?.data?.detail || e.message); }
+    finally { setLoading(false); }
+  };
+
+  const toggle = () => { const n = !open; setOpen(n); if (n) load(); };
+
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 mb-4 overflow-hidden" data-testid="coverage-panel">
+      <button onClick={toggle} className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50" data-testid="coverage-panel-toggle">
+        <Layers className="w-4 h-4 text-cyan-500" />
+        <span className="text-sm font-semibold text-slate-900 dark:text-white">Acoperire zone client (Cluj)</span>
+        <span className="text-[11px] text-slate-500">— parteneri activi corelați cu zonele din profilul clientului</span>
+        <div className="flex-1" />
+        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="border-t border-slate-100 dark:border-slate-800 p-4">
+          {loading && <div className="py-6 text-center"><Loader2 className="w-4 h-4 animate-spin mx-auto text-slate-400" /></div>}
+          {err && <div className="text-rose-500 text-xs flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> {err}</div>}
+          {data && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {(data.zones || []).map(z => (
+                <div key={z.zone} className="rounded-xl border border-slate-200 dark:border-slate-800 p-3" data-testid={`coverage-zone-${z.zone}`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm font-medium text-slate-900 dark:text-white">{z.label}</span>
+                    <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${z.partner_count > 0 ? "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" : "bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-500"}`} data-testid={`coverage-count-${z.zone}`}>
+                      {z.partner_count} parteneri
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 mb-2">{(z.nzeb_categories || []).join(" · ")}</div>
+                  {z.partner_count === 0
+                    ? <div className="text-[11px] text-amber-600 dark:text-amber-500">Nicio acoperire activă — recomandă recrutarea unui partener nZEB pentru această zonă.</div>
+                    : <div className="space-y-1">
+                        {(z.partners || []).map(p => (
+                          <div key={p.partner_id} className="flex items-center gap-1.5 text-[12px] text-slate-700 dark:text-slate-300">
+                            <Building2 className="w-3 h-3 text-slate-400" />
+                            <span>{p.company}</span>
+                            {p.referral_url && <span className="inline-flex items-center gap-0.5 text-cyan-600 dark:text-cyan-400"><Link2 className="w-3 h-3" /> link</span>}
+                          </div>
+                        ))}
+                      </div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const CityPartnersPage = () => {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
@@ -308,6 +373,8 @@ const CityPartnersPage = () => {
           <button onClick={() => { setFilterCategory(""); setFilterCountry(""); setFilterZone(""); }} className="px-2.5 py-1.5 text-xs rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" data-testid="filter-clear">Resetează</button>
         )}
       </div>
+
+      <CoveragePanel />
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
         {loading && <div className="p-10 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-slate-400" /></div>}

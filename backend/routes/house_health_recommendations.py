@@ -265,6 +265,14 @@ async def publish_to_marketplace(
     }
     mp_category = category_map.get(r.get("category"), "general")
 
+    # Additive correlation metadata (does NOT change existing `category` or matching):
+    # - coverage_zone links the request back to the client-profile health zone
+    # - referred_partner stamps the City Partner whose referral link brought this client
+    from coverage_mapping import CLIENT_ZONES, resolve_referring_partner
+    hh_zone = r.get("category") if r.get("category") in CLIENT_ZONES else None
+    client_doc = await db.users.find_one({"_id": ObjectId(user["id"])}) if ObjectId.is_valid(user["id"]) else None
+    referred_partner = await resolve_referring_partner(client_doc or {})
+
     description_parts = [r.get("description", "").strip()]
     if payload.extra_notes:
         description_parts.append(f"\n\nNote client:\n{payload.extra_notes.strip()}")
@@ -291,6 +299,10 @@ async def publish_to_marketplace(
         "specialist_name": None,
         "escrow_amount": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
+        # Additive correlation (client-profile zone ↔ City Partners). Non-breaking.
+        "coverage_zone": hh_zone,
+        "referred_partner_id": (referred_partner or {}).get("partner_id"),
+        "referred_partner_name": (referred_partner or {}).get("company"),
         # House Health attribution metadata
         "house_health_source": {
             "recommendation_id": rec_id,

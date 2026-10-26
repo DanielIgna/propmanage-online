@@ -287,3 +287,17 @@ Integrare aditivă a bazei externe HartaBlocuri Cluj în entitatea `buildings` e
 **Teste preview:** 0 task exceptions; scheduler pornit complet în background; admin login 200; /api/health = ok (db ok); fără regresii (erorile Resend sunt pre-existente, demo emails).
 **NESCHIMBAT:** memorie (rămâne 512Mi), replici (2), Health Score, HartaBlocuri, geocoding, DB.
 **Status:** DOAR în Preview. NEPUBLICAT — necesită Publish/Deploy cu confirmarea userului pentru Production.
+
+## 2026-06 — City Partners ↔ Client Zones coverage correlation (additive, non-destructive)
+Scope corectat de user: NU extinde taxonomia A–G, NU modifica Design Interior (17 etape), NU schimba home page / payload cont client. Doar legături + extindere zone nZEB corelate cu City Partners.
+
+Implementat:
+- `/app/backend/coverage_mapping.py` (NOU): mapare zone profil client (House Health: air/thermal/humidity/electric/radon/structural/docs) ↔ categorii nZEB existente; helpers `nzeb_categories_for_zone`, `partner_covers_zone`, `match_partners_for_zone` (doar parteneri `status=active`, filtrat pe county=Cluj), `resolve_referring_partner` (reutilizează referral existent: client.referrer_id == partner.linked_user_id).
+- `routes/city_partners.py`: `coverage_router` nou — `GET /api/city-partners/coverage/zones`, `GET /api/city-partners/coverage/match?zone=&county=Cluj` (read-only, include `referral_url=/register?ref=<linked_user_id>`); `admin_router` + `GET /api/admin/city-partners/coverage-overview` (per zonă: count + parteneri activi).
+- `routes/house_health_recommendations.py`: la publish→marketplace request adaugă ADITIV `coverage_zone` + `referred_partner_id/name` (category/taxonomy_node_id/subcategory/comisioane NESCHIMBATE).
+- `routes/requests.py`: create_request stampează aditiv `referred_partner_id/name` (pregătire atribuire prin link, reutilizând referrer_id).
+- Frontend `pages/admin/CityPartnersPage.jsx`: panou read-only „Acoperire zone client (Cluj)” (CoveragePanel) — count + parteneri + indicator link per zonă.
+
+Neatins: NZEB_CATEGORIES (toate zonele mapează pe categorii existente — nicio categorie nouă necesară), reguli comision/procente, flux referral existent, taxonomie construcții, Design Interior, home, cont client.
+
+Verificare: endpoint-uri 200 (zones=7, match ok, admin coverage-overview=7 zone); logica de matching + referral verificată end-to-end cu partener tranzitoriu activ Cluj (șters după test); fără erori backend; pagina admin încarcă cu stats intacte (fără regresie).

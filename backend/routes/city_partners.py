@@ -54,6 +54,7 @@ logger = logging.getLogger("propmanage.city_partners")
 admin_router = APIRouter(prefix="/api/admin/city-partners", tags=["admin-city-partners"])
 partner_router = APIRouter(prefix="/api/partner", tags=["city-partner-portal"])
 products_admin_router = APIRouter(prefix="/api/admin/city-partner-products", tags=["admin-city-partner-products"])
+coverage_router = APIRouter(prefix="/api/city-partners", tags=["city-partner-coverage"])
 
 # Commercial prospecting statuses (City nZEB expansion) — additive, kept compatible
 # with the legacy lifecycle statuses. A "prospect" is NOT a public/verified partner.
@@ -407,13 +408,28 @@ async def partner_meta(user=Depends(get_current_user)):
     """Shared taxonomy for the City Partners / City nZEB registry: commercial statuses,
     nZEB categories, partner types and coverage levels. Single source for admin filters."""
     _require_super(user)
+    from coverage_mapping import zones_list
     return {
         "statuses": COMMERCIAL_STATUS_META,
         "prospect_statuses": sorted(PROSPECT_STATUSES),
         "nzeb_categories": NZEB_CATEGORIES,
         "partner_types": sorted(ALLOWED_PARTNER_TYPES),
         "coverage_levels": sorted(ALLOWED_COVERAGE),
+        "client_coverage_zones": zones_list(),
     }
+
+
+@admin_router.get("/coverage-overview")
+async def coverage_overview(county: str = "Cluj", user=Depends(get_current_user)):
+    """Per client-profile zone: which ACTIVE City Partners cover it (via nZEB categories).
+    Read-only correlation for Admin — no data writes, no prospect auto-publishing."""
+    _require_super(user)
+    from coverage_mapping import zones_list, match_partners_for_zone
+    out = []
+    for z in zones_list():
+        partners = await match_partners_for_zone(z["zone"], county)
+        out.append({**z, "partner_count": len(partners), "partners": partners})
+    return {"county": county, "zones": out}
 
 
 @admin_router.post("")
@@ -1460,3 +1476,25 @@ async def delete_product(product_id: str, user=Depends(get_current_user)):
     if res.deleted_count == 0:
         raise HTTPException(404, "Produs inexistent.")
     return {"ok": True, "deleted": True}
+
+
+
+# ════════════ Coverage correlation (client zones ↔ City Partners) ════════════
+@coverage_router.get("/coverage/zones")
+async def coverage_zones(user=Depends(get_current_user)):
+    """Zonele din profilul clientului + categoriile nZEB corelate. Read-only."""
+    from coverage_mapping import zones_list
+    return {"zones": zones_list()}
+
+
+@coverage_router.get("/coverage/match")
+async def coverage_match(zone: str, county: str = "Cluj", user=Depends(get_current_user)):
+    """Sugestie: City Partners ACTIVI care acoperă o zonă de client în județul dat.
+    Doar sugestie informativă — fără atribuire automată și fără comision pe simplă
+    solicitare. Include linkul de recomandare (pregătire atribuire)."""
+    from coverage_mapping import match_partners_for_zone, CLIENT_ZONES
+    if zone not in CLIENT_ZONES:
+        raise HTTPException(400, f"Zonă necunoscută. Permise: {sorted(CLIENT_ZONES)}")
+    partners = await match_partners_for_zone(zone, county)
+    return {"zone": zone, "label": CLIENT_ZONES[zone], "county": county,
+            "partner_count": len(partners), "partners": partners}

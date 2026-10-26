@@ -22,6 +22,10 @@ async def create_request(data: RequestIn, background_tasks: BackgroundTasks, use
         raise HTTPException(404, "Property not found")
     prop = await db.properties.find_one({"_id": ObjectId(data.property_id), "owner_id": user["id"]})
     if not prop: raise HTTPException(404, "Property not found")
+    # Additive: stamp the referring City Partner (if client arrived via their referral link).
+    from coverage_mapping import resolve_referring_partner
+    client_doc = await db.users.find_one({"_id": ObjectId(user["id"])}) if ObjectId.is_valid(user["id"]) else None
+    referred_partner = await resolve_referring_partner(client_doc or {})
     doc = {
         **data.model_dump(),
         "county": data.county or prop.get("county") or prop.get("zone") or prop.get("city"),
@@ -33,6 +37,8 @@ async def create_request(data: RequestIn, background_tasks: BackgroundTasks, use
         "specialist_id": None,
         "specialist_name": None,
         "escrow_amount": None,
+        "referred_partner_id": (referred_partner or {}).get("partner_id"),
+        "referred_partner_name": (referred_partner or {}).get("company"),
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     res = await db.requests.insert_one(doc)
